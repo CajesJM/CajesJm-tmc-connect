@@ -1,30 +1,31 @@
+// app/student/_layout.tsx
 import { Stack, useRouter } from "expo-router";
-import React from "react";
+import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useAuth } from "../context/AuthContext";
+
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { isAuthenticated, role, loading } = useAuth();
-  const didRedirectRef = React.useRef(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (loading) return;
-    if (didRedirectRef.current) return;
 
     const target = isAuthenticated ? (role === "admin" ? "/admin" : "/student") : "/";
-    const currentRaw = (router as any).pathname ?? (router as any).asPath ?? (router as any).route ?? "";
+
+    // try a few router props for compatibility
+    const currentRaw =
+      (router as any).pathname ?? (router as any).asPath ?? (router as any).route ?? "";
+
     if (!currentRaw) return;
+
+    // if we're already inside the target route (including nested routes) do nothing
     const normalized = String(currentRaw).toLowerCase();
-
-    const isAdminLogin = normalized.startsWith("/admin/login");
-
     const isInTarget =
       (target === "/" && normalized === "/") || normalized.startsWith(target.toLowerCase());
 
-    if (!isInTarget && !(target === "/" && isAdminLogin)) {
-      didRedirectRef.current = true;
+    if (!isInTarget) {
       try {
         router.replace(target);
       } catch (err) {
@@ -44,14 +45,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function RootLayout() {
+export default function StudentLayout() {
   return (
-    <AuthProvider>
-      <SafeAreaProvider>
-        <AuthGate>
-          <Stack screenOptions={{ headerShown: false }} />
-        </AuthGate>
-      </SafeAreaProvider>
-    </AuthProvider>
+    <AuthGate>
+      <Stack screenOptions={{ headerShown: false }} />
+    </AuthGate>
   );
 }

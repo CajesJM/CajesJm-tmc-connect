@@ -4,17 +4,17 @@ import { Tabs } from 'expo-router';
 export default function AdminTabsLayout() {
   return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: '#2563EB',
-        tabBarInactiveTintColor: '#6B7280',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 1,
-          borderTopColor: '#E5E7EB',
-        },
-        headerShown: false,
-      }}
-    >
+  screenOptions={{
+    tabBarActiveTintColor: '#2563EB',
+    tabBarInactiveTintColor: '#6B7280',
+    tabBarStyle: {
+      backgroundColor: '#FFFFFF',
+      borderTopWidth: 1,
+      borderTopColor: '#E5E7EB',
+    },
+    headerShown: false, 
+  }}
+>
       <Tabs.Screen
         name="announcements"
         options={{

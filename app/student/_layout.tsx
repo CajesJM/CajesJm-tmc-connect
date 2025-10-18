@@ -14,13 +14,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
     const target = isAuthenticated ? (role === "admin" ? "/admin" : "/student") : "/";
 
-    // try a few router props for compatibility
     const currentRaw =
       (router as any).pathname ?? (router as any).asPath ?? (router as any).route ?? "";
 
     if (!currentRaw) return;
 
-    // if we're already inside the target route (including nested routes) do nothing
     const normalized = String(currentRaw).toLowerCase();
     const isInTarget =
       (target === "/" && normalized === "/") || normalized.startsWith(target.toLowerCase());
@@ -44,11 +42,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
-
 export default function StudentLayout() {
   return (
     <AuthGate>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        {/* Add other student screens if needed */}
+      </Stack>
     </AuthGate>
   );
 }

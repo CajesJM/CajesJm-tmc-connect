@@ -1,16 +1,16 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useAuth } from "./context/AuthContext";
 
@@ -46,12 +46,12 @@ export default function Login() {
       const validAdmin = username === "admin" && password === "admin123";
       const validStudent = username === "student" && password === "student123";
 
-      if (
-        (role === "admin" && validAdmin) ||
-        (role === "student" && validStudent)
-      ) {
+      if (role === "admin" && validAdmin) {
         await login(role);
-        router.replace(`/${role}`);
+        router.replace("/admin/(tabs)/announcements");
+      } else if (role === "student" && validStudent) {
+        await login(role);
+        router.replace("/student/(tabs)/announcements");
       } else {
         setError("Invalid username or password");
         Alert.alert("Login Failed", "Invalid username or password");
@@ -127,6 +127,8 @@ export default function Login() {
     </KeyboardAvoidingView>
   );
 }
+
+// ... keep your existing styles the same
 
 const { width } = Dimensions.get("window");
 

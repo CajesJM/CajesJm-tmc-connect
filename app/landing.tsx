@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useRef } from "react";
 import {
   Animated,
   StyleSheet,
@@ -12,14 +12,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Landing() {
   const router = useRouter();
-  const [role, setRole] = useState<"admin" | "student">("student");
   const { width, height } = useWindowDimensions();
 
   const isSmallScreen = width < 380;
   const isTablet = width > 700;
 
-  const handleNavigate = () => {
-    router.push(`/login?role=${role}`);
+  const handleNavigateToLogin = () => {
+    router.push("/login"); 
   };
 
   const dynamicStyles = {
@@ -52,49 +51,12 @@ export default function Landing() {
         <Text style={[styles.title, dynamicStyles.title]}>Welcome to</Text>
         <Text style={[styles.brand, dynamicStyles.brand]}>TMC Connect</Text>
         <Text style={[styles.subtitle, dynamicStyles.subtitle]}>
-          Select your role to continue
+          Your campus hub for announcements, events, and attendance
         </Text>
 
-        <View style={styles.roleToggle}>
-          <TouchableOpacity
-            style={[
-              styles.roleOption,
-              role === "student" && styles.selectedRoleStudent,
-            ]}
-            onPress={() => setRole("student")}
-          >
-            <Text
-              style={[
-                styles.roleText,
-                role === "student" && styles.activeRoleText,
-              ]}
-            >
-              Student
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.roleOption,
-              role === "admin" && styles.selectedRoleAdmin,
-            ]}
-            onPress={() => setRole("admin")}
-          >
-            <Text
-              style={[
-                styles.roleText,
-                role === "admin" && styles.activeRoleText,
-              ]}
-            >
-              Admin
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <RoleButton
-          label="Continue"
-          onPress={handleNavigate}
-          variant={role}
+        <LoginButton
+          label="Get Started"
+          onPress={handleNavigateToLogin}
           dynamicStyle={dynamicStyles.button}
         />
       </View>
@@ -102,15 +64,13 @@ export default function Landing() {
   );
 }
 
-function RoleButton({
+function LoginButton({
   label,
   onPress,
-  variant,
   dynamicStyle,
 }: {
   label: string;
   onPress: () => void;
-  variant: "admin" | "student";
   dynamicStyle: any;
 }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -131,16 +91,16 @@ function RoleButton({
     onPress();
   };
 
-  const backgroundColor = variant === "admin" ? "#1E88E5" : "#43A047";
-  const borderColor = variant === "admin" ? "#1565C0" : "#2E7D32";
-
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
       <TouchableOpacity
         activeOpacity={0.9}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={[styles.button, dynamicStyle, { backgroundColor, borderColor }]}
+        style={[styles.button, dynamicStyle, { 
+          backgroundColor: "#1E88E5", 
+          borderColor: "#1565C0" 
+        }]}
       >
         <Text style={styles.buttonText}>{label}</Text>
       </TouchableOpacity>
@@ -183,43 +143,19 @@ const styles = StyleSheet.create({
   title: {
     color: "#444",
     fontWeight: "600",
+    textAlign: "center",
   },
   brand: {
     fontWeight: "800",
     color: "#1B5E20",
     marginBottom: 8,
+    textAlign: "center",
   },
   subtitle: {
     color: "#666",
-    marginBottom: 24,
-  },
-  roleToggle: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "80%",
-    marginBottom: 24,
-  },
-  roleOption: {
-    flex: 1,
-    paddingVertical: 12,
-    marginHorizontal: 6,
-    borderRadius: 10,
-    backgroundColor: "#E0E0E0",
-    alignItems: "center",
-  },
-  selectedRoleStudent: {
-    backgroundColor: "#43A047",
-  },
-  selectedRoleAdmin: {
-    backgroundColor: "#1E88E5",
-  },
-  roleText: {
-    color: "#444",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  activeRoleText: {
-    color: "#fff",
+    marginBottom: 32,
+    textAlign: "center",
+    lineHeight: 22,
   },
   button: {
     borderRadius: 14,

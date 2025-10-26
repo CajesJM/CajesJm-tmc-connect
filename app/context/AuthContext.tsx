@@ -1,85 +1,164 @@
 import * as SecureStore from "expo-secure-store";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  User
+} from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import React, { createContext, useContext, useState } from "react";
 import { Platform } from "react-native";
+import { auth, db } from "../../lib/firebaseConfig";
 
 type Role = "admin" | "student" | null;
+
+interface UserData {
+  email: string;
+  role: Role;
+  name: string;
+  studentID?: number;
+}
+
 type AuthContextValue = {
+  user: User | null;
+  userData: UserData | null;
   role: Role;
   loading: boolean;
   isAuthenticated: boolean;
-  login: (newRole: Role) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
-const KEY_ROLE = "role";
+const KEY_USER_DATA = "user_data";
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-/**
- * Platform-aware storage helpers:
- * - Web -> localStorage
- * - Native -> expo-secure-store
- */
-async function storeRole(role: Role) {
+// Store user data securely
+async function storeUserData(userData: UserData | null) {
   if (Platform.OS === "web") {
-    if (role) localStorage.setItem(KEY_ROLE, role);
-    else localStorage.removeItem(KEY_ROLE);
+    if (userData) {
+      localStorage.setItem(KEY_USER_DATA, JSON.stringify(userData));
+    } else {
+      localStorage.removeItem(KEY_USER_DATA);
+    }
   } else {
-    if (role) await SecureStore.setItemAsync(KEY_ROLE, role);
-    else await SecureStore.deleteItemAsync(KEY_ROLE);
+    if (userData) {
+      await SecureStore.setItemAsync(KEY_USER_DATA, JSON.stringify(userData));
+    } else {
+      await SecureStore.deleteItemAsync(KEY_USER_DATA);
+    }
   }
 }
 
-async function readRole(): Promise<Role> {
-  if (Platform.OS === "web") {
-    const v = localStorage.getItem(KEY_ROLE);
-    return v === "admin" || v === "student" ? (v as Role) : null;
-  } else {
-    const v = await SecureStore.getItemAsync(KEY_ROLE);
-    return v === "admin" || v === "student" ? (v as Role) : null;
+// Read user data from secure storage
+async function readUserData(): Promise<UserData | null> {
+  try {
+    if (Platform.OS === "web") {
+      const data = localStorage.getItem(KEY_USER_DATA);
+      return data ? JSON.parse(data) : null;
+    } else {
+      const data = await SecureStore.getItemAsync(KEY_USER_DATA);
+      return data ? JSON.parse(data) : null;
+    }
+  } catch (error) {
+    console.warn("Error reading user data:", error);
+    return null;
   }
 }
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [role, setRole] = useState<Role>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(false);
 
- useEffect(() => {
-  let mounted = true;
-  (async () => {
+  // Initialize from storage on app start
+  React.useEffect(() => {
+    const initializeAuth = async () => {
+      const storedData = await readUserData();
+      if (storedData) {
+        setUserData(storedData);
+        // Note: We don't set 'user' here since we don't have the Firebase User object
+        // The actual auth state will be handled by the login process
+      }
+    };
+    initializeAuth();
+  }, []);
+
+ const login = async (email: string, password: string): Promise<void> => {
+  setLoading(true);
+  
+  return new Promise<void>(async (resolve, reject) => {
     try {
-      // 🔥 Force clear role for testing
-      await storeRole(null);
+      console.log("AuthContext - Starting login for:", email);
+      
+      // Basic validation before even trying Firebase
+      if (!email || !password) {
+        setLoading(false);
+        return reject(new Error("Email and password are required"));
+      }
 
-      const stored = await readRole();
-      if (!mounted) return;
-      if (stored) setRole(stored);
-    } catch (err) {
-      console.warn("AuthProvider: readRole failed", err);
-    } finally {
-      if (mounted) setLoading(false);
+      if (!email.includes('@')) {
+        setLoading(false);
+        return reject(new Error("Invalid email format"));
+      }
+
+      // Try Firebase login with extra error isolation
+      let userCredential;
+      try {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } catch (firebaseError: any) {
+        console.log("AuthContext - Firebase auth failed, but caught safely");
+        setLoading(false);
+        // Return a generic error without the Firebase error object
+        return reject(new Error("Invalid username or password."));
+      }
+
+      // If we get here, Firebase login was successful
+      const firebaseUser = userCredential.user;
+
+      // Get user role from Firestore
+      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+      if (!userDoc.exists()) {
+        setLoading(false);
+        return reject(new Error("User account not found."));
+      }
+
+      const userDataFromDB = userDoc.data() as UserData;
+      const completeUserData = {
+        ...userDataFromDB,
+        email: firebaseUser.email || userDataFromDB.email,
+      };
+
+      setUser(firebaseUser);
+      setUserData(completeUserData);
+      await storeUserData(completeUserData);
+      
+      setLoading(false);
+      resolve();
+      
+    } catch (error: any) {
+      console.log("AuthContext - Unexpected error:", error);
+      setLoading(false);
+      reject(new Error("Login failed. Please try again."));
     }
-  })();
-  return () => {
-    mounted = false;
-  };
-}, []);
-
-
-  const login = async (newRole: Role) => {
-    if (!newRole) throw new Error("login requires a role");
-    await storeRole(newRole);
-    setRole(newRole);
-  };
-
+  });
+};
   const logout = async () => {
-    await storeRole(null);
-    setRole(null);
+    try {
+      await signOut(auth);
+      setUser(null);
+      setUserData(null);
+      await storeUserData(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+      throw error;
+    }
   };
 
   const value: AuthContextValue = {
-    role,
+    user,
+    userData,
+    role: userData?.role || null,
     loading,
-    isAuthenticated: !!role,
+    isAuthenticated: !!user,
     login,
     logout,
   };

@@ -2,8 +2,9 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { db } from '../../../lib/firebaseConfig';
+import { StudentAnnouncementStyles as styles } from '../../styles/StudentAnnouncementStyles';
 
 dayjs.extend(relativeTime);
 
@@ -14,8 +15,12 @@ interface Announcement {
   createdAt?: any;
 }
 
+type TimeFilter = 'all' | 'today' | 'week' | 'month';
+
 export default function StudentAnnouncements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [filteredAnnouncements, setFilteredAnnouncements] = useState<Announcement[]>([]);
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
 
   useEffect(() => {
     const q = query(collection(db, "updates"), orderBy("createdAt", "desc"));
@@ -25,84 +30,161 @@ export default function StudentAnnouncements() {
         ...(doc.data() as Omit<Announcement, "id">),
       }));
       setAnnouncements(list);
+      filterAnnouncements(list, timeFilter);
     });
     return () => unsubscribe();
   }, []);
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Campus Announcements</Text>
-      <Text style={styles.subtitle}>Stay updated with latest news</Text>
-      
-      <FlatList
-        data={announcements}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{item.title}</Text>
-            <Text style={styles.cardMessage}>{item.message}</Text>
-            {item.createdAt && (
-              <Text style={styles.timestamp}>
-                📅 {dayjs(item.createdAt.toDate()).fromNow()}
-              </Text>
-            )}
+  useEffect(() => {
+    filterAnnouncements(announcements, timeFilter);
+  }, [timeFilter, announcements]);
+
+  const filterAnnouncements = (announcementsList: Announcement[], filter: TimeFilter) => {
+    const now = dayjs();
+    let filtered = announcementsList;
+
+    switch (filter) {
+      case 'today':
+        filtered = announcementsList.filter(ann => 
+          ann.createdAt && dayjs(ann.createdAt.toDate()).isSame(now, 'day')
+        );
+        break;
+      case 'week':
+        filtered = announcementsList.filter(ann =>
+          ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'week'))
+        );
+        break;
+      case 'month':
+        filtered = announcementsList.filter(ann =>
+          ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'month'))
+        );
+        break;
+      default:
+        filtered = announcementsList;
+    }
+
+    setFilteredAnnouncements(filtered);
+  };
+
+  const isNewAnnouncement = (createdAt: any) => {
+    if (!createdAt) return false;
+    return dayjs(createdAt.toDate()).isAfter(dayjs().subtract(1, 'day'));
+  };
+
+  const getTotalStats = () => {
+    const now = dayjs();
+    const todayCount = announcements.filter(ann => 
+      ann.createdAt && dayjs(ann.createdAt.toDate()).isSame(now, 'day')
+    ).length;
+    const newCount = announcements.filter(ann => 
+      ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(3, 'day'))
+    ).length;
+
+    return { total: announcements.length, today: todayCount, new: newCount };
+  };
+
+  const stats = getTotalStats();
+
+  const renderAnnouncementItem = ({ item }: { item: Announcement }) => (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        {isNewAnnouncement(item.createdAt) && (
+          <View style={styles.newBadge}>
+            <Text style={styles.newBadgeText}>NEW</Text>
           </View>
         )}
+      </View>
+      <Text style={styles.cardMessage} numberOfLines={4}>
+        {item.message}
+      </Text>
+      {item.createdAt && (
+        <Text style={styles.timestamp}>
+          📅 {dayjs(item.createdAt.toDate()).format('MMM D, YYYY • h:mm A')} • {dayjs(item.createdAt.toDate()).fromNow()}
+        </Text>
+      )}
+    </View>
+  );
+
+  const timeFilters: { key: TimeFilter; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'today', label: 'Today' },
+    { key: 'week', label: 'This Week' },
+    { key: 'month', label: 'This Month' },
+  ];
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Campus Announcements</Text>
+        <Text style={styles.subtitle}>Stay updated with the latest campus news and updates</Text>
+      </View>
+
+      {/* Statistics Cards */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{stats.total}</Text>
+          <Text style={styles.statLabel}>Total</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{stats.today}</Text>
+          <Text style={styles.statLabel}>Today</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{stats.new}</Text>
+          <Text style={styles.statLabel}>New</Text>
+        </View>
+      </View>
+
+      {/* Time Filters */}
+      <View style={styles.filterContainer}>
+        <Text style={styles.filterTitle}>Filter by time:</Text>
+        <View style={styles.filterChips}>
+          {timeFilters.map((filter) => (
+            <TouchableOpacity
+              key={filter.key}
+              style={[
+                styles.filterChip,
+                timeFilter === filter.key && styles.filterChipActive
+              ]}
+              onPress={() => setTimeFilter(filter.key)}
+            >
+              <Text style={[
+                styles.filterChipText,
+                timeFilter === filter.key && styles.filterChipTextActive
+              ]}>
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Announcements List */}
+      <FlatList
+        data={filteredAnnouncements}
+        keyExtractor={(item) => item.id}
+        renderItem={renderAnnouncementItem}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text>No announcements yet</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateIcon}>📢</Text>
+            <Text style={styles.emptyStateText}>
+              {timeFilter === 'all' ? 'No announcements yet' : `No announcements from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
+            </Text>
+            <Text style={styles.emptyStateSubtext}>
+              {timeFilter === 'all' 
+                ? 'Check back later for new campus announcements!' 
+                : 'Try changing the filter to see more announcements'
+              }
+            </Text>
           </View>
         }
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#F8FAFC',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    color: '#1E293B',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#64748B',
-    marginBottom: 20,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  cardMessage: {
-    fontSize: 14,
-    color: '#475569',
-    lineHeight: 20,
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 8,
-  },
-  empty: {
-    alignItems: 'center',
-    padding: 40,
-  },
-});

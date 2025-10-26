@@ -4,12 +4,24 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ProfileScreen() {
-  const { logout } = useAuth();
+  const { logout, userData } = useAuth(); // Added userData
   const router = useRouter();
 
   const handleLogout = () => {
     logout();
-    router.replace('/login?role=admin');
+    router.replace('/login'); // Removed ?role=admin since it's auto-detected now
+  };
+
+  // Safely get the username from email
+  const getUsername = () => {
+    if (!userData?.email) return 'Administrator';
+    return userData.email.split('@')[0];
+  };
+
+  // Safely get the display name
+  const getDisplayName = () => {
+    if (userData?.name) return userData.name;
+    return getUsername();
   };
 
   return (
@@ -17,9 +29,9 @@ export default function ProfileScreen() {
       <Text style={styles.title}>Admin Profile</Text>
       
       <View style={styles.card}>
-        <Text style={styles.name}>Administrator</Text>
+        <Text style={styles.name}>{getDisplayName()}</Text>
         <Text style={styles.role}>Campus Admin</Text>
-        <Text style={styles.email}>admin@tmc.edu</Text>
+        <Text style={styles.email}>{userData?.email || 'admin@tmc.edu'}</Text>
       </View>
 
       <View style={styles.menu}>

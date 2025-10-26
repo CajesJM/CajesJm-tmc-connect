@@ -1,37 +1,11 @@
-import { Stack, useRouter } from "expo-router";
-import React from "react";
+// app/_layout.tsx
+import { Stack } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
-function AuthGate({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const { isAuthenticated, role, loading } = useAuth();
-  const didRedirectRef = React.useRef(false);
-
-  React.useEffect(() => {
-    if (loading) return;
-    if (didRedirectRef.current) return;
-
-    const target = isAuthenticated ? (role === "admin" ? "/admin" : "/student") : "/";
-    const currentRaw = (router as any).pathname ?? (router as any).asPath ?? (router as any).route ?? "";
-    if (!currentRaw) return;
-    const normalized = String(currentRaw).toLowerCase();
-
-    const isAdminLogin = normalized.startsWith("/admin/login");
-
-    const isInTarget =
-      (target === "/" && normalized === "/") || normalized.startsWith(target.toLowerCase());
-
-    if (!isInTarget && !(target === "/" && isAdminLogin)) {
-      didRedirectRef.current = true;
-      try {
-        router.replace(target);
-      } catch (err) {
-        console.warn("router.replace failed", err);
-      }
-    }
-  }, [loading, isAuthenticated, role, router]);
+// Simple component that shows loading while auth initializes
+function RootLayoutContent() {
+  const { loading } = useAuth();
 
   if (loading) {
     return (
@@ -41,17 +15,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="login" />
+      <Stack.Screen name="admin" />
+      <Stack.Screen name="student" />
+    </Stack>
+  );
 }
+
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <SafeAreaProvider>
-        <AuthGate>
-          <Stack screenOptions={{ headerShown: false }} />
-        </AuthGate>
-      </SafeAreaProvider>
+      <RootLayoutContent />
     </AuthProvider>
   );
 }

@@ -4,12 +4,24 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 
 export default function StudentProfile() {
-  const { logout } = useAuth();
+  const { logout, userData } = useAuth();
   const router = useRouter();
 
   const handleLogout = () => {
     logout();
-    router.replace('/login?role=student');
+    router.replace('/login');
+  };
+
+  // Safely get the username from email
+  const getUsername = () => {
+    if (!userData?.email) return 'Student';
+    return userData.email.split('@')[0];
+  };
+
+  // Safely get the display name
+  const getDisplayName = () => {
+    if (userData?.name) return userData.name;
+    return getUsername();
   };
 
   return (
@@ -18,10 +30,12 @@ export default function StudentProfile() {
       
       <View style={styles.profileCard}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>S</Text>
+          <Text style={styles.avatarText}>
+            {getDisplayName().charAt(0).toUpperCase()}
+          </Text>
         </View>
-        <Text style={styles.name}>Student User</Text>
-        <Text style={styles.id}>ID: STU2024001</Text>
+        <Text style={styles.name}>{getDisplayName()}</Text>
+        <Text style={styles.id}>ID: {userData?.studentID?.toString() || '2024001'}</Text>
         <Text style={styles.course}>Computer Science</Text>
       </View>
 

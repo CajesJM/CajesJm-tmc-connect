@@ -1,36 +1,27 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useAuth } from "./context/AuthContext";
+import { LoginStyles } from "./styles/LoginStyles";
 
 export default function Login() {
   const router = useRouter();
-  const { role } = useLocalSearchParams();
-  const { login } = useAuth();
+  const { login, loading } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    if (role !== "admin" && role !== "student") {
-      Alert.alert("Invalid role", "Redirecting to landing...");
-      router.replace("/");
-    }
-  }, [role]);
 
   const handleLogin = async () => {
     if (busy) return;
@@ -43,186 +34,87 @@ export default function Login() {
 
     setBusy(true);
     try {
-      const validAdmin = username === "admin" && password === "admin123";
-      const validStudent = username === "student" && password === "student123";
-
-      if (role === "admin" && validAdmin) {
-        await login(role);
-        router.replace("/admin/(tabs)/announcements");
-      } else if (role === "student" && validStudent) {
-        await login(role);
-        router.replace("/student/(tabs)/announcements");
-      } else {
-        setError("Invalid username or password");
-        Alert.alert("Login Failed", "Invalid username or password");
-      }
+      const loginEmail = username.includes("@") ? username : `${username}@tmc.edu`;
+      await login(loginEmail, password);
     } catch (err: any) {
-      setError(err?.message || "Something went wrong");
-      Alert.alert("Login Error", err?.message || "Something went wrong");
+      console.log("Login error:", err.message);
+      const errorMessage = "Invalid username or password. Please try again.";
+      setError(errorMessage);
+      Alert.alert("Login Failed", errorMessage);
     } finally {
       setBusy(false);
     }
   };
 
-  const isAdmin = role === "admin";
-  const accentColor = isAdmin ? "#1E88E5" : "#2E7D32";
-
   return (
     <KeyboardAvoidingView
-      style={styles.outerContainer}
+      style={LoginStyles.outerContainer}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={[styles.headerBg, { backgroundColor: accentColor }]} />
-      <View style={styles.card}>
-        <Text style={[styles.title, { color: accentColor }]}>
-          {isAdmin ? "Admin" : "Student"} Login
-        </Text>
+      {/* Background shapes */}
+      <View style={LoginStyles.cosmicBg} />
+      <View style={LoginStyles.nebulaBg} />
+
+      {/* Main Card */}
+      <View style={LoginStyles.card}>
+        <Text style={LoginStyles.title}>Campus Hub Login</Text>
+        <Text style={LoginStyles.subtitle}>Sign in with your username</Text>
 
         <TextInput
-          placeholder="Username"
+          placeholder="Username (e.g., john.cajes or admin)"
+          placeholderTextColor="rgba(255, 255, 255, 0.4)"
           value={username}
-          onChangeText={(v) => {
-            setUsername(v);
-            setError(null);
+          onChangeText={(text) => {
+            setUsername(text);
+            if (error) setError(null);
           }}
-          style={styles.input}
+          style={LoginStyles.input}
           autoCapitalize="none"
         />
 
-        <View style={styles.inputWrap}>
+        <View style={LoginStyles.inputWrap}>
           <TextInput
             placeholder="Password"
+            placeholderTextColor="rgba(255, 255, 255, 0.4)"
             value={password}
-            onChangeText={(v) => {
-              setPassword(v);
-              setError(null);
+            onChangeText={(text) => {
+              setPassword(text);
+              if (error) setError(null);
             }}
-            style={styles.inputWithIcon}
+            style={LoginStyles.inputWithIcon}
             secureTextEntry={!showPassword}
             autoCapitalize="none"
           />
           <TouchableOpacity
             onPress={() => setShowPassword((s) => !s)}
-            style={styles.iconBtn}
-            accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+            style={LoginStyles.iconBtn}
           >
-            <Text style={styles.icon}>{showPassword ? "🙈" : "👁️"}</Text>
+            <Text style={LoginStyles.icon}>{showPassword ? "🙈" : "👁️"}</Text>
           </TouchableOpacity>
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={LoginStyles.error}>{error}</Text> : null}
 
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: accentColor, shadowColor: accentColor }, busy && styles.disabled]}
+          style={[LoginStyles.button, (busy || loading) && LoginStyles.disabled]}
           onPress={handleLogin}
-          disabled={busy}
+          disabled={busy || loading}
         >
-          {busy ? (
-            <ActivityIndicator color="#fff" />
+          {busy || loading ? (
+            <ActivityIndicator color="#000" />
           ) : (
-            <Text style={styles.buttonText}>Login</Text>
+            <Text style={LoginStyles.buttonText}>Sign In</Text>
           )}
         </TouchableOpacity>
+
+        {/* Demo Accounts */}
+        <View style={LoginStyles.demoAccounts}>
+          <Text style={LoginStyles.demoTitle}>Demo Accounts:</Text>
+          <Text style={LoginStyles.demoText}>Admin: admin / admin123</Text>
+          <Text style={LoginStyles.demoText}>Student: john.cajes / 2024001</Text>
+          <Text style={LoginStyles.demoNote}>Format: username / password</Text>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
 }
-
-// ... keep your existing styles the same
-
-const { width } = Dimensions.get("window");
-
-const styles = StyleSheet.create({
-  outerContainer: {
-    flex: 1,
-    backgroundColor: "#F1F8E9",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  headerBg: {
-    position: "absolute",
-    top: 0,
-    width: "100%",
-    height: "35%",
-    borderBottomRightRadius: 120,
-  },
-  card: {
-    width: width > 400 ? "85%" : "95%",
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    paddingVertical: 40,
-    paddingHorizontal: 25,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    textAlign: "center",
-    marginBottom: 30,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    marginBottom: 14,
-    backgroundColor: "#fafafa",
-    fontSize: 16,
-  },
-  inputWrap: {
-    position: "relative",
-    marginBottom: 14,
-  },
-  inputWithIcon: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    paddingRight: 44,
-    borderRadius: 10,
-    backgroundColor: "#fafafa",
-    fontSize: 16,
-  },
-  iconBtn: {
-    position: "absolute",
-    right: 8,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    width: 40,
-  },
-  icon: {
-    fontSize: 18,
-  },
-  button: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 10,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  disabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  error: {
-    color: "#D32F2F",
-    marginBottom: 10,
-    textAlign: "center",
-  },
-});

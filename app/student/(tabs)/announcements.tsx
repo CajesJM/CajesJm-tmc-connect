@@ -145,46 +145,4 @@ export default function StudentAnnouncements() {
         <View style={styles.filterChips}>
           {timeFilters.map((filter) => (
             <TouchableOpacity
-              key={filter.key}
-              style={[
-                styles.filterChip,
-                timeFilter === filter.key && styles.filterChipActive
-              ]}
-              onPress={() => setTimeFilter(filter.key)}
-            >
-              <Text style={[
-                styles.filterChipText,
-                timeFilter === filter.key && styles.filterChipTextActive
-              ]}>
-                {filter.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Announcements List */}
-      <FlatList
-        data={filteredAnnouncements}
-        keyExtractor={(item) => item.id}
-        renderItem={renderAnnouncementItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>📢</Text>
-            <Text style={styles.emptyStateText}>
-              {timeFilter === 'all' ? 'No announcements yet' : `No announcements from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
-            </Text>
-            <Text style={styles.emptyStateSubtext}>
-              {timeFilter === 'all' 
-                ? 'Check back later for new campus announcements!' 
-                : 'Try changing the filter to see more announcements'
-              }
-            </Text>
-          </View>
-        }
-      />
-    </View>
-  );
-}
+           

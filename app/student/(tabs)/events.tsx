@@ -1,4 +1,4 @@
-import { arrayRemove, arrayUnion, collection, doc, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -6,14 +6,15 @@ import {
   FlatList,
   Image,
   RefreshControl,
-  StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  useWindowDimensions
 } from 'react-native';
-import SamplePhoto from '../../../assets/images/campusEvents/sampleevents.jpg';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { CAMPUS_LOCATIONS } from '../../../constants/campusLocations';
 import { db } from '../../../lib/firebaseConfig';
-import { useAuth } from '../../context/AuthContext';
+import { styles } from '../../styles/studentEvents';
 
 interface Event {
   id: string;
@@ -22,66 +23,35 @@ interface Event {
   date: Date;
   location: string;
   organizer: string;
-  imageUrl?: string;
+  locationImage?: string;
   createdAt: Date;
   attendees: string[];
+  locationDescription?: string;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+    radius: number;
+  };
 }
 
-// Use the same campus locations as your admin dashboard
-const CAMPUS_LOCATIONS = [
-  {
-    id: '1',
-    name: 'Main Auditorium',
-    image: SamplePhoto,
-    description: 'Main campus auditorium with 500 seating capacity'
-  },
-  {
-    id: '2', 
-    name: 'Sports Complex',
-    image: SamplePhoto,
-    description: 'Indoor sports facility with basketball and volleyball courts'
-  },
-  {
-    id: '3',
-    name: 'Student Center',
-    image: SamplePhoto,
-    description: 'Central hub for student activities and gatherings'
-  },
-  {
-    id: '4',
-    name: 'Library Hall',
-    image: SamplePhoto,
-    description: 'Quiet study area and event space in the library'
-  },
-  {
-    id: '5',
-    name: 'Outdoor Amphitheater',
-    image: SamplePhoto,
-    description: 'Open-air venue for performances and gatherings'
-  },
-  {
-    id: '6',
-    name: 'Science Building Lobby',
-    image: SamplePhoto,
-    description: 'Modern space for exhibitions and presentations'
-  }
-];
-
 export default function StudentEventsScreen() {
-  const { user } = useAuth();
+  const { width: screenWidth } = useWindowDimensions();
+  const isSmallScreen = screenWidth < 375;
+
   const [events, setEvents] = useState<Event[]>([]);
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [attendingEvents, setAttendingEvents] = useState<Set<string>>(new Set());
+  const [activeFilter, setActiveFilter] = useState<'upcoming' | 'past'>('upcoming');
 
-  // Real-time listener for events
   useEffect(() => {
     const eventsQuery = query(
       collection(db, 'events'),
-      orderBy('date', 'asc')
+      orderBy('date', 'desc')
     );
 
-    const unsubscribe = onSnapshot(eventsQuery, 
+    const unsubscribe = onSnapshot(
+      eventsQuery,
       (snapshot) => {
         const eventsData: Event[] = [];
         snapshot.forEach((doc) => {
@@ -93,28 +63,19 @@ export default function StudentEventsScreen() {
             date: data.date.toDate(),
             location: data.location,
             organizer: data.organizer,
-            imageUrl: data.imageUrl,
+            locationImage: data.locationImage,
             createdAt: data.createdAt.toDate(),
-            attendees: data.attendees || []
+            attendees: data.attendees || [],
+            locationDescription: data.locationDescription,
+            coordinates: data.coordinates
           });
         });
         setEvents(eventsData);
-        
-        // Update attending events set
-        if (user) {
-          const attending = new Set<string>();
-          eventsData.forEach(event => {
-            if (event.attendees.includes(user.uid)) {
-              attending.add(event.id);
-            }
-          });
-          setAttendingEvents(attending);
-        }
-        
+        filterEvents(eventsData, activeFilter);
         setLoading(false);
         setRefreshing(false);
       },
-      (error) => {
+      (error: unknown) => {
         console.error('Error fetching events:', error);
         Alert.alert('Error', 'Failed to load events');
         setLoading(false);
@@ -123,40 +84,19 @@ export default function StudentEventsScreen() {
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, []);
 
-  const handleRSVP = async (eventId: string, eventTitle: string) => {
-    if (!user) {
-      Alert.alert('Error', 'You must be logged in to RSVP');
-      return;
-    }
+  const filterEvents = (eventsList: Event[], filter: 'upcoming' | 'past') => {
+    const now = new Date();
+    const filtered = eventsList.filter(event =>
+      filter === 'upcoming' ? event.date > now : event.date <= now
+    );
+    setFilteredEvents(filtered);
+  };
 
-    try {
-      const eventRef = doc(db, 'events', eventId);
-      
-      if (attendingEvents.has(eventId)) {
-        // Cancel RSVP
-        await updateDoc(eventRef, {
-          attendees: arrayRemove(user.uid)
-        });
-        setAttendingEvents(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(eventId);
-          return newSet;
-        });
-        Alert.alert('RSVP Cancelled', `You are no longer attending ${eventTitle}`);
-      } else {
-        // RSVP to event
-        await updateDoc(eventRef, {
-          attendees: arrayUnion(user.uid)
-        });
-        setAttendingEvents(prev => new Set(prev.add(eventId)));
-        Alert.alert('RSVP Success', `You have RSVP'd for ${eventTitle}`);
-      }
-    } catch (error) {
-      console.error('Error updating RSVP:', error);
-      Alert.alert('Error', 'Failed to update RSVP');
-    }
+  const handleFilterChange = (filter: 'upcoming' | 'past') => {
+    setActiveFilter(filter);
+    filterEvents(events, filter);
   };
 
   const onRefresh = () => {
@@ -174,93 +114,155 @@ export default function StudentEventsScreen() {
     });
   };
 
-  const isUpcomingEvent = (eventDate: Date) => {
-    return eventDate > new Date();
-  };
+  const getLocationImage = (event: Event) => {
+    if (event.locationImage) {
+      const campusLocation = CAMPUS_LOCATIONS.find(loc => loc.id === event.locationImage);
+      if (campusLocation) {
+        return campusLocation.image;
+      }
+    }
 
-  // Get location image for display - same as admin dashboard
-  const getLocationImage = (locationName: string) => {
-    const location = CAMPUS_LOCATIONS.find(loc => loc.name === locationName);
-    return location?.image || SamplePhoto;
+    return CAMPUS_LOCATIONS[0].image;
   };
+  const getDaysUntilEvent = (eventDate: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const eventDateCopy = new Date(eventDate);
+    eventDateCopy.setHours(0, 0, 0, 0);
 
-  const getLocationDescription = (locationName: string) => {
-    const location = CAMPUS_LOCATIONS.find(loc => loc.name === locationName);
-    return location?.description || 'Campus venue';
+    const timeDiff = eventDateCopy.getTime() - today.getTime();
+    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+    if (daysDiff === 0) return 'Today';
+    if (daysDiff === 1) return 'Tomorrow';
+    if (daysDiff > 1) return `In ${daysDiff} days`;
+    if (daysDiff === -1) return 'Yesterday';
+    return 'Past event';
   };
 
   const renderEventItem = ({ item }: { item: Event }) => {
-    const isAttending = attendingEvents.has(item.id);
-    const isEventUpcoming = isUpcomingEvent(item.date);
+    const isEventUpcoming = item.date > new Date();
+    const daysUntil = getDaysUntilEvent(item.date);
 
     return (
       <View style={[
         styles.eventCard,
+        isSmallScreen && styles.eventCardSmall,
         !isEventUpcoming && styles.pastEventCard
       ]}>
-        {/* 1. IMAGE */}
-        {(item.imageUrl === 'local' || !item.imageUrl) && (
-          <Image 
-            source={getLocationImage(item.location)}
-            style={styles.eventImage}
+        <View style={styles.eventImageContainer}>
+          <Image
+            source={getLocationImage(item)}
+            style={[
+              styles.eventImage,
+              isSmallScreen && styles.eventImageSmall
+            ]}
             resizeMode="cover"
           />
-        )}
-        
-        {item.imageUrl && item.imageUrl !== 'local' && (
-          <Image 
-            source={{ uri: item.imageUrl }}
-            style={styles.eventImage}
-            resizeMode="cover"
-          />
-        )}
-        
-        <View style={styles.eventContent}>
-          {/* 2. LOCATION - Below the image */}
-          <View style={styles.locationContainer}>
-            <Text style={styles.eventLocation}>📍 {item.location}</Text>
-            <Text style={styles.locationDescription}>
-              {getLocationDescription(item.location)}
+          <View style={[
+            styles.eventBadge,
+            daysUntil === 'Today' && styles.todayBadge,
+            daysUntil === 'Tomorrow' && styles.tomorrowBadge,
+            (typeof daysUntil === 'string' && daysUntil.includes('days')) && styles.upcomingBadge,
+            daysUntil === 'Past event' && styles.pastBadge,
+            isSmallScreen && styles.eventBadgeSmall
+          ]}>
+            <Text style={[
+              styles.eventBadgeText,
+              isSmallScreen && styles.eventBadgeTextSmall
+            ]}>
+              {daysUntil}
             </Text>
           </View>
+        </View>
 
-          {/* 3. DATE - Next after location */}
+        <View style={[
+          styles.eventContent,
+          isSmallScreen && styles.eventContentSmall
+        ]}>
+          <View style={styles.eventHeader}>
+            <View style={styles.eventMeta}>
+              <Text style={[
+                styles.eventLocation,
+                isSmallScreen && styles.eventLocationSmall
+              ]}>
+                <Icon name="map-marker" size={16} color="#1e6dffff" /> {item.location}
+              </Text>
+              <Text style={[
+                styles.eventDate,
+                isSmallScreen && styles.eventDateSmall,
+                !isEventUpcoming && styles.pastEventDate
+              ]}>
+                {formatDate(item.date)}
+              </Text>
+            </View>
+          </View>
+
           <Text style={[
-            styles.eventDate,
-            !isEventUpcoming && styles.pastEventDate
+            styles.eventTitle,
+            isSmallScreen && styles.eventTitleSmall
           ]}>
-            {formatDate(item.date)}
+            {item.title}
           </Text>
 
-          {/* 4. TITLE - Next after date */}
-          <Text style={styles.eventTitle}>{item.title}</Text>
+          <Text style={[
+            styles.eventDescription,
+            isSmallScreen && styles.eventDescriptionSmall
+          ]}>
+            {item.description}
+          </Text>
 
-          {/* 5. DESCRIPTION - Next after title */}
-          <Text style={styles.eventDescription}>{item.description}</Text>
-          
-          <Text style={styles.eventOrganizer}>Organized by: {item.organizer}</Text>
-          
-          <View style={styles.eventFooter}>
-            <Text style={styles.attendeeCount}>
-              {item.attendees.length} people attending
-              {isAttending && ' • You are attending'}
+          {item.locationDescription && (
+            <Text style={[
+              styles.locationDescription,
+              isSmallScreen && styles.locationDescriptionSmall
+            ]}>
+              <Icon name="office-building" size={16} color="#666" /> {item.locationDescription}
             </Text>
-            
-            {isEventUpcoming ? (
-              <TouchableOpacity 
-                style={[
-                  styles.rsvpButton,
-                  isAttending ? styles.cancelRsvpButton : styles.attendRsvpButton
-                ]}
-                onPress={() => handleRSVP(item.id, item.title)}
-              >
-                <Text style={styles.rsvpButtonText}>
-                  {isAttending ? 'Cancel RSVP' : 'RSVP'}
+          )}
+
+          {item.coordinates && (
+            <View style={styles.verificationBadge}>
+              <Icon name="map-marker-check" size={12} color="#10B981" />
+              <Text style={styles.verificationBadgeText}>
+                Location Verification Enabled
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.eventStats}>
+            <View style={styles.eventStatItem}>
+              <Icon name="account" size={14} color="#1E88E5" />
+              <Text style={[
+                styles.eventOrganizer,
+                isSmallScreen && styles.eventOrganizerSmall
+              ]}>
+                {item.organizer}
+              </Text>
+            </View>
+            <View style={styles.eventStatItem}>
+              <Icon name="account-group" size={14} color="#1E88E5" />
+              <Text style={[
+                styles.attendeeCount,
+                isSmallScreen && styles.attendeeCountSmall
+              ]}>
+                {item.attendees.length} attending
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.eventFooter}>
+            {!isEventUpcoming && (
+              <View style={[
+                styles.pastEventBadge,
+                isSmallScreen && styles.pastEventBadgeSmall
+              ]}>
+                <Text style={[
+                  styles.pastEventText,
+                  isSmallScreen && styles.pastEventTextSmall
+                ]}>
+                  Event Ended
                 </Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.pastEventBadge}>
-                <Text style={styles.pastEventText}>Past Event</Text>
               </View>
             )}
           </View>
@@ -269,304 +271,173 @@ export default function StudentEventsScreen() {
     );
   };
 
-  const upcomingEvents = events.filter(event => isUpcomingEvent(event.date));
-  const pastEvents = events.filter(event => !isUpcomingEvent(event.date));
-
   if (loading && !refreshing) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#1E88E5" />
-        <Text style={styles.loadingText}>Loading events...</Text>
+        <Text style={styles.loadingText}>Loading campus events...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[
+        styles.dashboardHeader,
+        isSmallScreen && styles.dashboardHeaderSmall
+      ]}>
         <View style={styles.headerContent}>
-          <Text style={styles.title}>Campus Events</Text>
-          <Text style={styles.subtitle}>Discover and RSVP to upcoming events</Text>
+          <Text style={[
+            styles.title,
+            isSmallScreen && styles.titleSmall
+          ]}>
+            Campus Events
+          </Text>
+          <Text style={[
+            styles.subtitle,
+            isSmallScreen && styles.subtitleSmall
+          ]}>
+            Discover campus events and activities
+          </Text>
+        </View>
+
+        <View style={[
+          styles.headerStats,
+          isSmallScreen && styles.headerStatsSmall
+        ]}>
+          <View style={[
+            styles.statCard,
+            isSmallScreen && styles.statCardSmall
+          ]}>
+            <Text style={[
+              styles.statNumber,
+              isSmallScreen && styles.statNumberSmall
+            ]}>
+              {events.filter(event => event.date > new Date()).length}
+            </Text>
+            <Text style={[
+              styles.statLabel,
+              isSmallScreen && styles.statLabelSmall
+            ]}>
+              Upcoming
+            </Text>
+          </View>
+
+          <View style={[
+            styles.statCard,
+            isSmallScreen && styles.statCardSmall
+          ]}>
+            <Text style={[
+              styles.statNumber,
+              isSmallScreen && styles.statNumberSmall
+            ]}>
+              {events.length}
+            </Text>
+            <Text style={[
+              styles.statLabel,
+              isSmallScreen && styles.statLabelSmall
+            ]}>
+              Total Events
+            </Text>
+          </View>
+
+          <View style={[
+            styles.statCard,
+            isSmallScreen && styles.statCardSmall
+          ]}>
+            <Text style={[
+              styles.statNumber,
+              isSmallScreen && styles.statNumberSmall
+            ]}>
+              {events.filter(event => event.date <= new Date()).length}
+            </Text>
+            <Text style={[
+              styles.statLabel,
+              isSmallScreen && styles.statLabelSmall
+            ]}>
+              Past Events
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={[
+        styles.headerActions,
+        isSmallScreen && styles.headerActionsSmall
+      ]}>
+        <View style={styles.filterContainer}>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              activeFilter === 'upcoming' && styles.filterButtonActive
+            ]}
+            onPress={() => handleFilterChange('upcoming')}
+          >
+            <Text style={[
+              styles.filterButtonText,
+              activeFilter === 'upcoming' && styles.filterButtonTextActive
+            ]}>
+              <Icon name="calendar" size={16} color="#0521f8ff" /> Upcoming Events
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              activeFilter === 'past' && styles.filterButtonActive
+            ]}
+            onPress={() => handleFilterChange('past')}
+          >
+            <Text style={[
+              styles.filterButtonText,
+              activeFilter === 'past' && styles.filterButtonTextActive
+            ]}>
+              <Icon name="history" size={16} color="#2505f2ff" /> Past Events
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
       <FlatList
-        data={upcomingEvents}
+        data={filteredEvents}
         renderItem={renderEventItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          isSmallScreen && styles.listContentSmall
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             colors={['#1E88E5']}
+            tintColor="#1E88E5"
           />
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No upcoming events</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Check back later for new campus events!
+          <View style={[
+            styles.emptyState,
+            isSmallScreen && styles.emptyStateSmall
+          ]}>
+            <Icon name="calendar-remove" size={64} color="#94A3B8" />
+            <Text style={[
+              styles.emptyStateTitle,
+              isSmallScreen && styles.emptyStateTitleSmall
+            ]}>
+              {activeFilter === 'upcoming' ? 'No upcoming events' : 'No past events'}
+            </Text>
+            <Text style={[
+              styles.emptyStateText,
+              isSmallScreen && styles.emptyStateTextSmall
+            ]}>
+              {activeFilter === 'upcoming'
+                ? 'Check back later for new campus events!'
+                : 'No past events to display'
+              }
             </Text>
           </View>
-        }
-        ListFooterComponent={
-          pastEvents.length > 0 ? (
-            <View style={styles.pastEventsSection}>
-              <Text style={styles.sectionTitle}>Past Events</Text>
-              {pastEvents.map((event) => (
-                <View key={event.id} style={styles.pastEventCard}>
-                  {/* Past events with same layout */}
-                  {(event.imageUrl === 'local' || !event.imageUrl) && (
-                    <Image 
-                      source={getLocationImage(event.location)}
-                      style={styles.pastEventImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                  
-                  {event.imageUrl && event.imageUrl !== 'local' && (
-                    <Image 
-                      source={{ uri: event.imageUrl }}
-                      style={styles.pastEventImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                  
-                  <View style={styles.pastEventContent}>
-                    <Text style={styles.pastEventLocation}>📍 {event.location}</Text>
-                    <Text style={styles.pastEventDate}>
-                      {formatDate(event.date)}
-                    </Text>
-                    <Text style={styles.pastEventTitle}>{event.title}</Text>
-                    <Text style={styles.pastEventDescription}>
-                      {event.description}
-                    </Text>
-                    <Text style={styles.pastEventAttendees}>
-                      {event.attendees.length} people attended
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : null
         }
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#64748B',
-    fontSize: 16,
-  },
-  header: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  headerContent: {
-    maxWidth: '100%',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    textAlign: 'left',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 4,
-    textAlign: 'left',
-  },
-  listContent: {
-    padding: 16,
-    paddingTop: 8,
-  },
-  eventCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    overflow: 'hidden',
-  },
-  pastEventCard: {
-    opacity: 0.7,
-    backgroundColor: '#F8FAFC',
-  },
-  eventImage: {
-    width: '100%',
-    height: 150,
-  },
-  eventContent: {
-    padding: 16,
-  },
-  // LOCATION - Below image
-  locationContainer: {
-    marginBottom: 8,
-  },
-  eventLocation: {
-    fontSize: 14,
-    color: '#1E88E5',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  locationDescription: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  // DATE - After location
-  eventDate: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  pastEventDate: {
-    color: '#94A3B8',
-  },
-  // TITLE - After date
-  eventTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 8,
-    lineHeight: 24,
-  },
-  // DESCRIPTION - After title
-  eventDescription: {
-    fontSize: 14,
-    color: '#475569',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  eventOrganizer: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginBottom: 12,
-  },
-  eventFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  attendeeCount: {
-    fontSize: 12,
-    color: '#64748B',
-    flex: 1,
-    marginRight: 8,
-  },
-  rsvpButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    minWidth: 100,
-  },
-  attendRsvpButton: {
-    backgroundColor: '#10B981',
-  },
-  cancelRsvpButton: {
-    backgroundColor: '#EF4444',
-  },
-  rsvpButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  pastEventBadge: {
-    backgroundColor: '#94A3B8',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    minWidth: 100,
-  },
-  pastEventText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyStateText: {
-    fontSize: 18,
-    color: '#64748B',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#94A3B8',
-    textAlign: 'center',
-  },
-  pastEventsSection: {
-    marginTop: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 12,
-  },
-  pastEventImage: {
-    width: '100%',
-    height: 120,
-  },
-  pastEventContent: {
-    padding: 12,
-  },
-  pastEventLocation: {
-    fontSize: 14,
-    color: '#1E88E5',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  pastEventTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#475569',
-    marginBottom: 8,
-  },
-  pastEventDescription: {
-    fontSize: 14,
-    color: '#64748B',
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  pastEventAttendees: {
-    fontSize: 12,
-    color: '#94A3B8',
-  },
-});

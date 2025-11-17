@@ -51,17 +51,15 @@ export default function Login() {
       style={LoginStyles.outerContainer}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      {/* Background shapes */}
       <View style={LoginStyles.cosmicBg} />
       <View style={LoginStyles.nebulaBg} />
 
-      {/* Main Card */}
       <View style={LoginStyles.card}>
         <Text style={LoginStyles.title}>Campus Hub Login</Text>
         <Text style={LoginStyles.subtitle}>Sign in with your username</Text>
 
         <TextInput
-          placeholder="Username (e.g., john.cajes or admin)"
+          placeholder="Username"
           placeholderTextColor="rgba(255, 255, 255, 0.4)"
           value={username}
           onChangeText={(text) => {
@@ -107,7 +105,6 @@ export default function Login() {
           )}
         </TouchableOpacity>
 
-        {/* Demo Accounts */}
         <View style={LoginStyles.demoAccounts}>
           <Text style={LoginStyles.demoTitle}>Demo Accounts:</Text>
           <Text style={LoginStyles.demoText}>Admin: admin / admin123</Text>

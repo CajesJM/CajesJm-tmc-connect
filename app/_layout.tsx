@@ -1,9 +1,7 @@
-// app/_layout.tsx
 import { Stack } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 
-// Simple component that shows loading while auth initializes
 function RootLayoutContent() {
   const { loading } = useAuth();
 

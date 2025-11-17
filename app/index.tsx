@@ -26,11 +26,10 @@ export default function Landing() {
 
   return (
     <SafeAreaView style={LandingStyles.container}>
-      {/* Simple background layers */}
+      
       <View style={[LandingStyles.cosmicBg, { height: height * 0.8 }]} />
       <View style={[LandingStyles.nebulaBg, { height: height * 0.8 }]} />
 
-      {/* Content */}
       <View style={LandingStyles.content}>
         <Text style={LandingStyles.welcomeText}>WELCOME TO</Text>
         <Text style={LandingStyles.brand}>TMC Connect</Text>

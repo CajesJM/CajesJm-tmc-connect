@@ -5,7 +5,7 @@ export default function StudentTabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#2E7D32',
+        tabBarActiveTintColor: '#2e00fdff',
         tabBarInactiveTintColor: '#6B7280',
         tabBarStyle: {
           backgroundColor: '#FFFFFF',

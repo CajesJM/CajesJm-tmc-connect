@@ -2,7 +2,8 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { db } from '../../../lib/firebaseConfig';
 import { StudentAnnouncementStyles as styles } from '../../styles/StudentAnnouncementStyles';
 
@@ -21,6 +22,7 @@ export default function StudentAnnouncements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [filteredAnnouncements, setFilteredAnnouncements] = useState<Announcement[]>([]);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+  const [loading, setLoading] = useState(true); // Loading state
 
   useEffect(() => {
     const q = query(collection(db, "updates"), orderBy("createdAt", "desc"));
@@ -31,6 +33,10 @@ export default function StudentAnnouncements() {
       }));
       setAnnouncements(list);
       filterAnnouncements(list, timeFilter);
+      setLoading(false); 
+    }, (error) => {
+      console.error("Error fetching announcements:", error);
+      setLoading(false); 
     });
     return () => unsubscribe();
   }, []);
@@ -45,7 +51,7 @@ export default function StudentAnnouncements() {
 
     switch (filter) {
       case 'today':
-        filtered = announcementsList.filter(ann => 
+        filtered = announcementsList.filter(ann =>
           ann.createdAt && dayjs(ann.createdAt.toDate()).isSame(now, 'day')
         );
         break;
@@ -73,10 +79,10 @@ export default function StudentAnnouncements() {
 
   const getTotalStats = () => {
     const now = dayjs();
-    const todayCount = announcements.filter(ann => 
+    const todayCount = announcements.filter(ann =>
       ann.createdAt && dayjs(ann.createdAt.toDate()).isSame(now, 'day')
     ).length;
-    const newCount = announcements.filter(ann => 
+    const newCount = announcements.filter(ann =>
       ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(3, 'day'))
     ).length;
 
@@ -102,7 +108,7 @@ export default function StudentAnnouncements() {
       </Text>
       {item.createdAt && (
         <Text style={styles.timestamp}>
-          📅 {dayjs(item.createdAt.toDate()).format('MMM D, YYYY • h:mm A')} • {dayjs(item.createdAt.toDate()).fromNow()}
+          <Icon name="calendar" size={16} color="#0122f7ff" /> {dayjs(item.createdAt.toDate()).format('MMM D, YYYY • h:mm A')} • {dayjs(item.createdAt.toDate()).fromNow()}
         </Text>
       )}
     </View>
@@ -115,15 +121,29 @@ export default function StudentAnnouncements() {
     { key: 'month', label: 'This Month' },
   ];
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Campus Announcements</Text>
+          <Text style={styles.subtitle}>Stay updated with the latest campus news and updates</Text>
+        </View>
+        
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1E88E5" />
+          <Text style={styles.loadingText}>Loading announcements...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Campus Announcements</Text>
         <Text style={styles.subtitle}>Stay updated with the latest campus news and updates</Text>
       </View>
 
-      {/* Statistics Cards */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>{stats.total}</Text>
@@ -139,7 +159,6 @@ export default function StudentAnnouncements() {
         </View>
       </View>
 
-      {/* Time Filters */}
       <View style={styles.filterContainer}>
         <Text style={styles.filterTitle}>Filter by time:</Text>
         <View style={styles.filterChips}>
@@ -163,7 +182,6 @@ export default function StudentAnnouncements() {
         </View>
       </View>
 
-      {/* Announcements List */}
       <FlatList
         data={filteredAnnouncements}
         keyExtractor={(item) => item.id}
@@ -177,8 +195,8 @@ export default function StudentAnnouncements() {
               {timeFilter === 'all' ? 'No announcements yet' : `No announcements from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
             </Text>
             <Text style={styles.emptyStateSubtext}>
-              {timeFilter === 'all' 
-                ? 'Check back later for new campus announcements!' 
+              {timeFilter === 'all'
+                ? 'Check back later for new campus announcements!'
                 : 'Try changing the filter to see more announcements'
               }
             </Text>

@@ -4,12 +4,12 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ProfileScreen() {
-  const { logout, userData } = useAuth(); // Added userData
+  const { logout, userData } = useAuth(); 
   const router = useRouter();
 
   const handleLogout = () => {
     logout();
-    router.replace('/login'); // Removed ?role=admin since it's auto-detected now
+    router.replace('/login');
   };
 
   // Safely get the username from email

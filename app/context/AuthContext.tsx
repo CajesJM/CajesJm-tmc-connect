@@ -75,8 +75,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const storedData = await readUserData();
       if (storedData) {
         setUserData(storedData);
-        // Note: We don't set 'user' here since we don't have the Firebase User object
-        // The actual auth state will be handled by the login process
+   
       }
     };
     initializeAuth();

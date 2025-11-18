@@ -22,7 +22,7 @@ export default function StudentAnnouncements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [filteredAnnouncements, setFilteredAnnouncements] = useState<Announcement[]>([]);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
-  const [loading, setLoading] = useState(true); // Loading state
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const q = query(collection(db, "updates"), orderBy("createdAt", "desc"));
@@ -33,10 +33,10 @@ export default function StudentAnnouncements() {
       }));
       setAnnouncements(list);
       filterAnnouncements(list, timeFilter);
-      setLoading(false); 
+      setLoading(false);
     }, (error) => {
       console.error("Error fetching announcements:", error);
-      setLoading(false); 
+      setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -128,7 +128,7 @@ export default function StudentAnnouncements() {
           <Text style={styles.title}>Campus Announcements</Text>
           <Text style={styles.subtitle}>Stay updated with the latest campus news and updates</Text>
         </View>
-        
+
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1E88E5" />
           <Text style={styles.loadingText}>Loading announcements...</Text>

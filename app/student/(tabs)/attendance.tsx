@@ -6,7 +6,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { auth, db } from '../../../lib/firebaseConfig';
 import { locationService } from '../../../lib/locationService';
 import type { AttendanceRecord, EventData, EventLocation, QRCodeData, UserLocation, ValidationResult } from '../../../lib/types';
-import { studentAttendanceStyles } from '../../styles/studentAttendanceStyles';
+import { attendanceStyles as studentAttendanceStyles } from '../../styles/studentAttendanceStyles';
 
 
 const convertToEventData = (docData: DocumentData, id: string): EventData => ({

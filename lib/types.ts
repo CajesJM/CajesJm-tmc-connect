@@ -109,3 +109,31 @@ export interface Student {
   gender: string;
   createdAt?: string;
 }
+
+// User Data Type for Auth Context
+export interface UserData {
+  id: string;
+  studentID?: string;
+  name?: string;
+  email?: string;
+  course?: string;
+  yearLevel?: string;
+  block?: string;
+  gender?: string;
+  profilePhoto?: string;
+  createdAt?: string;
+}
+
+// Missed Event Type for Profile
+export interface MissedEvent {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+  attendanceDeadline?: string;
+}
+
+// Attendee Type
+export interface Attendee {
+  studentID: string;
+}

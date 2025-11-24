@@ -323,6 +323,49 @@ export const attendanceStyles = StyleSheet.create({
     marginLeft: 6,
     fontWeight: "600",
   },
+   // Enhanced Loading States
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  loadingText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    marginTop: 12,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  // Retry Button Styles
+  retryButton: {
+    backgroundColor: "#3B82F6",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginTop: 16,
+    alignSelf: "center",
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  scanAgainButton: {
+    backgroundColor: "#10B981",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginTop: 8,
+    alignSelf: "center",
+  },
+  scanAgainButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
 
   // Result Modal Styles
   resultOverlay: {
@@ -429,6 +472,17 @@ export const attendanceStyles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
+  },
+   buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 16,
+  },
+  halfButton: {
+    flex: 0.48,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
   },
 
   // Card styling (existing)

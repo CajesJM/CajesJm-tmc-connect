@@ -9,7 +9,6 @@ import {
   Image,
   Modal,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
@@ -19,6 +18,30 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { auth, db } from '../../../lib/firebaseConfig';
 import type { Attendee, EventData, MissedEvent } from '../../../lib/types';
 import { useAuth } from '../../context/AuthContext';
+import { styles } from '../../styles/studentsProfile';
+
+interface TeamMember {
+  id: string;
+  name: string;
+  profilePhoto?: any;
+  role?: string;
+  email?: string;
+}
+
+interface AboutInfo {
+  submittedBy: {
+    members: TeamMember[];
+    organization?: string;
+  };
+  submittedTo: {
+    name: string;
+    profilePhoto?:any;
+    department?: string;
+    institution?: string;
+  };
+  version?: string;
+  description?: string;
+}
 
 export default function StudentProfile() {
   const { logout, userData } = useAuth();
@@ -28,6 +51,96 @@ export default function StudentProfile() {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showImageOptions, setShowImageOptions] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+
+  const [aboutInfo] = useState<AboutInfo>({
+    submittedBy: {
+      members: [
+        {
+          id: '1',
+          name: 'Ken Suarez',
+          profilePhoto: require('../../../assets/images/Profile/ken.jpg'),
+          role: 'Lead Developer',
+          email: 'kensuarez31@gmail.com'
+        },
+        {
+          id: '2',
+          name: 'John Mark Cajes',
+          profilePhoto: require('../../../assets/images/Profile/Jm.jpg'),
+          role: '',
+          email: 'markcajes24@gmail.com'
+        },
+        {
+          id: '3',
+          name: 'Kenneth Baculpo',
+          profilePhoto: require('../../../assets/images/Profile/kenneth.jpg'),
+          role: '',
+          email: 'johnkennethbaculpo@gmail.com'
+        },
+        {
+          id: '4',
+          name: 'Kristian Jay Ayuban',
+          profilePhoto: require('../../../assets/images/Profile/kian.jpg'),
+          role: '',
+          email: 'ayubankristianjay711@gmail.com'
+        },
+        {
+          id: '5',
+          name: 'Mc Air Jun Olmillo',
+          profilePhoto: require('../../../assets/images/Profile/mcair.jpg'),
+          role: '',
+          email: 'airtatzolmillo@gmail.com'
+
+        },
+         {
+          id: '6',
+          name: 'Cherry Ann Cagoco',
+          profilePhoto: require('../../../assets/images/Profile/cherry.jpg'),
+          role: '',
+          email: 'cherryanncagoco@gmail.com'
+
+        },
+         {
+          id: '7',
+          name: 'Flor Albert Asa ',
+          profilePhoto: require('../../../assets/images/Profile/flor.jpg'),
+          role: '',
+          email: 'afloralbert@gmail.com'
+        },
+          {
+          id: '8',
+          name: 'Christian Bautista',
+          profilePhoto: require('../../../assets/images/Profile/kristian.gif'),
+          role: '',
+          email: 'yashians120704@gmail.com'
+
+        },
+        {
+          id: '8',
+          name: 'Kento Mabanag',
+          role: '',
+          email: 'mabanagkento@gmail.com'
+
+        },
+        {
+          id: '8',
+          name: 'Madelo',
+          role: '',
+          email: 'yashians120704@gmail.com'
+
+        },
+      ],
+      organization: 'TMC Connect Developers'
+    },
+    submittedTo: {
+      name: 'Jay Ian Camelotes',
+      profilePhoto: '',
+      department: 'Bachelor of Information Technology',
+      institution: ''
+    },
+    version: '1.0.1',
+    description: 'TMC Connect - A comprehensive solution for managing campus events, attendance tracking, and student engagement.'
+  });
 
   useEffect(() => {
     fetchMissedEvents();
@@ -36,7 +149,7 @@ export default function StudentProfile() {
 
   const fetchMissedEvents = async () => {
     try {
-      // Use type assertion to access studentID safely
+     
       const studentID = (userData as any)?.studentID;
       if (!studentID) return;
 
@@ -45,16 +158,16 @@ export default function StudentProfile() {
         eventsRef,
         where('date', '<', new Date().toISOString())
       );
-      
+
       const querySnapshot = await getDocs(q);
       const events: MissedEvent[] = [];
 
       for (const doc of querySnapshot.docs) {
         const eventData = doc.data() as EventData;
         const attendees = eventData.attendees || [];
-        
-        // Check if student attended this event
-        const attended = attendees.some((attendee: Attendee) => 
+
+       
+        const attended = attendees.some((attendee: Attendee) =>
           attendee.studentID === studentID
         );
 
@@ -83,7 +196,7 @@ export default function StudentProfile() {
       if (user) {
         const userRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userRef);
-        
+
         if (userDoc.exists() && userDoc.data().profilePhoto) {
           setProfileImage(userDoc.data().profilePhoto as string);
         }
@@ -96,8 +209,8 @@ export default function StudentProfile() {
   const pickImage = async (useCamera = false) => {
     try {
       setShowImageOptions(false);
-      
-      const permissionResult = useCamera 
+
+      const permissionResult = useCamera
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -108,15 +221,15 @@ export default function StudentProfile() {
 
       const result = useCamera
         ? await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.5,
-          })
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.5,
+        })
         : await ImagePicker.launchImageLibraryAsync({
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.5,
-          });
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.5,
+        });
 
       if (!result.canceled && result.assets && result.assets[0]) {
         await uploadImage(result.assets[0].uri);
@@ -131,7 +244,7 @@ export default function StudentProfile() {
     try {
       setUploading(true);
       const user = auth.currentUser;
-      
+
       if (!user) {
         Alert.alert('Error', 'User not found.');
         return;
@@ -168,7 +281,7 @@ export default function StudentProfile() {
   const removeProfileImage = async () => {
     try {
       setShowImageOptions(false);
-      
+
       const user = auth.currentUser;
       if (!user) return;
 
@@ -202,7 +315,7 @@ export default function StudentProfile() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'Date not available';
-    
+
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', {
@@ -215,20 +328,121 @@ export default function StudentProfile() {
     }
   };
 
-  // Safely access user data properties with proper typing
-  // Use type assertion to access the properties that exist in your actual data
+
   const userCourse = (userData as any)?.course || 'Course not set';
   const userYearLevel = (userData as any)?.yearLevel || 'N/A';
   const userBlock = (userData as any)?.block || 'Block not assigned';
   const userStudentID = (userData as any)?.studentID || 'Not assigned';
 
+  const renderAboutModal = () => (
+    <Modal
+      visible={showAboutModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowAboutModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.aboutModal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>About This App</Text>
+            <TouchableOpacity onPress={() => setShowAboutModal(false)}>
+              <Icon name="close" size={24} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.aboutContent} showsVerticalScrollIndicator={false}>
+        
+            {aboutInfo.description && (
+              <View style={styles.aboutSection}>
+                <Text style={styles.aboutDescription}>
+                  {aboutInfo.description}
+                </Text>
+              </View>
+            )}
+
+    
+            <View style={styles.aboutSection}>
+           
+              {aboutInfo.submittedBy.organization && (
+                <Text style={styles.organizationName}>
+                  {aboutInfo.submittedBy.organization}
+                </Text>
+              )}
+
+              <View style={styles.membersList}>
+                {aboutInfo.submittedBy.members.map((member) => (
+                  <View key={member.id} style={styles.memberItem}>
+               
+                    {member.profilePhoto ? (
+                      <Image
+                        source={member.profilePhoto}
+                        style={styles.memberAvatarImage}
+                      />
+                    ) : (
+                      <View style={styles.memberAvatar}>
+                        <Text style={styles.memberAvatarText}>
+                          {member.name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberName}>{member.name}</Text>
+                      {member.role && (
+                        <Text style={styles.memberRole}>{member.role}</Text>
+                      )}
+                      {member.email && (
+                        <Text style={styles.memberEmail}>{member.email}</Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+         
+            <View style={styles.aboutSection}>
+              <Text style={styles.sectionLabel}>Submitted To</Text>
+              <View style={styles.submittedToCard}>
+                <Icon name="school" size={24} color="#3B82F6" />
+                <View style={styles.submittedToInfo}>
+                  <Text style={styles.submittedToName}>
+                    {aboutInfo.submittedTo.name}
+                  </Text>
+                  {aboutInfo.submittedTo.department && (
+                    <Text style={styles.submittedToDepartment}>
+                      {aboutInfo.submittedTo.department}
+                    </Text>
+                  )}
+                  {aboutInfo.submittedTo.institution && (
+                    <Text style={styles.submittedToInstitution}>
+                      {aboutInfo.submittedTo.institution}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
+
+      
+            {aboutInfo.version && (
+              <View style={styles.versionSection}>
+                <Text style={styles.versionText}>
+                  Version {aboutInfo.version}
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <Text style={styles.title}>My Profile</Text>
       
-      {/* Profile Card with Photo */}
+
+     
       <View style={styles.profileCard}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.avatarContainer}
           onPress={() => setShowImageOptions(true)}
           disabled={uploading}
@@ -250,20 +464,20 @@ export default function StudentProfile() {
             <Icon name="camera" size={16} color="#FFFFFF" />
           </View>
         </TouchableOpacity>
-        
+
         <Text style={styles.name}>{getDisplayName()}</Text>
         <Text style={styles.id}>ID: {userStudentID}</Text>
         <Text style={styles.course}>{userCourse}</Text>
         <Text style={styles.yearLevel}>Year {userYearLevel} • {userBlock}</Text>
       </View>
 
-      {/* Missed Events Section */}
+ 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>📅 Missed Events</Text>
+          <Text style={styles.sectionTitle}>Missed Events</Text>
           <Text style={styles.eventsCount}>({missedEvents.length})</Text>
         </View>
-        
+
         {loading ? (
           <ActivityIndicator size="small" color="#3B82F6" style={styles.loading} />
         ) : missedEvents.length === 0 ? (
@@ -300,34 +514,40 @@ export default function StudentProfile() {
         )}
       </View>
 
-      {/* Menu Options */}
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>📋 Quick Actions</Text>
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.menu}>
           <TouchableOpacity style={styles.menuItem}>
             <Icon name="book-open-variant" size={20} color="#3B82F6" />
             <Text style={styles.menuText}>My Courses</Text>
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.menuItem}>
             <Icon name="chart-bar" size={20} color="#8B5CF6" />
             <Text style={styles.menuText}>Attendance Report</Text>
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.menuItem}>
-            <Icon name="calendar-clock" size={20} color="#10B981" />
-            <Text style={styles.menuText}>Event Schedule</Text>
+
+         
+
+       
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => setShowAboutModal(true)}
+          >
+            <Icon name="information" size={20} color="#F59E0B" />
+            <Text style={styles.menuText}>About this App</Text>
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.menuItem}>
             <Icon name="cog" size={20} color="#6B7280" />
             <Text style={styles.menuText}>Settings</Text>
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.menuItem}>
             <Icon name="help-circle" size={20} color="#F59E0B" />
             <Text style={styles.menuText}>Help & Support</Text>
@@ -354,25 +574,25 @@ export default function StudentProfile() {
             <TouchableWithoutFeedback>
               <View style={styles.imageOptions}>
                 <Text style={styles.optionsTitle}>Profile Photo</Text>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.optionButton}
                   onPress={() => pickImage(false)}
                 >
                   <Icon name="image" size={24} color="#3B82F6" />
                   <Text style={styles.optionText}>Choose from Gallery</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.optionButton}
                   onPress={() => pickImage(true)}
                 >
                   <Icon name="camera" size={24} color="#10B981" />
                   <Text style={styles.optionText}>Take Photo</Text>
                 </TouchableOpacity>
-                
+
                 {profileImage && (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.optionButton, styles.removeButton]}
                     onPress={removeProfileImage}
                   >
@@ -380,8 +600,8 @@ export default function StudentProfile() {
                     <Text style={[styles.optionText, styles.removeText]}>Remove Photo</Text>
                   </TouchableOpacity>
                 )}
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   style={styles.cancelButton}
                   onPress={() => setShowImageOptions(false)}
                 >
@@ -392,259 +612,10 @@ export default function StudentProfile() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
+      {/* About Modal */}
+      {renderAboutModal()}
     </ScrollView>
   );
 }
 
-// ... keep your existing styles the same ...
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#F8FAFC',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#1E293B',
-    textAlign: 'center',
-  },
-  profileCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: 36,
-    fontWeight: 'bold',
-  },
-  cameraIcon: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#3B82F6',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-  },
-  name: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#111827',
-  },
-  id: {
-    fontSize: 15,
-    color: '#64748B',
-    marginBottom: 4,
-  },
-  course: {
-    fontSize: 16,
-    color: '#475569',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  yearLevel: {
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  section: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  eventsCount: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  loading: {
-    padding: 20,
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyStateText: {
-    marginTop: 12,
-    fontSize: 15,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  eventsList: {
-    gap: 12,
-  },
-  eventItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FEF2F2',
-    padding: 12,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#DC2626',
-  },
-  eventIcon: {
-    marginRight: 12,
-    marginTop: 2,
-  },
-  eventDetails: {
-    flex: 1,
-  },
-  eventTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  eventDate: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  deadlineText: {
-    fontSize: 12,
-    color: '#DC2626',
-    fontWeight: '500',
-  },
-  moreEventsText: {
-    fontSize: 13,
-    color: '#3B82F6',
-    textAlign: 'center',
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  menu: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  menuText: {
-    fontSize: 16,
-    marginLeft: 12,
-    marginRight: 'auto',
-    color: '#374151',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FEF2F2',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 30,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  logoutText: {
-    color: '#DC2626',
-    fontWeight: '600',
-    fontSize: 16,
-    marginLeft: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  imageOptions: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    width: '100%',
-    maxWidth: 300,
-  },
-  optionsTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  optionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: '#F8FAFC',
-  },
-  optionText: {
-    fontSize: 16,
-    marginLeft: 12,
-    color: '#374151',
-    fontWeight: '500',
-  },
-  removeButton: {
-    backgroundColor: '#FEF2F2',
-  },
-  removeText: {
-    color: '#DC2626',
-  },
-  cancelButton: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-    backgroundColor: '#F1F5F9',
-  },
-  cancelText: {
-    fontSize: 16,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-});

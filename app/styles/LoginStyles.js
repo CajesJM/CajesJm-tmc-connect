@@ -168,4 +168,13 @@ export const LoginStyles = StyleSheet.create({
     fontStyle: "italic",
     marginTop: 8,
   },
+   logoContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
 });

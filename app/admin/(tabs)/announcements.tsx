@@ -18,6 +18,7 @@ import {
   View,
   useWindowDimensions
 } from 'react-native';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { db } from "../../../lib/firebaseConfig";
 import { useAuth } from "../../context/AuthContext";
 import { AnnouncementStyles as styles } from "../../styles/AnnouncementStyles";
@@ -42,7 +43,7 @@ export default function AnnouncementScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'week' | 'month'>('all');
-  const [isLoading, setIsLoading] = useState(true); // Add loading state
+  const [isLoading, setIsLoading] = useState(true); 
   const { user } = useAuth();
 
   useEffect(() => {
@@ -195,13 +196,19 @@ export default function AnnouncementScreen() {
   }).length;
 
   const formatDate = (date: Date) => {
-    return dayjs(date).format('MMM D, YYYY [at] h:mm A');
+    return dayjs(date).format('MMM D, YYYY • h:mm A');
   };
+
+  const isNewAnnouncement = (createdAt: any) => {
+    if (!createdAt) return false;
+    return dayjs(createdAt.toDate()).isAfter(dayjs().subtract(1, 'day'));
+  };
+
 const renderLoading = () => (
   <View style={styles.loadingContainer}>
     <ActivityIndicator 
       size="large" 
-      color="#1E88E5"
+      color="#4F46E5"
     />
     <Text style={styles.loadingText}>Loading announcements...</Text>
   </View>
@@ -210,7 +217,14 @@ const renderLoading = () => (
   const renderAnnouncementItem = ({ item }: { item: Announcement }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle}>{item.title}</Text>
+        <View style={styles.titleContainer}>
+          {isNewAnnouncement(item.createdAt) && (
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>NEW</Text>
+            </View>
+          )}
+          <Text style={styles.cardTitle}>{item.title}</Text>
+        </View>
         <View style={styles.cardActions}>
           <TouchableOpacity
             style={styles.editButton}
@@ -231,11 +245,9 @@ const renderLoading = () => (
       
       {item.createdAt && (
         <View style={styles.dateContainer}>
+          <Icon name="clock-outline" size={12} color="#6B7280" />
           <Text style={styles.timestamp}>
-            Created {dayjs(item.createdAt.toDate()).fromNow()}
-          </Text>
-          <Text style={styles.fullDate}>
-            {formatDate(item.createdAt.toDate())}
+            {dayjs(item.createdAt.toDate()).fromNow()} • {formatDate(item.createdAt.toDate())}
           </Text>
         </View>
       )}
@@ -245,16 +257,13 @@ const renderLoading = () => (
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>Announcements</Text>
-          <Text style={styles.subtitle}>Manage campus announcements</Text>
+        <View style={styles.headerIcon}>
+          <Icon name="bullhorn" size={20} color="#FFFFFF" />
         </View>
-        <TouchableOpacity 
-          style={styles.createButton}
-          onPress={() => setShowCreateForm(true)}
-        >
-          <Text style={styles.createButtonText}>+ Create</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Announcements</Text>
+        <Text style={styles.headerSubtitle}>
+          Manage campus announcements and updates
+        </Text>
       </View>
 
       {isLoading ? (
@@ -276,45 +285,65 @@ const renderLoading = () => (
             </View>
           </View>
 
-          <View style={styles.filterContainer}>
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                activeFilter === 'all' && styles.filterButtonActive
-              ]}
-              onPress={() => handleFilterChange('all')}
-            >
-              <Text style={[
-                styles.filterButtonText,
-                activeFilter === 'all' && styles.filterButtonTextActive
-              ]}>All Announcements</Text>
-            </TouchableOpacity>
+          <View style={styles.filterSection}>
+            <View style={styles.filterChips}>
+              <TouchableOpacity
+                style={[
+                  styles.filterChip,
+                  activeFilter === 'all' && styles.filterChipActive
+                ]}
+                onPress={() => handleFilterChange('all')}
+              >
+          
+                <Text style={[
+                  styles.filterChipText,
+                  activeFilter === 'all' && styles.filterChipTextActive
+                ]}>All</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                activeFilter === 'week' && styles.filterButtonActive
-              ]}
-              onPress={() => handleFilterChange('week')}
-            >
-              <Text style={[
-                styles.filterButtonText,
-                activeFilter === 'week' && styles.filterButtonTextActive
-              ]}>This Week</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.filterChip,
+                  activeFilter === 'week' && styles.filterChipActive
+                ]}
+                onPress={() => handleFilterChange('week')}
+              >
+             
+                <Text style={[
+                  styles.filterChipText,
+                  activeFilter === 'week' && styles.filterChipTextActive
+                ]}>This Week</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                activeFilter === 'month' && styles.filterButtonActive
-              ]}
-              onPress={() => handleFilterChange('month')}
+              <TouchableOpacity
+                style={[
+                  styles.filterChip,
+                  activeFilter === 'month' && styles.filterChipActive
+                ]}
+                onPress={() => handleFilterChange('month')}
+              >
+            
+                <Text style={[
+                  styles.filterChipText,
+                  activeFilter === 'month' && styles.filterChipTextActive
+                ]}>This Month</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.createButton}
+              onPress={() => setShowCreateForm(true)}
             >
-              <Text style={[
-                styles.filterButtonText,
-                activeFilter === 'month' && styles.filterButtonTextActive
-              ]}>This Month</Text>
+              <Icon name="plus" size={16} color="#FFFFFF" />
+              <Text style={styles.createButtonText}>Create</Text>
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.resultsInfo}>
+            <Text style={styles.resultsText}>
+              {filteredAnnouncements.length} announcement{filteredAnnouncements.length !== 1 ? 's' : ''}
+              {activeFilter === 'week' ? ' this week' : activeFilter === 'month' ? ' this month' : ''}
+            </Text>
           </View>
 
           <FlatList
@@ -324,6 +353,7 @@ const renderLoading = () => (
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <View style={styles.emptyState}>
+                <Icon name="bullhorn-outline" size={48} color="#9CA3AF" />
                 <Text style={styles.emptyStateTitle}>
                   {activeFilter === 'all' ? 'No announcements' : 
                   activeFilter === 'week' ? 'No announcements this week' : 
@@ -334,6 +364,14 @@ const renderLoading = () => (
                   activeFilter === 'week' ? 'No announcements created in the past 7 days' :
                   'No announcements created in the past 30 days'}
                 </Text>
+                {activeFilter === 'all' && (
+                  <TouchableOpacity 
+                    style={styles.emptyStateButton}
+                    onPress={() => setShowCreateForm(true)}
+                  >
+                    <Text style={styles.emptyStateButtonText}>Create Announcement</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             }
           />
@@ -347,8 +385,9 @@ const renderLoading = () => (
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={handleCloseCreateForm}>
-              <Text style={styles.backButton}>← Back</Text>
+            <TouchableOpacity onPress={handleCloseCreateForm} style={styles.backButton}>
+              <Icon name="arrow-left" size={20} color="#4F46E5" />
+              <Text style={styles.backButtonText}>Back to Dashboard</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
               {editingId ? 'Edit Announcement' : 'Create Announcement'}
@@ -360,7 +399,7 @@ const renderLoading = () => (
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardAvoidingView}
           >
-            <ScrollView style={styles.modalContent}>
+            <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentContainer}>
               <View style={styles.formSection}>
                 <Text style={styles.label}>Title</Text>
                 <TextInput
@@ -380,6 +419,7 @@ const renderLoading = () => (
                   onChangeText={setMessage}
                   multiline
                   numberOfLines={6}
+                  textAlignVertical="top"
                 />
               </View>
 

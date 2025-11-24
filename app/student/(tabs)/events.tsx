@@ -5,6 +5,9 @@ import {
   Alert,
   FlatList,
   Image,
+  Linking,
+  Modal,
+  Platform,
   RefreshControl,
   Text,
   TouchableOpacity,
@@ -43,6 +46,8 @@ export default function StudentEventsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'upcoming' | 'past'>('upcoming');
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [showMapOptions, setShowMapOptions] = useState(false);
 
   useEffect(() => {
     const eventsQuery = query(
@@ -105,9 +110,8 @@ export default function StudentEventsScreen() {
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
+      weekday: 'short',
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -121,9 +125,9 @@ export default function StudentEventsScreen() {
         return campusLocation.image;
       }
     }
-
     return CAMPUS_LOCATIONS[0].image;
   };
+
   const getDaysUntilEvent = (eventDate: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -135,9 +139,53 @@ export default function StudentEventsScreen() {
 
     if (daysDiff === 0) return 'Today';
     if (daysDiff === 1) return 'Tomorrow';
-    if (daysDiff > 1) return `In ${daysDiff} days`;
+    if (daysDiff > 1) return `${daysDiff}d`;
     if (daysDiff === -1) return 'Yesterday';
-    return 'Past event';
+    return 'Past';
+  };
+
+  const openEventInMaps = (event: Event, showBoundary: boolean = false) => {
+    if (!event.coordinates) {
+      const url = Platform.OS === 'ios' 
+        ? `http://maps.apple.com/?q=${encodeURIComponent(event.location)}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`;
+      
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Error', 'Could not open maps app');
+      });
+      return;
+    }
+
+    const { latitude, longitude, radius } = event.coordinates;
+    
+    if (showBoundary) {
+      const url = Platform.OS === 'ios'
+        ? `http://maps.apple.com/?ll=${latitude},${longitude}&q=${encodeURIComponent(event.location + ' (Event Location)')}`
+        : `https://www.google.com/maps/@${latitude},${longitude},${radius}m/data=!3m1!1e3?q=${encodeURIComponent(event.location)}`;
+      
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Error', 'Could not open maps app');
+      });
+      
+      Alert.alert(
+        'Event Boundary',
+        `Location: ${event.location}\n\nVerification Radius: ${radius} meters\n\nStudents must be within ${radius}m of the event location to mark attendance.`,
+        [{ text: 'OK' }]
+      );
+    } else {
+      const url = Platform.OS === 'ios'
+        ? `http://maps.apple.com/?ll=${latitude},${longitude}&q=${encodeURIComponent(event.title + ' - ' + event.location)}`
+        : `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}&query_place_id=${encodeURIComponent(event.title)}`;
+      
+      Linking.openURL(url).catch(() => {
+        Alert.alert('Error', 'Could not open maps app');
+      });
+    }
+  };
+
+  const showMapOptionsModal = (event: Event) => {
+    setSelectedEvent(event);
+    setShowMapOptions(true);
   };
 
   const renderEventItem = ({ item }: { item: Event }) => {
@@ -147,50 +195,35 @@ export default function StudentEventsScreen() {
     return (
       <View style={[
         styles.eventCard,
-        isSmallScreen && styles.eventCardSmall,
         !isEventUpcoming && styles.pastEventCard
       ]}>
         <View style={styles.eventImageContainer}>
           <Image
             source={getLocationImage(item)}
-            style={[
-              styles.eventImage,
-              isSmallScreen && styles.eventImageSmall
-            ]}
+            style={styles.eventImage}
             resizeMode="cover"
           />
           <View style={[
             styles.eventBadge,
             daysUntil === 'Today' && styles.todayBadge,
             daysUntil === 'Tomorrow' && styles.tomorrowBadge,
-            (typeof daysUntil === 'string' && daysUntil.includes('days')) && styles.upcomingBadge,
-            daysUntil === 'Past event' && styles.pastBadge,
-            isSmallScreen && styles.eventBadgeSmall
+            (typeof daysUntil === 'string' && daysUntil.includes('d')) && styles.upcomingBadge,
+            daysUntil === 'Past' && styles.pastBadge,
           ]}>
-            <Text style={[
-              styles.eventBadgeText,
-              isSmallScreen && styles.eventBadgeTextSmall
-            ]}>
+            <Text style={styles.eventBadgeText}>
               {daysUntil}
             </Text>
           </View>
         </View>
 
-        <View style={[
-          styles.eventContent,
-          isSmallScreen && styles.eventContentSmall
-        ]}>
+        <View style={styles.eventContent}>
           <View style={styles.eventHeader}>
             <View style={styles.eventMeta}>
-              <Text style={[
-                styles.eventLocation,
-                isSmallScreen && styles.eventLocationSmall
-              ]}>
-                <Icon name="map-marker" size={16} color="#1e6dffff" /> {item.location}
+              <Text style={styles.eventLocation}>
+                <Icon name="map-marker" size={14} color="#4F46E5" /> {item.location}
               </Text>
               <Text style={[
                 styles.eventDate,
-                isSmallScreen && styles.eventDateSmall,
                 !isEventUpcoming && styles.pastEventDate
               ]}>
                 {formatDate(item.date)}
@@ -198,238 +231,267 @@ export default function StudentEventsScreen() {
             </View>
           </View>
 
-          <Text style={[
-            styles.eventTitle,
-            isSmallScreen && styles.eventTitleSmall
-          ]}>
+          <Text style={styles.eventTitle}>
             {item.title}
           </Text>
 
-          <Text style={[
-            styles.eventDescription,
-            isSmallScreen && styles.eventDescriptionSmall
-          ]}>
+          <Text style={styles.eventDescription}>
             {item.description}
           </Text>
 
           {item.locationDescription && (
-            <Text style={[
-              styles.locationDescription,
-              isSmallScreen && styles.locationDescriptionSmall
-            ]}>
-              <Icon name="office-building" size={16} color="#666" /> {item.locationDescription}
+            <Text style={styles.locationDescription}>
+              <Icon name="office-building" size={14} color="#6B7280" /> {item.locationDescription}
             </Text>
           )}
 
           {item.coordinates && (
-            <View style={styles.verificationBadge}>
-              <Icon name="map-marker-check" size={12} color="#10B981" />
-              <Text style={styles.verificationBadgeText}>
-                Location Verification Enabled
-              </Text>
+            <View style={styles.coordinatesSection}>
+              <View style={styles.verificationBadge}>
+                <Icon name="map-marker-check" size={12} color="#10B981" />
+                <Text style={styles.verificationBadgeText}>
+                  Location Verification
+                </Text>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.mapButton}
+                onPress={() => showMapOptionsModal(item)}
+              >
+                <View style={styles.mapButtonContent}>
+                  <Icon name="map" size={18} color="#4F46E5" />
+                  <View style={styles.mapButtonText}>
+                    <Text style={styles.mapButtonTitle}>View on Map</Text>
+                    <Text style={styles.mapButtonSubtitle}>
+                      {item.coordinates.radius}m radius
+                    </Text>
+                  </View>
+                  <Icon name="chevron-right" size={18} color="#6B7280" />
+                </View>
+              </TouchableOpacity>
             </View>
+          )}
+
+          {!item.coordinates && isEventUpcoming && (
+            <TouchableOpacity 
+              style={styles.mapButton}
+              onPress={() => openEventInMaps(item, false)}
+            >
+              <View style={styles.mapButtonContent}>
+                <Icon name="map" size={18} color="#4F46E5" />
+                <View style={styles.mapButtonText}>
+                  <Text style={styles.mapButtonTitle}>Find Location</Text>
+                  <Text style={styles.mapButtonSubtitle}>
+                    Open in Maps
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={18} color="#6B7280" />
+              </View>
+            </TouchableOpacity>
           )}
 
           <View style={styles.eventStats}>
             <View style={styles.eventStatItem}>
-              <Icon name="account" size={14} color="#1E88E5" />
-              <Text style={[
-                styles.eventOrganizer,
-                isSmallScreen && styles.eventOrganizerSmall
-              ]}>
+              <Icon name="account" size={12} color="#6B7280" />
+              <Text style={styles.eventOrganizer}>
                 {item.organizer}
               </Text>
             </View>
             <View style={styles.eventStatItem}>
-              <Icon name="account-group" size={14} color="#1E88E5" />
-              <Text style={[
-                styles.attendeeCount,
-                isSmallScreen && styles.attendeeCountSmall
-              ]}>
+              <Icon name="account-group" size={12} color="#6B7280" />
+              <Text style={styles.attendeeCount}>
                 {item.attendees.length} attending
               </Text>
             </View>
           </View>
 
-          <View style={styles.eventFooter}>
-            {!isEventUpcoming && (
-              <View style={[
-                styles.pastEventBadge,
-                isSmallScreen && styles.pastEventBadgeSmall
-              ]}>
-                <Text style={[
-                  styles.pastEventText,
-                  isSmallScreen && styles.pastEventTextSmall
-                ]}>
-                  Event Ended
-                </Text>
-              </View>
-            )}
-          </View>
+          {!isEventUpcoming && (
+            <View style={styles.pastEventBadge}>
+              <Text style={styles.pastEventText}>
+                Event Ended
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     );
   };
 
+  const renderMapOptionsModal = () => (
+    <Modal
+      visible={showMapOptions}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => setShowMapOptions(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Map Options</Text>
+          <TouchableOpacity 
+            style={styles.closeButton}
+            onPress={() => setShowMapOptions(false)}
+          >
+            <Icon name="close" size={24} color="#6B7280" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.modalContent}>
+          {selectedEvent && (
+            <>
+              <View style={styles.eventInfo}>
+                <Text style={styles.eventInfoTitle}>{selectedEvent.title}</Text>
+                <Text style={styles.eventInfoLocation}>
+                  <Icon name="map-marker" size={14} color="#4F46E5" /> {selectedEvent.location}
+                </Text>
+                {selectedEvent.coordinates && (
+                  <View style={styles.coordinatesInfo}>
+                    <Text style={styles.coordinatesText}>
+                      <Icon name="map-marker-radius" size={14} color="#4F46E5" /> 
+                      Verification Radius: {selectedEvent.coordinates.radius}m
+                    </Text>
+                    <Text style={styles.coordinatesHint}>
+                      You must be within this distance to mark attendance
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <TouchableOpacity
+                style={styles.mapOptionButton}
+                onPress={() => {
+                  setShowMapOptions(false);
+                  openEventInMaps(selectedEvent, false);
+                }}
+              >
+                <View style={styles.mapOptionContent}>
+                  <Icon name="map-marker" size={20} color="#4F46E5" />
+                  <View style={styles.mapOptionText}>
+                    <Text style={styles.mapOptionTitle}>Show Event Location</Text>
+                    <Text style={styles.mapOptionSubtitle}>Open exact event location in maps</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.mapInstructions}>
+                <Text style={styles.instructionsTitle}>How to use:</Text>
+                <View style={styles.instructionItem}>
+                  <Icon name="map-marker" size={14} color="#6B7280" />
+                  <Text style={styles.instructionText}>
+                    <Text style={styles.instructionBold}>Event Location</Text> - Shows exact event spot
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+
   if (loading && !refreshing) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#1E88E5" />
+        <ActivityIndicator size="large" color="#4F46E5" />
         <Text style={styles.loadingText}>Loading campus events...</Text>
       </View>
     );
   }
 
+  const upcomingCount = events.filter(event => event.date > new Date()).length;
+  const pastCount = events.filter(event => event.date <= new Date()).length;
+
   return (
     <View style={styles.container}>
-      <View style={[
-        styles.dashboardHeader,
-        isSmallScreen && styles.dashboardHeaderSmall
-      ]}>
-        <View style={styles.headerContent}>
-          <Text style={[
-            styles.title,
-            isSmallScreen && styles.titleSmall
-          ]}>
-            Campus Events
-          </Text>
-          <Text style={[
-            styles.subtitle,
-            isSmallScreen && styles.subtitleSmall
-          ]}>
-            Discover campus events and activities
-          </Text>
+      <View style={styles.header}>
+        <View style={styles.headerIcon}>
+          <Icon name="calendar" size={20} color="#FFFFFF" />
         </View>
+        <Text style={styles.headerTitle}>Campus Events</Text>
+        <Text style={styles.headerSubtitle}>
+          Discover campus events and activities
+        </Text>
+      </View>
 
-        <View style={[
-          styles.headerStats,
-          isSmallScreen && styles.headerStatsSmall
-        ]}>
-          <View style={[
-            styles.statCard,
-            isSmallScreen && styles.statCardSmall
-          ]}>
-            <Text style={[
-              styles.statNumber,
-              isSmallScreen && styles.statNumberSmall
-            ]}>
-              {events.filter(event => event.date > new Date()).length}
-            </Text>
-            <Text style={[
-              styles.statLabel,
-              isSmallScreen && styles.statLabelSmall
-            ]}>
-              Upcoming
-            </Text>
-          </View>
-
-          <View style={[
-            styles.statCard,
-            isSmallScreen && styles.statCardSmall
-          ]}>
-            <Text style={[
-              styles.statNumber,
-              isSmallScreen && styles.statNumberSmall
-            ]}>
-              {events.length}
-            </Text>
-            <Text style={[
-              styles.statLabel,
-              isSmallScreen && styles.statLabelSmall
-            ]}>
-              Total Events
-            </Text>
-          </View>
-
-          <View style={[
-            styles.statCard,
-            isSmallScreen && styles.statCardSmall
-          ]}>
-            <Text style={[
-              styles.statNumber,
-              isSmallScreen && styles.statNumberSmall
-            ]}>
-              {events.filter(event => event.date <= new Date()).length}
-            </Text>
-            <Text style={[
-              styles.statLabel,
-              isSmallScreen && styles.statLabelSmall
-            ]}>
-              Past Events
-            </Text>
-          </View>
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{upcomingCount}</Text>
+          <Text style={styles.statLabel}>Upcoming</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{events.length}</Text>
+          <Text style={styles.statLabel}>Total</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{pastCount}</Text>
+          <Text style={styles.statLabel}>Past</Text>
         </View>
       </View>
 
-      <View style={[
-        styles.headerActions,
-        isSmallScreen && styles.headerActionsSmall
-      ]}>
-        <View style={styles.filterContainer}>
+      <View style={styles.filterSection}>
+        <View style={styles.filterChips}>
           <TouchableOpacity
             style={[
-              styles.filterButton,
-              activeFilter === 'upcoming' && styles.filterButtonActive
+              styles.filterChip,
+              activeFilter === 'upcoming' && styles.filterChipActive
             ]}
             onPress={() => handleFilterChange('upcoming')}
           >
+          
             <Text style={[
-              styles.filterButtonText,
-              activeFilter === 'upcoming' && styles.filterButtonTextActive
+              styles.filterChipText,
+              activeFilter === 'upcoming' && styles.filterChipTextActive
             ]}>
-              <Icon name="calendar" size={16} color="#0521f8ff" /> Upcoming Events
+              Upcoming
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[
-              styles.filterButton,
-              activeFilter === 'past' && styles.filterButtonActive
+              styles.filterChip,
+              activeFilter === 'past' && styles.filterChipActive
             ]}
             onPress={() => handleFilterChange('past')}
           >
+       
             <Text style={[
-              styles.filterButtonText,
-              activeFilter === 'past' && styles.filterButtonTextActive
+              styles.filterChipText,
+              activeFilter === 'past' && styles.filterChipTextActive
             ]}>
-              <Icon name="history" size={16} color="#2505f2ff" /> Past Events
+              Past Events
             </Text>
           </TouchableOpacity>
         </View>
+      </View>
+
+      <View style={styles.resultsInfo}>
+        <Text style={styles.resultsText}>
+          {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
+          {activeFilter === 'upcoming' ? ' upcoming' : ' past'}
+        </Text>
       </View>
 
       <FlatList
         data={filteredEvents}
         renderItem={renderEventItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[
-          styles.listContent,
-          isSmallScreen && styles.listContentSmall
-        ]}
+        contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#1E88E5']}
-            tintColor="#1E88E5"
+            colors={['#4F46E5']}
+            tintColor="#4F46E5"
           />
         }
         ListEmptyComponent={
-          <View style={[
-            styles.emptyState,
-            isSmallScreen && styles.emptyStateSmall
-          ]}>
-            <Icon name="calendar-remove" size={64} color="#94A3B8" />
-            <Text style={[
-              styles.emptyStateTitle,
-              isSmallScreen && styles.emptyStateTitleSmall
-            ]}>
+          <View style={styles.emptyState}>
+            <View style={styles.emptyStateIcon}>
+              <Icon name="calendar-remove" size={48} color="#9CA3AF" />
+            </View>
+            <Text style={styles.emptyStateTitle}>
               {activeFilter === 'upcoming' ? 'No upcoming events' : 'No past events'}
             </Text>
-            <Text style={[
-              styles.emptyStateText,
-              isSmallScreen && styles.emptyStateTextSmall
-            ]}>
+            <Text style={styles.emptyStateText}>
               {activeFilter === 'upcoming'
                 ? 'Check back later for new campus events!'
                 : 'No past events to display'
@@ -438,6 +500,8 @@ export default function StudentEventsScreen() {
           </View>
         }
       />
+
+      {renderMapOptionsModal()}
     </View>
   );
 }

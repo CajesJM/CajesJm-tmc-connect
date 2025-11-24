@@ -1,392 +1,485 @@
-import { Dimensions, Platform, StyleSheet } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
-const isSmallScreen = screenWidth < 375;
+
+const COLORS = {
+  primary: '#4F46E5',
+  primaryLight: '#6366F1',
+  secondary: '#6B7280',
+  background: '#F0F4F8',
+  cardBg: '#FFFFFF',
+  textDark: '#111827',
+  textMedium: '#374151',
+  textLight: '#6B7280',
+  border: '#E5E7EB',
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#DC2626',
+  info: '#3B82F6',
+  shadow: '#000000',
+};
 
 export const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8FAFC',
-    },
-    centerContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#F8FAFC',
-    },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
 
-    dashboardHeader: {
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: isSmallScreen ? 12 : 16,
-        paddingTop: Platform.OS === 'ios' ? (isSmallScreen ? 40 : 45) : (isSmallScreen ? 20 : 25),
-        paddingBottom: isSmallScreen ? 10 : 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-        elevation: 3,
-    },
-    dashboardHeaderSmall: {
-        paddingHorizontal: 12,
-        paddingTop: Platform.OS === 'ios' ? 40 : 20,
-        paddingBottom: 10,
-    },
-    headerContent: {
-        marginBottom: isSmallScreen ? 8 : 10,
-    },
-    title: {
-        fontSize: isSmallScreen ? 20 : 24,
-        fontWeight: 'bold',
-        color: '#1E293B',
-        marginBottom: 2,
-    },
-    titleSmall: {
-        fontSize: 20,
-    },
-    subtitle: {
-        fontSize: isSmallScreen ? 12 : 13,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    subtitleSmall: {
-        fontSize: 12,
-    },
+  // Header Styles
+  header: {
+    backgroundColor: COLORS.primary,
+    padding: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
 
-    headerStats: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    headerStatsSmall: {},
-    statCard: {
-        backgroundColor: '#F1F5F9',
-        padding: isSmallScreen ? 8 : 10,
-        borderRadius: 8,
-        alignItems: 'center',
-        flex: 1,
-        marginHorizontal: isSmallScreen ? 2 : 3,
-    },
-    statCardSmall: {
-        padding: 8,
-        marginHorizontal: 2,
-    },
-    statNumber: {
-        fontSize: isSmallScreen ? 16 : 18,
-        fontWeight: 'bold',
-        color: '#1E88E5',
-        marginBottom: 2,
-    },
-    statNumberSmall: {
-        fontSize: 16,
-    },
-    statLabel: {
-        fontSize: isSmallScreen ? 9 : 10,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    statLabelSmall: {
-        fontSize: 9,
-    },
+  // Stats Container
+  statsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.textDark,
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
 
-    headerActions: {
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: isSmallScreen ? 12 : 16,
-        paddingVertical: isSmallScreen ? 8 : 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
-    },
-    headerActionsSmall: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-    },
-    filterContainer: {
-        flexDirection: 'row',
-        backgroundColor: '#F1F5F9',
-        borderRadius: 8,
-        padding: isSmallScreen ? 1 : 2,
-        width: '100%',
-    },
-    filterButton: {
-        paddingHorizontal: isSmallScreen ? 10 : 12,
-        paddingVertical: isSmallScreen ? 8 : 10,
-        borderRadius: 6,
-        marginHorizontal: isSmallScreen ? 1 : 2,
-        flex: 1,
-        alignItems: 'center',
-    },
-    filterButtonActive: {
-        backgroundColor: '#FFFFFF',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    filterButtonText: {
-        fontSize: isSmallScreen ? 11 : 12,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    filterButtonTextActive: {
-        color: '#1E88E5',
-        fontWeight: '600',
-    },
+  // Filter Section
+  filterSection: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  filterChips: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  filterChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMedium,
+    marginLeft: 4,
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+  },
 
-    listContent: {
-        padding: isSmallScreen ? 8 : 12,
-        paddingTop: isSmallScreen ? 4 : 6,
-    },
-    listContentSmall: {
-        padding: 8,
-        paddingTop: 4,
-    },
+  // Results Info
+  resultsInfo: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  resultsText: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    fontWeight: '500',
+  },
 
-    eventCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: isSmallScreen ? 10 : 12,
-        marginBottom: isSmallScreen ? 8 : 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
-        elevation: 2,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#F1F5F9',
-    },
-    eventCardSmall: {
-        borderRadius: 10,
-        marginBottom: 8,
-    },
-    pastEventCard: {
-        opacity: 0.7,
-        backgroundColor: '#F8FAFC',
-    },
+  // List Content
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
 
-    eventImageContainer: {
-        position: 'relative',
-    },
-    eventImage: {
-        width: '100%',
-        height: isSmallScreen ? 120 : 140,
-    },
-    eventImageSmall: {
-        height: 120,
-    },
+  // Event Card
+  eventCard: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+  },
+  pastEventCard: {
+    opacity: 0.8,
+  },
+  eventImageContainer: {
+    position: 'relative',
+  },
+  eventImage: {
+    width: '100%',
+    height: 140,
+  },
+  eventBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: COLORS.primary,
+  },
+  todayBadge: {
+    backgroundColor: '#DC2626',
+  },
+  tomorrowBadge: {
+    backgroundColor: '#F59E0B',
+  },
+  upcomingBadge: {
+    backgroundColor: '#10B981',
+  },
+  pastBadge: {
+    backgroundColor: '#6B7280',
+  },
+  eventBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  eventContent: {
+    padding: 16,
+  },
+  eventHeader: {
+    marginBottom: 8,
+  },
+  eventMeta: {
+    marginBottom: 4,
+  },
+  eventLocation: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginBottom: 2,
+  },
+  eventDate: {
+    fontSize: 11,
+    color: COLORS.textMedium,
+    fontWeight: '500',
+  },
+  pastEventDate: {
+    color: COLORS.textLight,
+  },
+  eventTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    marginBottom: 6,
+    lineHeight: 20,
+  },
+  eventDescription: {
+    fontSize: 13,
+    color: COLORS.textMedium,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  locationDescription: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    marginBottom: 8,
+  },
 
-    eventBadge: {
-        position: 'absolute',
-        top: isSmallScreen ? 6 : 8,
-        right: isSmallScreen ? 6 : 8,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        paddingHorizontal: isSmallScreen ? 6 : 8,
-        paddingVertical: isSmallScreen ? 3 : 4,
-        borderRadius: isSmallScreen ? 10 : 12,
-    },
-    eventBadgeSmall: {
-        top: 6,
-        right: 6,
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 10,
-    },
-    todayBadge: {
-        backgroundColor: '#EF4444',
-    },
-    tomorrowBadge: {
-        backgroundColor: '#F59E0B',
-    },
-    upcomingBadge: {
-        backgroundColor: '#10B981',
-    },
-    pastBadge: {
-        backgroundColor: '#6B7280',
-    },
-    eventBadgeText: {
-        color: '#FFFFFF',
-        fontSize: isSmallScreen ? 9 : 10,
-        fontWeight: '600',
-    },
-    eventBadgeTextSmall: {
-        fontSize: 9,
-    },
+  // Coordinates Section
+  coordinatesSection: {
+    marginBottom: 8,
+  },
+  verificationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  verificationBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#065F46',
+    marginLeft: 4,
+  },
+  mapButton: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 12,
+  },
+  mapButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mapButtonText: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  mapButtonTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textDark,
+    marginBottom: 2,
+  },
+  mapButtonSubtitle: {
+    fontSize: 11,
+    color: COLORS.textLight,
+  },
 
-    eventContent: {
-        padding: isSmallScreen ? 12 : 14,
-    },
-    eventContentSmall: {
-        padding: 12,
-    },
-    eventHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: isSmallScreen ? 6 : 8,
-    },
-    eventMeta: {
-        flex: 1,
-    },
-    eventLocation: {
-        fontSize: isSmallScreen ? 11 : 12,
-        color: '#1E88E5',
-        fontWeight: '700',
-        marginBottom: 2,
-    },
-    eventLocationSmall: {
-        fontSize: 11,
-    },
-    eventDate: {
-        fontSize: isSmallScreen ? 9 : 10,
-        color: '#64748B',
-        fontWeight: '500',
-    },
-    eventDateSmall: {
-        fontSize: 9,
-    },
-    pastEventDate: {
-        color: '#94A3B8',
-    },
-    eventTitle: {
-        fontSize: isSmallScreen ? 14 : 16,
-        fontWeight: 'bold',
-        color: '#1E293B',
-        marginBottom: isSmallScreen ? 3 : 4,
-        lineHeight: isSmallScreen ? 18 : 20,
-    },
-    eventTitleSmall: {
-        fontSize: 14,
-        marginBottom: 3,
-        lineHeight: 18,
-    },
-    eventDescription: {
-        fontSize: isSmallScreen ? 11 : 12,
-        color: '#475569',
-        lineHeight: isSmallScreen ? 14 : 16,
-        marginBottom: isSmallScreen ? 3 : 4,
-    },
-    eventDescriptionSmall: {
-        fontSize: 11,
-        lineHeight: 14,
-        marginBottom: 3,
-    },
-    locationDescription: {
-        fontSize: isSmallScreen ? 9 : 10,
-        color: '#64748B',
-        fontStyle: 'italic',
-        marginBottom: isSmallScreen ? 6 : 8,
-    },
-    locationDescriptionSmall: {
-        fontSize: 9,
-        marginBottom: 6,
-    },
+  // Event Stats
+  eventStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  eventStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  eventOrganizer: {
+    fontSize: 11,
+    color: COLORS.textLight,
+    marginLeft: 4,
+  },
+  attendeeCount: {
+    fontSize: 11,
+    color: COLORS.textLight,
+    marginLeft: 4,
+  },
 
-    verificationBadge: {
-        backgroundColor: '#D1FAE5',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        alignSelf: 'flex-start',
-        marginTop: 4,
-        marginLeft: -8,
-        marginBottom: isSmallScreen ? 6 : 8,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    verificationBadgeText: {
-        color: '#065F46',
-        fontSize: 12,
-        fontWeight: '500',
-    },
+  // Past Event Badge
+  pastEventBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  pastEventText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textLight,
+  },
 
-    eventStats: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: isSmallScreen ? 8 : 10,
-    },
-    eventOrganizer: {
-        fontSize: isSmallScreen ? 9 : 10,
-        color: '#1E88E5',
-        fontWeight: '600',
-    },
-    eventStatItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    eventOrganizerSmall: {
-        fontSize: 9,
-    },
-    attendeeCount: {
-        fontSize: isSmallScreen ? 9 : 10,
-        color: '#1E88E5',
-        fontWeight: '600',
-    },
-    attendeeCountSmall: {
-        fontSize: 9,
-    },
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.cardBg,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textDark,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  modalContent: {
+    flex: 1,
+    padding: 16,
+  },
+  eventInfo: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  eventInfoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    marginBottom: 4,
+  },
+  eventInfoLocation: {
+    fontSize: 14,
+    color: COLORS.textMedium,
+    marginBottom: 8,
+  },
+  coordinatesInfo: {
+    backgroundColor: '#F0F9FF',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
+  },
+  coordinatesText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0369A1',
+    marginBottom: 4,
+  },
+  coordinatesHint: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  mapOptionButton: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  mapOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mapOptionText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  mapOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textDark,
+    marginBottom: 2,
+  },
+  mapOptionSubtitle: {
+    fontSize: 13,
+    color: COLORS.textLight,
+  },
+  mapInstructions: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  instructionsTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    marginBottom: 8,
+  },
+  instructionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  instructionText: {
+    fontSize: 13,
+    color: COLORS.textMedium,
+    marginLeft: 8,
+    flex: 1,
+  },
+  instructionBold: {
+    fontWeight: '600',
+    color: COLORS.textDark,
+  },
 
-    eventFooter: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-    },
-    pastEventBadge: {
-        backgroundColor: '#EF4444',
-        paddingHorizontal: isSmallScreen ? 12 : 14,
-        paddingVertical: isSmallScreen ? 6 : 8,
-        borderRadius: 6,
-        minWidth: isSmallScreen ? 100 : 120,
-    },
-    pastEventBadgeSmall: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        minWidth: 100,
-    },
-    pastEventText: {
-        color: '#FFFFFF',
-        fontWeight: '600',
-        fontSize: isSmallScreen ? 11 : 12,
-        textAlign: 'center',
-    },
-    pastEventTextSmall: {
-        fontSize: 11,
-    },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.textLight,
+  },
 
-    emptyState: {
-        alignItems: 'center',
-        padding: isSmallScreen ? 30 : 40,
-        marginTop: isSmallScreen ? 40 : 60,
-    },
-    emptyStateSmall: {
-        padding: 30,
-        marginTop: 40,
-    },
-    emptyStateTitle: {
-        fontSize: isSmallScreen ? 18 : 20,
-        color: '#64748B',
-        fontWeight: '600',
-        marginBottom: 8,
-        textAlign: 'center',
-        marginTop: 12,
-    },
-    emptyStateTitleSmall: {
-        fontSize: 18,
-    },
-    emptyStateText: {
-        fontSize: isSmallScreen ? 12 : 14,
-        color: '#94A3B8',
-        textAlign: 'center',
-        marginBottom: 24,
-    },
-    emptyStateTextSmall: {
-        fontSize: 12,
-    },
-
-    loadingText: {
-        marginTop: 10,
-        color: '#64748B',
-        fontSize: isSmallScreen ? 14 : 16,
-        fontWeight: '500',
-    },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  emptyStateIcon: {
+    marginBottom: 16,
+    opacity: 0.5,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    color: COLORS.textDark,
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });

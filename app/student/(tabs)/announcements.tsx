@@ -23,8 +23,13 @@ export default function StudentAnnouncements() {
   const [filteredAnnouncements, setFilteredAnnouncements] = useState<Announcement[]>([]);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+    fetchAnnouncements();
+  }, []);
+
+  const fetchAnnouncements = () => {
     const q = query(collection(db, "updates"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list: Announcement[] = snapshot.docs.map((doc) => ({
@@ -34,12 +39,14 @@ export default function StudentAnnouncements() {
       setAnnouncements(list);
       filterAnnouncements(list, timeFilter);
       setLoading(false);
+      setRefreshing(false);
     }, (error) => {
       console.error("Error fetching announcements:", error);
       setLoading(false);
+      setRefreshing(false);
     });
-    return () => unsubscribe();
-  }, []);
+    return unsubscribe;
+  };
 
   useEffect(() => {
     filterAnnouncements(announcements, timeFilter);
@@ -77,6 +84,13 @@ export default function StudentAnnouncements() {
     return dayjs(createdAt.toDate()).isAfter(dayjs().subtract(1, 'day'));
   };
 
+  const isUrgentAnnouncement = (title: string) => {
+    const urgentKeywords = ['urgent', 'important', 'emergency', 'critical', 'immediate'];
+    return urgentKeywords.some(keyword => 
+      title.toLowerCase().includes(keyword)
+    );
+  };
+
   const getTotalStats = () => {
     const now = dayjs();
     const todayCount = announcements.filter(ann =>
@@ -85,52 +99,83 @@ export default function StudentAnnouncements() {
     const newCount = announcements.filter(ann =>
       ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(3, 'day'))
     ).length;
+    const urgentCount = announcements.filter(ann =>
+      isUrgentAnnouncement(ann.title)
+    ).length;
 
-    return { total: announcements.length, today: todayCount, new: newCount };
+    return { total: announcements.length, today: todayCount, new: newCount, urgent: urgentCount };
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchAnnouncements();
   };
 
   const stats = getTotalStats();
 
   const renderAnnouncementItem = ({ item }: { item: Announcement }) => (
-    <View style={styles.card}>
+    <View style={[
+      styles.card,
+      isUrgentAnnouncement(item.title) && styles.urgentCard
+    ]}>
       <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        {isNewAnnouncement(item.createdAt) && (
-          <View style={styles.newBadge}>
-            <Text style={styles.newBadgeText}>NEW</Text>
-          </View>
-        )}
+        <View style={styles.titleContainer}>
+          {isUrgentAnnouncement(item.title) && (
+            <Icon name="alert-circle" size={14} color="#DC2626" style={styles.urgentIcon} />
+          )}
+          <Text style={[
+            styles.cardTitle,
+            isUrgentAnnouncement(item.title) && styles.urgentTitle
+          ]} numberOfLines={2}>
+            {item.title}
+          </Text>
+        </View>
+        <View style={styles.badgeContainer}>
+          {isNewAnnouncement(item.createdAt) && (
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>NEW</Text>
+            </View>
+          )}
+        </View>
       </View>
-      <Text style={styles.cardMessage} numberOfLines={4}>
+      
+      <Text style={styles.cardMessage} numberOfLines={3}>
         {item.message}
       </Text>
+      
       {item.createdAt && (
-        <Text style={styles.timestamp}>
-          <Icon name="calendar" size={16} color="#0122f7ff" /> {dayjs(item.createdAt.toDate()).format('MMM D, YYYY • h:mm A')} • {dayjs(item.createdAt.toDate()).fromNow()}
-        </Text>
+        <View style={styles.timestampContainer}>
+          <Icon name="clock-outline" size={12} color="#6B7280" />
+          <Text style={styles.timestamp}>
+            {dayjs(item.createdAt.toDate()).format('MMM D • h:mm A')} • {dayjs(item.createdAt.toDate()).fromNow()}
+          </Text>
+        </View>
       )}
     </View>
   );
 
-  const timeFilters: { key: TimeFilter; label: string }[] = [
+  const timeFilters: { key: TimeFilter; label: string;}[] = [
     { key: 'all', label: 'All' },
     { key: 'today', label: 'Today' },
-    { key: 'week', label: 'This Week' },
-    { key: 'month', label: 'This Month' },
+    { key: 'week', label: 'Week' },
+    { key: 'month', label: 'Month'},
   ];
 
   if (loading) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Campus Announcements</Text>
-          <Text style={styles.subtitle}>Stay updated with the latest campus news and updates</Text>
+          <View style={styles.headerIcon}>
+            <Icon name="bullhorn" size={20} color="#FFFFFF" />
+          </View>
+          <Text style={styles.headerTitle}>Announcements</Text>
+          <Text style={styles.headerSubtitle}>
+            Latest campus news and updates
+          </Text>
         </View>
 
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1E88E5" />
+          <ActivityIndicator size="large" color="#4F46E5" />
           <Text style={styles.loadingText}>Loading announcements...</Text>
         </View>
       </View>
@@ -140,8 +185,13 @@ export default function StudentAnnouncements() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Campus Announcements</Text>
-        <Text style={styles.subtitle}>Stay updated with the latest campus news and updates</Text>
+        <View style={styles.headerIcon}>
+          <Icon name="bullhorn" size={20} color="#FFFFFF" />
+        </View>
+        <Text style={styles.headerTitle}>Announcements</Text>
+        <Text style={styles.headerSubtitle}>
+          Latest campus news and updates
+        </Text>
       </View>
 
       <View style={styles.statsContainer}>
@@ -157,10 +207,14 @@ export default function StudentAnnouncements() {
           <Text style={styles.statNumber}>{stats.new}</Text>
           <Text style={styles.statLabel}>New</Text>
         </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{stats.urgent}</Text>
+          <Text style={styles.statLabel}>Urgent</Text>
+        </View>
       </View>
 
-      <View style={styles.filterContainer}>
-        <Text style={styles.filterTitle}>Filter by time:</Text>
+      <View style={styles.filterSection}>
+        <Text style={styles.filterTitle}>Filter by:</Text>
         <View style={styles.filterChips}>
           {timeFilters.map((filter) => (
             <TouchableOpacity
@@ -182,22 +236,33 @@ export default function StudentAnnouncements() {
         </View>
       </View>
 
+      <View style={styles.resultsInfo}>
+        <Text style={styles.resultsText}>
+          {filteredAnnouncements.length} announcement{filteredAnnouncements.length !== 1 ? 's' : ''}
+          {timeFilter !== 'all' && ` from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
+        </Text>
+      </View>
+
       <FlatList
         data={filteredAnnouncements}
         keyExtractor={(item) => item.id}
         renderItem={renderAnnouncementItem}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>📢</Text>
+            <View style={styles.emptyStateIcon}>
+              <Icon name="bullhorn-outline" size={32} color="#9CA3AF" />
+            </View>
             <Text style={styles.emptyStateText}>
               {timeFilter === 'all' ? 'No announcements yet' : `No announcements from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
             </Text>
             <Text style={styles.emptyStateSubtext}>
               {timeFilter === 'all'
-                ? 'Check back later for new campus announcements!'
-                : 'Try changing the filter to see more announcements'
+                ? 'Check back later for new announcements'
+                : 'Try changing the filter to see more'
               }
             </Text>
           </View>

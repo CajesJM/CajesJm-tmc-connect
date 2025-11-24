@@ -1,4 +1,3 @@
-// lib/locationService.ts
 import * as Location from 'expo-location';
 import { Alert, Linking, Platform } from 'react-native';
 
@@ -12,7 +11,7 @@ export interface UserLocation {
 export interface EventLocation {
   latitude: number;
   longitude: number;
-  radius: number; // in meters
+  radius: number; 
   address?: string;
 }
 

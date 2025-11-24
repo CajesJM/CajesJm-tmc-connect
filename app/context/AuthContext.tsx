@@ -110,7 +110,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return reject(new Error("Invalid username or password."));
       }
 
-      // If we get here, Firebase login was successful
       const firebaseUser = userCredential.user;
 
       // Get user role from Firestore

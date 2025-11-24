@@ -12,13 +12,13 @@ export default function ProfileScreen() {
     router.replace('/login');
   };
 
-  // Safely get the username from email
+
   const getUsername = () => {
     if (!userData?.email) return 'Administrator';
     return userData.email.split('@')[0];
   };
 
-  // Safely get the display name
+
   const getDisplayName = () => {
     if (userData?.name) return userData.name;
     return getUsername();

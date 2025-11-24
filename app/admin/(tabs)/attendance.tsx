@@ -15,7 +15,6 @@ export default function AttendanceScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedYearLevel, setSelectedYearLevel] = useState<string>('all');
   const [selectedBlock, setSelectedBlock] = useState<string>('all');
-
   const [showExpirationModal, setShowExpirationModal] = useState<boolean>(false);
   const [customExpiration, setCustomExpiration] = useState<string>('');
 
@@ -128,12 +127,11 @@ export default function AttendanceScreen() {
       timestamp: new Date().toISOString(),
       expiresAt: expirationTime.toISOString(),
       usesManualExpiration: !!(event.qrExpiration && isValidDate(event.qrExpiration)),
-      eventLocation: event.coordinates // Include location coordinates in QR code
+      eventLocation: event.coordinates
     };
 
     setSelectedEvent(event);
     setShowEventModal(false);
-
     fetchAttendanceRecords(event.id);
   };
 
@@ -378,11 +376,19 @@ export default function AttendanceScreen() {
   const isCurrentQRExpired = selectedEvent ? isQRCodeExpired(selectedEvent) : false;
 
   return (
-    <ScrollView style={attendanceStyles.container} contentContainerStyle={attendanceStyles.contentContainer}>
-      <Text style={attendanceStyles.title}>Attendance Management</Text>
+    <ScrollView style={attendanceStyles.container} showsVerticalScrollIndicator={false}>
+      <View style={attendanceStyles.header}>
+        <View style={attendanceStyles.headerIcon}>
+          <Icon name="qrcode" size={20} color="#FFFFFF" />
+        </View>
+        <Text style={attendanceStyles.headerTitle}>Attendance Management</Text>
+        <Text style={attendanceStyles.headerSubtitle}>
+          Generate QR codes and track student attendance
+        </Text>
+      </View>
 
-      <View style={attendanceStyles.card}>
-        <Text style={attendanceStyles.cardTitle}>Event QR Code Generator</Text>
+      <View style={attendanceStyles.mainCard}>
+        <Text style={attendanceStyles.cardTitle}>QR Code Generator</Text>
 
         <View style={attendanceStyles.inputContainer}>
           <Text style={attendanceStyles.label}>Select Event</Text>
@@ -391,6 +397,7 @@ export default function AttendanceScreen() {
               <Text style={selectedEvent ? attendanceStyles.inputText : attendanceStyles.placeholderText}>
                 {selectedEvent ? selectedEvent.title : 'Tap to select an event'}
               </Text>
+              <Icon name="chevron-down" size={20} color="#6B7280" />
             </View>
           </TouchableOpacity>
         </View>
@@ -406,18 +413,14 @@ export default function AttendanceScreen() {
             )}
 
             <Text style={attendanceStyles.eventLocation}>
-              <Icon name="map-marker" size={16} color="#1e6dffff" />{selectedEvent.location}
+              <Icon name="map-marker" size={14} color="#4F46E5" /> {selectedEvent.location}
             </Text>
 
-            {/* Location Verification Status */}
             {selectedEvent.coordinates && (
               <View style={attendanceStyles.locationVerificationBadge}>
+                <Icon name="map-marker-check" size={14} color="#10B981"/>
                 <Text style={attendanceStyles.locationVerificationText}>
-                  <Icon name="map-marker-check" size={16} color="#10B981" /> Location Verification Enabled
-                </Text>
-                <Text style={attendanceStyles.locationDetails}>
-                  Radius: {selectedEvent.coordinates.radius}m • 
-                  {selectedEvent.coordinates.latitude.toFixed(6)}, {selectedEvent.coordinates.longitude.toFixed(6)}
+                  Location Verification Enabled
                 </Text>
               </View>
             )}
@@ -428,26 +431,23 @@ export default function AttendanceScreen() {
             ]}>
               {isCurrentQRExpired ? (
                 <>
-                  <Text style={attendanceStyles.qrStatusTitle}><Icon name="close" size={16} color="#DC2626" /> QR CODE EXPIRED</Text>
+                  <Text style={attendanceStyles.qrStatusTitle}>
+                    <Icon name="close-circle" size={16} color="#DC2626" /> QR Code Expired
+                  </Text>
                   <Text style={attendanceStyles.qrStatusText}>
                     This QR code is no longer working. Students cannot scan it.
                   </Text>
-                  {selectedEvent.qrExpiration && isValidDate(selectedEvent.qrExpiration) && (
-                    <Text style={attendanceStyles.qrStatusNote}>
-                      Expired on: {formatDate(selectedEvent.qrExpiration)}
-                    </Text>
-                  )}
                 </>
               ) : (
                 <>
                   <Text style={attendanceStyles.qrStatusTitle}>
                     {selectedEvent.qrExpiration ? (
                       <>
-                        <Icon name="check-circle" size={16} color="#10B981" /> MANUALLY CONTROLLED
+                        <Icon name="alarm" size={16} color="#10B981" /> Manually Controlled
                       </>
                     ) : (
                       <>
-                        <Icon name="check-circle" size={16} color="#10B981" /> ACTIVE QR CODE
+                        <Icon name="check-circle" size={16} color="#10B981" /> Active QR Code
                       </>
                     )}
                   </Text>
@@ -457,11 +457,6 @@ export default function AttendanceScreen() {
                       : 'No expiration set (default 24 hours)'
                     }
                   </Text>
-                  {selectedEvent.qrExpiration && isValidDate(selectedEvent.qrExpiration) && (
-                    <Text style={attendanceStyles.qrStatusNote}>
-                      Time remaining: {getTimeRemaining(selectedEvent.qrExpiration)}
-                    </Text>
-                  )}
                 </>
               )}
             </View>
@@ -480,20 +475,20 @@ export default function AttendanceScreen() {
                     usesManualExpiration: !!(selectedEvent.qrExpiration && isValidDate(selectedEvent.qrExpiration)),
                     eventLocation: selectedEvent.coordinates 
                   })}
-                  size={200}
+                  size={180}
                   color="#1E293B"
                   backgroundColor="#FFFFFF"
                 />
                 <Text style={attendanceStyles.codeHint}>Scan this QR code for attendance</Text>
                 {selectedEvent.coordinates && (
                   <Text style={attendanceStyles.locationHint}>
-                    <Icon name="map-marker" size={16} color="#1e6dffff" /> Location verification required ({selectedEvent.coordinates.radius}m radius)
+                    <Icon name="map-marker-radius" size={12} color="#4F46E5" /> {selectedEvent.coordinates.radius}m verification radius
                   </Text>
                 )}
               </>
             ) : (
               <View style={attendanceStyles.expiredQRPlaceholder}>
-                <Text style={attendanceStyles.expiredQRText}><Icon name="cancel" size={48} color="#DC2626" /></Text>
+                <Icon name="cancel" size={48} color="#DC2626" />
                 <Text style={attendanceStyles.expiredQRTitle}>QR Code Expired</Text>
                 <Text style={attendanceStyles.expiredQRDescription}>
                   This QR code is no longer valid for scanning
@@ -505,6 +500,7 @@ export default function AttendanceScreen() {
           </View>
         ) : (
           <View style={attendanceStyles.placeholderQR}>
+            <Icon name="qrcode" size={48} color="#9CA3AF" />
             <Text style={attendanceStyles.placeholderText}>
               Select an event to generate QR code
             </Text>
@@ -520,6 +516,7 @@ export default function AttendanceScreen() {
                 style={[attendanceStyles.managementButton, attendanceStyles.setExpirationButton]}
                 onPress={() => setShowExpirationModal(true)}
               >
+                <Icon name="alarm" size={16} color="#FFFFFF" />
                 <Text style={attendanceStyles.managementButtonText}>
                   {selectedEvent.qrExpiration ? 'Change Expiration' : 'Set Expiration'}
                 </Text>
@@ -530,17 +527,11 @@ export default function AttendanceScreen() {
                   style={[attendanceStyles.managementButton, attendanceStyles.clearExpirationButton]}
                   onPress={clearManualExpiration}
                 >
+                  <Icon name="alarm-off" size={16} color="#FFFFFF" />
                   <Text style={attendanceStyles.managementButtonText}>Clear Expiration</Text>
                 </TouchableOpacity>
               )}
             </View>
-
-            <Text style={attendanceStyles.managementNote}>
-              {selectedEvent.qrExpiration && isValidDate(selectedEvent.qrExpiration)
-                ? 'QR code expiration is manually controlled'
-                : 'QR code uses default 24-hour expiration'
-              }
-            </Text>
           </View>
         )}
 
@@ -550,6 +541,7 @@ export default function AttendanceScreen() {
               style={[attendanceStyles.button, attendanceStyles.refreshButton]}
               onPress={refreshAttendance}
             >
+              <Icon name="refresh" size={16} color="#FFFFFF" />
               <Text style={attendanceStyles.buttonText}>Refresh Attendance</Text>
             </TouchableOpacity>
           )}
@@ -559,6 +551,7 @@ export default function AttendanceScreen() {
               style={[attendanceStyles.button, attendanceStyles.clearButton]}
               onPress={clearSelection}
             >
+              <Icon name="close" size={16} color="#FFFFFF" />
               <Text style={attendanceStyles.buttonText}>Change Event</Text>
             </TouchableOpacity>
           )}
@@ -568,89 +561,83 @@ export default function AttendanceScreen() {
           <View style={attendanceStyles.attendanceContainer}>
             <View style={attendanceStyles.attendanceHeader}>
               <Text style={attendanceStyles.attendanceTitle}>
-                📊 Attendance Records ({filteredRecords.length})
+                Attendance Records ({filteredRecords.length})
               </Text>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={attendanceStyles.filterContainer}
-                contentContainerStyle={attendanceStyles.filterContainerContent}
-              >
+              <View style={attendanceStyles.filterSection}>
                 <Text style={attendanceStyles.filterLabel}>Year Level:</Text>
-                <TouchableOpacity
-                  style={[
-                    attendanceStyles.filterButton,
-                    selectedYearLevel === 'all' && attendanceStyles.filterButtonActive
-                  ]}
-                  onPress={() => setSelectedYearLevel('all')}
-                >
-                  <Text style={[
-                    attendanceStyles.filterButtonText,
-                    selectedYearLevel === 'all' && attendanceStyles.filterButtonTextActive
-                  ]}>
-                    All
-                  </Text>
-                </TouchableOpacity>
-                {DEFAULT_YEAR_LEVELS.map(yearLevel => (
+                <View style={attendanceStyles.filterChips}>
                   <TouchableOpacity
-                    key={yearLevel}
                     style={[
-                      attendanceStyles.filterButton,
-                      selectedYearLevel === yearLevel && attendanceStyles.filterButtonActive
+                      attendanceStyles.filterChip,
+                      selectedYearLevel === 'all' && attendanceStyles.filterChipActive
                     ]}
-                    onPress={() => setSelectedYearLevel(yearLevel)}
+                    onPress={() => setSelectedYearLevel('all')}
                   >
                     <Text style={[
-                      attendanceStyles.filterButtonText,
-                      selectedYearLevel === yearLevel && attendanceStyles.filterButtonTextActive
+                      attendanceStyles.filterChipText,
+                      selectedYearLevel === 'all' && attendanceStyles.filterChipTextActive
                     ]}>
-                      Year {yearLevel}
+                      All
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                  {DEFAULT_YEAR_LEVELS.map(yearLevel => (
+                    <TouchableOpacity
+                      key={yearLevel}
+                      style={[
+                        attendanceStyles.filterChip,
+                        selectedYearLevel === yearLevel && attendanceStyles.filterChipActive
+                      ]}
+                      onPress={() => setSelectedYearLevel(yearLevel)}
+                    >
+                      <Text style={[
+                        attendanceStyles.filterChipText,
+                        selectedYearLevel === yearLevel && attendanceStyles.filterChipTextActive
+                      ]}>
+                        Year {yearLevel}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={attendanceStyles.filterContainer}
-                contentContainerStyle={attendanceStyles.filterContainerContent}
-              >
+              <View style={attendanceStyles.filterSection}>
                 <Text style={attendanceStyles.filterLabel}>Block:</Text>
-                <TouchableOpacity
-                  style={[
-                    attendanceStyles.filterButton,
-                    selectedBlock === 'all' && attendanceStyles.filterButtonActive
-                  ]}
-                  onPress={() => setSelectedBlock('all')}
-                >
-                  <Text style={[
-                    attendanceStyles.filterButtonText,
-                    selectedBlock === 'all' && attendanceStyles.filterButtonTextActive
-                  ]}>
-                    All Blocks
-                  </Text>
-                </TouchableOpacity>
-
-                {DEFAULT_BLOCKS.map(block => (
+                <View style={attendanceStyles.filterChips}>
                   <TouchableOpacity
-                    key={block}
                     style={[
-                      attendanceStyles.filterButton,
-                      selectedBlock === block && attendanceStyles.filterButtonActive
+                      attendanceStyles.filterChip,
+                      selectedBlock === 'all' && attendanceStyles.filterChipActive
                     ]}
-                    onPress={() => setSelectedBlock(block)}
+                    onPress={() => setSelectedBlock('all')}
                   >
                     <Text style={[
-                      attendanceStyles.filterButtonText,
-                      selectedBlock === block && attendanceStyles.filterButtonTextActive
+                      attendanceStyles.filterChipText,
+                      selectedBlock === 'all' && attendanceStyles.filterChipTextActive
                     ]}>
-                      Block {block}
+                      All Blocks
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+
+                  {DEFAULT_BLOCKS.map(block => (
+                    <TouchableOpacity
+                      key={block}
+                      style={[
+                        attendanceStyles.filterChip,
+                        selectedBlock === block && attendanceStyles.filterChipActive
+                      ]}
+                      onPress={() => setSelectedBlock(block)}
+                    >
+                      <Text style={[
+                        attendanceStyles.filterChipText,
+                        selectedBlock === block && attendanceStyles.filterChipTextActive
+                      ]}>
+                        Block {block}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
 
             {Object.keys(studentsByBlock).length > 0 ? (
@@ -658,7 +645,7 @@ export default function AttendanceScreen() {
                 {Object.entries(studentsByBlock).map(([block, students]) => (
                   <View key={block} style={attendanceStyles.blockSection}>
                     <View style={attendanceStyles.blockHeader}>
-                      <Text style={attendanceStyles.blockTitle}>🧩 Block {block}</Text>
+                      <Text style={attendanceStyles.blockTitle}>Block {block}</Text>
                       <Text style={attendanceStyles.blockCount}>{students.length} students</Text>
                     </View>
                     <View style={attendanceStyles.studentsList}>
@@ -672,30 +659,34 @@ export default function AttendanceScreen() {
                                 attendanceStyles.locationBadge,
                                 record.location.isWithinRadius ? attendanceStyles.locationValid : attendanceStyles.locationInvalid
                               ]}>
+                                <Icon 
+                                  name={record.location.isWithinRadius ? "check-circle" : "close-circle"} 
+                                  size={12} 
+                                  color={record.location.isWithinRadius ? "#10B981" : "#DC2626"} 
+                                />
                                 <Text style={attendanceStyles.locationBadgeText}>
-                                  {record.location.isWithinRadius ? '📍 Verified' : '📍 Too Far'}
+                                  {record.location.isWithinRadius ? 'Verified' : 'Too Far'}
                                 </Text>
                               </View>
                             )}
                           </View>
                           <Text style={attendanceStyles.studentDetails}>
-                            🎓 {record.course} • 📚 Year {record.yearLevel} • 🧩 Block {record.block}
+                            {record.course} • Year {record.yearLevel} • Block {record.block}
                           </Text>
                           <Text style={attendanceStyles.studentDetails}>
-                            👤 {record.gender}
+                            {record.gender}
                           </Text>
 
                           {record.location && (
                             <View style={attendanceStyles.locationDetailsContainer}>
                               <Text style={attendanceStyles.locationDetailsText}>
-                                <Icon name="map-marker" size={16} color="#1e6dffff" /> {record.location.distance?.toFixed(0)}m away • 
+                                <Icon name="map-marker" size={12} color="#4F46E5" /> {record.location.distance?.toFixed(0)}m away • 
                                 Accuracy: {record.location.accuracy?.toFixed(0)}m
-                                {!record.location.isWithinRadius && ' ⚠️'}
                               </Text>
                             </View>
                           )}
                           <Text style={attendanceStyles.timestamp}>
-                            <Icon name="alarm" size={16} color="#666" /> {formatDate(record.timestamp || new Date().toISOString())}
+                            <Icon name="clock-outline" size={12} color="#6B7280" /> {formatDate(record.timestamp || new Date().toISOString())}
                           </Text>
                         </View>
                       ))}
@@ -715,6 +706,7 @@ export default function AttendanceScreen() {
 
         {selectedEvent && attendanceRecords.length === 0 && (
           <View style={attendanceStyles.noAttendance}>
+            <Icon name="account-group" size={48} color="#9CA3AF" />
             <Text style={attendanceStyles.noAttendanceText}>No attendance records yet</Text>
             <Text style={attendanceStyles.noAttendanceSubtext}>
               Students will appear here after scanning the QR code
@@ -723,6 +715,8 @@ export default function AttendanceScreen() {
         )}
       </View>
 
+      {/* Event Selection Modal */}
+            {/* Event Selection Modal */}
       <Modal
         visible={showEventModal}
         transparent={true}
@@ -731,12 +725,23 @@ export default function AttendanceScreen() {
       >
         <View style={attendanceStyles.modalOverlay}>
           <View style={attendanceStyles.modalContent}>
-            <Text style={attendanceStyles.modalTitle}>Select Event</Text>
+            <View style={attendanceStyles.modalHeader}>
+              <Text style={attendanceStyles.modalTitle}>Select Event</Text>
+              <TouchableOpacity 
+                style={attendanceStyles.closeButton}
+                onPress={() => setShowEventModal(false)}
+              >
+                <Icon name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
 
             {loading ? (
               <Text style={attendanceStyles.loadingText}>Loading events...</Text>
             ) : events.length === 0 ? (
-              <Text style={attendanceStyles.noEventsText}>No events available</Text>
+              <View style={attendanceStyles.emptyState}>
+                <Icon name="calendar-remove" size={48} color="#9CA3AF" />
+                <Text style={attendanceStyles.noEventsText}>No events available</Text>
+              </View>
             ) : (
               <ScrollView style={attendanceStyles.eventsList}>
                 {events.map((event) => (
@@ -753,42 +758,35 @@ export default function AttendanceScreen() {
                       </Text>
                     )}
                     <Text style={attendanceStyles.eventItemLocation}>
-                      <Icon name="map-marker" size={16} color="#1e6dffff" />{event.location}
+                      <Icon name="map-marker" size={14} color="#4F46E5" /> {event.location}
                     </Text>
 
-                    {/* Event Location Verification Status */}
                     {event.coordinates && (
                       <View style={attendanceStyles.eventLocationBadge}>
+                        <Icon name="map-marker-check" size={12} color="#10B981" />
                         <Text style={attendanceStyles.eventLocationBadgeText}>
-                          <Icon name="map-marker-check" size={14} color="#10B981" /> Location Verification
+                          Location Verification
                         </Text>
                       </View>
                     )}
 
                     {event.qrExpiration && isValidDate(event.qrExpiration) && (
                       <View style={attendanceStyles.eventExpirationBadge}>
+                        <Icon name="alarm" size={12} color="#6B7280" />
                         <Text style={attendanceStyles.eventExpirationText}>
-                          <Icon name="alarm" size={16} color="#666" /> Expires: {formatDate(event.qrExpiration)}
+                          Expires: {formatDate(event.qrExpiration)}
                         </Text>
                       </View>
                     )}
-                    <Text style={attendanceStyles.eventItemDescription}>
-                      {event.description || 'No description available'}
-                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             )}
-
-            <TouchableOpacity
-              style={[attendanceStyles.modalButton, attendanceStyles.cancelButton]}
-              onPress={() => setShowEventModal(false)}
-            >
-              <Text style={attendanceStyles.modalButtonText}>Cancel</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* Expiration Modal */}
       <Modal
         visible={showExpirationModal}
         transparent={true}
@@ -797,7 +795,16 @@ export default function AttendanceScreen() {
       >
         <View style={attendanceStyles.modalOverlay}>
           <View style={attendanceStyles.modalContent}>
-            <Text style={attendanceStyles.modalTitle}>Set QR Expiration</Text>
+            <View style={attendanceStyles.modalHeader}>
+              <Text style={attendanceStyles.modalTitle}>Set QR Expiration</Text>
+              <TouchableOpacity 
+                style={attendanceStyles.closeButton}
+                onPress={() => setShowExpirationModal(false)}
+              >
+                <Icon name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+            
             <Text style={attendanceStyles.modalSubtitle}>
               For event: {selectedEvent?.title}
             </Text>
@@ -814,10 +821,12 @@ export default function AttendanceScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
             <Text style={attendanceStyles.optionLabel}>Custom Date & Time:</Text>
             <Text style={attendanceStyles.inputHint}>
               Format: YYYY-MM-DDTHH:MM (e.g., {new Date().getFullYear()}-12-31T23:59)
             </Text>
+            
             <View style={attendanceStyles.customInputContainer}>
               <Text style={attendanceStyles.customInput}>
                 {customExpiration || 'No date selected'}

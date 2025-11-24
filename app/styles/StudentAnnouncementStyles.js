@@ -1,95 +1,115 @@
-import { Dimensions, Platform, StyleSheet } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;
 
+const COLORS = {
+  primary: '#4F46E5',
+  primaryLight: '#6366F1',
+  secondary: '#6B7280',
+  background: '#F0F4F8',
+  cardBg: '#FFFFFF',
+  textDark: '#111827',
+  textMedium: '#374151',
+  textLight: '#6B7280',
+  border: '#E5E7EB',
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#DC2626',
+  info: '#3B82F6',
+  shadow: '#000000',
+};
+
 export const StudentAnnouncementStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 45 : 25,
-    paddingBottom: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  title: {
-    fontSize: isSmallScreen ? 20 : 22,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    textAlign: 'left', // Changed from 'center' to 'left'
-  },
-  subtitle: {
-    fontSize: isSmallScreen ? 11 : 13,
-    color: '#64748B',
-    marginTop: 2,
-    textAlign: 'left', // Changed from 'center' to 'left'
+    backgroundColor: COLORS.background,
   },
 
-  // Loading styles
-  loadingContainer: {
-    flex: 1,
+  header: {
+    backgroundColor: COLORS.primary,
+    padding: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    marginBottom: 8,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#64748B',
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 4,
     textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    lineHeight: 16,
   },
 
   statsContainer: {
     flexDirection: 'row',
-    padding: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
     gap: 8,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
     padding: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   statNumber: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1E88E5',
+    fontWeight: '800',
+    color: COLORS.textDark,
     marginBottom: 2,
   },
   statLabel: {
     fontSize: 10,
-    color: '#64748B',
-    textAlign: 'center',
+    fontWeight: '600',
+    color: COLORS.textLight,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 
-  filterContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+  filterSection: {
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   filterTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 6,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    marginBottom: 8,
   },
   filterChips: {
     flexDirection: 'row',
@@ -97,63 +117,63 @@ export const StudentAnnouncementStyles = StyleSheet.create({
     gap: 6,
   },
   filterChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 4,
   },
   filterChipActive: {
-    backgroundColor: '#1E88E5',
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterIcon: {
+    marginRight: 4,
   },
   filterChipText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMedium,
   },
   filterChipTextActive: {
     color: '#FFFFFF',
   },
 
-  listContent: {
-    padding: 12,
-    paddingTop: 6,
+  resultsInfo: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
-  emptyState: {
-    alignItems: 'center',
-    padding: 30,
-    marginTop: 40,
-  },
-  emptyStateIcon: {
-    fontSize: 32,
-    marginBottom: 12,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#64748B',
-    fontWeight: '600',
-    marginBottom: 6,
-    textAlign: 'center',
-  },
-  emptyStateSubtext: {
+  resultsText: {
     fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
+    color: COLORS.textLight,
+    fontWeight: '500',
+  },
+
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
   },
 
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 14,
+    backgroundColor: COLORS.cardBg,
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
-    borderLeftWidth: 3,
-    borderLeftColor: '#1E88E5',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: COLORS.border,
+  },
+  urgentCard: {
+    borderLeftColor: COLORS.error,
+    backgroundColor: '#FEF2F2',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -161,35 +181,95 @@ export const StudentAnnouncementStyles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 6,
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E293B',
+  titleContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginRight: 8,
+  },
+  urgentIcon: {
     marginRight: 6,
-    lineHeight: 20,
+    marginTop: 1,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    flex: 1,
+    lineHeight: 18,
+  },
+  urgentTitle: {
+    color: COLORS.error,
+  },
+  badgeContainer: {
+    flexDirection: 'row',
   },
   cardMessage: {
     fontSize: 13,
-    color: '#475569',
+    color: COLORS.textMedium,
     lineHeight: 18,
     marginBottom: 8,
   },
+  timestampContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   timestamp: {
     fontSize: 11,
-    color: '#94A3B8',
     fontWeight: '500',
+    color: COLORS.textLight,
+    marginLeft: 4,
   },
+
   newBadge: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#ECFDF5',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 10,
-    marginLeft: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
   newBadgeText: {
-    color: '#FFFFFF',
+    color: '#065F46',
     fontSize: 9,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.textLight,
+  },
+
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyStateIcon: {
+    marginBottom: 12,
+    opacity: 0.5,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: COLORS.textDark,
+    fontWeight: '700',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  emptyStateSubtext: {
+    fontSize: 13,
+    color: COLORS.textLight,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

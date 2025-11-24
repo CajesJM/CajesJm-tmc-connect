@@ -5,6 +5,148 @@ const isSmallDevice = width < 375;
 const isLargeDevice = width > 414;
 
 export const attendanceStyles = StyleSheet.create({
+  header: {
+  backgroundColor: '#4F46E5',
+  padding: 20,
+  borderBottomLeftRadius: 20,
+  borderBottomRightRadius: 20,
+  alignItems: 'center',
+  marginBottom: 16,
+},
+headerIcon: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+headerTitle: {
+  fontSize: 20,
+  fontWeight: '800',
+  color: '#FFFFFF',
+  marginBottom: 4,
+  textAlign: 'center',
+},
+headerSubtitle: {
+  fontSize: 12,
+  color: 'rgba(255, 255, 255, 0.8)',
+  textAlign: 'center',
+  lineHeight: 16,
+},
+
+// Main Card
+mainCard: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 16,
+  padding: 20,
+  marginHorizontal: 16,
+  marginBottom: 20,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.08,
+  shadowRadius: 8,
+  elevation: 4,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+},
+
+// Filter Section
+filterSection: {
+  marginBottom: 12,
+},
+filterChips: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginTop: 4,
+},
+filterChip: {
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 8,
+  backgroundColor: '#F9FAFB',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+},
+filterChipActive: {
+  backgroundColor: '#4F46E5',
+  borderColor: '#4F46E5',
+},
+filterChipText: {
+  fontSize: 12,
+  fontWeight: '600',
+  color: '#6B7280',
+},
+filterChipTextActive: {
+  color: '#FFFFFF',
+},
+
+// Modal Header
+modalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 16,
+},
+closeButton: {
+  padding: 4,
+},
+
+// Empty State
+emptyState: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 40,
+},
+
+// Update existing styles to be more compact:
+qrContainer: {
+  alignItems: 'center',
+  marginTop: 12,
+  backgroundColor: '#F8FAFF',
+  borderRadius: 12,
+  padding: 16,
+  borderWidth: 1,
+  borderColor: '#E0E7FF',
+},
+eventName: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: '#1E40AF',
+  marginBottom: 4,
+  textAlign: 'center',
+},
+eventDate: {
+  fontSize: 12,
+  color: '#64748B',
+  marginBottom: 4,
+},
+eventLocation: {
+  fontSize: 13,
+  color: '#4F46E5',
+  marginBottom: 8,
+  textAlign: 'center',
+},
+
+// Make buttons more compact
+buttonContainer: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginTop: 16,
+  gap: 8,
+},
+button: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 10,
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  gap: 6,
+},
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
@@ -579,15 +721,12 @@ export const attendanceStyles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
-    borderLeftWidth: 4,
   },
   qrStatusActive: {
     backgroundColor: '#F0F9FF',
-    borderLeftColor: '#0EA5E9',
   },
   qrStatusExpired: {
     backgroundColor: '#FEF2F2',
-    borderLeftColor: '#EF4444',
   },
   qrStatusTitle: {
     fontSize: 16,
@@ -756,14 +895,15 @@ locationVerificationBadge: {
   backgroundColor: '#10B98120',
   padding: 12,
   borderRadius: 8,
-  marginVertical: 8,
-  borderLeftWidth: 4,
-  borderLeftColor: '#10B981',
+  marginVertical: 0,
+  flexDirection: 'row', 
+  alignItems: 'center', 
 },
 locationVerificationText: {
   color: '#10B981',
   fontWeight: 'bold',
   fontSize: 14,
+  marginLeft: 4, 
 },
 locationDetails: {
   color: '#065F46',
@@ -787,6 +927,7 @@ locationValid: {
   backgroundColor: '#10B98120',
   borderColor: '#10B981',
   borderWidth: 1,
+  
 },
 locationInvalid: {
   backgroundColor: '#EF444420',

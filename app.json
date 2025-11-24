@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "tmc-campus-hub",
-    "slug": "tmc-campus-hub",
+    "name": "TMC Connect",
+    "slug": "TMC-Connect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/campusLocations/tmcLogo.png",
+    "icon": "./assets/images/Logo/V_1.0.1.png",
     "scheme": "tmccampushub",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/campusLocations/tmcLogo.png",
+        "foregroundImage": "./assets/images/Logo/V_1.0.1.png",
         "backgroundColor": "#E6F4FE"
       },
       "edgeToEdgeEnabled": true,
@@ -22,14 +22,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/campusLocations/phoenix.png"
+      "favicon": "./assets/images/Logo/V_1.0.1.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/campusLocations/phoenix.png",
+          "image": "./assets/images/Logo/V_1.0.1.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

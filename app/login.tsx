@@ -1,8 +1,10 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Text,
@@ -55,6 +57,15 @@ export default function Login() {
       <View style={LoginStyles.nebulaBg} />
 
       <View style={LoginStyles.card}>
+        {/* Logo Section */}
+        <View style={LoginStyles.logoContainer}>
+          <Image 
+            source={require('../assets/images/Logo/V_1.0.1.png')} 
+            style={LoginStyles.logo}
+            resizeMode="contain"
+          />
+        </View>
+
         <Text style={LoginStyles.title}>Campus Hub Login</Text>
         <Text style={LoginStyles.subtitle}>Sign in with your username</Text>
 
@@ -87,7 +98,11 @@ export default function Login() {
             onPress={() => setShowPassword((s) => !s)}
             style={LoginStyles.iconBtn}
           >
-            <Text style={LoginStyles.icon}>{showPassword ? "🙈" : "👁️"}</Text>
+            <Ionicons 
+              name={showPassword ? "eye-off" : "eye"} 
+              size={24} 
+              color="rgba(255, 255, 255, 0.7)" 
+            />
           </TouchableOpacity>
         </View>
 

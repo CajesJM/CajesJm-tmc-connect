@@ -1,13 +1,13 @@
 import { Camera, CameraView } from 'expo-camera';
 import { arrayUnion, doc, DocumentData, getDoc, updateDoc } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { ErrorService } from '../../../lib/errorService';
 import { auth, db } from '../../../lib/firebaseConfig';
 import { locationService } from '../../../lib/locationService';
 import type { AttendanceRecord, EventData, EventLocation, QRCodeData, UserLocation, ValidationResult } from '../../../lib/types';
 import { attendanceStyles as studentAttendanceStyles } from '../../styles/studentAttendanceStyles';
-
 
 const convertToEventData = (docData: DocumentData, id: string): EventData => ({
   id,
@@ -33,7 +33,40 @@ export default function StudentAttendance() {
   const [currentStudent, setCurrentStudent] = useState<any>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [scanAttempts, setScanAttempts] = useState(0);
 
+  // Memoized student info for performance
+  const formattedStudentInfo = useMemo(() => {
+    if (!currentStudent) return null;
+
+    return {
+      name: currentStudent.name,
+      studentID: currentStudent.studentID,
+      course: currentStudent.course,
+      yearLevel: currentStudent.yearLevel,
+      block: currentStudent.block || 'Not assigned',
+      gender: currentStudent.gender
+    };
+  }, [currentStudent]);
+
+  // Memoized permission request
+  const requestCameraPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+      return status === 'granted';
+    } catch (error) {
+      console.error('Error requesting camera permission:', error);
+      setHasPermission(false);
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    requestCameraPermission();
+  }, [requestCameraPermission]);
+
+  // Fetch student data
   useEffect(() => {
     const fetchStudentData = async () => {
       try {
@@ -51,29 +84,14 @@ export default function StudentAttendance() {
         }
       } catch (error) {
         console.error('Error fetching student data:', error);
+        console.log('Student data fetch error:', error);
       }
     };
 
     fetchStudentData();
   }, []);
 
-  const requestCameraPermission = async () => {
-    try {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-      return status === 'granted';
-    } catch (error) {
-      console.error('Error requesting camera permission:', error);
-      setHasPermission(false);
-      return false;
-    }
-  };
-
-  useEffect(() => {
-    requestCameraPermission();
-  }, []);
-
-  const isValidDate = (dateString: any): boolean => {
+  const isValidDate = useCallback((dateString: any): boolean => {
     if (!dateString) return false;
     try {
       const date = new Date(dateString);
@@ -81,9 +99,9 @@ export default function StudentAttendance() {
     } catch (error) {
       return false;
     }
-  };
+  }, []);
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     if (!dateString || !isValidDate(dateString)) {
       return 'Date not available';
     }
@@ -100,9 +118,10 @@ export default function StudentAttendance() {
     } catch (error) {
       return 'Date not available';
     }
-  };
+  }, [isValidDate]);
 
-  const validateQRCode = async (qrData: QRCodeData, userLocation?: UserLocation): Promise<ValidationResult> => {
+  // Memoized validation function
+  const validateQRCode = useCallback(async (qrData: QRCodeData, userLocation?: UserLocation): Promise<ValidationResult> => {
     const now = new Date();
 
     try {
@@ -234,16 +253,42 @@ export default function StudentAttendance() {
         message: 'Error validating QR code. Please try again.'
       };
     }
-  };
+  }, [currentStudent?.studentID, isValidDate, formatDate]);
 
-  const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
+  // Retry mechanism
+  const retryScan = useCallback(() => {
+    setScanned(false);
+    setCameraReady(false);
+    setScanAttempts(prev => prev + 1);
+  }, []);
+
+  // Reset scanner function
+  const resetScanner = useCallback(() => {
+    setScanned(false);
+    setScanResult(null);
+    setShowResult(false);
+    setCameraReady(false);
+    setScanAttempts(0);
+  }, []);
+
+  // Optimized scan handler
+  const handleBarCodeScanned = useCallback(async ({ type, data }: { type: string; data: string }) => {
     if (scanned) return;
 
     setScanned(true);
     setIsGettingLocation(true);
 
     try {
-      const qrData: QRCodeData = JSON.parse(data);
+      let qrData: QRCodeData;
+      try {
+        qrData = JSON.parse(data);
+      } catch (parseError) {
+        const errorInfo = ErrorService.handleError('QR_PARSE_ERROR');
+        Alert.alert(errorInfo.title, errorInfo.message);
+        setShowScanner(false);
+        setIsGettingLocation(false);
+        return;
+      }
 
       if (qrData.type !== 'attendance' || !qrData.eventId) {
         Alert.alert('Invalid QR Code', 'This is not a valid attendance QR code.');
@@ -253,12 +298,12 @@ export default function StudentAttendance() {
       }
 
       if (!currentStudent) {
-        Alert.alert('Error', 'Student data not found. Please make sure you are logged in.');
+        const errorInfo = ErrorService.handleError('STUDENT_DATA_MISSING');
+        Alert.alert(errorInfo.title, errorInfo.message);
         setShowScanner(false);
         setIsGettingLocation(false);
         return;
       }
-
       let userLocation: UserLocation | undefined;
       try {
         const hasLocationPermission = await locationService.requestLocationPermission();
@@ -268,17 +313,17 @@ export default function StudentAttendance() {
             userLocation = locationResult.location;
             console.log('User location obtained:', userLocation);
           } else {
-            console.warn('Location not available:', locationResult.error);
+            const errorInfo = ErrorService.handleError('LOCATION_UNAVAILABLE', { showAlert: false });
             Alert.alert(
-              'Location Unavailable',
+              errorInfo.title,
               'Attendance will be recorded without location verification. Some events may require location verification.',
               [{ text: 'Continue' }]
             );
           }
         } else {
-          console.warn('Location permission denied');
+          const errorInfo = ErrorService.handleError('LOCATION_PERMISSION_DENIED', { showAlert: false });
           Alert.alert(
-            'Location Permission Denied',
+            errorInfo.title,
             'Attendance will be recorded without location verification. Some events may require location verification.',
             [{ text: 'Continue' }]
           );
@@ -293,6 +338,9 @@ export default function StudentAttendance() {
       }
 
       const validation = await validateQRCode(qrData, userLocation);
+
+      // Log the scan attempt
+      ErrorService.logScanAttempt(validation, currentStudent.studentID);
 
       if (!validation.valid) {
         setScanResult({
@@ -352,21 +400,16 @@ export default function StudentAttendance() {
 
     } catch (error) {
       console.error('Error processing QR code:', error);
-      Alert.alert('Error', 'Failed to process QR code. Please try again.');
+      const errorInfo = ErrorService.handleError('VALIDATION_ERROR');
+      Alert.alert(errorInfo.title, errorInfo.message);
       setShowScanner(false);
     } finally {
       setIsGettingLocation(false);
     }
-  };
+  }, [scanned, currentStudent, validateQRCode]);
 
-  const resetScanner = () => {
-    setScanned(false);
-    setScanResult(null);
-    setShowResult(false);
-    setCameraReady(false);
-  };
-
-  const openScanner = async () => {
+  // Open scanner function
+  const openScanner = useCallback(async () => {
     try {
       const { status } = await Camera.getCameraPermissionsAsync();
       if (status !== 'granted') {
@@ -386,9 +429,9 @@ export default function StudentAttendance() {
       console.error('Error opening scanner:', error);
       Alert.alert('Error', 'Failed to open camera. Please try again.');
     }
-  };
+  }, [requestCameraPermission, resetScanner]);
 
-  const formatTimeRemaining = (expirationTime: string) => {
+  const formatTimeRemaining = useCallback((expirationTime: string) => {
     if (!expirationTime || !isValidDate(expirationTime)) return 'Unknown';
 
     const now = new Date();
@@ -402,7 +445,18 @@ export default function StudentAttendance() {
 
     const diffHours = Math.floor(diffMins / 60);
     return `${diffHours} hour${diffHours > 1 ? 's' : ''}`;
-  };
+  }, [isValidDate]);
+
+  // Loading states for better UX
+  const getLoadingMessage = useCallback(() => {
+    if (isGettingLocation) {
+      return 'Verifying your location and proximity to event...';
+    }
+    if (!cameraReady) {
+      return 'Initializing camera...';
+    }
+    return 'Ready to scan';
+  }, [isGettingLocation, cameraReady]);
 
   if (hasPermission === null) {
     return (
@@ -441,33 +495,33 @@ export default function StudentAttendance() {
           <Text style={studentAttendanceStyles.permissionButtonText}>Enable Camera Access</Text>
         </TouchableOpacity>
 
-        {currentStudent && (
+        {formattedStudentInfo && (
           <View style={studentAttendanceStyles.studentInfoCard}>
             <Text style={studentAttendanceStyles.studentInfoTitle}>Your Profile</Text>
             <View style={studentAttendanceStyles.infoGrid}>
               <View style={studentAttendanceStyles.infoItem}>
                 <Text style={studentAttendanceStyles.infoLabel}>Name</Text>
-                <Text style={studentAttendanceStyles.infoValue}>{currentStudent.name}</Text>
+                <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.name}</Text>
               </View>
               <View style={studentAttendanceStyles.infoItem}>
                 <Text style={studentAttendanceStyles.infoLabel}>Student ID</Text>
-                <Text style={studentAttendanceStyles.infoValue}>{currentStudent.studentID}</Text>
+                <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.studentID}</Text>
               </View>
               <View style={studentAttendanceStyles.infoItem}>
                 <Text style={studentAttendanceStyles.infoLabel}>Course</Text>
-                <Text style={studentAttendanceStyles.infoValue}>{currentStudent.course}</Text>
+                <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.course}</Text>
               </View>
               <View style={studentAttendanceStyles.infoItem}>
                 <Text style={studentAttendanceStyles.infoLabel}>Year Level</Text>
-                <Text style={studentAttendanceStyles.infoValue}>Year {currentStudent.yearLevel}</Text>
+                <Text style={studentAttendanceStyles.infoValue}>Year {formattedStudentInfo.yearLevel}</Text>
               </View>
               <View style={studentAttendanceStyles.infoItem}>
                 <Text style={studentAttendanceStyles.infoLabel}>Block</Text>
-                <Text style={studentAttendanceStyles.infoValue}>{currentStudent.block || 'Not assigned'}</Text>
+                <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.block}</Text>
               </View>
               <View style={studentAttendanceStyles.infoItem}>
                 <Text style={studentAttendanceStyles.infoLabel}>Gender</Text>
-                <Text style={studentAttendanceStyles.infoValue}>{currentStudent.gender}</Text>
+                <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.gender}</Text>
               </View>
             </View>
           </View>
@@ -499,33 +553,33 @@ export default function StudentAttendance() {
         </TouchableOpacity>
       </View>
 
-      {currentStudent && (
+      {formattedStudentInfo && (
         <View style={studentAttendanceStyles.studentInfoCard}>
           <Text style={studentAttendanceStyles.studentInfoTitle}>👤 Student Profile</Text>
           <View style={studentAttendanceStyles.infoGrid}>
             <View style={studentAttendanceStyles.infoItem}>
               <Text style={studentAttendanceStyles.infoLabel}>Full Name</Text>
-              <Text style={studentAttendanceStyles.infoValue}>{currentStudent.name}</Text>
+              <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.name}</Text>
             </View>
             <View style={studentAttendanceStyles.infoItem}>
               <Text style={studentAttendanceStyles.infoLabel}>Student ID</Text>
-              <Text style={studentAttendanceStyles.infoValue}>{currentStudent.studentID}</Text>
+              <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.studentID}</Text>
             </View>
             <View style={studentAttendanceStyles.infoItem}>
               <Text style={studentAttendanceStyles.infoLabel}>Course Program</Text>
-              <Text style={studentAttendanceStyles.infoValue}>{currentStudent.course}</Text>
+              <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.course}</Text>
             </View>
             <View style={studentAttendanceStyles.infoItem}>
               <Text style={studentAttendanceStyles.infoLabel}>Academic Year</Text>
-              <Text style={studentAttendanceStyles.infoValue}>Year {currentStudent.yearLevel}</Text>
+              <Text style={studentAttendanceStyles.infoValue}>Year {formattedStudentInfo.yearLevel}</Text>
             </View>
             <View style={studentAttendanceStyles.infoItem}>
               <Text style={studentAttendanceStyles.infoLabel}>Class Block</Text>
-              <Text style={studentAttendanceStyles.infoValue}>Block {currentStudent.block || 'N/A'}</Text>
+              <Text style={studentAttendanceStyles.infoValue}>Block {formattedStudentInfo.block}</Text>
             </View>
             <View style={studentAttendanceStyles.infoItem}>
               <Text style={studentAttendanceStyles.infoLabel}>Gender</Text>
-              <Text style={studentAttendanceStyles.infoValue}>{currentStudent.gender}</Text>
+              <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.gender}</Text>
             </View>
           </View>
         </View>
@@ -586,11 +640,16 @@ export default function StudentAttendance() {
       <Modal visible={showScanner} animationType="slide" onRequestClose={() => setShowScanner(false)}>
         <View style={studentAttendanceStyles.scannerContainer}>
           {(!cameraReady || isGettingLocation) && (
-            <View style={studentAttendanceStyles.cameraLoading}>
+            <View style={studentAttendanceStyles.loadingOverlay}>
               <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={studentAttendanceStyles.cameraLoadingText}>
-                {isGettingLocation ? 'Verifying your location...' : 'Loading camera...'}
+              <Text style={studentAttendanceStyles.loadingText}>
+                {getLoadingMessage()}
               </Text>
+              {scanAttempts > 0 && (
+                <Text style={[studentAttendanceStyles.loadingText, { fontSize: 14, marginTop: 8 }]}>
+                  Attempt {scanAttempts + 1}
+                </Text>
+              )}
             </View>
           )}
 
@@ -623,6 +682,7 @@ export default function StudentAttendance() {
           </TouchableOpacity>
         </View>
       </Modal>
+
       <Modal visible={showResult} transparent animationType="fade" onRequestClose={resetScanner}>
         <View style={studentAttendanceStyles.resultOverlay}>
           <View style={studentAttendanceStyles.resultContent}>
@@ -631,11 +691,11 @@ export default function StudentAttendance() {
                 <Text style={studentAttendanceStyles.successTitle}>
                   {scanResult.locationVerified ? (
                     <>
-                      <Icon name="map-marker" size={16} color="#1e6dffff" /> Attendance Confirmed!
+                      <Icon name="map-marker-check" size={20} color="#10B981" /> Attendance Confirmed!
                     </>
                   ) : (
                     <>
-                      <Icon name="map-marker" size={16} color="#1e6dffff" />Attendance Confirmed!
+                      <Icon name="check-circle" size={20} color="#10B981" /> Attendance Confirmed!
                     </>
                   )}
                 </Text>
@@ -654,7 +714,9 @@ export default function StudentAttendance() {
 
                 <View style={studentAttendanceStyles.eventInfo}>
                   <Text style={studentAttendanceStyles.eventName}>{scanResult.event?.title}</Text>
-                  <Text style={studentAttendanceStyles.eventDetails}><Icon name="map-marker" size={16} color="#1e6dffff" />{scanResult.event?.location}</Text>
+                  <Text style={studentAttendanceStyles.eventDetails}>
+                    <Icon name="map-marker" size={16} color="#1e6dffff" /> {scanResult.event?.location}
+                  </Text>
 
                   {scanResult.event?.date && isValidDate(scanResult.event.date) && (
                     <Text style={studentAttendanceStyles.eventDetails}>
@@ -682,15 +744,21 @@ export default function StudentAttendance() {
                   <Text style={studentAttendanceStyles.detailItem}>🧩 Block: {scanResult.studentData.block}</Text>
                   <Text style={studentAttendanceStyles.detailItem}>👥 Gender: {scanResult.studentData.gender}</Text>
                   <Text style={studentAttendanceStyles.detailItem}>
-                    <Icon name="alarm" size={16} color="#666" /> Time: {new Date(scanResult.studentData.timestamp).toLocaleTimeString()}
+                    <Icon name="clock-outline" size={16} color="#666" /> Time: {new Date(scanResult.studentData.timestamp).toLocaleTimeString()}
                   </Text>
                 </View>
+
+                <TouchableOpacity style={studentAttendanceStyles.okButton} onPress={resetScanner}>
+                  <Text style={studentAttendanceStyles.okButtonText}>Great!</Text>
+                </TouchableOpacity>
               </>
             ) : (
               <>
                 {scanResult?.error === 'QR_CODE_EXPIRED' ? (
                   <>
-                    <Text style={studentAttendanceStyles.errorTitle}><Icon name="alarm" size={16} color="#666" /> QR Code Expired</Text>
+                    <Text style={studentAttendanceStyles.errorTitle}>
+                      <Icon name="alarm-off" size={20} color="#DC2626" /> QR Code Expired
+                    </Text>
                     <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
                     {scanResult.expirationTime && (
                       <Text style={studentAttendanceStyles.resultText}>
@@ -700,17 +768,23 @@ export default function StudentAttendance() {
                   </>
                 ) : scanResult?.error === 'ATTENDANCE_DEADLINE_PASSED' ? (
                   <>
-                    <Text style={studentAttendanceStyles.errorTitle}><Icon name="calendar" size={16} color="#000000ff" /> Deadline Passed</Text>
+                    <Text style={studentAttendanceStyles.errorTitle}>
+                      <Icon name="calendar-remove" size={20} color="#DC2626" /> Deadline Passed
+                    </Text>
                     <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
                   </>
                 ) : scanResult?.error === 'EVENT_NOT_STARTED' ? (
                   <>
-                    <Text style={studentAttendanceStyles.errorTitle}><Icon name="timer-sand" size={16} color="#000000ff" /> Event Not Started</Text>
+                    <Text style={studentAttendanceStyles.errorTitle}>
+                      <Icon name="timer-sand" size={20} color="#DC2626" /> Event Not Started
+                    </Text>
                     <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
                   </>
                 ) : scanResult?.error === 'LOCATION_MISMATCH' ? (
                   <>
-                    <Text style={studentAttendanceStyles.errorTitle}><Icon name="map-marker" size={16} color="#1e6dffff" /> Too Far From Event</Text>
+                    <Text style={studentAttendanceStyles.errorTitle}>
+                      <Icon name="map-marker-radius" size={20} color="#DC2626" /> Too Far From Event
+                    </Text>
                     <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
                     <Text style={studentAttendanceStyles.resultText}>
                       Please go to the event location and try again.
@@ -718,7 +792,9 @@ export default function StudentAttendance() {
                   </>
                 ) : scanResult?.error === 'LOCATION_INACCURATE' ? (
                   <>
-                    <Text style={studentAttendanceStyles.errorTitle}><Icon name="map-marker" size={16} color="#1e6dffff" /> Location Unclear</Text>
+                    <Text style={studentAttendanceStyles.errorTitle}>
+                      <Icon name="map-marker-off" size={20} color="#DC2626" /> Location Unclear
+                    </Text>
                     <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
                     <Text style={studentAttendanceStyles.resultText}>
                       Accuracy: {scanResult.accuracy?.toFixed(0)}m
@@ -726,7 +802,9 @@ export default function StudentAttendance() {
                   </>
                 ) : (
                   <>
-                    <Text style={studentAttendanceStyles.errorTitle}>Attendance Failed</Text>
+                    <Text style={studentAttendanceStyles.errorTitle}>
+                      <Icon name="close-circle" size={20} color="#DC2626" /> Attendance Failed
+                    </Text>
                     <Text style={studentAttendanceStyles.resultText}>{scanResult?.message}</Text>
                   </>
                 )}
@@ -734,7 +812,9 @@ export default function StudentAttendance() {
                 {scanResult?.event && (
                   <View style={studentAttendanceStyles.eventInfo}>
                     <Text style={studentAttendanceStyles.eventName}>{scanResult.event.title}</Text>
-                    <Text style={studentAttendanceStyles.eventDetails}><Icon name="map-marker" size={16} color="#1e6dffff" /> {scanResult.event.location}</Text>
+                    <Text style={studentAttendanceStyles.eventDetails}>
+                      <Icon name="map-marker" size={16} color="#1e6dffff" /> {scanResult.event.location}
+                    </Text>
 
                     {scanResult.event.date && isValidDate(scanResult.event.date) && (
                       <Text style={studentAttendanceStyles.eventDetails}>
@@ -743,14 +823,26 @@ export default function StudentAttendance() {
                     )}
                   </View>
                 )}
+
+                <View style={studentAttendanceStyles.buttonRow}>
+                  <TouchableOpacity
+                    style={[studentAttendanceStyles.halfButton, { backgroundColor: '#6B7280' }]}
+                    onPress={resetScanner}
+                  >
+                    <Text style={studentAttendanceStyles.okButtonText}>Close</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[studentAttendanceStyles.halfButton, { backgroundColor: '#3B82F6' }]}
+                    onPress={() => {
+                      resetScanner();
+                      openScanner();
+                    }}
+                  >
+                    <Text style={studentAttendanceStyles.okButtonText}>Scan Again</Text>
+                  </TouchableOpacity>
+                </View>
               </>
             )}
-
-            <TouchableOpacity style={studentAttendanceStyles.okButton} onPress={resetScanner}>
-              <Text style={studentAttendanceStyles.okButtonText}>
-                {scanResult?.success ? 'Great!' : 'Try Again'}
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>

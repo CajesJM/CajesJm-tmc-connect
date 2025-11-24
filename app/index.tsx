@@ -1,9 +1,9 @@
 import { useRouter } from "expo-router";
 import React, { useEffect } from "react";
-import { Text, TouchableOpacity, useWindowDimensions, View } from "react-native";
+import { Image, Text, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "./context/AuthContext";
-import { LandingStyles } from "./styles/LandingStyles";
+import { useAuth } from "../context/AuthContext";
+import { LandingStyles } from "../styles/LandingStyles";
 
 export default function Landing() {
   const router = useRouter();
@@ -33,6 +33,15 @@ export default function Landing() {
       <View style={LandingStyles.content}>
         <Text style={LandingStyles.welcomeText}>WELCOME TO</Text>
         <Text style={LandingStyles.brand}>TMC Connect</Text>
+
+        <View style={LandingStyles.logoContainer}>
+          <Image
+            source={require('../assets/images/Logo/TMC_Connect.png')}
+            style={LandingStyles.logo}
+            resizeMode="contain"
+          />
+        </View>
+        
 
         <View style={LandingStyles.subtitleContainer}>
           <Text style={LandingStyles.subtitleLine}>Your campus hub for</Text>

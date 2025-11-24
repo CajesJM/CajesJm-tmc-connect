@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "../context/AuthContext";
 
 function RootLayoutContent() {
   const { loading } = useAuth();

@@ -173,8 +173,19 @@ export const LoginStyles = StyleSheet.create({
     marginBottom: 20,
   },
   logo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+  },
+  outerContainer: {
+    flex: 1,
+    backgroundColor: "#0A0A0A",
+  },
+  
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
   },
 });

@@ -5,7 +5,7 @@ import QRCode from 'react-native-qrcode-svg';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { db } from "../../../lib/firebaseConfig";
 import type { QRCodeData } from '../../../lib/types';
-import { attendanceStyles, DEFAULT_BLOCKS, DEFAULT_YEAR_LEVELS } from '../../styles/attendanceStyles';
+import { attendanceStyles, DEFAULT_BLOCKS, DEFAULT_YEAR_LEVELS } from '../../../styles/attendanceStyles';
 
 export default function AttendanceScreen() {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);

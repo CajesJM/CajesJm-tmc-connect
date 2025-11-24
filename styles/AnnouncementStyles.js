@@ -24,6 +24,7 @@ export const AnnouncementStyles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
 
+  // Header styles with responsive variants
   header: {
     backgroundColor: COLORS.primary,
     padding: 20,
@@ -31,6 +32,12 @@ export const AnnouncementStyles = StyleSheet.create({
     borderBottomRightRadius: 20,
     alignItems: 'center',
     marginBottom: 16,
+  },
+  headerSmall: {
+    padding: 16,
+    marginBottom: 12,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   },
   headerIcon: {
     width: 48,
@@ -41,6 +48,12 @@ export const AnnouncementStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  headerIconSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginBottom: 6,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
@@ -48,18 +61,32 @@ export const AnnouncementStyles = StyleSheet.create({
     marginBottom: 4,
     textAlign: 'center',
   },
+  headerTitleSmall: {
+    fontSize: 18,
+    marginBottom: 2,
+  },
   headerSubtitle: {
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
     lineHeight: 16,
   },
+  headerSubtitleSmall: {
+    fontSize: 11,
+    lineHeight: 14,
+  },
 
+  // Stats container responsive styles
   statsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     marginBottom: 16,
     gap: 8,
+  },
+  statsContainerSmall: {
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    gap: 6,
   },
   statCard: {
     flex: 1,
@@ -75,11 +102,18 @@ export const AnnouncementStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  statCardSmall: {
+    padding: 8,
+    borderRadius: 8,
+  },
   statNumber: {
     fontSize: 18,
     fontWeight: '800',
     color: COLORS.textDark,
     marginBottom: 2,
+  },
+  statNumberSmall: {
+    fontSize: 16,
   },
   statLabel: {
     fontSize: 10,
@@ -88,7 +122,11 @@ export const AnnouncementStyles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  statLabelSmall: {
+    fontSize: 9,
+  },
 
+  // Filter section responsive styles
   filterSection: {
     backgroundColor: COLORS.cardBg,
     borderRadius: 12,
@@ -106,6 +144,14 @@ export const AnnouncementStyles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  filterSectionSmall: {
+    padding: 12,
+    marginHorizontal: 12,
+    marginBottom: 8,
+  },
+  filterScrollView: {
+    flex: 1,
+  },
   filterChips: {
     flexDirection: 'row',
     gap: 8,
@@ -120,6 +166,11 @@ export const AnnouncementStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  filterChipSmall: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
   filterChipActive: {
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
@@ -130,10 +181,14 @@ export const AnnouncementStyles = StyleSheet.create({
     color: COLORS.textMedium,
     marginLeft: 4,
   },
+  filterChipTextSmall: {
+    fontSize: 11,
+  },
   filterChipTextActive: {
     color: '#FFFFFF',
   },
 
+  // Create button responsive styles
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -142,6 +197,15 @@ export const AnnouncementStyles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     gap: 6,
+    minWidth: 44, // Minimum touch target size
+    minHeight: 36,
+    justifyContent: 'center',
+  },
+  createButtonSmall: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    minWidth: 40,
+    minHeight: 36,
   },
   createButtonText: {
     color: '#FFFFFF',
@@ -149,21 +213,35 @@ export const AnnouncementStyles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // Results info responsive
   resultsInfo: {
     paddingHorizontal: 16,
     marginBottom: 8,
+  },
+  resultsInfoSmall: {
+    paddingHorizontal: 12,
+    marginBottom: 6,
   },
   resultsText: {
     fontSize: 12,
     color: COLORS.textLight,
     fontWeight: '500',
   },
+  resultsTextSmall: {
+    fontSize: 11,
+  },
 
+  // List content responsive
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 20,
   },
+  listContentSmall: {
+    paddingHorizontal: 12,
+    paddingBottom: 16,
+  },
 
+  // Card responsive styles
   card: {
     backgroundColor: COLORS.cardBg,
     borderRadius: 12,
@@ -176,13 +254,20 @@ export const AnnouncementStyles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
     borderColor: COLORS.border,
-
+  },
+  cardSmall: {
+    padding: 12,
+    marginBottom: 8,
+    borderRadius: 8,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 8,
+  },
+  cardHeaderSmall: {
+    marginBottom: 6,
   },
   titleContainer: {
     flex: 1,
@@ -197,15 +282,27 @@ export const AnnouncementStyles = StyleSheet.create({
     flex: 1,
     lineHeight: 20,
   },
+  cardTitleSmall: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
   cardMessage: {
     fontSize: 14,
     color: COLORS.textMedium,
     lineHeight: 20,
     marginBottom: 12,
   },
+  cardMessageSmall: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
   cardActions: {
     flexDirection: 'row',
     gap: 8,
+  },
+  cardActionsSmall: {
+    gap: 6,
   },
   editButton: {
     flexDirection: 'row',
@@ -216,10 +313,18 @@ export const AnnouncementStyles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
+  editButtonSmall: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
   editButtonText: {
     fontSize: 11,
     fontWeight: '600',
     color: COLORS.primary,
+  },
+  editButtonTextSmall: {
+    fontSize: 10,
   },
   deleteButton: {
     flexDirection: 'row',
@@ -230,21 +335,35 @@ export const AnnouncementStyles = StyleSheet.create({
     borderRadius: 6,
     gap: 4,
   },
+  deleteButtonSmall: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
   deleteButtonText: {
     fontSize: 11,
     fontWeight: '600',
     color: '#DC2626',
+  },
+  deleteButtonTextSmall: {
+    fontSize: 10,
   },
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
   },
+  dateContainerSmall: {
+    marginTop: 6,
+  },
   timestamp: {
     fontSize: 11,
     color: COLORS.textLight,
     fontWeight: '500',
     marginLeft: 4,
+  },
+  timestampSmall: {
+    fontSize: 10,
   },
   newBadge: {
     backgroundColor: '#ECFDF5',
@@ -262,6 +381,7 @@ export const AnnouncementStyles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
+  // Modal responsive styles
   modalContainer: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -275,6 +395,9 @@ export const AnnouncementStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  modalHeaderSmall: {
+    padding: 12,
+  },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -285,10 +408,16 @@ export const AnnouncementStyles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.primary,
   },
+  backButtonTextSmall: {
+    fontSize: 14,
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.textDark,
+  },
+  modalTitleSmall: {
+    fontSize: 16,
   },
   placeholder: {
     width: 100,
@@ -302,6 +431,9 @@ export const AnnouncementStyles = StyleSheet.create({
   modalContentContainer: {
     padding: 16,
   },
+  modalContentContainerSmall: {
+    padding: 12,
+  },
   formSection: {
     marginBottom: 16,
   },
@@ -310,6 +442,10 @@ export const AnnouncementStyles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textDark,
     marginBottom: 8,
+  },
+  labelSmall: {
+    fontSize: 13,
+    marginBottom: 6,
   },
   input: {
     backgroundColor: '#F9FAFB',
@@ -320,19 +456,35 @@ export const AnnouncementStyles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textDark,
   },
+  inputSmall: {
+    padding: 10,
+    fontSize: 13,
+    borderRadius: 6,
+  },
   textArea: {
     minHeight: 120,
     textAlignVertical: 'top',
   },
+  textAreaSmall: {
+    minHeight: 100,
+  },
   buttonContainer: {
     gap: 12,
     marginTop: 8,
+  },
+  buttonContainerSmall: {
+    gap: 10,
+    marginTop: 6,
   },
   submitButton: {
     backgroundColor: COLORS.primary,
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
+  },
+  submitButtonSmall: {
+    padding: 14,
+    borderRadius: 6,
   },
   submitButtonDisabled: {
     backgroundColor: '#9CA3AF',
@@ -342,23 +494,38 @@ export const AnnouncementStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  submitButtonTextSmall: {
+    fontSize: 14,
+  },
   cancelButton: {
     backgroundColor: '#F3F4F6',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
   },
+  cancelButtonSmall: {
+    padding: 14,
+    borderRadius: 6,
+  },
   cancelButtonText: {
     color: COLORS.textMedium,
     fontSize: 16,
     fontWeight: '600',
   },
+  cancelButtonTextSmall: {
+    fontSize: 14,
+  },
 
+  // Empty state responsive
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
     paddingHorizontal: 20,
+  },
+  emptyStateSmall: {
+    paddingVertical: 40,
+    paddingHorizontal: 16,
   },
   emptyStateTitle: {
     fontSize: 18,
@@ -367,6 +534,10 @@ export const AnnouncementStyles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
+  emptyStateTitleSmall: {
+    fontSize: 16,
+    marginBottom: 6,
+  },
   emptyStateText: {
     fontSize: 14,
     color: COLORS.textLight,
@@ -374,16 +545,29 @@ export const AnnouncementStyles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 16,
   },
+  emptyStateTextSmall: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
   emptyStateButton: {
     backgroundColor: COLORS.primary,
     borderRadius: 8,
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
+  emptyStateButtonSmall: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
   emptyStateButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  emptyStateButtonTextSmall: {
+    fontSize: 13,
   },
 
   loadingContainer: {

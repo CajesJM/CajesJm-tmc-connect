@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { db } from '../../../lib/firebaseConfig';
-import { StudentAnnouncementStyles as styles } from '../../styles/StudentAnnouncementStyles';
+import { StudentAnnouncementStyles as styles } from '../../../styles/StudentAnnouncementStyles';
 
 dayjs.extend(relativeTime);
 

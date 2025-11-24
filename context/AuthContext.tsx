@@ -1,13 +1,13 @@
 import * as SecureStore from "expo-secure-store";
 import {
-  signInWithEmailAndPassword,
-  signOut,
-  User
+    signInWithEmailAndPassword,
+    signOut,
+    User
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import React, { createContext, useContext, useState } from "react";
 import { Platform } from "react-native";
-import { auth, db } from "../../lib/firebaseConfig";
+import { auth, db } from "../lib/firebaseConfig";
 
 type Role = "admin" | "student" | null;
 

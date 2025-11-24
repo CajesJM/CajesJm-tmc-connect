@@ -45,6 +45,11 @@ export const LandingStyles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  logoWrap: {
+    alignItems: 'center',
+    width: '100%',
+  },
+
   welcomeText: {
     fontSize: isSmallScreen ? 14 : isTablet ? 18 : 16,
     color: "rgba(255, 255, 255, 0.7)",
@@ -99,5 +104,16 @@ export const LandingStyles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: 1.5,
     textTransform: "uppercase",
+  },
+
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+
+  logo: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
 });

@@ -7,13 +7,14 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useAuth } from "./context/AuthContext";
-import { LoginStyles } from "./styles/LoginStyles";
+import { useAuth } from "../context/AuthContext";
+import { LoginStyles } from "../styles/LoginStyles";
 
 export default function Login() {
   const router = useRouter();
@@ -51,82 +52,93 @@ export default function Login() {
   return (
     <KeyboardAvoidingView
       style={LoginStyles.outerContainer}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
     >
       <View style={LoginStyles.cosmicBg} />
       <View style={LoginStyles.nebulaBg} />
 
-      <View style={LoginStyles.card}>
-        {/* Logo Section */}
-        <View style={LoginStyles.logoContainer}>
-          <Image 
-            source={require('../assets/images/Logo/V_1.0.1.png')} 
-            style={LoginStyles.logo}
-            resizeMode="contain"
-          />
-        </View>
+      <ScrollView 
+        contentContainerStyle={LoginStyles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={LoginStyles.card}>
+          <View style={LoginStyles.logoContainer}>
+            <Image 
+              source={require('../assets/images/Logo/TMC_Connect.png')} 
+              style={LoginStyles.logo}
+              resizeMode="contain"
+            />
+          </View>
 
-        <Text style={LoginStyles.title}>Campus Hub Login</Text>
-        <Text style={LoginStyles.subtitle}>Sign in with your username</Text>
+          <Text style={LoginStyles.title}>Campus Hub Login</Text>
+          <Text style={LoginStyles.subtitle}>Sign in with your username</Text>
 
-        <TextInput
-          placeholder="Username"
-          placeholderTextColor="rgba(255, 255, 255, 0.4)"
-          value={username}
-          onChangeText={(text) => {
-            setUsername(text);
-            if (error) setError(null);
-          }}
-          style={LoginStyles.input}
-          autoCapitalize="none"
-        />
-
-        <View style={LoginStyles.inputWrap}>
           <TextInput
-            placeholder="Password"
+            placeholder="Username"
             placeholderTextColor="rgba(255, 255, 255, 0.4)"
-            value={password}
+            value={username}
             onChangeText={(text) => {
-              setPassword(text);
+              setUsername(text);
               if (error) setError(null);
             }}
-            style={LoginStyles.inputWithIcon}
-            secureTextEntry={!showPassword}
+            style={LoginStyles.input}
             autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="next"
           />
-          <TouchableOpacity
-            onPress={() => setShowPassword((s) => !s)}
-            style={LoginStyles.iconBtn}
-          >
-            <Ionicons 
-              name={showPassword ? "eye-off" : "eye"} 
-              size={24} 
-              color="rgba(255, 255, 255, 0.7)" 
+
+          <View style={LoginStyles.inputWrap}>
+            <TextInput
+              placeholder="Password"
+              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (error) setError(null);
+              }}
+              style={LoginStyles.inputWithIcon}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
             />
+            <TouchableOpacity
+              onPress={() => setShowPassword((s) => !s)}
+              style={LoginStyles.iconBtn}
+            >
+              <Ionicons 
+                name={showPassword ? "eye-off" : "eye"} 
+                size={24} 
+                color="rgba(255, 255, 255, 0.7)" 
+              />
+            </TouchableOpacity>
+          </View>
+
+          {error ? <Text style={LoginStyles.error}>{error}</Text> : null}
+
+          <TouchableOpacity
+            style={[LoginStyles.button, (busy || loading) && LoginStyles.disabled]}
+            onPress={handleLogin}
+            disabled={busy || loading}
+          >
+            {busy || loading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <Text style={LoginStyles.buttonText}>Sign In</Text>
+            )}
           </TouchableOpacity>
+
+          {/* <View style={LoginStyles.demoAccounts}>
+            <Text style={LoginStyles.demoTitle}>Demo Accounts:</Text>
+            <Text style={LoginStyles.demoText}>Admin: admin / admin123</Text>
+            <Text style={LoginStyles.demoText}>Student: john.cajes / 2024001</Text>
+            <Text style={LoginStyles.demoNote}>Format: username / password</Text>
+          </View>   */}
         </View>
-
-        {error ? <Text style={LoginStyles.error}>{error}</Text> : null}
-
-        <TouchableOpacity
-          style={[LoginStyles.button, (busy || loading) && LoginStyles.disabled]}
-          onPress={handleLogin}
-          disabled={busy || loading}
-        >
-          {busy || loading ? (
-            <ActivityIndicator color="#000" />
-          ) : (
-            <Text style={LoginStyles.buttonText}>Sign In</Text>
-          )}
-        </TouchableOpacity>
-
-        <View style={LoginStyles.demoAccounts}>
-          <Text style={LoginStyles.demoTitle}>Demo Accounts:</Text>
-          <Text style={LoginStyles.demoText}>Admin: admin / admin123</Text>
-          <Text style={LoginStyles.demoText}>Student: john.cajes / 2024001</Text>
-          <Text style={LoginStyles.demoNote}>Format: username / password</Text>
-        </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

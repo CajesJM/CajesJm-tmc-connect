@@ -22,58 +22,85 @@ export const styles = StyleSheet.create({
         fontWeight: '500',
     },
     dashboardHeader: {
-        backgroundColor: '#FFFFFF',
-        paddingHorizontal: isSmallScreen ? 12 : 16,
-        paddingTop: Platform.OS === 'ios' ? (isSmallScreen ? 40 : 45) : (isSmallScreen ? 20 : 25),
-        paddingBottom: isSmallScreen ? 10 : 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E2E8F0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-        elevation: 3,
+        backgroundColor: '#4F46E5',
+        padding: 20,
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+        alignItems: 'center',
+        marginBottom: 16,
     },
     dashboardHeaderSmall: {
-        paddingHorizontal: 12,
-        paddingTop: Platform.OS === 'ios' ? 40 : 20,
-        paddingBottom: 10,
+        padding: 16,
+        marginBottom: 12,
+        borderBottomLeftRadius: 16,
+        borderBottomRightRadius: 16,
+    },
+    headerIcon: {
+        width: 46,
+        height: 46,
+        borderRadius: 24,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    headerIconSmall: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginBottom: 6,
     },
     headerContent: {
-        marginBottom: isSmallScreen ? 8 : 10,
+        alignItems: 'center',
     },
     title: {
-        fontSize: isSmallScreen ? 20 : 24,
-        fontWeight: 'bold',
-        color: '#1E293B',
-        marginBottom: 2,
+        fontSize: 20,
+        fontWeight: '800',
+        color: '#FFFFFF',
+        marginBottom: 4,
+        textAlign: 'center',
     },
     titleSmall: {
-        fontSize: 20,
+        fontSize: 18,
+        marginBottom: 2,
     },
     subtitle: {
-        fontSize: isSmallScreen ? 12 : 13,
-        color: '#64748B',
-        fontWeight: '500',
+        fontSize: 12, 
+        color: 'rgba(255, 255, 255, 0.8)',
+        textAlign: 'center',
+        lineHeight: 16,
     },
     subtitleSmall: {
-        fontSize: 12,
+        fontSize: 11, 
+        lineHeight: 14, 
     },
     headerStats: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        paddingHorizontal: 16, 
+        marginBottom: 16, 
+        gap: 8, 
     },
     headerStatsSmall: {
-        // Additional small screen adjustments if needed
+        paddingHorizontal: 12, 
+        marginBottom: 12, 
+        gap: 6, 
     },
     statCard: {
-        backgroundColor: '#F1F5F9',
+        backgroundColor: '#FFFFFF',
         padding: isSmallScreen ? 8 : 10,
         borderRadius: 8,
         alignItems: 'center',
         flex: 1,
         marginHorizontal: isSmallScreen ? 2 : 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
     },
+
     statCardSmall: {
         padding: 8,
         marginHorizontal: 2,
@@ -81,7 +108,7 @@ export const styles = StyleSheet.create({
     statNumber: {
         fontSize: isSmallScreen ? 16 : 18,
         fontWeight: 'bold',
-        color: '#1E88E5',
+        color: '#000000ff',
         marginBottom: 2,
     },
     statNumberSmall: {
@@ -821,105 +848,105 @@ export const styles = StyleSheet.create({
         marginVertical: 10,
         fontWeight: '500',
     },
-     sectionContainer: {
-    marginBottom: 16,
-    paddingHorizontal: 8,
-  },
-  
-  sectionDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  
-  hintContainer: {
-    marginTop: 4,
-    paddingHorizontal: 4,
-  },
-  
-  inputHint: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  
-  coordinatesDisplay: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  
-  coordinatesText: {
-    fontSize: 14,
-    color: '#495057',
-    marginBottom: 4,
-  },
-   locationOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    marginVertical: 4,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#e1e5e9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  
-  locationOptionSelected: {
-    backgroundColor: '#f0f7ff',
-    borderColor: '#1e6dffff',
-    shadowColor: '#1e6dffff',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  
-  locationOptionImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
-    marginRight: 12,
-    backgroundColor: '#f8f9fa',
-  },
-  
-  locationOptionText: {
-    flex: 1,
-    marginRight: 8,
-  },
-  
-  locationOptionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
-  },
-  
-  locationOptionDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 18,
-  },
-  
-  imagePickerSubtitle: {
-    fontSize: 13,
-    color: '#888',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  mapPickerButtonDisabled: {
-  opacity: 0.7,
-  backgroundColor: '#f5f5f5',
-},
-loadingSpinner: {
-  marginLeft: 'auto',
-},
+    sectionContainer: {
+        marginBottom: 16,
+        paddingHorizontal: 8,
+    },
+
+    sectionDescription: {
+        fontSize: 14,
+        color: '#666',
+        lineHeight: 20,
+        textAlign: 'center',
+    },
+
+    hintContainer: {
+        marginTop: 4,
+        paddingHorizontal: 4,
+    },
+
+    inputHint: {
+        fontSize: 12,
+        color: '#666',
+        fontStyle: 'italic',
+    },
+
+    coordinatesDisplay: {
+        marginTop: 12,
+        padding: 12,
+        backgroundColor: '#f8f9fa',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e9ecef',
+    },
+
+    coordinatesText: {
+        fontSize: 14,
+        color: '#495057',
+        marginBottom: 4,
+    },
+    locationOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        marginVertical: 4,
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#e1e5e9',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+
+    locationOptionSelected: {
+        backgroundColor: '#f0f7ff',
+        borderColor: '#1e6dffff',
+        shadowColor: '#1e6dffff',
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+
+    locationOptionImage: {
+        width: 60,
+        height: 60,
+        borderRadius: 10,
+        marginRight: 12,
+        backgroundColor: '#f8f9fa',
+    },
+
+    locationOptionText: {
+        flex: 1,
+        marginRight: 8,
+    },
+
+    locationOptionName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1a1a1a',
+        marginBottom: 4,
+    },
+
+    locationOptionDescription: {
+        fontSize: 14,
+        color: '#666',
+        lineHeight: 18,
+    },
+
+    imagePickerSubtitle: {
+        fontSize: 13,
+        color: '#888',
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
+    mapPickerButtonDisabled: {
+        opacity: 0.7,
+        backgroundColor: '#f5f5f5',
+    },
+    loadingSpinner: {
+        marginLeft: 'auto',
+    },
 });

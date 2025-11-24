@@ -15,10 +15,10 @@ import {
   View
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../../../context/AuthContext';
 import { auth, db } from '../../../lib/firebaseConfig';
 import type { Attendee, EventData, MissedEvent } from '../../../lib/types';
-import { useAuth } from '../../context/AuthContext';
-import { styles } from '../../styles/studentsProfile';
+import { styles } from '../../../styles/studentsProfile';
 
 interface TeamMember {
   id: string;
@@ -116,14 +116,14 @@ export default function StudentProfile() {
 
         },
         {
-          id: '8',
+          id: '9',
           name: 'Kento Mabanag',
           role: '',
           email: 'mabanagkento@gmail.com'
 
         },
         {
-          id: '8',
+          id: '10',
           name: 'Madelo',
           role: '',
           email: 'yashians120704@gmail.com'

@@ -7,7 +7,7 @@ import { ErrorService } from '../../../lib/errorService';
 import { auth, db } from '../../../lib/firebaseConfig';
 import { locationService } from '../../../lib/locationService';
 import type { AttendanceRecord, EventData, EventLocation, QRCodeData, UserLocation, ValidationResult } from '../../../lib/types';
-import { attendanceStyles as studentAttendanceStyles } from '../../styles/studentAttendanceStyles';
+import { attendanceStyles as studentAttendanceStyles } from '../../../styles/studentAttendanceStyles';
 
 const convertToEventData = (docData: DocumentData, id: string): EventData => ({
   id,
@@ -35,7 +35,6 @@ export default function StudentAttendance() {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [scanAttempts, setScanAttempts] = useState(0);
 
-  // Memoized student info for performance
   const formattedStudentInfo = useMemo(() => {
     if (!currentStudent) return null;
 
@@ -544,7 +543,7 @@ export default function StudentAttendance() {
       <View style={studentAttendanceStyles.mainCard}>
         <Text style={studentAttendanceStyles.cardTitle}>Quick Attendance</Text>
         <Text style={studentAttendanceStyles.instruction}>
-          Simply scan the QR code displayed during your event. Your attendance will be recorded instantly with all your details.
+          Simply scan the QR code displayed during your event. Your attendance will be recorded instantly with all your details. And make sure your location is already turned on.
         </Text>
 
         <TouchableOpacity style={studentAttendanceStyles.actionButton} onPress={openScanner}>

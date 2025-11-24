@@ -21,9 +21,9 @@ import {
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CAMPUS_LOCATIONS, CampusLocation } from '../../../constants/campusLocations';
+import { useAuth } from '../../../context/AuthContext';
 import { db } from '../../../lib/firebaseConfig';
-import { useAuth } from '../../context/AuthContext';
-import { styles } from '../../styles/adminEvents';
+import { styles } from '../../../styles/adminEvents';
 
 interface Event {
   id: string;
@@ -894,68 +894,75 @@ export default function EventsScreen() {
     <View style={styles.container}>
 
       <View style={[
-        styles.dashboardHeader,
-        isSmallScreen && styles.dashboardHeaderSmall
-      ]}>
-        <View style={styles.headerContent}>
-          <Text style={[
-            styles.title,
-            isSmallScreen && styles.titleSmall
-          ]}>Events</Text>
-          <Text style={[
-            styles.subtitle,
-            isSmallScreen && styles.subtitleSmall
-          ]}>Manage and monitor campus events</Text>
-        </View>
-        <View style={[
-          styles.headerStats,
-          isSmallScreen && styles.headerStatsSmall
+            styles.dashboardHeader,
+            isSmallScreen && styles.dashboardHeaderSmall
         ]}>
           <View style={[
-            styles.statCard,
-            isSmallScreen && styles.statCardSmall
-          ]}>
-            <Text style={[
-              styles.statNumber,
-              isSmallScreen && styles.statNumberSmall
-            ]}>{events.length}</Text>
-            <Text style={[
-              styles.statLabel,
-              isSmallScreen && styles.statLabelSmall
-            ]}>Total Events</Text>
-          </View>
-          <View style={[
-            styles.statCard,
-            isSmallScreen && styles.statCardSmall
-          ]}>
-            <Text style={[
-              styles.statNumber,
-              isSmallScreen && styles.statNumberSmall
+                styles.headerIcon,
+                isSmallScreen && styles.headerIconSmall
             ]}>
-              {events.filter(event => event.date > new Date()).length}
-            </Text>
-            <Text style={[
-              styles.statLabel,
-              isSmallScreen && styles.statLabelSmall
-            ]}>Upcoming</Text>
-          </View>
-          <View style={[
-            styles.statCard,
-            isSmallScreen && styles.statCardSmall
-          ]}>
-            <Text style={[
-              styles.statNumber,
-              isSmallScreen && styles.statNumberSmall
-            ]}>
-              {events.filter(event => event.date <= new Date()).length}
-            </Text>
-            <Text style={[
-              styles.statLabel,
-              isSmallScreen && styles.statLabelSmall
-            ]}>Past</Text>
-          </View>
+                <Icon name="calendar" size={isSmallScreen ? 16 : 20} color="#FFFFFF" />
+            </View>
+            <View style={styles.headerContent}>
+                <Text style={[
+                    styles.title,
+                    isSmallScreen && styles.titleSmall
+                ]}>Events</Text>
+                <Text style={[
+                    styles.subtitle,
+                    isSmallScreen && styles.subtitleSmall
+                ]}>Manage and monitor campus events</Text>
+            </View>
         </View>
-      </View>
+
+        <View style={[
+            styles.headerStats,
+            isSmallScreen && styles.headerStatsSmall
+        ]}>
+            <View style={[
+                styles.statCard,
+                isSmallScreen && styles.statCardSmall
+            ]}>
+                <Text style={[
+                    styles.statNumber,
+                    isSmallScreen && styles.statNumberSmall
+                ]}>{events.length}</Text>
+                <Text style={[
+                    styles.statLabel,
+                    isSmallScreen && styles.statLabelSmall
+                ]}>Total Events</Text>
+            </View>
+            <View style={[
+                styles.statCard,
+                isSmallScreen && styles.statCardSmall
+            ]}>
+                <Text style={[
+                    styles.statNumber,
+                    isSmallScreen && styles.statNumberSmall
+                ]}>
+                    {events.filter(event => event.date > new Date()).length}
+                </Text>
+                <Text style={[
+                    styles.statLabel,
+                    isSmallScreen && styles.statLabelSmall
+                ]}>Upcoming</Text>
+            </View>
+            <View style={[
+                styles.statCard,
+                isSmallScreen && styles.statCardSmall
+            ]}>
+                <Text style={[
+                    styles.statNumber,
+                    isSmallScreen && styles.statNumberSmall
+                ]}>
+                    {events.filter(event => event.date <= new Date()).length}
+                </Text>
+                <Text style={[
+                    styles.statLabel,
+                    isSmallScreen && styles.statLabelSmall
+                ]}>Past</Text>
+            </View>
+        </View>
 
       <View style={[
         styles.headerActions,

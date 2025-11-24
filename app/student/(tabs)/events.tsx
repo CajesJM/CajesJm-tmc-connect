@@ -17,7 +17,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CAMPUS_LOCATIONS } from '../../../constants/campusLocations';
 import { db } from '../../../lib/firebaseConfig';
-import { styles } from '../../styles/studentEvents';
+import { styles } from '../../../styles/studentEvents';
 
 interface Event {
   id: string;

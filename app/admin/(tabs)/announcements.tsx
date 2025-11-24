@@ -19,9 +19,9 @@ import {
   useWindowDimensions
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useAuth } from "../../../context/AuthContext";
 import { db } from "../../../lib/firebaseConfig";
-import { useAuth } from "../../context/AuthContext";
-import { AnnouncementStyles as styles } from "../../styles/AnnouncementStyles";
+import { AnnouncementStyles as styles } from "../../../styles/AnnouncementStyles";
 
 dayjs.extend(relativeTime);
 
@@ -35,6 +35,7 @@ interface Announcement {
 export default function AnnouncementScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const isSmallScreen = screenWidth < 375;
+  const isMediumScreen = screenWidth < 768;
   
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -215,38 +216,71 @@ const renderLoading = () => (
 );
 
   const renderAnnouncementItem = ({ item }: { item: Announcement }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
+    <View style={[
+      styles.card,
+      isSmallScreen && styles.cardSmall
+    ]}>
+      <View style={[
+        styles.cardHeader,
+        isSmallScreen && styles.cardHeaderSmall
+      ]}>
         <View style={styles.titleContainer}>
           {isNewAnnouncement(item.createdAt) && (
             <View style={styles.newBadge}>
               <Text style={styles.newBadgeText}>NEW</Text>
             </View>
           )}
-          <Text style={styles.cardTitle}>{item.title}</Text>
+          <Text style={[
+            styles.cardTitle,
+            isSmallScreen && styles.cardTitleSmall
+          ]}>{item.title}</Text>
         </View>
-        <View style={styles.cardActions}>
+        <View style={[
+          styles.cardActions,
+          isSmallScreen && styles.cardActionsSmall
+        ]}>
           <TouchableOpacity
-            style={styles.editButton}
+            style={[
+              styles.editButton,
+              isSmallScreen && styles.editButtonSmall
+            ]}
             onPress={() => handleEditStart(item)}
           >
-            <Text style={styles.editButtonText}>Edit</Text>
+            <Text style={[
+              styles.editButtonText,
+              isSmallScreen && styles.editButtonTextSmall
+            ]}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.deleteButton}
+            style={[
+              styles.deleteButton,
+              isSmallScreen && styles.deleteButtonSmall
+            ]}
             onPress={() => handleDelete(item.id, item.title)}
           >
-            <Text style={styles.deleteButtonText}>Delete</Text>
+            <Text style={[
+              styles.deleteButtonText,
+              isSmallScreen && styles.deleteButtonTextSmall
+            ]}>Delete</Text>
           </TouchableOpacity>
         </View>
       </View>
       
-      <Text style={styles.cardMessage}>{item.message}</Text>
+      <Text style={[
+        styles.cardMessage,
+        isSmallScreen && styles.cardMessageSmall
+      ]}>{item.message}</Text>
       
       {item.createdAt && (
-        <View style={styles.dateContainer}>
-          <Icon name="clock-outline" size={12} color="#6B7280" />
-          <Text style={styles.timestamp}>
+        <View style={[
+          styles.dateContainer,
+          isSmallScreen && styles.dateContainerSmall
+        ]}>
+          <Icon name="clock-outline" size={isSmallScreen ? 10 : 12} color="#6B7280" />
+          <Text style={[
+            styles.timestamp,
+            isSmallScreen && styles.timestampSmall
+          ]}>
             {dayjs(item.createdAt.toDate()).fromNow()} • {formatDate(item.createdAt.toDate())}
           </Text>
         </View>
@@ -256,12 +290,24 @@ const renderLoading = () => (
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <Icon name="bullhorn" size={20} color="#FFFFFF" />
+      <View style={[
+        styles.header,
+        isSmallScreen && styles.headerSmall
+      ]}>
+        <View style={[
+          styles.headerIcon,
+          isSmallScreen && styles.headerIconSmall
+        ]}>
+          <Icon name="bullhorn" size={isSmallScreen ? 16 : 20} color="#FFFFFF" />
         </View>
-        <Text style={styles.headerTitle}>Announcements</Text>
-        <Text style={styles.headerSubtitle}>
+        <Text style={[
+          styles.headerTitle,
+          isSmallScreen && styles.headerTitleSmall
+        ]}>Announcements</Text>
+        <Text style={[
+          styles.headerSubtitle,
+          isSmallScreen && styles.headerSubtitleSmall
+        ]}>
           Manage campus announcements and updates
         </Text>
       </View>
@@ -270,77 +316,130 @@ const renderLoading = () => (
         renderLoading()
       ) : (
         <>
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{totalAnnouncements}</Text>
-              <Text style={styles.statLabel}>Total</Text>
+          <View style={[
+            styles.statsContainer,
+            isSmallScreen && styles.statsContainerSmall
+          ]}>
+            <View style={[
+              styles.statCard,
+              isSmallScreen && styles.statCardSmall
+            ]}>
+              <Text style={[
+                styles.statNumber,
+                isSmallScreen && styles.statNumberSmall
+              ]}>{totalAnnouncements}</Text>
+              <Text style={[
+                styles.statLabel,
+                isSmallScreen && styles.statLabelSmall
+              ]}>Total</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{todayAnnouncements}</Text>
-              <Text style={styles.statLabel}>Today</Text>
+            <View style={[
+              styles.statCard,
+              isSmallScreen && styles.statCardSmall
+            ]}>
+              <Text style={[
+                styles.statNumber,
+                isSmallScreen && styles.statNumberSmall
+              ]}>{todayAnnouncements}</Text>
+              <Text style={[
+                styles.statLabel,
+                isSmallScreen && styles.statLabelSmall
+              ]}>Today</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{thisWeekAnnouncements}</Text>
-              <Text style={styles.statLabel}>This Week</Text>
+            <View style={[
+              styles.statCard,
+              isSmallScreen && styles.statCardSmall
+            ]}>
+              <Text style={[
+                styles.statNumber,
+                isSmallScreen && styles.statNumberSmall
+              ]}>{thisWeekAnnouncements}</Text>
+              <Text style={[
+                styles.statLabel,
+                isSmallScreen && styles.statLabelSmall
+              ]}>This Week</Text>
             </View>
           </View>
 
-          <View style={styles.filterSection}>
-            <View style={styles.filterChips}>
-              <TouchableOpacity
-                style={[
-                  styles.filterChip,
-                  activeFilter === 'all' && styles.filterChipActive
-                ]}
-                onPress={() => handleFilterChange('all')}
-              >
-          
-                <Text style={[
-                  styles.filterChipText,
-                  activeFilter === 'all' && styles.filterChipTextActive
-                ]}>All</Text>
-              </TouchableOpacity>
+          <View style={[
+            styles.filterSection,
+            isSmallScreen && styles.filterSectionSmall
+          ]}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.filterScrollView}
+            >
+              <View style={styles.filterChips}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterChip,
+                    activeFilter === 'all' && styles.filterChipActive,
+                    isSmallScreen && styles.filterChipSmall
+                  ]}
+                  onPress={() => handleFilterChange('all')}
+                >
+                  <Text style={[
+                    styles.filterChipText,
+                    activeFilter === 'all' && styles.filterChipTextActive,
+                    isSmallScreen && styles.filterChipTextSmall
+                  ]}>All</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.filterChip,
-                  activeFilter === 'week' && styles.filterChipActive
-                ]}
-                onPress={() => handleFilterChange('week')}
-              >
-             
-                <Text style={[
-                  styles.filterChipText,
-                  activeFilter === 'week' && styles.filterChipTextActive
-                ]}>This Week</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.filterChip,
+                    activeFilter === 'week' && styles.filterChipActive,
+                    isSmallScreen && styles.filterChipSmall
+                  ]}
+                  onPress={() => handleFilterChange('week')}
+                >
+                  <Text style={[
+                    styles.filterChipText,
+                    activeFilter === 'week' && styles.filterChipTextActive,
+                    isSmallScreen && styles.filterChipTextSmall
+                  ]}>This Week</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.filterChip,
-                  activeFilter === 'month' && styles.filterChipActive
-                ]}
-                onPress={() => handleFilterChange('month')}
-              >
-            
-                <Text style={[
-                  styles.filterChipText,
-                  activeFilter === 'month' && styles.filterChipTextActive
-                ]}>This Month</Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={[
+                    styles.filterChip,
+                    activeFilter === 'month' && styles.filterChipActive,
+                    isSmallScreen && styles.filterChipSmall
+                  ]}
+                  onPress={() => handleFilterChange('month')}
+                >
+                  <Text style={[
+                    styles.filterChipText,
+                    activeFilter === 'month' && styles.filterChipTextActive,
+                    isSmallScreen && styles.filterChipTextSmall
+                  ]}>This Month</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
 
             <TouchableOpacity 
-              style={styles.createButton}
+              style={[
+                styles.createButton,
+                isSmallScreen && styles.createButtonSmall
+              ]}
               onPress={() => setShowCreateForm(true)}
             >
-              <Icon name="plus" size={16} color="#FFFFFF" />
-              <Text style={styles.createButtonText}>Create</Text>
+              <Icon name="plus" size={isSmallScreen ? 14 : 16} color="#FFFFFF" />
+              {!isSmallScreen && (
+                <Text style={styles.createButtonText}>Create</Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          <View style={styles.resultsInfo}>
-            <Text style={styles.resultsText}>
+          <View style={[
+            styles.resultsInfo,
+            isSmallScreen && styles.resultsInfoSmall
+          ]}>
+            <Text style={[
+              styles.resultsText,
+              isSmallScreen && styles.resultsTextSmall
+            ]}>
               {filteredAnnouncements.length} announcement{filteredAnnouncements.length !== 1 ? 's' : ''}
               {activeFilter === 'week' ? ' this week' : activeFilter === 'month' ? ' this month' : ''}
             </Text>
@@ -350,26 +449,44 @@ const renderLoading = () => (
             data={filteredAnnouncements}
             keyExtractor={(item) => item.id}
             renderItem={renderAnnouncementItem}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              isSmallScreen && styles.listContentSmall
+            ]}
             ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Icon name="bullhorn-outline" size={48} color="#9CA3AF" />
-                <Text style={styles.emptyStateTitle}>
+              <View style={[
+                styles.emptyState,
+                isSmallScreen && styles.emptyStateSmall
+              ]}>
+                <Icon name="bullhorn-outline" size={isSmallScreen ? 36 : 48} color="#9CA3AF" />
+                <Text style={[
+                  styles.emptyStateTitle,
+                  isSmallScreen && styles.emptyStateTitleSmall
+                ]}>
                   {activeFilter === 'all' ? 'No announcements' : 
                   activeFilter === 'week' ? 'No announcements this week' : 
                   'No announcements this month'}
                 </Text>
-                <Text style={styles.emptyStateText}>
+                <Text style={[
+                  styles.emptyStateText,
+                  isSmallScreen && styles.emptyStateTextSmall
+                ]}>
                   {activeFilter === 'all' ? 'Create your first announcement to get started' :
                   activeFilter === 'week' ? 'No announcements created in the past 7 days' :
                   'No announcements created in the past 30 days'}
                 </Text>
                 {activeFilter === 'all' && (
                   <TouchableOpacity 
-                    style={styles.emptyStateButton}
+                    style={[
+                      styles.emptyStateButton,
+                      isSmallScreen && styles.emptyStateButtonSmall
+                    ]}
                     onPress={() => setShowCreateForm(true)}
                   >
-                    <Text style={styles.emptyStateButtonText}>Create Announcement</Text>
+                    <Text style={[
+                      styles.emptyStateButtonText,
+                      isSmallScreen && styles.emptyStateButtonTextSmall
+                    ]}>Create Announcement</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -381,15 +498,24 @@ const renderLoading = () => (
       <Modal
         visible={showCreateForm}
         animationType="slide"
-        presentationStyle="fullScreen"
+        presentationStyle={isSmallScreen ? "fullScreen" : "formSheet"}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
+          <View style={[
+            styles.modalHeader,
+            isSmallScreen && styles.modalHeaderSmall
+          ]}>
             <TouchableOpacity onPress={handleCloseCreateForm} style={styles.backButton}>
-              <Icon name="arrow-left" size={20} color="#4F46E5" />
-              <Text style={styles.backButtonText}>Back to Dashboard</Text>
+              <Icon name="arrow-left" size={isSmallScreen ? 18 : 20} color="#4F46E5" />
+              <Text style={[
+                styles.backButtonText,
+                isSmallScreen && styles.backButtonTextSmall
+              ]}>Back</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>
+            <Text style={[
+              styles.modalTitle,
+              isSmallScreen && styles.modalTitleSmall
+            ]}>
               {editingId ? 'Edit Announcement' : 'Create Announcement'}
             </Text>
             <View style={styles.placeholder} />
@@ -399,11 +525,20 @@ const renderLoading = () => (
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardAvoidingView}
           >
-            <ScrollView style={styles.modalContent} contentContainerStyle={styles.modalContentContainer}>
+            <ScrollView style={styles.modalContent} contentContainerStyle={[
+              styles.modalContentContainer,
+              isSmallScreen && styles.modalContentContainerSmall
+            ]}>
               <View style={styles.formSection}>
-                <Text style={styles.label}>Title</Text>
+                <Text style={[
+                  styles.label,
+                  isSmallScreen && styles.labelSmall
+                ]}>Title</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    isSmallScreen && styles.inputSmall
+                  ]}
                   placeholder="Enter announcement title"
                   value={title}
                   onChangeText={setTitle}
@@ -411,37 +546,58 @@ const renderLoading = () => (
               </View>
 
               <View style={styles.formSection}>
-                <Text style={styles.label}>Message</Text>
+                <Text style={[
+                  styles.label,
+                  isSmallScreen && styles.labelSmall
+                ]}>Message</Text>
                 <TextInput
-                  style={[styles.input, styles.textArea]}
+                  style={[
+                    styles.input, 
+                    styles.textArea,
+                    isSmallScreen && styles.inputSmall,
+                    isSmallScreen && styles.textAreaSmall
+                  ]}
                   placeholder="Write your announcement message..."
                   value={message}
                   onChangeText={setMessage}
                   multiline
-                  numberOfLines={6}
+                  numberOfLines={isSmallScreen ? 4 : 6}
                   textAlignVertical="top"
                 />
               </View>
 
-              <View style={styles.buttonContainer}>
+              <View style={[
+                styles.buttonContainer,
+                isSmallScreen && styles.buttonContainerSmall
+              ]}>
                 <TouchableOpacity 
                   style={[
                     styles.submitButton,
-                    (!title.trim() || !message.trim()) && styles.submitButtonDisabled
+                    (!title.trim() || !message.trim()) && styles.submitButtonDisabled,
+                    isSmallScreen && styles.submitButtonSmall
                   ]}
                   onPress={editingId ? handleSaveEdit : handleAddAnnouncement}
                   disabled={!title.trim() || !message.trim()}
                 >
-                  <Text style={styles.submitButtonText}>
+                  <Text style={[
+                    styles.submitButtonText,
+                    isSmallScreen && styles.submitButtonTextSmall
+                  ]}>
                     {editingId ? 'Save Changes' : 'Create Announcement'}
                   </Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
-                  style={styles.cancelButton}
+                  style={[
+                    styles.cancelButton,
+                    isSmallScreen && styles.cancelButtonSmall
+                  ]}
                   onPress={handleCloseCreateForm}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={[
+                    styles.cancelButtonText,
+                    isSmallScreen && styles.cancelButtonTextSmall
+                  ]}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

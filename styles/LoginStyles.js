@@ -43,7 +43,7 @@ export const LoginStyles = StyleSheet.create({
     paddingVertical: isTablet ? 50 : 40,
     paddingHorizontal: isTablet ? 40 : 30,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderColor: "rgba(139, 92, 246, 0.4)",
     alignItems: "center",
   },
 

@@ -1,37 +1,50 @@
 import * as SecureStore from "expo-secure-store";
 import {
-    signInWithEmailAndPassword,
-    signOut,
-    User
+  signInWithEmailAndPassword,
+  signOut,
+  User
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import React, { createContext, useContext, useState } from "react";
 import { Platform } from "react-native";
 import { auth, db } from "../lib/firebaseConfig";
 
-type Role = "admin" | "student" | null;
+// Define user roles
+type Role = "main_admin" | "assistant_admin" | "student" | null;
 
 interface UserData {
   email: string;
   role: Role;
   name: string;
   studentID?: number;
+  active?: boolean; 
+  deactivatedAt?: string;
+  photoURL?: string;
+  permissions?: {
+    canManageUsers?: boolean;
+    canManageEvents?: boolean;
+    canManageAnnouncements?: boolean;
+    canManageAttendance?: boolean;
+    canViewAnalytics?: boolean;
+  };
 }
 
-type AuthContextValue = {
+interface AuthContextValue {
   user: User | null;
   userData: UserData | null;
   role: Role;
   loading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<UserData>; 
   logout: () => Promise<void>;
-};
+  hasPermission: (permission: string) => boolean;
+  isMainAdmin: () => boolean;
+  isAssistantAdmin: () => boolean;
+}
 
 const KEY_USER_DATA = "user_data";
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-// Store user data securely
 async function storeUserData(userData: UserData | null) {
   if (Platform.OS === "web") {
     if (userData) {
@@ -48,7 +61,6 @@ async function storeUserData(userData: UserData | null) {
   }
 }
 
-// Read user data from secure storage
 async function readUserData(): Promise<UserData | null> {
   try {
     if (Platform.OS === "web") {
@@ -69,76 +81,91 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Initialize from storage on app start
   React.useEffect(() => {
     const initializeAuth = async () => {
       const storedData = await readUserData();
       if (storedData) {
         setUserData(storedData);
-   
       }
     };
     initializeAuth();
   }, []);
 
- const login = async (email: string, password: string): Promise<void> => {
+  const login = async (email: string, password: string): Promise<UserData> => {
   setLoading(true);
   
-  return new Promise<void>(async (resolve, reject) => {
-    try {
-      console.log("AuthContext - Starting login for:", email);
-      
-      // Basic validation before even trying Firebase
-      if (!email || !password) {
-        setLoading(false);
-        return reject(new Error("Email and password are required"));
-      }
-
-      if (!email.includes('@')) {
-        setLoading(false);
-        return reject(new Error("Invalid email format"));
-      }
-
-      // Try Firebase login with extra error isolation
-      let userCredential;
-      try {
-        userCredential = await signInWithEmailAndPassword(auth, email, password);
-      } catch (firebaseError: any) {
-        console.log("AuthContext - Firebase auth failed, but caught safely");
-        setLoading(false);
-        // Return a generic error without the Firebase error object
-        return reject(new Error("Invalid username or password."));
-      }
-
-      const firebaseUser = userCredential.user;
-
-      // Get user role from Firestore
-      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-      if (!userDoc.exists()) {
-        setLoading(false);
-        return reject(new Error("User account not found."));
-      }
-
-      const userDataFromDB = userDoc.data() as UserData;
-      const completeUserData = {
-        ...userDataFromDB,
-        email: firebaseUser.email || userDataFromDB.email,
-      };
-
-      setUser(firebaseUser);
-      setUserData(completeUserData);
-      await storeUserData(completeUserData);
-      
+  try { 
+    console.log("AuthContext - Starting login for:", email);
+    
+    if (!email || !password) {
       setLoading(false);
-      resolve();
-      
-    } catch (error: any) {
-      console.log("AuthContext - Unexpected error:", error);
-      setLoading(false);
-      reject(new Error("Login failed. Please try again."));
+      throw new Error("Email and password are required");
     }
-  });
+
+    if (!email.includes('@')) {
+      setLoading(false);
+      throw new Error("Invalid email format");
+    }
+
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const firebaseUser = userCredential.user;
+
+    // Get user data from Firestore (including role and active status)
+    const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+    if (!userDoc.exists()) {
+      setLoading(false);
+      throw new Error("User account not found in database.");
+    }
+
+    const userDataFromDB = userDoc.data() as UserData & { active?: boolean };
+    
+    // Check if user is active
+    if (userDataFromDB.active === false) {
+      // Sign out the user since they're deactivated
+      await signOut(auth);
+      setLoading(false);
+      throw new Error("This account has been deactivated. Please contact an administrator.");
+    }
+    
+    // Validate that role exists
+    if (!userDataFromDB.role) {
+      setLoading(false);
+      throw new Error("User role not assigned. Contact administrator.");
+    }
+
+    const completeUserData = {
+      ...userDataFromDB,
+      email: firebaseUser.email || userDataFromDB.email,
+    };
+
+    setUser(firebaseUser);
+    setUserData(completeUserData);
+    await storeUserData(completeUserData);
+    
+    console.log("Login successful. Role:", completeUserData.role);
+    setLoading(false);
+    
+    return completeUserData; 
+    
+  } catch (error: any) {
+    console.log("AuthContext - Login error:", error);
+    setLoading(false);
+    
+    // Better error messages
+    if (error.code === 'auth/invalid-credential') {
+      throw new Error("Invalid email or password."); 
+    } else if (error.code === 'auth/user-not-found') {
+      throw new Error("User not found.");
+    } else if (error.code === 'auth/wrong-password') {
+      throw new Error("Incorrect password.");
+    } else if (error.message.includes("deactivated")) {
+      throw error;
+    } else {
+      throw new Error("Login failed. Please try again.");
+    }
+  }
 };
+
   const logout = async () => {
     try {
       await signOut(auth);
@@ -151,6 +178,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Helper functions for role checking
+  const hasPermission = (permission: string): boolean => {
+    if (!userData) return false;
+    if (userData.role === 'main_admin') return true;
+    return userData.permissions?.[permission as keyof typeof userData.permissions] || false;
+  };
+
+  const isMainAdmin = (): boolean => {
+    return userData?.role === 'main_admin';
+  };
+
+  const isAssistantAdmin = (): boolean => {
+    return userData?.role === 'assistant_admin';
+  };
+
   const value: AuthContextValue = {
     user,
     userData,
@@ -159,6 +201,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isAuthenticated: !!user,
     login,
     logout,
+    hasPermission,
+    isMainAdmin,
+    isAssistantAdmin,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

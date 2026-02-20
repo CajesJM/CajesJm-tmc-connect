@@ -17,12 +17,12 @@ function RootLayoutContent() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
-      <Stack.Screen name="admin" />
+      <Stack.Screen name="assistant_admin" />
+      <Stack.Screen name="main_admin" />
       <Stack.Screen name="student" />
     </Stack>
   );
 }
-
 
 export default function RootLayout() {
   return (

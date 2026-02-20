@@ -5,115 +5,239 @@ const isSmallScreen = width < 380;
 const isTablet = width > 700;
 
 export const LandingStyles = StyleSheet.create({
+  // Container
   container: {
     flex: 1,
     backgroundColor: "#0A0A0A",
-    alignItems: "center",
-    justifyContent: "center",
     position: "relative",
+    overflow: "hidden",
   },
 
-  cosmicBg: {
+  background: {
     position: "absolute",
-    top: -height * 0.3,
-    left: -width * 0.2,
-    width: "140%",
-    height: height * 0.8,
-    backgroundColor: "#1E1E1E",
-    borderBottomRightRadius: 300,
-    transform: [{ rotate: "-10deg" }],
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#0A0A0A",
   },
 
-  nebulaBg: {
+  gradientOverlay: {
     position: "absolute",
-    bottom: -height * 0.3,
-    right: -width * 0.2,
-    width: "140%",
-    height: height * 0.8,
-    backgroundColor: "#151515",
-    borderTopLeftRadius: 300,
-    transform: [{ rotate: "10deg" }],
+    width: "100%",
+    height: "100%",
+    backgroundImage: "linear-gradient(135deg, #0A0A0A 0%, #1a0a2a 100%)",
   },
 
-  content: {
-    width: isTablet ? "65%" : "90%",
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderRadius: 25,
-    paddingVertical: isTablet ? 60 : 45,
-    paddingHorizontal: isTablet ? 50 : 35,
-    alignItems: "center",
+  slideBackground: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+  },
+
+  floatingOrbs: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+  },
+
+  orb: {
+    position: "absolute",
+    borderRadius: 500,
+  },
+
+  orb1: {
+    width: 300,
+    height: 300,
+    backgroundColor: "rgba(139, 92, 246, 0.15)",
+    top: -100,
+    left: -100,
+  },
+
+  orb2: {
+    width: 200,
+    height: 200,
+    backgroundColor: "rgba(236, 72, 153, 0.1)",
+    bottom: -50,
+    right: -50,
+  },
+
+  orb3: {
+    width: 150,
+    height: 150,
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+    top: "50%",
+    right: "27%",
+  },
+
+  mainContainer: {
+    flex: 1,
     justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
   },
 
-  logoWrap: {
+  contentCard: {
+    width: isTablet ? "70%" : "100%",
+    maxWidth: 450,
+    borderRadius: 32,
+    paddingVertical: isTablet ? 50 : 40,
+    paddingHorizontal: isTablet ? 40 : 30,
+    alignItems: "center",
+    borderWidth: 0.7, 
+    borderColor: "rgba(139, 92, 246, 0.4)", 
+   
+    backdropFilter: "blur(20px)",
+  },
+
+  logoSection: {
     alignItems: 'center',
-    width: '100%',
+    marginBottom: 30,
+    position: 'relative',
+  },
+
+  logo: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 1.5, 
+    borderColor: "rgba(139, 92, 246, 0.4)", 
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    zIndex: 2,
+  },
+
+  logoGlow: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: "rgba(139, 92, 246, 0.15)", 
+    zIndex: 1,
+  },
+
+  textContent: {
+    alignItems: "center",
+    marginBottom: 40,
   },
 
   welcomeText: {
-    fontSize: isSmallScreen ? 14 : isTablet ? 18 : 16,
+    fontSize: isSmallScreen ? 13 : isTablet ? 16 : 14,
     color: "rgba(255, 255, 255, 0.7)",
     fontWeight: "600",
-    letterSpacing: 3,
+    letterSpacing: 3.5,
     textTransform: "uppercase",
     marginBottom: 8,
+    fontFamily: "System",
   },
 
-  brand: {
-    fontSize: isSmallScreen ? 36 : isTablet ? 60 : 48,
+  brandName: {
+    fontSize: isSmallScreen ? 38 : isTablet ? 64 : 50,
     fontWeight: "900",
     color: "#FFFFFF",
     textAlign: "center",
-    letterSpacing: -1.5,
-    marginBottom: 10,
+    letterSpacing: -1,
+    marginBottom: 25,
+    textShadowColor: "rgba(139, 92, 246, 0.3)",
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 15,
+    fontFamily: "System",
   },
 
-  subtitleContainer: {
-    marginBottom: 40,
+  subtitleSection: {
+    marginBottom: 10,
     alignItems: "center",
   },
 
-  subtitleLine: {
+  subtitle: {
     fontSize: isSmallScreen ? 16 : isTablet ? 20 : 18,
     color: "rgba(255, 255, 255, 0.85)",
     fontWeight: "300",
     textAlign: "center",
-    lineHeight: 26,
+    lineHeight: 28,
+    fontFamily: "System",
+    letterSpacing: 0.3,
   },
 
-  accentLine: {
-    width: 60,
-    height: 3,
-    backgroundColor: "rgba(255, 255, 255, 0.4)",
+  divider: {
+    width: 80,
+    height: 2.5, 
+    backgroundColor: "rgba(139, 92, 246, 0.6)", 
     borderRadius: 2,
-    marginTop: 15,
+    marginTop: 25,
   },
 
-  button: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 30,
-    paddingVertical: isSmallScreen ? 15 : isTablet ? 22 : 18,
-    paddingHorizontal: isSmallScreen ? 45 : isTablet ? 60 : 50,
+  skipButton: {
+    marginTop: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 25,
+    borderWidth: 0.5, 
+    borderColor: "rgba(139, 92, 246, 0.3)", 
+  },
+
+  skipButtonContent: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 10,
   },
 
-  buttonText: {
-    color: "#000000",
-    fontSize: isSmallScreen ? 16 : isTablet ? 18 : 17,
-    fontWeight: "800",
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
+  skipText: {
+    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: 15,
+    fontWeight: "500",
+    letterSpacing: 0.5,
+    fontFamily: "System",
   },
 
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
+  skipArrow: {
+    color: "rgba(139, 92, 246, 0.9)",
+    fontSize: 18,
+    fontWeight: "600",
   },
 
-  logo: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  progressSection: {
+    position: "absolute",
+    bottom: isSmallScreen ? 40 : 60,
+    width: "100%",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+
+  progressContainer: {
+    width: "100%",
+    maxWidth: 400,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 15,
+    marginBottom: 12,
+  },
+
+  progressBackground: {
+    flex: 1,
+    height: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+
+  progressFill: {
+    height: "100%",
+    backgroundColor: "rgba(139, 92, 246, 0.9)", 
+    borderRadius: 2,
+  },
+
+  progressText: {
+    color: "rgba(255, 255, 255, 0.7)",
+    fontSize: 13,
+    fontWeight: "600",
+    fontFamily: "System",
+    minWidth: 35,
+  },
+
+  progressLabel: {
+    color: "rgba(255, 255, 255, 0.5)",
+    fontSize: 12,
+    fontWeight: "400",
+    fontFamily: "System",
+    letterSpacing: 0.5,
   },
 });

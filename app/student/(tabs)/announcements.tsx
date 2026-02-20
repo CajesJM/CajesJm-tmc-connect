@@ -1,10 +1,11 @@
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, onSnapshot, orderBy, query, Unsubscribe } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { db } from '../../../lib/firebaseConfig';
+import { auth, db } from '../../../lib/firebaseConfig';
 import { StudentAnnouncementStyles as styles } from '../../../styles/StudentAnnouncementStyles';
 
 dayjs.extend(relativeTime);
@@ -24,28 +25,64 @@ export default function StudentAnnouncements() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isUserAuthenticated, setIsUserAuthenticated] = useState(false);
 
   useEffect(() => {
-    fetchAnnouncements();
+    let unsubscribeAnnouncements: Unsubscribe | null = null;
+    let unsubscribeAuth: Unsubscribe | null = null;
+
+    unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      const authenticated = !!user;
+      setIsUserAuthenticated(authenticated);
+
+      if (unsubscribeAnnouncements) {
+        unsubscribeAnnouncements();
+        unsubscribeAnnouncements = null;
+      }
+
+      if (authenticated) {
+        setLoading(true);
+        unsubscribeAnnouncements = setupAnnouncementsListener();
+      } else {
+        setAnnouncements([]);
+        setFilteredAnnouncements([]);
+        setLoading(false);
+        setRefreshing(false);
+      }
+    });
+
+    return () => {
+      if (unsubscribeAuth) unsubscribeAuth();
+      if (unsubscribeAnnouncements) unsubscribeAnnouncements();
+    };
   }, []);
 
-  const fetchAnnouncements = () => {
+  const setupAnnouncementsListener = (): Unsubscribe => {
     const q = query(collection(db, "updates"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: Announcement[] = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Announcement, "id">),
-      }));
-      setAnnouncements(list);
-      filterAnnouncements(list, timeFilter);
-      setLoading(false);
-      setRefreshing(false);
-    }, (error) => {
-      console.error("Error fetching announcements:", error);
-      setLoading(false);
-      setRefreshing(false);
-    });
-    return unsubscribe;
+    
+    return onSnapshot(q, 
+      (snapshot) => {
+  
+        if (auth.currentUser) {
+          const list: Announcement[] = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...(doc.data() as Omit<Announcement, "id">),
+          }));
+          setAnnouncements(list);
+          filterAnnouncements(list, timeFilter);
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }, 
+      (error) => {
+     
+        if (auth.currentUser) {
+          console.error("Error fetching announcements:", error);
+        }
+        setLoading(false);
+        setRefreshing(false);
+      }
+    );
   };
 
   useEffect(() => {
@@ -107,8 +144,13 @@ export default function StudentAnnouncements() {
   };
 
   const handleRefresh = () => {
+    if (!isUserAuthenticated) {
+      setRefreshing(false);
+      return;
+    }
     setRefreshing(true);
-    fetchAnnouncements();
+    // The listener will automatically update when new data comes in
+    setRefreshing(false);
   };
 
   const stats = getTotalStats();
@@ -161,7 +203,8 @@ export default function StudentAnnouncements() {
     { key: 'month', label: 'Month'},
   ];
 
-  if (loading) {
+  // Show loading only when initially loading AND user is authenticated
+  if (loading && isUserAuthenticated) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
@@ -194,80 +237,94 @@ export default function StudentAnnouncements() {
         </Text>
       </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.total}</Text>
-          <Text style={styles.statLabel}>Total</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.today}</Text>
-          <Text style={styles.statLabel}>Today</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.new}</Text>
-          <Text style={styles.statLabel}>New</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.urgent}</Text>
-          <Text style={styles.statLabel}>Urgent</Text>
-        </View>
-      </View>
-
-      <View style={styles.filterSection}>
-        <Text style={styles.filterTitle}>Filter by:</Text>
-        <View style={styles.filterChips}>
-          {timeFilters.map((filter) => (
-            <TouchableOpacity
-              key={filter.key}
-              style={[
-                styles.filterChip,
-                timeFilter === filter.key && styles.filterChipActive
-              ]}
-              onPress={() => setTimeFilter(filter.key)}
-            >
-              <Text style={[
-                styles.filterChipText,
-                timeFilter === filter.key && styles.filterChipTextActive
-              ]}>
-                {filter.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.resultsInfo}>
-        <Text style={styles.resultsText}>
-          {filteredAnnouncements.length} announcement{filteredAnnouncements.length !== 1 ? 's' : ''}
-          {timeFilter !== 'all' && ` from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
-        </Text>
-      </View>
-
-      <FlatList
-        data={filteredAnnouncements}
-        keyExtractor={(item) => item.id}
-        renderItem={renderAnnouncementItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <View style={styles.emptyStateIcon}>
-              <Icon name="bullhorn-outline" size={32} color="#9CA3AF" />
+      {isUserAuthenticated ? (
+        <>
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats.total}</Text>
+              <Text style={styles.statLabel}>Total</Text>
             </View>
-            <Text style={styles.emptyStateText}>
-              {timeFilter === 'all' ? 'No announcements yet' : `No announcements from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
-            </Text>
-            <Text style={styles.emptyStateSubtext}>
-              {timeFilter === 'all'
-                ? 'Check back later for new announcements'
-                : 'Try changing the filter to see more'
-              }
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats.today}</Text>
+              <Text style={styles.statLabel}>Today</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats.new}</Text>
+              <Text style={styles.statLabel}>New</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats.urgent}</Text>
+              <Text style={styles.statLabel}>Urgent</Text>
+            </View>
+          </View>
+
+          <View style={styles.filterSection}>
+            <Text style={styles.filterTitle}>Filter by:</Text>
+            <View style={styles.filterChips}>
+              {timeFilters.map((filter) => (
+                <TouchableOpacity
+                  key={filter.key}
+                  style={[
+                    styles.filterChip,
+                    timeFilter === filter.key && styles.filterChipActive
+                  ]}
+                  onPress={() => setTimeFilter(filter.key)}
+                >
+                  <Text style={[
+                    styles.filterChipText,
+                    timeFilter === filter.key && styles.filterChipTextActive
+                  ]}>
+                    {filter.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.resultsInfo}>
+            <Text style={styles.resultsText}>
+              {filteredAnnouncements.length} announcement{filteredAnnouncements.length !== 1 ? 's' : ''}
+              {timeFilter !== 'all' && ` from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
             </Text>
           </View>
-        }
-      />
+
+          <FlatList
+            data={filteredAnnouncements}
+            keyExtractor={(item) => item.id}
+            renderItem={renderAnnouncementItem}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <View style={styles.emptyStateIcon}>
+                  <Icon name="bullhorn-outline" size={32} color="#9CA3AF" />
+                </View>
+                <Text style={styles.emptyStateText}>
+                  {timeFilter === 'all' ? 'No announcements yet' : `No announcements from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
+                </Text>
+                <Text style={styles.emptyStateSubtext}>
+                  {timeFilter === 'all'
+                    ? 'Check back later for new announcements'
+                    : 'Try changing the filter to see more'
+                  }
+                </Text>
+              </View>
+            }
+          />
+        </>
+      ) : (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyStateIcon}>
+            <Icon name="account-off" size={32} color="#9CA3AF" />
+          </View>
+          <Text style={styles.emptyStateText}>Please log in to view announcements</Text>
+          <Text style={styles.emptyStateSubtext}>
+            Sign in to see the latest campus updates
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

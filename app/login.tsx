@@ -1,24 +1,28 @@
+import Alert from '@blazejkustra/react-native-alert';
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
+import { db } from '../lib/firebaseConfig';
 import { LoginStyles } from "../styles/LoginStyles";
 
 export default function Login() {
   const router = useRouter();
   const { login, loading } = useAuth();
+  
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -26,28 +30,112 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleLogin = async () => {
-    if (busy) return;
-    setError(null);
+  const isMainAdmin = (email: string) => {
+    
+    const mainAdminEmails = [
+      'mainadmin@tmc.edu',
+      'systemadmin@tmc.edu',
+      'superadmin@tmc.edu',
+      'admin@tmc.edu' 
+    ];
+    
+    const mainAdminPatterns = [
+      /^main\.admin/i,
+      /^system\.admin/i,
+      /^super\.admin/i
+    ];
+    
+    if (mainAdminEmails.includes(email.toLowerCase())) {
+      return true;
+    }
+    
+    // Check patterns
+    for (const pattern of mainAdminPatterns) {
+      if (pattern.test(email)) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
 
-    if (!username || !password) {
-      setError("Please enter username and password");
+ const handleLogin = async () => {
+  if (busy) return;
+  setError(null);
+
+  if (!username || !password) {
+    setError("Please enter username and password");
+    return;
+  }
+
+  setBusy(true);
+  try {
+    console.log("Looking up username:", username);
+    
+    // 1. Find the user by username in Firestore
+    const usersCollection = collection(db, 'users');
+    const q = query(usersCollection, where('username', '==', username));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+      console.log("Username not found in database");
+      setError("Invalid username or password");
+      Alert.alert("Login Failed", "Invalid username or password");
+      setBusy(false);
       return;
     }
 
-    setBusy(true);
-    try {
-      const loginEmail = username.includes("@") ? username : `${username}@tmc.edu`;
-      await login(loginEmail, password);
-    } catch (err: any) {
-      console.log("Login error:", err.message);
-      const errorMessage = "Invalid username or password. Please try again.";
-      setError(errorMessage);
-      Alert.alert("Login Failed", errorMessage);
-    } finally {
-      setBusy(false);
+    // Get the user data
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data();
+    
+    console.log("Found user with email:", userData.email);
+    console.log("User role:", userData.role);
+
+    // 2. Login with the email and password
+    const loggedInUser = await login(userData.email, password);
+    
+    console.log("Login successful. User role:", loggedInUser.role);
+    
+    let targetRoute = '/student';
+    
+    if (loggedInUser.role === 'main_admin') {
+      targetRoute = '/main_admin';
+    } else if (loggedInUser.role === 'assistant_admin') {
+      targetRoute = '/assistant_admin';
+    } else if (loggedInUser.role === 'student') {
+      targetRoute = '/student';
     }
-  };
+    
+    console.log("Redirecting to:", targetRoute);
+    
+    // Navigate to appropriate route
+    setTimeout(() => {
+      router.replace(targetRoute as any);
+    }, 300);
+    
+  } catch (err: any) {
+    console.log("Login error:", err.message);
+    
+    // Handle specific Firebase Auth errors
+    let errorMessage = "Invalid username or password. Please try again.";
+    
+    if (err.code === 'auth/invalid-credential' || 
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/user-not-found') {
+      errorMessage = "Invalid username or password";
+    } else if (err.code === 'auth/too-many-requests') {
+      errorMessage = "Too many failed attempts. Please try again later.";
+    } else if (err.code === 'auth/network-request-failed') {
+      errorMessage = "Network error. Please check your connection.";
+    }
+    
+    setError(errorMessage);
+    Alert.alert("Login Failed", errorMessage);
+  } finally {
+    setBusy(false);
+  }
+};
 
   return (
     <KeyboardAvoidingView
@@ -131,14 +219,26 @@ export default function Login() {
             )}
           </TouchableOpacity>
 
-          {/* <View style={LoginStyles.demoAccounts}>
-            <Text style={LoginStyles.demoTitle}>Demo Accounts:</Text>
-            <Text style={LoginStyles.demoText}>Admin: admin / admin123</Text>
-            <Text style={LoginStyles.demoText}>Student: john.cajes / 2024001</Text>
-            <Text style={LoginStyles.demoNote}>Format: username / password</Text>
-          </View>   */}
+         
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  adminHint: {
+    marginTop: 20,
+    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  adminHintText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    marginBottom: 4,
+    fontFamily: 'monospace',
+  },
+});

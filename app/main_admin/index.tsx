@@ -792,9 +792,9 @@ export default function MainAdminDashboard() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0ea5e9" />
       }
     >
-      {/* Gradient Header */}
+   
       <LinearGradient
-        colors={['#0f172a', '#1e293b']}
+        colors={['#14203d', '#06080b']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
@@ -806,7 +806,6 @@ export default function MainAdminDashboard() {
             <Text style={styles.roleText}>Administrator</Text>
           </View>
 
-          {/* Profile Section with Image Picker */}
           <TouchableOpacity
             style={styles.profileButton}
             onPress={handleProfileImagePress}
@@ -831,10 +830,9 @@ export default function MainAdminDashboard() {
           </TouchableOpacity>
         </View>
 
-        {/* Date and Quick Actions */}
         <View style={styles.dateSection}>
           <View style={styles.dateContainer}>
-            <Feather name="calendar" size={16} color="#94a3b8" />
+            <Feather name="calendar" size={12} color="#94a3b8" />
             <Text style={styles.dateText}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: 'long',

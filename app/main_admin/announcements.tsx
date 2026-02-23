@@ -1,33 +1,30 @@
-import {
-  Feather,
-  FontAwesome6,
-  Ionicons,
-  MaterialIcons,
-  Octicons
-} from '@expo/vector-icons';
+import { Feather, FontAwesome6, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import {
   addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  useWindowDimensions
+  useWindowDimensions,
+  View
 } from 'react-native';
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../lib/firebaseConfig";
+import { announcementStyles } from '../../styles/main-admin/announcementStyles';
 
 dayjs.extend(relativeTime);
 
@@ -38,489 +35,33 @@ interface Announcement {
   createdAt?: any;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(14, 165, 233, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  headerSubtitle: {
-    color: '#cbd5e1',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  createAnnouncementButton: {
-    backgroundColor: '#0ea5e9',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  createAnnouncementButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statCardPrimary: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#0ea5e9',
-  },
-  statCardSuccess: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#10b981',
-  },
-  statCardWarning: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
-  },
-  statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  controlsContainer: {
-    paddingHorizontal: 16,
-    gap: 16,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 14,
-    color: '#1e293b',
-  },
-  filtersContainer: {
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
-  },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    marginRight: 8,
-  },
-  filterButtonActive: {
-    backgroundColor: '#0ea5e9',
-    borderColor: '#0ea5e9',
-  },
-  filterButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  filterButtonTextActive: {
-    color: '#ffffff',
-  },
-  resultsHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f1f5f9',
-  },
-  resultsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  resultsSubtitle: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-  },
-  resultsFilterText: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  resultsSearchText: {
-    fontSize: 12,
-    color: '#0ea5e9',
-  },
-  listContainer: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  urgentCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  importantCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
-    backgroundColor: '#fffbeb',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  titleContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 6,
-    flexWrap: 'wrap',
-  },
-  newBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#3b82f6',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  newBadgeText: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#ffffff',
-    textTransform: 'uppercase',
-  },
-  urgentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#ef4444',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  urgentBadgeText: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#ffffff',
-    textTransform: 'uppercase',
-  },
-  importantBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  importantBadgeText: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#ffffff',
-    textTransform: 'uppercase',
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  cardActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#eff6ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#fef2f2',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardMessage: {
-    fontSize: 14,
-    color: '#475569',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 12,
-  },
-  dateInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  fullDate: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  emptyStateIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginBottom: 24,
-    maxWidth: 300,
-  },
-  emptyStateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#0ea5e9',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  emptyStateButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#64748b',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  modalHeader: {
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  modalHeaderTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  modalBackButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  modalBackText: {
-    fontSize: 14,
-    color: '#0ea5e9',
-    fontWeight: '600',
-  },
-  modalTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    textAlign: 'center',
-    marginLeft: -80,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  formInput: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: '#1e293b',
-  },
-  textArea: {
-    height: 120,
-    textAlignVertical: 'top',
-  },
-  formActions: {
-    marginTop: 24,
-    gap: 12,
-  },
-  submitButton: {
-    backgroundColor: '#0ea5e9',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 10,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#cbd5e1',
-  },
-  submitButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    backgroundColor: '#f1f5f9',
-    paddingVertical: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#64748b',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
-
 export default function MainAdminAnnouncements() {
   const { width: screenWidth } = useWindowDimensions();
-  const isSmallScreen = screenWidth < 375;
-  const isMediumScreen = screenWidth < 768;
   
+  const isMobile = screenWidth < 640;
+  const isTablet = screenWidth >= 640 && screenWidth < 1024;
+  const isDesktop = screenWidth >= 1024;
+  const isSmallScreen = screenWidth < 375;
+
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [filteredAnnouncements, setFilteredAnnouncements] = useState<Announcement[]>([]);
+  const [paginatedAnnouncements, setPaginatedAnnouncements] = useState<Announcement[]>([]);
+  const [searchResults, setSearchResults] = useState<Announcement[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'week' | 'month' | 'pinned'>('all');
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(true); 
-  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const [itemsPerPage] = useState(isMobile ? 5 : 10);
+
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<string | null>(null);
+  const [priority, setPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
+  const { user, userData } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     const q = query(collection(db, "updates"), orderBy("createdAt", "desc"));
@@ -530,59 +71,71 @@ export default function MainAdminAnnouncements() {
         ...(doc.data() as Omit<Announcement, "id">),
       }));
       setAnnouncements(list);
-      filterAnnouncements(list, activeFilter);
-      setIsLoading(false); 
+      setIsLoading(false);
     }, (error) => {
       console.error("Error fetching announcements:", error);
-      setIsLoading(false); 
+      setIsLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  const filterAnnouncements = (announcementsList: Announcement[], filter: 'all' | 'week' | 'month' | 'pinned') => {
+  useEffect(() => {
+    let filtered = filterAnnouncementsByTime(announcements, activeFilter);
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setPaginatedAnnouncements(filtered.slice(startIndex, endIndex));
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+  }, [announcements, activeFilter, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase();
+      const results = announcements.filter(ann =>
+        ann.title.toLowerCase().includes(searchLower) ||
+        ann.message.toLowerCase().includes(searchLower)
+      );
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery, announcements]);
+
+  const filterAnnouncementsByTime = (announcementsList: Announcement[], filter: 'all' | 'week' | 'month' | 'pinned') => {
     const now = dayjs();
-    let filtered = announcementsList;
 
     switch (filter) {
       case 'week':
-        filtered = announcementsList.filter(ann => {
+        return announcementsList.filter(ann => {
           if (!ann.createdAt) return false;
           return dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'week'));
         });
-        break;
       case 'month':
-        filtered = announcementsList.filter(ann => {
+        return announcementsList.filter(ann => {
           if (!ann.createdAt) return false;
           return dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'month'));
         });
-        break;
       case 'pinned':
-        filtered = announcementsList.filter(ann => ann.title.toLowerCase().includes('important') || 
-                                                 ann.title.toLowerCase().includes('urgent'));
-        break;
+        return announcementsList.filter(ann =>
+          ann.title.toLowerCase().includes('important') ||
+          ann.title.toLowerCase().includes('urgent')
+        );
       default:
-        filtered = announcementsList;
+        return announcementsList;
     }
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      filtered = filtered.filter(ann => 
-        ann.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ann.message.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    setFilteredAnnouncements(filtered);
   };
 
   const handleFilterChange = (filter: 'all' | 'week' | 'month' | 'pinned') => {
     setActiveFilter(filter);
-    filterAnnouncements(announcements, filter);
+    setCurrentPage(1); 
   };
 
   const handleSearch = (text: string) => {
     setSearchQuery(text);
-    filterAnnouncements(announcements, activeFilter);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
   };
 
   const handleAddAnnouncement = async () => {
@@ -591,15 +144,20 @@ export default function MainAdminAnnouncements() {
       return;
     }
 
+    let finalTitle = title.trim();
+    if (priority === 'urgent' && !finalTitle.toLowerCase().includes('urgent')) {
+      finalTitle = `URGENT: ${finalTitle}`;
+    } else if (priority === 'important' && !finalTitle.toLowerCase().includes('important')) {
+      finalTitle = `IMPORTANT: ${finalTitle}`;
+    }
+
     try {
       await addDoc(collection(db, "updates"), {
-        title: title.trim(),
+        title: finalTitle,
         message: message.trim(),
         createdAt: serverTimestamp(),
       });
-      setTitle("");
-      setMessage("");
-      setShowCreateForm(false);
+      resetForm();
       Alert.alert("Success", "Announcement created successfully!");
     } catch (error) {
       console.error("Error adding announcement:", error);
@@ -611,22 +169,34 @@ export default function MainAdminAnnouncements() {
     setEditingId(announcement.id);
     setTitle(announcement.title);
     setMessage(announcement.message);
+
+    if (announcement.title.toLowerCase().includes('urgent')) {
+      setPriority('urgent');
+    } else if (announcement.title.toLowerCase().includes('important')) {
+      setPriority('important');
+    } else {
+      setPriority('normal');
+    }
+
     setShowCreateForm(true);
   };
 
   const handleSaveEdit = async () => {
     if (!editingId || !title.trim() || !message.trim()) return;
-    
+    let finalTitle = title.trim();
+    if (priority === 'urgent' && !finalTitle.toLowerCase().includes('urgent')) {
+      finalTitle = `URGENT: ${finalTitle}`;
+    } else if (priority === 'important' && !finalTitle.toLowerCase().includes('important')) {
+      finalTitle = `IMPORTANT: ${finalTitle}`;
+    }
+
     try {
       const announcementRef = doc(db, "updates", editingId);
-      await updateDoc(announcementRef, { 
-        title: title.trim(), 
-        message: message.trim() 
+      await updateDoc(announcementRef, {
+        title: finalTitle,
+        message: message.trim()
       });
-      setEditingId(null);
-      setTitle("");
-      setMessage("");
-      setShowCreateForm(false);
+      resetForm();
       Alert.alert("Success", "Announcement updated successfully!");
     } catch (error) {
       console.error("Error updating announcement:", error);
@@ -637,7 +207,6 @@ export default function MainAdminAnnouncements() {
   const handleDelete = async (id: string, announcementTitle: string) => {
     if (Platform.OS === 'web') {
       const isConfirmed = window.confirm(`Are you sure you want to delete "${announcementTitle}"?`);
-      
       if (isConfirmed) {
         try {
           await deleteDoc(doc(db, "updates", id));
@@ -649,12 +218,12 @@ export default function MainAdminAnnouncements() {
       }
     } else {
       Alert.alert(
-        "Delete Announcement", 
+        "Delete Announcement",
         `Are you sure you want to delete "${announcementTitle}"?`,
         [
           { text: "Cancel", style: "cancel" },
-          { 
-            text: "Delete", 
+          {
+            text: "Delete",
             style: "destructive",
             onPress: async () => {
               try {
@@ -671,26 +240,38 @@ export default function MainAdminAnnouncements() {
     }
   };
 
-  const handleCloseCreateForm = () => {
+  const resetForm = () => {
     setEditingId(null);
     setTitle("");
     setMessage("");
+    setPriority('normal');
     setShowCreateForm(false);
   };
 
-  const totalAnnouncements = announcements.length;
-  const todayAnnouncements = announcements.filter(ann => {
-    if (!ann.createdAt) return false;
-    return dayjs(ann.createdAt.toDate()).isSame(dayjs(), 'day');
-  }).length;
-  const urgentAnnouncements = announcements.filter(ann => 
-    ann.title.toLowerCase().includes('urgent') || 
-    ann.title.toLowerCase().includes('important')
-  ).length;
-
-  const formatDate = (date: Date) => {
-    return dayjs(date).format('MMM D, YYYY • h:mm A');
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
   };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const stats = useMemo(() => {
+    const total = announcements.length;
+    const today = announcements.filter(ann => {
+      if (!ann.createdAt) return false;
+      return dayjs(ann.createdAt.toDate()).isSame(dayjs(), 'day');
+    }).length;
+    const urgent = announcements.filter(ann =>
+      ann.title.toLowerCase().includes('urgent') ||
+      ann.title.toLowerCase().includes('important')
+    ).length;
+    return { total, today, urgent };
+  }, [announcements]);
 
   const isNewAnnouncement = (createdAt: any) => {
     if (!createdAt) return false;
@@ -705,337 +286,656 @@ export default function MainAdminAnnouncements() {
     return title.toLowerCase().includes('important');
   };
 
-  const renderLoading = () => (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#0ea5e9" />
-      <Text style={styles.loadingText}>Loading announcements...</Text>
-    </View>
-  );
+  const formatDate = (date: Date) => {
+    return dayjs(date).format('MMM D, YYYY • h:mm A');
+  };
 
-  const renderAnnouncementItem = ({ item }: { item: Announcement }) => (
-    <View style={[
-      styles.card,
-      isUrgentAnnouncement(item.title) && styles.urgentCard,
-      isImportantAnnouncement(item.title) && styles.importantCard,
-    ]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.titleContainer}>
-          <View style={styles.titleRow}>
-            {isNewAnnouncement(item.createdAt) && (
-              <View style={styles.newBadge}>
-                <Feather name="zap" size={10} color="#ffffff" />
-                <Text style={styles.newBadgeText}>NEW</Text>
-              </View>
-            )}
-            {isUrgentAnnouncement(item.title) && (
-              <View style={styles.urgentBadge}>
-                <MaterialIcons name="warning" size={10} color="#ffffff" />
-                <Text style={styles.urgentBadgeText}>URGENT</Text>
-              </View>
-            )}
-            {isImportantAnnouncement(item.title) && (
-              <View style={styles.importantBadge}>
-                <Octicons name="star-fill" size={10} color="#ffffff" />
-                <Text style={styles.importantBadgeText}>IMPORTANT</Text>
-              </View>
-            )}
-          </View>
-          <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-        </View>
-        <View style={styles.cardActions}>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => handleEditStart(item)}
-          >
-            <Feather name="edit-2" size={16} color="#3b82f6" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleDelete(item.id, item.title)}
-          >
-            <Feather name="trash-2" size={16} color="#ef4444" />
-          </TouchableOpacity>
-        </View>
-      </View>
-      
-      <Text style={styles.cardMessage} numberOfLines={3}>{item.message}</Text>
-      
-      {item.createdAt && (
-        <View style={styles.cardFooter}>
-          <View style={styles.dateInfo}>
-            <Feather name="clock" size={12} color="#64748b" />
-            <Text style={styles.timestamp}>
-              {dayjs(item.createdAt.toDate()).fromNow()}
-            </Text>
-          </View>
-          <Text style={styles.fullDate}>
-            {formatDate(item.createdAt.toDate())}
+  const getPriorityColor = (title: string) => {
+    if (title.toLowerCase().includes('urgent')) return '#ef4444';
+    if (title.toLowerCase().includes('important')) return '#f59e0b';
+    return '#0ea5e9';
+  };
+
+  const renderPaginatedItem = ({ item, index }: { item: Announcement; index: number }) => {
+    const isActive = selectedAnnouncement === item.id;
+    const priorityColor = getPriorityColor(item.title);
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.paginatedItem, 
+          isActive && styles.paginatedItemActive,
+          isMobile && styles.paginatedItemMobile
+        ]}
+        onPress={() => setSelectedAnnouncement(item.id)}
+      >
+        <View style={[styles.paginatedNumber, { backgroundColor: `${priorityColor}15` }]}>
+          <Text style={[styles.paginatedNumberText, { color: priorityColor }]}>
+            {(currentPage - 1) * itemsPerPage + index + 1}
           </Text>
         </View>
-      )}
-    </View>
-  );
+        <View style={styles.paginatedInfo}>
+          <Text style={[styles.paginatedTitle, isMobile && styles.paginatedTitleMobile]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <View style={styles.paginatedMeta}>
+            <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
+              {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
+            </Text>
+            {isNewAnnouncement(item.createdAt) && (
+              <View style={[styles.paginatedBadge, { backgroundColor: '#3b82f6' }]}>
+                <Text style={styles.paginatedBadgeText}>NEW</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        <View style={styles.paginatedActions}>
+          <TouchableOpacity
+            style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
+            onPress={() => handleEditStart(item)}
+          >
+            <Feather name="edit-2" size={isMobile ? 12 : 14} color="#3b82f6" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
+            onPress={() => handleDelete(item.id, item.title)}
+          >
+            <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderSearchResultItem = ({ item }: { item: Announcement }) => {
+    const priorityColor = getPriorityColor(item.title);
+
+    return (
+      <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile]}>
+        <View style={styles.searchResultHeader}>
+          <View style={styles.searchResultTitleContainer}>
+            <Text style={[styles.searchResultTitle, isMobile && styles.searchResultTitleMobile]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View style={styles.searchResultBadges}>
+              {isNewAnnouncement(item.createdAt) && (
+                <View style={[styles.searchResultBadge, { backgroundColor: '#3b82f6' }]}>
+                  <Text style={styles.searchResultBadgeText}>NEW</Text>
+                </View>
+              )}
+              {isUrgentAnnouncement(item.title) && (
+                <View style={[styles.searchResultBadge, { backgroundColor: '#ef4444' }]}>
+                  <Text style={styles.searchResultBadgeText}>URGENT</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          <View style={styles.searchResultActions}>
+            <TouchableOpacity
+              style={[styles.searchResultEditButton, isMobile && styles.searchResultEditButtonMobile]}
+              onPress={() => handleEditStart(item)}
+            >
+              <Feather name="edit-2" size={isMobile ? 12 : 14} color="#3b82f6" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.searchResultDeleteButton, isMobile && styles.searchResultDeleteButtonMobile]}
+              onPress={() => handleDelete(item.id, item.title)}
+            >
+              <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <Text style={[styles.searchResultMessage, isMobile && styles.searchResultMessageMobile]} numberOfLines={2}>
+          {item.message}
+        </Text>
+
+        <View style={styles.searchResultFooter}>
+          <View style={styles.searchResultDate}>
+            <Feather name="clock" size={isMobile ? 8 : 10} color="#64748b" />
+            <Text style={[styles.searchResultDateText, isMobile && styles.searchResultDateTextMobile]}>
+              {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
+            </Text>
+          </View>
+          <Text style={[styles.searchResultFullDate, isMobile && styles.searchResultFullDateMobile]}>
+            {item.createdAt ? dayjs(item.createdAt.toDate()).format('MMM D, YYYY') : ''}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <View style={[styles.paginationContainer, isMobile && styles.paginationContainerMobile]}>
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled, isMobile && styles.paginationButtonMobile]}
+          onPress={handlePrevPage}
+          disabled={currentPage === 1}
+        >
+          <Feather name="chevron-left" size={isMobile ? 14 : 16} color={currentPage === 1 ? '#cbd5e1' : '#0ea5e9'} />
+          {!isMobile && <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
+            Prev
+          </Text>}
+        </TouchableOpacity>
+
+        <View style={styles.pageInfo}>
+          <Text style={[styles.pageInfoText, isMobile && styles.pageInfoTextMobile]}>{currentPage}/{totalPages}</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled, isMobile && styles.paginationButtonMobile]}
+          onPress={handleNextPage}
+          disabled={currentPage === totalPages}
+        >
+          {!isMobile && <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>
+            Next
+          </Text>}
+          <Feather name="chevron-right" size={isMobile ? 14 : 16} color={currentPage === totalPages ? '#cbd5e1' : '#0ea5e9'} />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const styles = announcementStyles;
 
   return (
     <View style={styles.container}>
-      {/* Header Section */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerIconContainer}>
-            <FontAwesome6 name="bullhorn" size={24} color="#ffffff" />
-          </View>
+      {/* Header with Gradient (matching dashboard) */}
+      <LinearGradient
+        colors={['#14203d', '#06080b']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
+      >
+        <View style={[styles.headerContent, isMobile && styles.headerContentMobile]}>
           <View>
-            <Text style={styles.headerTitle}>Announcements Management</Text>
-            <Text style={styles.headerSubtitle}>Broadcast and manage official announcements</Text>
+            <Text style={[styles.greetingText, isMobile && styles.greetingTextMobile]}>Welcome back,</Text>
+            <Text style={[styles.userName, isMobile && styles.userNameMobile]}>{userData?.name || 'Admin'}</Text>
+            <Text style={[styles.roleText, isMobile && styles.roleTextMobile]}>Announcements Manager</Text>
           </View>
-        </View>
-        <TouchableOpacity 
-          style={styles.createAnnouncementButton}
-          onPress={() => setShowCreateForm(true)}
-        >
-          <Feather name="plus" size={18} color="#ffffff" />
-          <Text style={styles.createAnnouncementButtonText}>New Announcement</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Stats Overview */}
-      <View style={styles.statsGrid}>
-        <View style={[styles.statCard, styles.statCardPrimary]}>
-          <View style={styles.statIconContainer}>
-            <Ionicons name="document-text" size={20} color="#0ea5e9" />
-          </View>
-          <View>
-            <Text style={styles.statNumber}>{totalAnnouncements}</Text>
-            <Text style={styles.statLabel}>Total Announcements</Text>
-          </View>
-        </View>
-        
-        <View style={[styles.statCard, styles.statCardSuccess]}>
-          <View style={styles.statIconContainer}>
-            <Feather name="sun" size={20} color="#10b981" />
-          </View>
-          <View>
-            <Text style={styles.statNumber}>{todayAnnouncements}</Text>
-            <Text style={styles.statLabel}>Today</Text>
-          </View>
-        </View>
-        
-        <View style={[styles.statCard, styles.statCardWarning]}>
-          <View style={styles.statIconContainer}>
-            <MaterialIcons name="priority-high" size={20} color="#f59e0b" />
-          </View>
-          <View>
-            <Text style={styles.statNumber}>{urgentAnnouncements}</Text>
-            <Text style={styles.statLabel}>Urgent</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Search and Filters */}
-      <View style={styles.controlsContainer}>
-        <View style={styles.searchContainer}>
-          <Feather name="search" size={18} color="#64748b" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search announcements..."
-            value={searchQuery}
-            onChangeText={handleSearch}
-          />
-        </View>
-        
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.filtersContainer}
-        >
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              activeFilter === 'all' && styles.filterButtonActive
-            ]}
-            onPress={() => handleFilterChange('all')}
-          >
-            <Feather name="grid" size={16} color={activeFilter === 'all' ? '#ffffff' : '#64748b'} />
-            <Text style={[
-              styles.filterButtonText,
-              activeFilter === 'all' && styles.filterButtonTextActive
-            ]}>All</Text>
-          </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.filterButton,
-              activeFilter === 'week' && styles.filterButtonActive
-            ]}
-            onPress={() => handleFilterChange('week')}
+            style={[styles.profileButton, isMobile && styles.profileButtonMobile]}
+            onPress={() => router.push('/main_admin/profile')}
           >
-            <Feather name="calendar" size={16} color={activeFilter === 'week' ? '#ffffff' : '#64748b'} />
-            <Text style={[
-              styles.filterButtonText,
-              activeFilter === 'week' && styles.filterButtonTextActive
-            ]}>This Week</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              activeFilter === 'month' && styles.filterButtonActive
-            ]}
-            onPress={() => handleFilterChange('month')}
-          >
-            <Feather name="calendar" size={16} color={activeFilter === 'month' ? '#ffffff' : '#64748b'} />
-            <Text style={[
-              styles.filterButtonText,
-              activeFilter === 'month' && styles.filterButtonTextActive
-            ]}>This Month</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              activeFilter === 'pinned' && styles.filterButtonActive
-            ]}
-            onPress={() => handleFilterChange('pinned')}
-          >
-            <Octicons name="pin" size={16} color={activeFilter === 'pinned' ? '#ffffff' : '#64748b'} />
-            <Text style={[
-              styles.filterButtonText,
-              activeFilter === 'pinned' && styles.filterButtonTextActive
-            ]}>Important</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-
-      {/* Results Info */}
-      <View style={styles.resultsHeader}>
-        <Text style={styles.resultsTitle}>
-          {filteredAnnouncements.length} announcement{filteredAnnouncements.length !== 1 ? 's' : ''}
-        </Text>
-        <View style={styles.resultsSubtitle}>
-          {activeFilter !== 'all' && (
-            <Text style={styles.resultsFilterText}>
-              • Filtered by {activeFilter}
-            </Text>
-          )}
-          {searchQuery && (
-            <Text style={styles.resultsSearchText}>
-              • Matching "{searchQuery}"
-            </Text>
-          )}
-        </View>
-      </View>
-
-      {isLoading ? (
-        renderLoading()
-      ) : (
-        <FlatList
-          data={filteredAnnouncements}
-          keyExtractor={(item) => item.id}
-          renderItem={renderAnnouncementItem}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <View style={styles.emptyStateIcon}>
-                <FontAwesome6 name="bullhorn" size={48} color="#cbd5e1" />
+            {userData?.photoURL ? (
+              <Image
+                source={{ uri: userData.photoURL }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={[styles.profileImage, styles.profileFallback]}>
+                <Text style={[styles.profileInitials, isMobile && styles.profileInitialsMobile]}>
+                  {userData?.name ? userData.name.charAt(0).toUpperCase() : 'A'}
+                </Text>
               </View>
-              <Text style={styles.emptyStateTitle}>
-                No announcements found
-              </Text>
-              <Text style={styles.emptyStateText}>
-                {activeFilter !== 'all' || searchQuery 
-                  ? 'Try changing your filters or search query'
-                  : 'Create your first announcement to get started'}
-              </Text>
-              <TouchableOpacity 
-                style={styles.emptyStateButton}
-                onPress={() => setShowCreateForm(true)}
-              >
-                <Feather name="plus" size={18} color="#ffffff" />
-                <Text style={styles.emptyStateButtonText}>Create Announcement</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
-      )}
+            )}
+          </TouchableOpacity>
+        </View>
 
-      {/* Create/Edit Modal */}
+        <View style={[styles.dateSection, isMobile && styles.dateSectionMobile]}>
+          <View style={[styles.dateContainer, isMobile && styles.dateContainerMobile]}>
+            <Feather name="calendar" size={isMobile ? 10 : 12} color="#94a3b8" />
+            <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
+              {new Date().toLocaleDateString('en-US', {
+                weekday: isMobile ? 'short' : 'long',
+                year: 'numeric',
+                month: isMobile ? 'short' : 'long',
+                day: 'numeric'
+              })}
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[styles.headerAction, isMobile && styles.headerActionMobile]}
+              onPress={() => setShowCreateForm(true)}
+            >
+              <Feather name="plus" size={isMobile ? 16 : 18} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Stats Grid - Responsive */}
+      <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#0ea5e9' }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
+            <Ionicons name="document-text" size={isMobile ? 16 : 20} color="#0ea5e9" />
+          </View>
+          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
+        </View>
+
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#10b981' }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#10b98115' }]}>
+            <Feather name="sun" size={isMobile ? 16 : 20} color="#10b981" />
+          </View>
+          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.today}</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Today</Text>
+        </View>
+
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#f59e0b' }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#f59e0b15' }]}>
+            <MaterialIcons name="priority-high" size={isMobile ? 16 : 20} color="#f59e0b" />
+          </View>
+          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.urgent}</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Urgent</Text>
+        </View>
+      </View>
+
+      {/* Main Content Grid - Responsive */}
+      <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
+        {/* Left Grid - Paginated Announcements */}
+        <View style={[styles.leftGrid, isMobile && styles.leftGridMobile]}>
+          <View style={[styles.leftHeader, isMobile && styles.leftHeaderMobile]}>
+            <Text style={[styles.leftTitle, isMobile && styles.leftTitleMobile]}>Announcements</Text>
+            <View style={[styles.leftControls, isMobile && styles.leftControlsMobile]}>
+              <Text style={[styles.announcementCount, isMobile && styles.announcementCountMobile]}>
+                {filterAnnouncementsByTime(announcements, activeFilter).length}
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={[styles.leftFilters, isMobile && styles.leftFiltersMobile]}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.leftFilterButton,
+                    activeFilter === 'all' && styles.leftFilterButtonActive,
+                    isMobile && styles.leftFilterButtonMobile
+                  ]}
+                  onPress={() => handleFilterChange('all')}
+                >
+                  <Text style={[
+                    styles.leftFilterButtonText,
+                    activeFilter === 'all' && styles.leftFilterButtonTextActive,
+                    isMobile && styles.leftFilterButtonTextMobile
+                  ]}>All</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.leftFilterButton,
+                    activeFilter === 'week' && styles.leftFilterButtonActive,
+                    isMobile && styles.leftFilterButtonMobile
+                  ]}
+                  onPress={() => handleFilterChange('week')}
+                >
+                  <Text style={[
+                    styles.leftFilterButtonText,
+                    activeFilter === 'week' && styles.leftFilterButtonTextActive,
+                    isMobile && styles.leftFilterButtonTextMobile
+                  ]}>Week</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.leftFilterButton,
+                    activeFilter === 'month' && styles.leftFilterButtonActive,
+                    isMobile && styles.leftFilterButtonMobile
+                  ]}
+                  onPress={() => handleFilterChange('month')}
+                >
+                  <Text style={[
+                    styles.leftFilterButtonText,
+                    activeFilter === 'month' && styles.leftFilterButtonTextActive,
+                    isMobile && styles.leftFilterButtonTextMobile
+                  ]}>Month</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.leftFilterButton,
+                    activeFilter === 'pinned' && styles.leftFilterButtonActive,
+                    isMobile && styles.leftFilterButtonMobile
+                  ]}
+                  onPress={() => handleFilterChange('pinned')}
+                >
+                  <Text style={[
+                    styles.leftFilterButtonText,
+                    activeFilter === 'pinned' && styles.leftFilterButtonTextActive,
+                    isMobile && styles.leftFilterButtonTextMobile
+                  ]}>Important</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size={isMobile ? "small" : "large"} color="#0ea5e9" />
+              <Text style={[styles.loadingText, isMobile && styles.loadingTextMobile]}>Loading...</Text>
+            </View>
+          ) : (
+            <>
+              <FlatList
+                data={paginatedAnnouncements}
+                keyExtractor={(item) => item.id}
+                renderItem={renderPaginatedItem}
+                style={styles.paginatedList}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                    <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
+                      <FontAwesome6 name="bullhorn" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                    </View>
+                    <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No announcements</Text>
+                    <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
+                      Create your first announcement to get started
+                    </Text>
+                  </View>
+                }
+              />
+
+              {/* Selected Announcement Detail View - Responsive */}
+              {selectedAnnouncement && (
+                <View style={[styles.selectedDetailContainer, isMobile && styles.selectedDetailContainerMobile]}>
+                  <View style={[styles.selectedDetailHeader, isMobile && styles.selectedDetailHeaderMobile]}>
+                    <Text style={[styles.selectedDetailTitle, isMobile && styles.selectedDetailTitleMobile]}>Details</Text>
+                    <TouchableOpacity onPress={() => setSelectedAnnouncement(null)}>
+                      <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {(() => {
+                    const selected = announcements.find(a => a.id === selectedAnnouncement);
+                    if (!selected) return null;
+
+                    return (
+                      <View style={styles.selectedDetailContent}>
+                        <View style={[styles.selectedDetailBadges, isMobile && styles.selectedDetailBadgesMobile]}>
+                          {isNewAnnouncement(selected.createdAt) && (
+                            <View style={[styles.detailBadge, { backgroundColor: '#3b82f6' }, isMobile && styles.detailBadgeMobile]}>
+                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>NEW</Text>
+                            </View>
+                          )}
+                          {isUrgentAnnouncement(selected.title) && (
+                            <View style={[styles.detailBadge, { backgroundColor: '#ef4444' }, isMobile && styles.detailBadgeMobile]}>
+                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>URGENT</Text>
+                            </View>
+                          )}
+                          {isImportantAnnouncement(selected.title) && (
+                            <View style={[styles.detailBadge, { backgroundColor: '#f59e0b' }, isMobile && styles.detailBadgeMobile]}>
+                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>IMPORTANT</Text>
+                            </View>
+                          )}
+                        </View>
+
+                        <Text style={[styles.selectedDetailMessage, isMobile && styles.selectedDetailMessageMobile]}>
+                          {selected.message}
+                        </Text>
+
+                        <View style={[styles.selectedDetailFooter, isMobile && styles.selectedDetailFooterMobile]}>
+                          <View style={[styles.selectedDetailDate, isMobile && styles.selectedDetailDateMobile]}>
+                            <Feather name="calendar" size={isMobile ? 12 : 14} color="#64748b" />
+                            <Text style={[styles.selectedDetailDateText, isMobile && styles.selectedDetailDateTextMobile]}>
+                              {selected.createdAt ? dayjs(selected.createdAt.toDate()).format('MMM D, YYYY') : ''}
+                            </Text>
+                          </View>
+
+                          <View style={[styles.selectedDetailActions, isMobile && styles.selectedDetailActionsMobile]}>
+                            <TouchableOpacity
+                              style={[styles.selectedDetailEditButton, isMobile && styles.selectedDetailEditButtonMobile]}
+                              onPress={() => handleEditStart(selected)}
+                            >
+                              <Feather name="edit-2" size={isMobile ? 14 : 16} color="#3b82f6" />
+                              {!isMobile && <Text style={styles.selectedDetailEditText}>Edit</Text>}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.selectedDetailDeleteButton, isMobile && styles.selectedDetailDeleteButtonMobile]}
+                              onPress={() => handleDelete(selected.id, selected.title)}
+                            >
+                              <Feather name="trash-2" size={isMobile ? 14 : 16} color="#ef4444" />
+                              {!isMobile && <Text style={styles.selectedDetailDeleteText}>Delete</Text>}
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })()}
+                </View>
+              )}
+
+              {renderPagination()}
+            </>
+          )}
+        </View>
+
+        {/* Right Grid - Search and Results */}
+        <View style={[styles.rightGrid, isMobile && styles.rightGridMobile]}>
+          <View style={[styles.rightHeader, isMobile && styles.rightHeaderMobile]}>
+            <Text style={[styles.searchTitle, isMobile && styles.searchTitleMobile]}>Search</Text>
+
+            {/* Search Bar */}
+            <View style={[styles.searchContainer, isMobile && styles.searchContainerMobile]}>
+              <Feather name="search" size={isMobile ? 14 : 16} color="#64748b" />
+              <TextInput
+                style={[styles.searchInput, isMobile && styles.searchInputMobile]}
+                placeholder="Type to search..."
+                value={searchQuery}
+                onChangeText={handleSearch}
+                autoCapitalize="none"
+                placeholderTextColor="#94a3b8"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={clearSearch} style={styles.searchClearButton}>
+                  <Feather name="x" size={isMobile ? 14 : 16} color="#64748b" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Search Stats */}
+            {searchQuery && (
+              <View style={[styles.searchStats, isMobile && styles.searchStatsMobile]}>
+                <Text style={[styles.resultsCount, isMobile && styles.resultsCountMobile]}>
+                  Found <Text style={styles.resultsHighlight}>{searchResults.length}</Text> {isMobile ? '' : 'results'}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.searchResultsContainer}>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size={isMobile ? "small" : "small"} color="#0ea5e9" />
+              </View>
+            ) : (
+              <FlatList
+                data={searchResults}
+                keyExtractor={(item) => item.id}
+                renderItem={renderSearchResultItem}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  searchQuery ? (
+                    <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                      <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
+                        <Feather name="search" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                      </View>
+                      <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No matches</Text>
+                      <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
+                        Try different keywords
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                      <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
+                        <Feather name="search" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                      </View>
+                      <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>Start searching</Text>
+                      <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
+                        Type to find announcements
+                      </Text>
+                    </View>
+                  )
+                }
+              />
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Create/Edit Modal - Responsive */}
       <Modal
         visible={showCreateForm}
-        animationType="slide"
-        presentationStyle={isSmallScreen ? "fullScreen" : "formSheet"}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={resetForm}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <View style={styles.modalHeaderTop}>
-              <TouchableOpacity onPress={handleCloseCreateForm} style={styles.modalBackButton}>
-                <Feather name="arrow-left" size={20} color="#0ea5e9" />
-                <Text style={styles.modalBackText}>Back</Text>
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>
-                {editingId ? 'Edit Announcement' : 'Create New Announcement'}
-              </Text>
-            </View>
-            <Text style={styles.modalSubtitle}>
-              {editingId ? 'Update the announcement details' : 'Fill in the announcement details'}
-            </Text>
-          </View>
-
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.keyboardAvoidingView}
-          >
-            <ScrollView style={styles.modalContent}>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Title *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  placeholder="Enter announcement title"
-                  value={title}
-                  onChangeText={setTitle}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Message *</Text>
-                <TextInput
-                  style={[styles.formInput, styles.textArea]}
-                  placeholder="Write your announcement message..."
-                  value={message}
-                  onChangeText={setMessage}
-                  multiline
-                  numberOfLines={6}
-                  textAlignVertical="top"
-                />
-              </View>
-
-              <View style={styles.formActions}>
-                <TouchableOpacity 
-                  style={[
-                    styles.submitButton,
-                    (!title.trim() || !message.trim()) && styles.submitButtonDisabled
-                  ]}
-                  onPress={editingId ? handleSaveEdit : handleAddAnnouncement}
-                  disabled={!title.trim() || !message.trim()}
-                >
-                  <Feather 
-                    name={editingId ? "save" : "check-circle"} 
-                    size={18} 
-                    color="#ffffff" 
+        <View style={styles.modernModalOverlay}>
+          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
+            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+              <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
+                <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+                  <FontAwesome6
+                    name={editingId ? "pen-to-square" : "bullhorn"}
+                    size={isMobile ? 16 : 20}
+                    color="#0ea5e9"
                   />
-                  <Text style={styles.submitButtonText}>
-                    {editingId ? 'Save Changes' : 'Publish Announcement'}
+                </View>
+                <View style={styles.modernModalTitleContainer}>
+                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                    {editingId ? 'Edit' : 'New'}
                   </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.cancelButton}
-                  onPress={handleCloseCreateForm}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
+                  <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>
+                    {editingId ? 'Update details' : 'Create announcement'}
+                  </Text>
+                </View>
               </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
+              <TouchableOpacity
+                onPress={resetForm}
+                style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+              >
+                <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+              <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+                <View style={styles.modernFormGroup}>
+                  <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Priority</Text>
+                  <View style={[styles.priorityContainer, isMobile && styles.priorityContainerMobile]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.priorityButton,
+                        priority === 'normal' && styles.priorityButtonNormalActive,
+                        isMobile && styles.priorityButtonMobile
+                      ]}
+                      onPress={() => setPriority('normal')}
+                    >
+                      <View style={[
+                        styles.priorityIndicator,
+                        { backgroundColor: '#0ea5e9' },
+                        isMobile && styles.priorityIndicatorMobile
+                      ]} />
+                      <Text style={[
+                        styles.priorityButtonText,
+                        priority === 'normal' && styles.priorityButtonTextActive,
+                        isMobile && styles.priorityButtonTextMobile
+                      ]}>Normal</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.priorityButton,
+                        priority === 'important' && styles.priorityButtonImportantActive,
+                        isMobile && styles.priorityButtonMobile
+                      ]}
+                      onPress={() => setPriority('important')}
+                    >
+                      <View style={[
+                        styles.priorityIndicator,
+                        { backgroundColor: '#f59e0b' },
+                        isMobile && styles.priorityIndicatorMobile
+                      ]} />
+                      <Text style={[
+                        styles.priorityButtonText,
+                        priority === 'important' && styles.priorityButtonTextActive,
+                        isMobile && styles.priorityButtonTextMobile
+                      ]}>Important</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.priorityButton,
+                        priority === 'urgent' && styles.priorityButtonUrgentActive,
+                        isMobile && styles.priorityButtonMobile
+                      ]}
+                      onPress={() => setPriority('urgent')}
+                    >
+                      <View style={[
+                        styles.priorityIndicator,
+                        { backgroundColor: '#ef4444' },
+                        isMobile && styles.priorityIndicatorMobile
+                      ]} />
+                      <Text style={[
+                        styles.priorityButtonText,
+                        priority === 'urgent' && styles.priorityButtonTextActive,
+                        isMobile && styles.priorityButtonTextMobile
+                      ]}>Urgent</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.modernFormGroup}>
+                  <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Title</Text>
+                  <TextInput
+                    style={[styles.modernFormInput, isMobile && styles.modernFormInputMobile]}
+                    placeholder="Enter title"
+                    placeholderTextColor="#94a3b8"
+                    value={title}
+                    onChangeText={setTitle}
+                  />
+                </View>
+
+                <View style={styles.modernFormGroup}>
+                  <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Message</Text>
+                  <TextInput
+                    style={[styles.modernFormInput, styles.modernTextArea, isMobile && styles.modernFormInputMobile]}
+                    placeholder="Write message..."
+                    placeholderTextColor="#94a3b8"
+                    value={message}
+                    onChangeText={setMessage}
+                    multiline
+                    numberOfLines={isMobile ? 4 : 6}
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.modernSubmitButton,
+                      (!title.trim() || !message.trim()) && styles.modernSubmitButtonDisabled,
+                      isMobile && styles.modernSubmitButtonMobile
+                    ]}
+                    onPress={editingId ? handleSaveEdit : handleAddAnnouncement}
+                    disabled={!title.trim() || !message.trim()}
+                  >
+                    <Feather
+                      name={editingId ? "check-circle" : "send"}
+                      size={isMobile ? 16 : 18}
+                      color="#ffffff"
+                    />
+                    <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
+                      {editingId ? 'Save' : 'Publish'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.modernCancelButton, isMobile && styles.modernCancelButtonMobile]}
+                    onPress={resetForm}
+                  >
+                    <Text style={[styles.modernCancelButtonText, isMobile && styles.modernCancelButtonTextMobile]}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </View>
         </View>
       </Modal>
     </View>

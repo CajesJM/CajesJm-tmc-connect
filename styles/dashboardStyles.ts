@@ -1,4 +1,3 @@
-// dashboardStyles.ts
 import { StyleSheet } from 'react-native';
 
 export const dashboardStyles = StyleSheet.create({
@@ -13,14 +12,10 @@ export const dashboardStyles = StyleSheet.create({
   overviewContainer: {
     flex: 1,
   },
-
-  // Header Gradient
   headerGradient: {
-    paddingTop: 40,
-    paddingBottom: 30,
+    paddingTop: 15,
+    paddingBottom: 8,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
   },
   headerContent: {
     flexDirection: 'row',
@@ -71,16 +66,16 @@ export const dashboardStyles = StyleSheet.create({
     alignItems: 'center',
   },
   dateContainer: {
+    marginLeft: -10,
+    marginTop: -20,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   dateText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#ffffff',
     fontWeight: '500',
   },
@@ -206,7 +201,6 @@ export const dashboardStyles = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // Quick Actions
   quickActionsContainer: {
     marginBottom: 24,
   },
@@ -239,7 +233,6 @@ export const dashboardStyles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Charts Section
   chartsContainer: {
     backgroundColor: '#ffffff',
     marginHorizontal: 20,
@@ -286,7 +279,6 @@ export const dashboardStyles = StyleSheet.create({
     borderRadius: 16,
   },
 
-  // Two Column Layout
   twoColumnLayout: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -651,6 +643,4 @@ export const dashboardStyles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
-
-
 });

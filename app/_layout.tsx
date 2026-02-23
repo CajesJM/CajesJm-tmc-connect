@@ -17,6 +17,7 @@ function RootLayoutContent() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="super-admin-login" /> 
       <Stack.Screen name="assistant_admin" />
       <Stack.Screen name="main_admin" />
       <Stack.Screen name="student" />

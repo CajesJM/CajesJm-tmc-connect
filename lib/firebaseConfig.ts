@@ -13,10 +13,14 @@ const firebaseConfig = {
   measurementId: "G-1SKKFCZJ47", 
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Export Firestore, Auth, and Storage
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export const storage = getStorage(app);
+// Simple approach - no window access
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// Remove all window references and debug code
+// Just export the services
+
+export { auth, db, storage };

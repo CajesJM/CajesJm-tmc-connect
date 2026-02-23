@@ -55,6 +55,16 @@ export const dashboardStyles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  profileFallback: {
+    backgroundColor: '#0ea5e9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileInitials: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
   dateSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -89,15 +99,24 @@ export const dashboardStyles = StyleSheet.create({
   },
   notificationBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 8,
+    right: 8,
     backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ffffff',
   },
+  notificationBadgeText: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '700',
+    paddingHorizontal: 3,
+  },
+
 
   // Stats Grid
   statsGrid: {
@@ -594,17 +613,6 @@ export const dashboardStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#0f172a',
   },
-
-  profileFallback: {
-    backgroundColor: '#0ea5e9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileInitials: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
   loadingContainer: {
     padding: 24,
     alignItems: 'center',
@@ -643,5 +651,6 @@ export const dashboardStyles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
+
 
 });

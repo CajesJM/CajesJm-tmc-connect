@@ -1,13 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, router, Tabs, usePathname } from 'expo-router';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import LoadingScreen from '../../components/LoadingScreen';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../lib/firebaseConfig';
 
 interface MenuItem {
   name: string;
   title: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
-  route: Href; 
+  route: Href;
+}
+
+interface UserStats {
+  total: number;
+  newThisWeek: number;
+  mainAdmins: number;
+  assistantAdmins: number;
+  students: number;
 }
 
 const menuItems: MenuItem[] = [
@@ -24,11 +36,27 @@ export default function MainAdminLayout() {
   const isWeb = Platform.OS === 'web';
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userStats, setUserStats] = useState<UserStats>({
+    total: 0,
+    newThisWeek: 0,
+    mainAdmins: 0,
+    assistantAdmins: 0,
+    students: 0
+  });
+  const [isLayoutReady, setIsLayoutReady] = useState(false);
   const slideAnim = useRef(new Animated.Value(-300)).current;
+  const { userData } = useAuth();
 
   const sidebarWidth = collapsed ? 80 : 260;
 
-  // Enhanced color palette
+  useEffect(() => {
+
+    const timer = setTimeout(() => {
+      setIsLayoutReady(true);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, []);
   const colors = {
     sidebar: {
       background: '#0A0F1E',
@@ -54,7 +82,47 @@ export default function MainAdminLayout() {
     }
   };
 
-  // Animate mobile menu
+  // Real-time user stats
+  useEffect(() => {
+    const usersQuery = query(collection(db, 'users'));
+
+    const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      let mainAdmins = 0;
+      let assistantAdmins = 0;
+      let students = 0;
+      let newThisWeek = 0;
+
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const role = data.role;
+
+        // Count by role
+        if (role === 'main_admin') mainAdmins++;
+        else if (role === 'assistant_admin') assistantAdmins++;
+        else if (role === 'student') students++;
+
+        // Count new users this week
+        const createdAt = data.createdAt?.toDate?.() || data.createdAt;
+        if (createdAt && createdAt >= oneWeekAgo) {
+          newThisWeek++;
+        }
+      });
+
+      setUserStats({
+        total: snapshot.size,
+        newThisWeek,
+        mainAdmins,
+        assistantAdmins,
+        students
+      });
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => {
     Animated.timing(slideAnim, {
       toValue: mobileMenuOpen ? 0 : -300,
@@ -83,7 +151,7 @@ export default function MainAdminLayout() {
     <View style={[
       styles.sidebarContainer,
       { backgroundColor: colors.sidebar.background, width: sidebarWidth },
-      isMobile && { width: 280 } 
+      isMobile && { width: 280 }
     ]}>
       <View style={styles.sidebarContent}>
         {isWeb && !isMobile && !collapsed && (
@@ -98,7 +166,7 @@ export default function MainAdminLayout() {
             />
           </TouchableOpacity>
         )}
-        
+
         {isWeb && !isMobile && collapsed && (
           <TouchableOpacity
             onPress={() => setCollapsed(!collapsed)}
@@ -112,17 +180,19 @@ export default function MainAdminLayout() {
           </TouchableOpacity>
         )}
 
-        {/* Logo Section */}
         <View style={[
           styles.logoSection,
           collapsed && styles.logoSectionCollapsed
         ]}>
           <View style={styles.logoWrapper}>
             <View style={[styles.logoBackground, collapsed && { marginRight: 0 }]}>
-              <Ionicons 
-                name="school" 
-                size={collapsed ? 24 : 28} 
-                color="#FFFFFF" 
+              <Image
+                source={require('../../assets/images/Logo/V_1.0.1.png')}
+                style={[
+                  styles.logoImage,
+                  collapsed ? { width: 30, height: 30 } : { width: 40, height: 40 }
+                ]}
+                resizeMode="contain"
               />
             </View>
           </View>
@@ -133,22 +203,42 @@ export default function MainAdminLayout() {
               <Text style={styles.adminSubtitle}>TMC Campus Hub</Text>
               <View style={styles.statusContainer}>
                 <View style={styles.statusDot} />
-                <Text style={styles.statusText}>Online</Text>
+                <Text style={styles.statusText}>
+                  {userData?.role === 'main_admin' ? 'Main Admin' : 'Assistant Admin'}
+                </Text>
               </View>
             </View>
           )}
         </View>
 
+        {/* Quick Stats with Real Data */}
         {isWeb && !collapsed && (
           <View style={styles.quickStats}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>12</Text>
-              <Text style={styles.statLabel}>New</Text>
+              <Text style={styles.statValue}>{userStats.newThisWeek}</Text>
+              <Text style={styles.statLabel}>New this week</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>284</Text>
-              <Text style={styles.statLabel}>Total</Text>
+              <Text style={styles.statValue}>{userStats.total}</Text>
+              <Text style={styles.statLabel}>Total users</Text>
+            </View>
+          </View>
+        )}
+
+        {isWeb && !collapsed && userStats.total > 0 && (
+          <View style={styles.roleBreakdown}>
+            <View style={styles.roleItem}>
+              <View style={[styles.roleDot, { backgroundColor: '#3B82F6' }]} />
+              <Text style={styles.roleText}>Main Admin: {userStats.mainAdmins}</Text>
+            </View>
+            <View style={styles.roleItem}>
+              <View style={[styles.roleDot, { backgroundColor: '#10B981' }]} />
+              <Text style={styles.roleText}>Asst. Admin: {userStats.assistantAdmins}</Text>
+            </View>
+            <View style={styles.roleItem}>
+              <View style={[styles.roleDot, { backgroundColor: '#F59E0B' }]} />
+              <Text style={styles.roleText}>Students: {userStats.students}</Text>
             </View>
           </View>
         )}
@@ -157,7 +247,7 @@ export default function MainAdminLayout() {
         <View style={styles.navItems}>
           {menuItems.map((item) => {
             const isActive = isRouteActive(item.route);
-            
+
             return (
               <TouchableOpacity
                 key={item.name}
@@ -172,9 +262,9 @@ export default function MainAdminLayout() {
                   styles.navIconWrapper,
                   collapsed && styles.navIconWrapperCollapsed
                 ]}>
-                  <Ionicons 
-                    name={item.icon} 
-                    size={collapsed ? 24 : 20} 
+                  <Ionicons
+                    name={item.icon}
+                    size={collapsed ? 24 : 20}
                     color={isActive ? colors.accent.primary : colors.sidebar.icon.inactive}
                   />
                 </View>
@@ -204,10 +294,10 @@ export default function MainAdminLayout() {
               styles.navIconWrapper,
               collapsed && styles.navIconWrapperCollapsed
             ]}>
-              <Ionicons 
-                name="settings-outline" 
-                size={collapsed ? 24 : 20} 
-                color={colors.sidebar.icon.inactive} 
+              <Ionicons
+                name="settings-outline"
+                size={collapsed ? 24 : 20}
+                color={colors.sidebar.icon.inactive}
               />
             </View>
             {!collapsed && <Text style={styles.navText}>Settings</Text>}
@@ -219,16 +309,16 @@ export default function MainAdminLayout() {
               styles.logoutButton,
               collapsed && styles.navItemCollapsed
             ]}
-            onPress={() => router.replace('/login' as Href)}
+            onPress={() => router.replace('/super-admin-login' as Href)}
           >
             <View style={[
               styles.navIconWrapper,
               collapsed && styles.navIconWrapperCollapsed
             ]}>
-              <Ionicons 
-                name="log-out-outline" 
-                size={collapsed ? 24 : 20} 
-                color="#EF4444" 
+              <Ionicons
+                name="log-out-outline"
+                size={collapsed ? 24 : 20}
+                color="#EF4444"
               />
             </View>
             {!collapsed && <Text style={[styles.navText, styles.logoutText]}>Logout</Text>}
@@ -237,6 +327,14 @@ export default function MainAdminLayout() {
       </View>
     </View>
   );
+  if (!isLayoutReady) {
+    return (
+      <LoadingScreen
+        message="Loading Dashboard"
+        subMessage="Preparing your admin workspace"
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -247,13 +345,19 @@ export default function MainAdminLayout() {
             onPress={() => setMobileMenuOpen(!mobileMenuOpen)}
             style={styles.hamburgerButton}
           >
-            <Ionicons 
-              name={mobileMenuOpen ? "close" : "menu"} 
-              size={28} 
-              color="#0A0F1E" 
+            <Ionicons
+              name={mobileMenuOpen ? "close" : "menu"}
+              size={28}
+              color="#0A0F1E"
             />
           </TouchableOpacity>
-          <Text style={styles.mobileHeaderTitle}>Admin Panel</Text>
+          <View style={styles.mobileLogoContainer}>
+            <Image
+              source={require('../../assets/images/Logo/V_1.0.1.png')}
+              style={styles.mobileLogo}
+              resizeMode="contain"
+            />
+          </View>
           <View style={styles.mobileHeaderRight} />
         </View>
       )}
@@ -286,11 +390,12 @@ export default function MainAdminLayout() {
         styles.mainContent,
         isWeb && { marginLeft: sidebarWidth },
       ]}>
-    
+
         {isWeb && <Sidebar />}
 
         <View style={styles.tabsContainer}>
-          <Tabs 
+          <Tabs
+            initialRouteName='index'
             screenOptions={{
               headerShown: false,
               headerStyle: {
@@ -311,7 +416,7 @@ export default function MainAdminLayout() {
                 paddingTop: 8,
                 height: 65,
               } : {
-                display: 'none', 
+                display: 'none',
               },
               tabBarActiveTintColor: colors.accent.primary,
               tabBarInactiveTintColor: '#94A3B8',
@@ -322,10 +427,10 @@ export default function MainAdminLayout() {
               options={{
                 title: 'Dashboard',
                 tabBarIcon: ({ color, focused }) => (
-                  <Ionicons 
-                    name={focused ? "home" : "home-outline"} 
-                    size={24} 
-                    color={color} 
+                  <Ionicons
+                    name={focused ? "home" : "home-outline"}
+                    size={24}
+                    color={color}
                   />
                 ),
               }}
@@ -335,10 +440,10 @@ export default function MainAdminLayout() {
               options={{
                 title: 'Announcements',
                 tabBarIcon: ({ color, focused }) => (
-                  <Ionicons 
-                    name={focused ? "megaphone" : "megaphone-outline"} 
-                    size={24} 
-                    color={color} 
+                  <Ionicons
+                    name={focused ? "megaphone" : "megaphone-outline"}
+                    size={24}
+                    color={color}
                   />
                 ),
               }}
@@ -348,10 +453,10 @@ export default function MainAdminLayout() {
               options={{
                 title: 'Attendance',
                 tabBarIcon: ({ color, focused }) => (
-                  <Ionicons 
-                    name={focused ? "calendar" : "calendar-outline"} 
-                    size={24} 
-                    color={color} 
+                  <Ionicons
+                    name={focused ? "calendar" : "calendar-outline"}
+                    size={24}
+                    color={color}
                   />
                 ),
               }}
@@ -361,10 +466,10 @@ export default function MainAdminLayout() {
               options={{
                 title: 'Events',
                 tabBarIcon: ({ color, focused }) => (
-                  <Ionicons 
-                    name={focused ? "calendar" : "calendar-outline"} 
-                    size={24} 
-                    color={color} 
+                  <Ionicons
+                    name={focused ? "calendar" : "calendar-outline"}
+                    size={24}
+                    color={color}
                   />
                 ),
               }}
@@ -374,10 +479,10 @@ export default function MainAdminLayout() {
               options={{
                 title: 'Users',
                 tabBarIcon: ({ color, focused }) => (
-                  <Ionicons 
-                    name={focused ? "people" : "people-outline"} 
-                    size={24} 
-                    color={color} 
+                  <Ionicons
+                    name={focused ? "people" : "people-outline"}
+                    size={24}
+                    color={color}
                   />
                 ),
               }}
@@ -387,10 +492,10 @@ export default function MainAdminLayout() {
               options={{
                 title: 'Profile',
                 tabBarIcon: ({ color, focused }) => (
-                  <Ionicons 
-                    name={focused ? "person" : "person-outline"} 
-                    size={24} 
-                    color={color} 
+                  <Ionicons
+                    name={focused ? "person" : "person-outline"}
+                    size={24}
+                    color={color}
                   />
                 ),
               }}
@@ -414,7 +519,6 @@ const styles = StyleSheet.create({
   tabsContainer: {
     flex: 1,
   },
-  // Web Sidebar
   sidebarContainer: {
     height: '100%',
     position: 'fixed',
@@ -462,14 +566,17 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
+  },
+  logoImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   adminInfo: {
     flex: 1,
@@ -507,7 +614,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   statItem: {
     flex: 1,
@@ -527,6 +634,28 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: '#1E2A45',
     marginHorizontal: 8,
+  },
+  roleBreakdown: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 8,
+    padding: 10,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  roleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 3,
+  },
+  roleDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  roleText: {
+    color: '#8B98B5',
+    fontSize: 11,
   },
   navItems: {
     flex: 1,
@@ -601,6 +730,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 8,
+  },
+  mobileLogoContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  mobileLogo: {
+    width: 40,
+    height: 40,
   },
   mobileHeaderTitle: {
     fontSize: 18,

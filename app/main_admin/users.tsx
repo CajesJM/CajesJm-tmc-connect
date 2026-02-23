@@ -1,4 +1,3 @@
-import Alert from '@blazejkustra/react-native-alert';
 import { Feather } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
 import {
@@ -13,8 +12,7 @@ import {
 } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
+  ActivityIndicator, Alert, FlatList,
   Modal,
   ScrollView,
   StyleSheet,

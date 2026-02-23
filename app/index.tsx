@@ -19,7 +19,7 @@ export default function Landing() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [entranceComplete, setEntranceComplete] = useState(false);
-  
+
   //intervals and timeouts
   const progressIntervalRef = useRef<number | null>(null);
   const transitionTimerRef = useRef<number | null>(null);
@@ -66,11 +66,11 @@ export default function Landing() {
     slideAnim.setValue(0);
     logoScale.setValue(1);
     logoMove.setValue(0);
-    
+
     setIsAnimating(false);
     setProgress(0);
     setEntranceComplete(false);
-    
+
     if (progressIntervalRef.current !== null) {
       clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
@@ -89,7 +89,7 @@ export default function Landing() {
   ]);
 
   const playEntranceAnimation = useCallback(() => {
-  
+
     Animated.parallel([
       Animated.timing(entranceAnim, {
         toValue: 1,
@@ -146,9 +146,9 @@ export default function Landing() {
 
   const startAutoTransition = useCallback(() => {
     if (isAnimating) return;
-    
+
     setProgress(0);
-    
+
     progressIntervalRef.current = setInterval(() => {
       setProgress((prev) => {
         const newProgress = prev + 100 / 30;
@@ -171,11 +171,11 @@ export default function Landing() {
   useEffect(() => {
     if (isAuthenticated) {
       if (userData?.role === "main_admin") {
-        router.replace("/main_admin/(tabs)/announcements" as any);
+        router.replace("/main_admin"); 
       } else if (userData?.role === "assistant_admin") {
-        router.replace("/assistant_admin/(tabs)/announcements" as any);
+        router.replace("/assistant_admin/(tabs)/announcements"); 
       } else if (userData?.role === "student") {
-        router.replace("/student/(tabs)/announcements" as any);
+        router.replace("/student/(tabs)/announcements"); 
       }
     }
   }, [isAuthenticated, userData, router]);
@@ -248,7 +248,7 @@ export default function Landing() {
 
   return (
     <SafeAreaView style={LandingStyles.container}>
-    
+
       <View style={LandingStyles.background}>
         <Animated.View
           style={[
@@ -261,8 +261,8 @@ export default function Landing() {
             },
           ]}
         />
-        
-       
+
+
         <Animated.View
           style={[
             LandingStyles.slideBackground,
@@ -272,14 +272,14 @@ export default function Landing() {
           ]}
         >
           <View style={LandingStyles.floatingOrbs}>
-            <Animated.View 
+            <Animated.View
               style={[
                 LandingStyles.orb,
                 LandingStyles.orb1,
                 {
                   opacity: orb1Anim,
                   transform: [
-                    { 
+                    {
                       scale: orb1Anim.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0.3, 1]
@@ -287,16 +287,16 @@ export default function Landing() {
                     },
                   ],
                 }
-              ]} 
+              ]}
             />
-            <Animated.View 
+            <Animated.View
               style={[
                 LandingStyles.orb,
                 LandingStyles.orb2,
                 {
                   opacity: orb2Anim,
                   transform: [
-                    { 
+                    {
                       scale: orb2Anim.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0.3, 1]
@@ -304,16 +304,16 @@ export default function Landing() {
                     },
                   ],
                 }
-              ]} 
+              ]}
             />
-            <Animated.View 
+            <Animated.View
               style={[
                 LandingStyles.orb,
                 LandingStyles.orb3,
                 {
                   opacity: orb3Anim,
                   transform: [
-                    { 
+                    {
                       scale: orb3Anim.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0.3, 1]
@@ -321,7 +321,7 @@ export default function Landing() {
                     },
                   ],
                 }
-              ]} 
+              ]}
             />
           </View>
         </Animated.View>
@@ -371,7 +371,7 @@ export default function Landing() {
           <View style={LandingStyles.textContent}>
             <Text style={LandingStyles.welcomeText}>WELCOME TO</Text>
             <Text style={LandingStyles.brandName}>TMC Connect</Text>
-            
+
             <View style={LandingStyles.subtitleSection}>
               <Text style={LandingStyles.subtitle}>Your campus hub for</Text>
               <Text style={LandingStyles.subtitle}>announcements, events,</Text>
@@ -380,7 +380,7 @@ export default function Landing() {
             </View>
           </View>
 
-       
+
         </Animated.View>
 
         {/* Progress Indicator */}
@@ -388,13 +388,13 @@ export default function Landing() {
           <View style={LandingStyles.progressSection}>
             <View style={LandingStyles.progressContainer}>
               <View style={LandingStyles.progressBackground}>
-                <View 
+                <View
                   style={[
                     LandingStyles.progressFill,
                     {
                       width: `${progress}%`,
                     },
-                  ]} 
+                  ]}
                 />
               </View>
               <Text style={LandingStyles.progressText}>

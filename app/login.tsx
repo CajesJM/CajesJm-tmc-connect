@@ -1,11 +1,9 @@
-import Alert from '@blazejkustra/react-native-alert';
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Image,
+  ActivityIndicator, Alert, Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,7 +11,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { db } from '../lib/firebaseConfig';
@@ -22,7 +20,7 @@ import { LoginStyles } from "../styles/LoginStyles";
 export default function Login() {
   const router = useRouter();
   const { login, loading } = useAuth();
-  
+
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -31,35 +29,34 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
 
   const isMainAdmin = (email: string) => {
-    
+
     const mainAdminEmails = [
       'mainadmin@tmc.edu',
       'systemadmin@tmc.edu',
       'superadmin@tmc.edu',
-      'admin@tmc.edu' 
+      'admin@tmc.edu'
     ];
-    
+
     const mainAdminPatterns = [
       /^main\.admin/i,
       /^system\.admin/i,
       /^super\.admin/i
     ];
-    
+
     if (mainAdminEmails.includes(email.toLowerCase())) {
       return true;
     }
-    
-    // Check patterns
+
     for (const pattern of mainAdminPatterns) {
       if (pattern.test(email)) {
         return true;
       }
     }
-    
+
     return false;
   };
 
- const handleLogin = async () => {
+  const handleLogin = async () => {
   if (busy) return;
   setError(null);
 
@@ -72,7 +69,7 @@ export default function Login() {
   try {
     console.log("Looking up username:", username);
     
-    // 1. Find the user by username in Firestore
+    // Find the user by username in Firestore
     const usersCollection = collection(db, 'users');
     const q = query(usersCollection, where('username', '==', username));
     const querySnapshot = await getDocs(q);
@@ -92,24 +89,30 @@ export default function Login() {
     console.log("Found user with email:", userData.email);
     console.log("User role:", userData.role);
 
-    // 2. Login with the email and password
+    if (userData.role === 'main_admin') {
+      console.log("Main admin attempted to login through regular portal - blocked");
+      setError("Main administrators must use the Admin Portal");
+      Alert.alert(
+        "Access Denied", 
+        "Main administrators must login through the Admin Portal.\n\nPlease visit: /super-admin-login"
+      );
+      setBusy(false);
+      return;
+    }
+
     const loggedInUser = await login(userData.email, password);
     
     console.log("Login successful. User role:", loggedInUser.role);
     
-    let targetRoute = '/student';
+
+    let targetRoute = '/student'; 
     
-    if (loggedInUser.role === 'main_admin') {
-      targetRoute = '/main_admin';
-    } else if (loggedInUser.role === 'assistant_admin') {
+    if (loggedInUser.role === 'assistant_admin') {
       targetRoute = '/assistant_admin';
-    } else if (loggedInUser.role === 'student') {
-      targetRoute = '/student';
     }
     
     console.log("Redirecting to:", targetRoute);
     
-    // Navigate to appropriate route
     setTimeout(() => {
       router.replace(targetRoute as any);
     }, 300);
@@ -117,7 +120,6 @@ export default function Login() {
   } catch (err: any) {
     console.log("Login error:", err.message);
     
-    // Handle specific Firebase Auth errors
     let errorMessage = "Invalid username or password. Please try again.";
     
     if (err.code === 'auth/invalid-credential' || 
@@ -146,15 +148,15 @@ export default function Login() {
       <View style={LoginStyles.cosmicBg} />
       <View style={LoginStyles.nebulaBg} />
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={LoginStyles.scrollContainer}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         <View style={LoginStyles.card}>
           <View style={LoginStyles.logoContainer}>
-            <Image 
-              source={require('../assets/images/Logo/TMC_Connect.png')} 
+            <Image
+              source={require('../assets/images/Logo/TMC_Connect.png')}
               style={LoginStyles.logo}
               resizeMode="contain"
             />
@@ -197,10 +199,10 @@ export default function Login() {
               onPress={() => setShowPassword((s) => !s)}
               style={LoginStyles.iconBtn}
             >
-              <Ionicons 
-                name={showPassword ? "eye-off" : "eye"} 
-                size={24} 
-                color="rgba(255, 255, 255, 0.7)" 
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={24}
+                color="rgba(255, 255, 255, 0.7)"
               />
             </TouchableOpacity>
           </View>
@@ -219,7 +221,7 @@ export default function Login() {
             )}
           </TouchableOpacity>
 
-         
+
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

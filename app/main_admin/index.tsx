@@ -1,10 +1,13 @@
 import { Feather, FontAwesome6, Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePathname, useRouter } from 'expo-router';
-import { collection, getDocs, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, } from 'firebase/firestore';
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Platform,
   RefreshControl,
@@ -15,8 +18,10 @@ import {
   View
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
+import { NotificationModal } from '../../components/NotificationModal';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebaseConfig';
+import { Notification, notificationService } from '../../utils/notifications';
 
 import { dashboardStyles as styles } from '../../styles/dashboardStyles';
 import { generateDashboardPDF, sharePDF } from '../../utils/pdfGenerator';
@@ -79,6 +84,7 @@ export default function MainAdminDashboard() {
     eventGrowth: 0
   });
 
+
   const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
   const [displayedActivities, setDisplayedActivities] = useState<Activity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
@@ -107,7 +113,12 @@ export default function MainAdminDashboard() {
   const [announcementsLoading, setAnnouncementsLoading] = useState(true);
   const [downloadLoading, setDownloadLoading] = useState(false);
 
-  // Determine active tab from pathname
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   const getActiveTabFromPath = () => {
     if (pathname.includes('/main_admin/events')) return 'events';
     if (pathname.includes('/main_admin/attendance')) return 'attendance';
@@ -137,7 +148,6 @@ export default function MainAdminDashboard() {
           const data = doc.data();
           const eventDate = data.date?.toDate();
 
-          // Only include future events
           if (eventDate && eventDate >= now) {
             return {
               id: doc.id,
@@ -195,15 +205,14 @@ export default function MainAdminDashboard() {
     });
   };
 
+  //Notifications
   useEffect(() => {
     fetchDashboardStats();
 
-    // Set up real-time listeners
     const unsubscribeActivities = setupRealtimeActivities();
     const unsubscribeEvents = fetchUpcomingEvents();
     const unsubscribeAnnouncements = fetchRecentAnnouncements();
 
-    // Calculate monthly stats
     calculateMonthlyStats();
 
     return () => {
@@ -213,7 +222,38 @@ export default function MainAdminDashboard() {
     };
   }, []);
 
-  // Update displayed activities when page changes or activities update
+  useEffect(() => {
+    fetchDashboardStats();
+    const unsubscribeActivities = setupRealtimeActivities();
+    const unsubscribeEvents = fetchUpcomingEvents();
+    const unsubscribeAnnouncements = fetchRecentAnnouncements();
+    calculateMonthlyStats();
+
+    if (userData?.email) {
+      const unsubscribeNotifications = notificationService.listenForNotifications(
+        userData.email,
+        (notifs) => {
+          setNotifications(notifs);
+          setUnreadCount(notifs.filter(n => !n.read).length);
+        }
+      );
+
+      return () => {
+        unsubscribeActivities();
+        unsubscribeEvents();
+        unsubscribeAnnouncements();
+        unsubscribeNotifications();
+        notificationService.cleanup();
+      };
+    }
+
+    return () => {
+      unsubscribeActivities();
+      unsubscribeEvents();
+      unsubscribeAnnouncements();
+    };
+  }, [userData]);
+
   useEffect(() => {
     updateDisplayedActivities();
   }, [recentActivities, currentPage]);
@@ -248,28 +288,24 @@ export default function MainAdminDashboard() {
   const setupRealtimeActivities = () => {
     setActivitiesLoading(true);
 
-    // Listen to recent events
     const eventsQuery = query(
       collection(db, 'events'),
       orderBy('createdAt', 'desc'),
       limit(20)
     );
 
-    // Listen to recent announcements
     const announcementsQuery = query(
       collection(db, 'updates'),
       orderBy('createdAt', 'desc'),
       limit(20)
     );
 
-    // Listen to recent users
     const usersQuery = query(
       collection(db, 'users'),
       orderBy('createdAt', 'desc'),
       limit(20)
     );
 
-    // Combine all listeners
     const unsubscribeEvents = onSnapshot(eventsQuery, (snapshot) => {
       const events = snapshot.docs.map(doc => {
         const data = doc.data();
@@ -324,7 +360,6 @@ export default function MainAdminDashboard() {
       updateActivities(users, 'user');
     });
 
-    // Function to merge and sort activities
     const updateActivities = (newActivities: Activity[], type: string) => {
       setRecentActivities(prev => {
         const filtered = prev.filter(a => a.type !== type);
@@ -419,15 +454,149 @@ export default function MainAdminDashboard() {
       const fileUri = await generateDashboardPDF(pdfData);
       await sharePDF(fileUri);
 
-      // Optional success message
       if (Platform.OS !== 'web') {
-        alert('✅ Report generated successfully!');
+        Alert.alert(
+          'Success',
+          '✅ Report generated successfully!',
+          [{ text: 'OK' }]
+        );
       }
     } catch (error) {
       console.error('Error generating report:', error);
-      alert('❌ Failed to generate report. Please try again.');
+      Alert.alert(
+        'Error',
+        '❌ Failed to generate report. Please try again.',
+        [{ text: 'OK' }]
+      );
     } finally {
       setDownloadLoading(false);
+    }
+  };
+  // Notification handlers
+  const handleNotificationPress = async (notification: Notification) => {
+    if (!notification.read) {
+      await notificationService.markAsRead(notification.id);
+    }
+
+    switch (notification.type) {
+      case 'event':
+        if (notification.data?.eventId) {
+          router.push(`/main_admin/events?id=${notification.data.eventId}`);
+        } else {
+          navigateTo('events');
+        }
+        break;
+      case 'announcement':
+        if (notification.data?.announcementId) {
+          router.push(`/main_admin/announcements?id=${notification.data.announcementId}`);
+        } else {
+          navigateTo('announcements');
+        }
+        break;
+      case 'attendance':
+        navigateTo('attendance');
+        break;
+      case 'user':
+        navigateTo('users');
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    if (userData?.email) {
+      await notificationService.markAllAsRead(userData.email);
+    }
+  };
+
+  // Profile image handlers
+  const handleProfileImagePress = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async (e: any) => {
+          const file = e.target.files[0];
+          if (file) {
+            await uploadProfileImage(file);
+          }
+        };
+        input.click();
+      } else {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (permissionResult.granted === false) {
+          Alert.alert(
+            'Permission Required',
+            'Permission to access camera roll is required!',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.5,
+        });
+
+        if (!result.canceled) {
+          await uploadProfileImage(result.assets[0].uri);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert(
+        'Error',
+        'Failed to pick image. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const uploadProfileImage = async (imageUri: string | File) => {
+    try {
+      setUploadingImage(true);
+
+      let blob: Blob;
+      if (imageUri instanceof File) {
+        // Web: File object
+        blob = imageUri;
+      } else {
+        // Mobile: URI string
+        const response = await fetch(imageUri);
+        blob = await response.blob();
+      }
+
+      // Upload to Firebase Storage
+      const storage = getStorage();
+      const fileName = `profile_${userData?.email}_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `profileImages/${fileName}`);
+
+      await uploadBytes(storageRef, blob);
+      const downloadUrl = await getDownloadURL(storageRef);
+
+      if (userData?.email) {
+        const userRef = doc(db, 'users', userData.email);
+        await updateDoc(userRef, {
+          photoURL: downloadUrl
+        });
+
+        Alert.alert(
+          'Success',
+          'Profile image updated successfully!',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert(
+        'Error',
+        'Failed to upload image. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -470,7 +639,6 @@ export default function MainAdminDashboard() {
         }
       });
 
-      // Calculate growth (mock data - you can implement actual growth calculation)
       const userGrowth = ((activeUsers - totalUsers * 0.8) / (totalUsers * 0.8)) * 100;
       const eventGrowth = ((upcomingEvents - totalEvents * 0.3) / (totalEvents * 0.3)) * 100;
 
@@ -494,28 +662,28 @@ export default function MainAdminDashboard() {
   };
 
   const navigateTo = (screen: string, id?: string) => {
-    switch (screen) {
-      case 'events':
-        router.push(id ? `/main_admin/events?id=${id}` : '/main_admin/events');
-        break;
-      case 'attendance':
-        router.push('/main_admin/attendance');
-        break;
-      case 'announcements':
-        router.push(id ? `/main_admin/announcements?id=${id}` : '/main_admin/announcements');
-        break;
-      case 'users':
-        router.push('/main_admin/users');
-        break;
-      case 'profile':
-        router.push('/main_admin/profile');
-        break;
-      case 'overview':
-      default:
-        router.push('/main_admin');
-        break;
-    }
-  };
+  switch (screen) {
+    case 'events':
+      router.push(id ? `/main_admin/events?id=${id}` : '/main_admin/events');
+      break;
+    case 'attendance':
+      router.push('/main_admin/attendance');
+      break;
+    case 'announcements':
+      router.push(id ? `/main_admin/announcements?id=${id}` : '/main_admin/announcements');
+      break;
+    case 'users':
+      router.push('/main_admin/users');
+      break;
+    case 'profile':
+      router.push('/main_admin/profile');
+      break;
+    case 'overview':
+    default:
+      console.log('Already on overview');
+      break;
+  }
+};
 
   const getActivityIcon = (activity: Activity) => {
     switch (activity.type) {
@@ -637,8 +805,18 @@ export default function MainAdminDashboard() {
             <Text style={styles.userName}>{userData?.name || 'Admin'}</Text>
             <Text style={styles.roleText}>Administrator</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton}>
-            {userData?.photoURL ? (
+
+          {/* Profile Section with Image Picker */}
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={handleProfileImagePress}
+            disabled={uploadingImage}
+          >
+            {uploadingImage ? (
+              <View style={[styles.profileImage, styles.profileFallback]}>
+                <ActivityIndicator size="small" color="#ffffff" />
+              </View>
+            ) : userData?.photoURL ? (
               <Image
                 source={{ uri: userData.photoURL }}
                 style={styles.profileImage}
@@ -678,13 +856,33 @@ export default function MainAdminDashboard() {
                 <Feather name="download" size={18} color="#ffffff" />
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerAction}>
+
+            {/* Notification Bell with Badge */}
+            <TouchableOpacity
+              style={styles.headerAction}
+              onPress={() => setNotificationModalVisible(true)}
+            >
               <Feather name="bell" size={18} color="#ffffff" />
-              <View style={styles.notificationBadge} />
+              {unreadCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
       </LinearGradient>
+
+      {/* Notification Modal */}
+      <NotificationModal
+        visible={notificationModalVisible}
+        onClose={() => setNotificationModalVisible(false)}
+        notifications={notifications}
+        onNotificationPress={handleNotificationPress}
+        onMarkAllRead={handleMarkAllRead}
+      />
 
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
@@ -1034,7 +1232,6 @@ export default function MainAdminDashboard() {
     </ScrollView>
   );
 
-  // Render the appropriate component based on the current path
   const renderContent = () => {
     switch (activeTab) {
       case 'events':

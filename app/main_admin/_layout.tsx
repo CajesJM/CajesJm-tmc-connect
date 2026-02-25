@@ -25,8 +25,8 @@ interface UserStats {
 const menuItems: MenuItem[] = [
   { name: 'index', title: 'Dashboard', icon: 'home', route: '/main_admin' },
   { name: 'announcements', title: 'Announcements', icon: 'megaphone', route: '/main_admin/announcements' },
-  { name: 'attendance', title: 'Attendance', icon: 'calendar', route: '/main_admin/attendance' },
   { name: 'events', title: 'Events', icon: 'calendar', route: '/main_admin/events' },
+  { name: 'attendance', title: 'Attendance', icon: 'calendar', route: '/main_admin/attendance' },
   { name: 'users', title: 'Users', icon: 'people', route: '/main_admin/users' },
   { name: 'profile', title: 'Profile', icon: 'person', route: '/main_admin/profile' },
 ];
@@ -338,7 +338,6 @@ export default function MainAdminLayout() {
 
   return (
     <View style={styles.container}>
-      {/* Mobile Header */}
       {!isWeb && (
         <View style={styles.mobileHeader}>
           <TouchableOpacity
@@ -362,7 +361,6 @@ export default function MainAdminLayout() {
         </View>
       )}
 
-      {/* Mobile Sidebar Overlay */}
       {!isWeb && mobileMenuOpen && (
         <TouchableOpacity
           style={styles.overlay}
@@ -371,7 +369,6 @@ export default function MainAdminLayout() {
         />
       )}
 
-      {/* Mobile Sidebar */}
       {!isWeb && (
         <Animated.View
           style={[

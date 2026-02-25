@@ -1,10 +1,13 @@
 import {
   Feather
 } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
 import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp, updateDoc } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -12,10 +15,8 @@ import {
   Linking,
   Modal,
   Platform,
-  RefreshControl,
   TextInput as RNTextInput,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   useWindowDimensions,
@@ -25,6 +26,7 @@ import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { CAMPUS_LOCATIONS, CampusLocation } from '../../constants/campusLocations';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebaseConfig';
+import { eventsStyles as styles } from '../../styles/main-admin/eventsStyles';
 
 interface Event {
   id: string;
@@ -84,10 +86,11 @@ const TextInput = ({
   [key: string]: any;
 }) => (
   <RNTextInput
-    style={[styles.input, style]}
+    style={[styles.modernFormInput, style]}
     value={value}
     onChangeText={onChangeText}
     placeholder={placeholder}
+    placeholderTextColor="#94a3b8"
     multiline={multiline}
     numberOfLines={numberOfLines}
     keyboardType={keyboardType}
@@ -95,625 +98,20 @@ const TextInput = ({
   />
 );
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  headerContent: {
-    marginBottom: 16,
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    color: '#cbd5e1',
-    fontSize: 14,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-  },
-  statNumber: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  statLabel: {
-    color: '#cbd5e1',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  mainContent: {
-    padding: 16,
-  },
-  controlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  filtersContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  filterButtonActive: {
-    backgroundColor: '#0ea5e9',
-    borderColor: '#0ea5e9',
-  },
-  filterButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  filterButtonTextActive: {
-    color: '#ffffff',
-  },
-  createButton: {
-    backgroundColor: '#0ea5e9',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  createButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  eventsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  eventCard: {
-    flex: 1,
-    minWidth: '48%',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  eventImageContainer: {
-    height: 120,
-    position: 'relative',
-  },
-  eventImage: {
-    width: '100%',
-    height: '100%',
-  },
-  eventBadge: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  todayBadge: {
-    backgroundColor: '#dcfce7',
-  },
-  tomorrowBadge: {
-    backgroundColor: '#dbeafe',
-  },
-  upcomingBadge: {
-    backgroundColor: '#fef3c7',
-  },
-  pastBadge: {
-    backgroundColor: '#f1f5f9',
-  },
-  eventBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  todayBadgeText: {
-    color: '#16a34a',
-  },
-  tomorrowBadgeText: {
-    color: '#2563eb',
-  },
-  upcomingBadgeText: {
-    color: '#d97706',
-  },
-  pastBadgeText: {
-    color: '#64748b',
-  },
-  eventContent: {
-    padding: 16,
-  },
-  eventHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  eventTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 8,
-    lineHeight: 22,
-  },
-  eventMeta: {
-    flex: 1,
-  },
-  eventLocation: {
-    fontSize: 12,
-    color: '#0ea5e9',
-    marginBottom: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  eventDate: {
-    fontSize: 11,
-    color: '#64748b',
-  },
-  editButton: {
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  editButtonText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#3b82f6',
-  },
-  eventDescription: {
-    fontSize: 12,
-    color: '#475569',
-    lineHeight: 16,
-    marginBottom: 12,
-    flex: 1,
-  },
-  verificationBadge: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  verificationBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#16a34a',
-    marginLeft: 4,
-  },
-  eventFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 12,
-    marginTop: 8,
-  },
-  eventStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  attendeeCount: {
-    fontSize: 11,
-    color: '#64748b',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  organizer: {
-    fontSize: 11,
-    color: '#64748b',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  deleteButton: {
-    backgroundColor: '#fef2f2',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  deleteButtonText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#dc2626',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 48,
-  },
-  emptyStateIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f1f5f9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginBottom: 24,
-    maxWidth: 300,
-  },
-  emptyStateButton: {
-    backgroundColor: '#0ea5e9',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  emptyStateButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  modalHeader: {
-    backgroundColor: '#f8fafc',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  modalHeaderTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  modalBackButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  modalBackText: {
-    fontSize: 14,
-    color: '#0ea5e9',
-    fontWeight: '600',
-  },
-  modalTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    textAlign: 'center',
-    marginLeft: -80,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: '#1e293b',
-  },
-  textArea: {
-    height: 120,
-    textAlignVertical: 'top',
-  },
-  datePickerButton: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  datePickerText: {
-    fontSize: 14,
-    color: '#1e293b',
-    fontWeight: '500',
-  },
-  locationPickerButton: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    padding: 16,
-  },
-  locationPickerText: {
-    fontSize: 14,
-    color: '#1e293b',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  locationPickerSubtext: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  formActions: {
-    marginTop: 24,
-    gap: 12,
-  },
-  submitButton: {
-    backgroundColor: '#0ea5e9',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 10,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#cbd5e1',
-  },
-  submitButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    backgroundColor: '#f1f5f9',
-    paddingVertical: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#64748b',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  locationModal: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
-  locationModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  locationOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    gap: 12,
-  },
-  locationOptionImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-  },
-  locationOptionText: {
-    flex: 1,
-  },
-  locationOptionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  locationOptionDescription: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  locationsList: {
-    maxHeight: 400,
-  },
-  sectionDescription: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  mapPickerButton: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  mapPickerButtonDisabled: {
-    opacity: 0.6,
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  buttonTextContainer: {
-    flex: 1,
-  },
-  buttonTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  buttonSubtitle: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  secondaryLocationButton: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  secondaryButtonTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  coordinatesDisplay: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 12,
-  },
-  coordinatesText: {
-    fontSize: 12,
-    color: '#475569',
-    marginBottom: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  hintContainer: {
-    marginTop: 4,
-  },
-  inputHint: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  coordinatesActions: {
-    marginTop: 24,
-    gap: 12,
-  },
-  secondaryButton: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingVertical: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  loadingSpinner: {
-    marginLeft: 12,
-  },
-  imageUploadButton: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-  },
-  imageUploadText: {
-    fontSize: 14,
-    color: '#1e293b',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  imagePickerSubtitle: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  selectedImagePreview: {
-    width: '100%',
-    height: 150,
-    borderRadius: 8,
-    marginTop: 12,
-  },
-  locationDescription: {
-    fontSize: 11,
-    color: '#64748b',
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-});
-
 export default function MainAdminEvents() {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
+  const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
+
+  const isMobile = screenWidth < 640;
+  const isTablet = screenWidth >= 640 && screenWidth < 1024;
+  const isDesktop = screenWidth >= 1024;
   const isSmallScreen = screenWidth < 375;
 
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const [paginatedEvents, setPaginatedEvents] = useState<Event[]>([]);
+  const [searchResults, setSearchResults] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -729,6 +127,18 @@ export default function MainAdminEvents() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'upcoming' | 'past'>('all');
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(isMobile ? 5 : 10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [userLocation, setUserLocation] = useState<{ latitude: number, longitude: number } | null>(null);
+  const [isWithinRange, setIsWithinRange] = useState<boolean | null>(null);
+  const [checkingLocation, setCheckingLocation] = useState(false);
+  const [selectedEventUserLocation, setSelectedEventUserLocation] = useState<{ latitude: number, longitude: number } | null>(null);
+  const [selectedEventIsWithinRange, setIsSelectedEventWithinRange] = useState<boolean | null>(null);
+  const [checkingSelectedEventLocation, setCheckingSelectedEventLocation] = useState(false);
 
   const [eventCoordinates, setEventCoordinates] = useState<CoordinatesState>({
     latitude: '',
@@ -745,6 +155,105 @@ export default function MainAdminEvents() {
     locationImage: '',
     coordinates: undefined
   });
+
+  useEffect(() => {
+    const eventsQuery = query(
+      collection(db, 'events'),
+      orderBy('date', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(eventsQuery,
+      (snapshot) => {
+        const eventsData: Event[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          eventsData.push({
+            id: doc.id,
+            title: data.title,
+            description: data.description,
+            date: data.date.toDate(),
+            location: data.location,
+            organizer: data.organizer,
+            locationImage: data.locationImage,
+            createdAt: data.createdAt.toDate(),
+            attendees: data.attendees || [],
+            locationDescription: data.locationDescription,
+            coordinates: data.coordinates
+          });
+        });
+        setEvents(eventsData);
+        filterEvents(eventsData, activeFilter);
+        setLoading(false);
+        setRefreshing(false);
+      },
+      (error: unknown) => {
+        console.error('Error fetching events:', error);
+        Alert.alert('Error', 'Failed to load events');
+        setLoading(false);
+        setRefreshing(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    filterEvents(events, activeFilter);
+  }, [events]);
+
+  useEffect(() => {
+    let filtered = filterEventsByTime(events, activeFilter);
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setPaginatedEvents(filtered.slice(startIndex, endIndex));
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+  }, [events, activeFilter, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase();
+      const results = events.filter(event =>
+        event.title.toLowerCase().includes(searchLower) ||
+        event.description.toLowerCase().includes(searchLower) ||
+        event.location.toLowerCase().includes(searchLower)
+      );
+      setSearchResults(results);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery, events]);
+
+  const filterEventsByTime = (eventsList: Event[], filter: 'all' | 'upcoming' | 'past') => {
+    const now = new Date();
+    switch (filter) {
+      case 'upcoming':
+        return eventsList.filter(event => event.date > now);
+      case 'past':
+        return eventsList.filter(event => event.date <= now);
+      default:
+        return eventsList;
+    }
+  };
+
+  const filterEvents = (eventsList: Event[], filter: 'all' | 'upcoming' | 'past') => {
+    const filtered = filterEventsByTime(eventsList, filter);
+    setFilteredEvents(filtered);
+  };
+
+  const handleFilterChange = (filter: 'all' | 'upcoming' | 'past') => {
+    setActiveFilter(filter);
+    setCurrentPage(1);
+    setSelectedEvent(null);
+  };
+
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
+  };
 
   const handleSelectCampusImage = (location: CampusLocation) => {
     setSelectedCampusLocation(location);
@@ -799,7 +308,7 @@ export default function MainAdminEvents() {
       console.error('Error getting location:', error);
 
       let errorMessage = 'Failed to get current location. Please try again or enter coordinates manually.';
-      
+
       setLocationError(errorMessage);
       Alert.alert('Location Error', errorMessage);
     }
@@ -896,66 +405,113 @@ export default function MainAdminEvents() {
     setShowCoordinatesModal(false);
     Alert.alert('Success', 'Location verification coordinates saved!');
   };
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371e3;
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-  useEffect(() => {
-    const eventsQuery = query(
-      collection(db, 'events'),
-      orderBy('date', 'desc')
-    );
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    const unsubscribe = onSnapshot(eventsQuery,
-      (snapshot) => {
-        const eventsData: Event[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          eventsData.push({
-            id: doc.id,
-            title: data.title,
-            description: data.description,
-            date: data.date.toDate(),
-            location: data.location,
-            organizer: data.organizer,
-            locationImage: data.locationImage,
-            createdAt: data.createdAt.toDate(),
-            attendees: data.attendees || [],
-            locationDescription: data.locationDescription,
-            coordinates: data.coordinates
-          });
-        });
-        setEvents(eventsData);
-        filterEvents(eventsData, activeFilter);
-
-        setLoading(false);
-        setRefreshing(false);
-      },
-      (error: unknown) => {
-        console.error('Error fetching events:', error);
-        Alert.alert('Error', 'Failed to load events');
-        setLoading(false);
-        setRefreshing(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, []);
-
-  const filterEvents = (eventsList: Event[], filter: 'all' | 'upcoming' | 'past') => {
-    const now = new Date();
-    switch (filter) {
-      case 'upcoming':
-        setFilteredEvents(eventsList.filter(event => event.date > now));
-        break;
-      case 'past':
-        setFilteredEvents(eventsList.filter(event => event.date <= now));
-        break;
-      default:
-        setFilteredEvents(eventsList);
-    }
+    return R * c;
   };
 
-  const handleFilterChange = (filter: 'all' | 'upcoming' | 'past') => {
-    setActiveFilter(filter);
-    filterEvents(events, filter);
+  const openLocationInMaps = async (location: string, coordinates?: { latitude: number, longitude: number }) => {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    let origin = '';
+    
+    if (status === 'granted') {
+      const userLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Low,
+      });
+      origin = `${userLocation.coords.latitude},${userLocation.coords.longitude}`;
+    }
+
+    if (coordinates) {
+      const { latitude, longitude } = coordinates;
+      const destination = `${latitude},${longitude}`;
+      
+      let url: string;
+      if (Platform.OS === 'ios') {
+        url = origin 
+          ? `http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=d`
+          : `http://maps.apple.com/?daddr=${destination}&dirflg=d`;
+      } else {
+    
+        url = origin
+          ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`
+          : `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+      }
+      
+      await Linking.openURL(url);
+    } else {
+    
+      const query = encodeURIComponent(location);
+      const url = Platform.OS === 'ios'
+        ? `http://maps.apple.com/?q=${query}`
+        : `https://www.google.com/maps/search/?api=1&query=${query}`;
+      await Linking.openURL(url);
+    }
+  } catch (error) {
+    console.error('Error opening maps:', error);
+    Alert.alert('Error', 'Could not open maps application');
+  }
+};
+
+  const checkSelectedEventLocation = async (selectedEventId: string) => {
+    const selected = events.find(e => e.id === selectedEventId);
+    if (!selected?.coordinates) {
+      Alert.alert('No Location Set', 'This event does not have a verification location set.');
+      return;
+    }
+
+    try {
+      setCheckingSelectedEventLocation(true);
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required to check attendance range.');
+        setCheckingSelectedEventLocation(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const userLoc = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+      setSelectedEventUserLocation(userLoc);
+
+      const distance = calculateDistance(
+        userLoc.latitude,
+        userLoc.longitude,
+        selected.coordinates.latitude,
+        selected.coordinates.longitude
+      );
+
+      const withinRange = distance <= selected.coordinates.radius;
+      setIsSelectedEventWithinRange(withinRange);
+
+      Alert.alert(
+        withinRange ? '✅ You are within range!' : '❌ You are outside the range',
+        `Your distance: ${Math.round(distance)}m\nAllowed radius: ${selected.coordinates.radius}m`,
+        [{ text: 'OK' }]
+      );
+
+    } catch (error) {
+      console.error('Error checking location:', error);
+      Alert.alert('Error', 'Failed to get your location. Please try again.');
+    } finally {
+      setCheckingSelectedEventLocation(false);
+    }
   };
 
   const handleCreateEvent = async () => {
@@ -994,6 +550,103 @@ export default function MainAdminEvents() {
     } finally {
       setLoading(false);
     }
+  };
+  const handleWebDateChange = (event: any) => {
+    // Get the local date string from the input (format: YYYY-MM-DDTHH:mm)
+    const localDateString = event.target.value;
+
+    if (!localDateString) return;
+
+    try {
+      // Split date and time
+      const [datePart, timePart] = localDateString.split('T');
+
+      // Validate that we have both date and time parts
+      if (!datePart || !timePart) {
+        console.warn('Invalid date format');
+        return;
+      }
+
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hours, minutes] = timePart.split(':').map(Number);
+
+      // Validate all components are valid numbers
+      if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) {
+        console.warn('Invalid date components');
+        return;
+      }
+
+      // Validate year range (e.g., between 2000 and 2100)
+      if (year < 2000 || year > 2100) {
+        console.warn('Year out of valid range');
+        return;
+      }
+
+      // Validate month (1-12)
+      if (month < 1 || month > 12) {
+        console.warn('Invalid month');
+        return;
+      }
+
+      // Validate day (1-31) - basic validation
+      if (day < 1 || day > 31) {
+        console.warn('Invalid day');
+        return;
+      }
+
+      // Validate hours (0-23)
+      if (hours < 0 || hours > 23) {
+        console.warn('Invalid hours');
+        return;
+      }
+
+      // Validate minutes (0-59)
+      if (minutes < 0 || minutes > 59) {
+        console.warn('Invalid minutes');
+        return;
+      }
+
+      // Create a new date using local time components
+      // Note: Months are 0-indexed in JavaScript Date
+      const localDate = new Date(year, month - 1, day, hours, minutes);
+
+      // Final validation - check if it's a valid date
+      if (isNaN(localDate.getTime())) {
+        console.warn('Invalid date created');
+        return;
+      }
+
+      // Optional: Ensure the date is not too far in the past or future
+      const now = new Date();
+      const maxFutureDate = new Date();
+      maxFutureDate.setFullYear(now.getFullYear() + 5); // Allow up to 5 years in the future
+
+      if (localDate < now) {
+        // Allow past dates? If not, uncomment the next line
+        // Alert.alert('Invalid Date', 'Please select a future date');
+        // return;
+      }
+
+      if (localDate > maxFutureDate) {
+        Alert.alert('Invalid Date', 'Date cannot be more than 5 years in the future');
+        return;
+      }
+
+      // Set the valid date
+      setNewEvent({ ...newEvent, date: localDate });
+
+    } catch (error) {
+      console.error('Error parsing date:', error);
+    }
+  };
+  const formatDateForWebInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
   const handleUpdateEvent = async () => {
@@ -1162,10 +815,33 @@ export default function MainAdminEvents() {
     setShowEditForm(false);
   };
 
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      setSelectedEvent(null);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      setSelectedEvent(null);
+    }
+  };
+
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
       weekday: 'short',
       year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatShortDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -1206,369 +882,944 @@ export default function MainAdminEvents() {
 
   const getEventBadgeStyle = (type: string) => {
     switch (type) {
-      case 'today': return [styles.eventBadge, styles.todayBadge];
-      case 'tomorrow': return [styles.eventBadge, styles.tomorrowBadge];
-      case 'upcoming': return [styles.eventBadge, styles.upcomingBadge];
-      case 'past': return [styles.eventBadge, styles.pastBadge];
-      default: return [styles.eventBadge, styles.pastBadge];
+      case 'today': return [styles.paginatedBadge, { backgroundColor: '#16a34a' }];
+      case 'tomorrow': return [styles.paginatedBadge, { backgroundColor: '#2563eb' }];
+      case 'upcoming': return [styles.paginatedBadge, { backgroundColor: '#d97706' }];
+      case 'past': return [styles.paginatedBadge, { backgroundColor: '#64748b' }];
+      default: return [styles.paginatedBadge, { backgroundColor: '#64748b' }];
     }
   };
 
-  const getEventBadgeTextStyle = (type: string) => {
-    switch (type) {
-      case 'today': return [styles.eventBadgeText, styles.todayBadgeText];
-      case 'tomorrow': return [styles.eventBadgeText, styles.tomorrowBadgeText];
-      case 'upcoming': return [styles.eventBadgeText, styles.upcomingBadgeText];
-      case 'past': return [styles.eventBadgeText, styles.pastBadgeText];
-      default: return [styles.eventBadgeText, styles.pastBadgeText];
+  const getPriorityColor = (eventDate: Date) => {
+    const daysUntil = getDaysUntilEvent(eventDate);
+    switch (daysUntil.type) {
+      case 'today': return '#16a34a';
+      case 'tomorrow': return '#2563eb';
+      case 'upcoming': return '#d97706';
+      default: return '#64748b';
     }
   };
 
-  const renderEventItem = ({ item }: { item: Event }) => {
+  const stats = useMemo(() => {
+    const total = events.length;
+    const upcoming = events.filter(event => event.date > new Date()).length;
+    const past = events.filter(event => event.date <= new Date()).length;
+    return { total, upcoming, past };
+  }, [events]);
+
+  const renderPaginatedItem = ({ item, index }: { item: Event; index: number }) => {
+    const isActive = selectedEvent === item.id;
+    const priorityColor = getPriorityColor(item.date);
     const daysUntil = getDaysUntilEvent(item.date);
 
     return (
-      <View style={styles.eventCard}>
-        <View style={styles.eventImageContainer}>
-          <Image
-            source={getLocationImage(item)}
-            style={styles.eventImage}
-            resizeMode="cover"
-          />
-          <View style={getEventBadgeStyle(daysUntil.type)}>
-            <Text style={getEventBadgeTextStyle(daysUntil.type)}>
-              {daysUntil.text}
+      <TouchableOpacity
+        style={[
+          styles.paginatedItem,
+          isActive && styles.paginatedItemActive,
+          isMobile && styles.paginatedItemMobile
+        ]}
+        onPress={() => setSelectedEvent(item.id)}
+      >
+        <View style={[styles.paginatedNumber, { backgroundColor: `${priorityColor}15` }]}>
+          <Text style={[styles.paginatedNumberText, { color: priorityColor }]}>
+            {(currentPage - 1) * itemsPerPage + index + 1}
+          </Text>
+        </View>
+        <View style={styles.paginatedInfo}>
+          <Text style={[styles.paginatedTitle, isMobile && styles.paginatedTitleMobile]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <View style={styles.paginatedMeta}>
+            <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
+              {formatShortDate(item.date)}
             </Text>
+            {daysUntil.type === 'today' && (
+              <View style={[styles.paginatedBadge, { backgroundColor: '#16a34a' }]}>
+                <Text style={styles.paginatedBadgeText}>TODAY</Text>
+              </View>
+            )}
+            {daysUntil.type === 'tomorrow' && (
+              <View style={[styles.paginatedBadge, { backgroundColor: '#2563eb' }]}>
+                <Text style={styles.paginatedBadgeText}>TOMORROW</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.paginatedLocation} numberOfLines={1}>
+            <Feather name="map-pin" size={8} color="#0ea5e9" /> {item.location}
+          </Text>
+        </View>
+        <View style={styles.paginatedActions}>
+          <TouchableOpacity
+            style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
+            onPress={() => handleEditEvent(item)}
+          >
+            <Feather name="edit-2" size={isMobile ? 12 : 14} color="#3b82f6" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
+            onPress={() => handleDeleteEvent(item.id, item.title)}
+          >
+            <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderSearchResultItem = ({ item }: { item: Event }) => {
+    const daysUntil = getDaysUntilEvent(item.date);
+
+    return (
+      <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile]}>
+        <View style={styles.searchResultHeader}>
+          <View style={styles.searchResultTitleContainer}>
+            <Text style={[styles.searchResultTitle, isMobile && styles.searchResultTitleMobile]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View style={styles.searchResultBadges}>
+              {daysUntil.type === 'today' && (
+                <View style={[styles.searchResultBadge, { backgroundColor: '#16a34a' }]}>
+                  <Text style={styles.searchResultBadgeText}>TODAY</Text>
+                </View>
+              )}
+              {daysUntil.type === 'tomorrow' && (
+                <View style={[styles.searchResultBadge, { backgroundColor: '#2563eb' }]}>
+                  <Text style={styles.searchResultBadgeText}>TOMORROW</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          <Text style={[styles.searchResultLocation, isMobile && styles.searchResultLocationMobile]}>
+            <Feather name="map-pin" size={10} color="#0ea5e9" /> {item.location}
+          </Text>
+          <View style={styles.searchResultActions}>
+            <TouchableOpacity
+              style={[styles.searchResultEditButton, isMobile && styles.searchResultEditButtonMobile]}
+              onPress={() => handleEditEvent(item)}
+            >
+              <Feather name="edit-2" size={isMobile ? 12 : 14} color="#3b82f6" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.searchResultDeleteButton, isMobile && styles.searchResultDeleteButtonMobile]}
+              onPress={() => handleDeleteEvent(item.id, item.title)}
+            >
+              <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.eventContent}>
-          <View style={styles.eventHeader}>
-            <View style={styles.eventMeta}>
-              <View style={styles.eventLocation}>
-                <Feather name="map-pin" size={12} color="#0ea5e9" />
-                <Text style={{ marginLeft: 4 }}>{item.location}</Text>
-              </View>
-              <Text style={styles.eventDate}>{formatDate(item.date)}</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => handleEditEvent(item)}
-            >
-              <Text style={styles.editButtonText}>Edit</Text>
-            </TouchableOpacity>
+        <Text style={[styles.searchResultDescription, isMobile && styles.searchResultDescriptionMobile]} numberOfLines={2}>
+          {item.description}
+        </Text>
+
+        <View style={styles.searchResultFooter}>
+          <View style={styles.searchResultDate}>
+            <Feather name="clock" size={isMobile ? 8 : 10} color="#64748b" />
+            <Text style={[styles.searchResultDateText, isMobile && styles.searchResultDateTextMobile]}>
+              {formatShortDate(item.date)}
+            </Text>
           </View>
-
-          <Text style={styles.eventTitle}>{item.title}</Text>
-          <Text style={styles.eventDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
-
-          {item.locationDescription && (
-            <View style={styles.locationDescription}>
-              <Feather name="info" size={10} color="#64748b" />
-              <Text style={{ marginLeft: 4 }}>{item.locationDescription}</Text>
-            </View>
-          )}
-
-          {item.coordinates && (
-            <View style={styles.verificationBadge}>
-              <Feather name="shield" size={10} color="#16a34a" />
-              <Text style={styles.verificationBadgeText}>Location Verification</Text>
-            </View>
-          )}
-
-          <View style={styles.eventFooter}>
-            <View style={styles.eventStats}>
-              <View style={styles.organizer}>
-                <Feather name="user" size={10} color="#64748b" />
-                <Text style={{ marginLeft: 4 }}>{item.organizer}</Text>
-              </View>
-              <View style={styles.attendeeCount}>
-                <Feather name="users" size={10} color="#64748b" />
-                <Text style={{ marginLeft: 4 }}>{item.attendees?.length || 0}</Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => handleDeleteEvent(item.id, item.title)}
-            >
-              <Text style={styles.deleteButtonText}>Delete</Text>
-            </TouchableOpacity>
+          <View style={styles.searchResultAttendees}>
+            <Feather name="users" size={isMobile ? 8 : 10} color="#64748b" />
+            <Text style={[styles.searchResultAttendeesText, isMobile && styles.searchResultAttendeesTextMobile]}>
+              {item.attendees?.length || 0}
+            </Text>
           </View>
         </View>
       </View>
     );
   };
 
-  const renderForm = (isEdit: boolean = false) => (
-    <View style={styles.modalContainer}>
-      <View style={styles.modalHeader}>
-        <View style={styles.modalHeaderTop}>
-          <TouchableOpacity onPress={handleCloseForm} style={styles.modalBackButton}>
-            <Feather name="arrow-left" size={20} color="#0ea5e9" />
-            <Text style={styles.modalBackText}>Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.modalTitle}>
-            {isEdit ? 'Edit Event' : 'Create New Event'}
+  const renderSelectedDetail = (
+    selected: Event,
+    userLocation: { latitude: number, longitude: number } | null,
+    isWithinRange: boolean | null,
+    checkingLocation: boolean,
+    onCheckLocation: () => void,
+    onOpenMaps: (location: string, coordinates?: { latitude: number, longitude: number }) => void
+  ) => {
+    const daysUntil = getDaysUntilEvent(selected.date);
+
+    return (
+      <View>
+        {/* Image */}
+        <View style={[styles.modernDetailImageContainer, isMobile && styles.modernDetailImageContainerMobile]}>
+          <Image
+            source={getLocationImage(selected)}
+            style={styles.modernDetailImage}
+            resizeMode="cover"
+          />
+          <View style={[styles.modernDetailImageBadge, getEventBadgeStyle(daysUntil.type)]}>
+            <Text style={styles.eventBadgeText}>{daysUntil.text}</Text>
+          </View>
+        </View>
+
+        {/* Title */}
+        <Text style={[styles.modernDetailTitle, isMobile && styles.modernDetailTitleMobile]}>
+          {selected.title}
+        </Text>
+
+        {/* Description */}
+        <View style={styles.modernDetailSection}>
+          <Text style={styles.modernDetailLabel}>Description</Text>
+          <Text style={[styles.modernDetailText, isMobile && styles.modernDetailTextMobile]}>
+            {selected.description}
           </Text>
         </View>
-        <Text style={styles.modalSubtitle}>
-          {isEdit ? 'Update the event details' : 'Fill in the event details'}
-        </Text>
-      </View>
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <ScrollView style={styles.modalContent}>
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Title *</Text>
-            <TextInput
-              placeholder="Enter event title"
-              value={newEvent.title}
-              onChangeText={(text: string) => setNewEvent({ ...newEvent, title: text })}
-            />
+        {/* Date & Time */}
+        <View style={styles.modernDetailRow}>
+          <Feather name="calendar" size={16} color="#0ea5e9" />
+          <Text style={styles.modernDetailRowText}>
+            {formatDate(selected.date)}
+          </Text>
+        </View>
+
+        {/* Location with Icon Button */}
+        <View style={styles.modernDetailRow}>
+          <Feather name="map-pin" size={16} color="#0ea5e9" />
+          <Text style={styles.modernDetailRowText}>
+            {selected.location}
+          </Text>
+
+        </View>
+
+        {selected.locationDescription && (
+          <View style={styles.modernDetailRow}>
+            <Feather name="info" size={16} color="#64748b" />
+            <Text style={styles.modernDetailRowText}>
+              {selected.locationDescription}
+            </Text>
           </View>
+        )}
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Description *</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Describe your event in detail..."
-              value={newEvent.description}
-              onChangeText={(text: string) => setNewEvent({ ...newEvent, description: text })}
-              multiline
-              numberOfLines={4}
-            />
-          </View>
+        {/* Coordinates with Range Indicator */}
+        {selected.coordinates && (
+          <View style={styles.modernDetailSection}>
+            <View style={styles.modernDetailRangeHeader}>
+              <Text style={styles.modernDetailLabel}>Attendance Range</Text>
+              {isWithinRange !== null && (
+                <View style={[
+                  styles.rangeIndicator,
+                  { backgroundColor: isWithinRange ? '#10b981' : '#ef4444' }
+                ]}>
+                  <Text style={styles.rangeIndicatorText}>
+                    {isWithinRange ? '✓ In Range' : '✗ Out of Range'}
+                  </Text>
+                </View>
+              )}
+            </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Date & Time *</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={showDatePickerModal}
-            >
-              <Text style={styles.datePickerText}>{formatDate(newEvent.date)}</Text>
-              <Feather name="calendar" size={20} color="#64748b" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.formLabel}>Location *</Text>
-            <TouchableOpacity
-              style={styles.locationPickerButton}
-              onPress={() => setShowLocationPicker(true)}
-            >
-              <Text style={styles.locationPickerText}>
-                {newEvent.location ? newEvent.location : 'Set location details'}
+            <View style={styles.modernDetailRow}>
+              <Feather name="map" size={16} color="#f59e0b" />
+              <Text style={styles.modernDetailRowText}>
+                {selected.coordinates.latitude.toFixed(4)}, {selected.coordinates.longitude.toFixed(4)}
               </Text>
-              <Text style={styles.locationPickerSubtext}>
-                {newEvent.location ? 'Tap to modify location' : 'Tap to set location'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={() => onOpenMaps(selected.location, selected.coordinates)}
+                style={[styles.modernDetailIconButton, { backgroundColor: '#f59e0b20' }]}
+              >
+                <Feather name="external-link" size={16} color="#f59e0b" />
+              </TouchableOpacity>
+            </View>
 
-          <View style={styles.formActions}>
-            <TouchableOpacity 
+            <View style={styles.modernDetailRow}>
+              <Feather name="radio" size={16} color="#f59e0b" />
+              <Text style={styles.modernDetailRowText}>
+                Allowed Radius: {selected.coordinates.radius}m
+              </Text>
+            </View>
+
+            {/* Range Visualization */}
+            <View style={styles.rangeVisualization}>
+              <View style={styles.rangeTrack}>
+                <View
+                  style={[
+                    styles.rangeFill,
+                    {
+                      width: `${Math.min(100, (userLocation ? calculateDistance(
+                        userLocation.latitude,
+                        userLocation.longitude,
+                        selected.coordinates.latitude,
+                        selected.coordinates.longitude
+                      ) / selected.coordinates.radius * 100 : 0))}%`
+                    }
+                  ]}
+                />
+              </View>
+              <Text style={styles.rangeTrackText}>
+                {userLocation
+                  ? `${Math.round(calculateDistance(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    selected.coordinates.latitude,
+                    selected.coordinates.longitude
+                  ))}m / ${selected.coordinates.radius}m`
+                  : 'Check your location to see distance'}
+              </Text>
+            </View>
+
+            {/* Check Location Button */}
+            <TouchableOpacity
               style={[
-                styles.submitButton,
-                (!newEvent.title.trim() || !newEvent.description.trim() || !newEvent.location.trim()) && styles.submitButtonDisabled
+                styles.checkLocationButton,
+                checkingLocation && styles.checkLocationButtonDisabled
               ]}
-              onPress={isEdit ? handleUpdateEvent : handleCreateEvent}
-              disabled={!newEvent.title.trim() || !newEvent.description.trim() || !newEvent.location.trim()}
+              onPress={onCheckLocation}
+              disabled={checkingLocation}
             >
-              <Feather 
-                name={isEdit ? "save" : "check-circle"} 
-                size={18} 
-                color="#ffffff" 
-              />
-              <Text style={styles.submitButtonText}>
-                {isEdit ? 'Update Event' : 'Create Event'}
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={handleCloseForm}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              {checkingLocation ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <Feather name="crosshair" size={16} color="#ffffff" />
+                  <Text style={styles.checkLocationButtonText}>
+                    {userLocation ? 'Refresh My Location' : 'Check My Location'}
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+        )}
+
+        {/* Attendees */}
+        <View style={styles.modernDetailRow}>
+          <Feather name="users" size={16} color="#64748b" />
+          <Text style={styles.modernDetailRowText}>
+            {selected.attendees?.length || 0} attending
+          </Text>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
+          <TouchableOpacity
+            style={[styles.modernSubmitButton, isMobile && styles.modernSubmitButtonMobile]}
+            onPress={() => {
+              handleEditEvent(selected);
+              setSelectedEvent(null);
+            }}
+          >
+            <Feather name="edit-2" size={isMobile ? 14 : 16} color="#ffffff" />
+            <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
+              Edit
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.modernCancelButton, isMobile && styles.modernCancelButtonMobile]}
+            onPress={() => {
+              handleDeleteEvent(selected.id, selected.title);
+              setSelectedEvent(null);
+            }}
+          >
+            <Text style={[styles.modernCancelButtonText, isMobile && styles.modernCancelButtonTextMobile]}>
+              Delete
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <View style={[styles.paginationContainer, isMobile && styles.paginationContainerMobile]}>
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled, isMobile && styles.paginationButtonMobile]}
+          onPress={handlePrevPage}
+          disabled={currentPage === 1}
+        >
+          <Feather name="chevron-left" size={isMobile ? 14 : 16} color={currentPage === 1 ? '#cbd5e1' : '#0ea5e9'} />
+          {!isMobile && <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
+            Prev
+          </Text>}
+        </TouchableOpacity>
+
+        <View style={styles.pageInfo}>
+          <Text style={[styles.pageInfoText, isMobile && styles.pageInfoTextMobile]}>{currentPage}/{totalPages}</Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled, isMobile && styles.paginationButtonMobile]}
+          onPress={handleNextPage}
+          disabled={currentPage === totalPages}
+        >
+          {!isMobile && <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>
+            Next
+          </Text>}
+          <Feather name="chevron-right" size={isMobile ? 14 : 16} color={currentPage === totalPages ? '#cbd5e1' : '#0ea5e9'} />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderForm = (isEdit: boolean = false) => (
+    <Modal
+      visible={showCreateForm || showEditForm}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={handleCloseForm}
+    >
+      <View style={styles.modernModalOverlay}>
+        <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
+          <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+            <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
+              <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+                <Feather
+                  name={isEdit ? "edit-2" : "calendar"}
+                  size={isMobile ? 16 : 20}
+                  color="#0ea5e9"
+                />
+              </View>
+              <View style={styles.modernModalTitleContainer}>
+                <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                  {isEdit ? 'Edit Event' : 'New Event'}
+                </Text>
+                <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>
+                  {isEdit ? 'Update event details' : 'Create a new event'}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={handleCloseForm}
+              style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+            >
+              <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+          >
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+              {/* Campus Image Selection */}
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Campus Image (Optional)</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginBottom: 8 }}
+                >
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {CAMPUS_LOCATIONS.map((location) => (
+                      <TouchableOpacity
+                        key={location.id}
+                        style={[
+                          {
+                            width: 80,
+                            height: 80,
+                            borderRadius: 12,
+                            overflow: 'hidden',
+                            borderWidth: 2,
+                            borderColor: selectedCampusLocation?.id === location.id ? '#0ea5e9' : '#e2e8f0',
+                          },
+                          isMobile && { width: 60, height: 60 }
+                        ]}
+                        onPress={() => handleSelectCampusImage(location)}
+                      >
+                        <Image
+                          source={location.image}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+                {selectedCampusLocation && (
+                  <Text style={styles.modernLocationButtonSubtitle}>
+                    Selected: {selectedCampusLocation.name}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Title *</Text>
+                <TextInput
+                  placeholder="Enter event title"
+                  value={newEvent.title}
+                  onChangeText={(text: string) => setNewEvent({ ...newEvent, title: text })}
+                />
+              </View>
+
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Description *</Text>
+                <TextInput
+                  style={[styles.modernTextArea, isMobile && styles.modernFormInputMobile]}
+                  placeholder="Describe your event..."
+                  value={newEvent.description}
+                  onChangeText={(text: string) => setNewEvent({ ...newEvent, description: text })}
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Date & Time *</Text>
+                <TouchableOpacity
+                  style={styles.modernLocationButton}
+                  onPress={showDatePickerModal}
+                >
+                  <Feather name="calendar" size={20} color="#0ea5e9" />
+                  <View style={styles.modernLocationButtonText}>
+                    <Text style={styles.modernLocationButtonTitle}>
+                      {formatDate(newEvent.date)}
+                    </Text>
+                    <Text style={styles.modernLocationButtonSubtitle}>
+                      Tap to change date and time
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location *</Text>
+                <TouchableOpacity
+                  style={styles.modernLocationButton}
+                  onPress={() => setShowLocationPicker(true)}
+                >
+                  <Feather name="map-pin" size={20} color="#0ea5e9" />
+                  <View style={styles.modernLocationButtonText}>
+                    <Text style={styles.modernLocationButtonTitle}>
+                      {newEvent.location || 'Set location'}
+                    </Text>
+                    <Text style={styles.modernLocationButtonSubtitle}>
+                      {newEvent.location ? 'Tap to modify' : 'Enter location details'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
+              
+
+              <TouchableOpacity
+                style={styles.modernCoordinatesButton}
+                onPress={() => setShowCoordinatesModal(true)}
+              >
+                <Feather name="map" size={20} color="#f59e0b" />
+                <View style={styles.modernLocationButtonText}>
+                  <Text style={styles.modernLocationButtonTitle}>
+                    {newEvent.coordinates ? 'Verification Location Set' : 'Set Verification Location'}
+                  </Text>
+                  <Text style={styles.modernLocationButtonSubtitle}>
+                    {newEvent.coordinates
+                      ? `Lat: ${newEvent.coordinates.latitude.toFixed(4)}, Lng: ${newEvent.coordinates.longitude.toFixed(4)}`
+                      : 'Add coordinates for attendance verification'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
+                <TouchableOpacity
+                  style={[
+                    styles.modernSubmitButton,
+                    (!newEvent.title.trim() || !newEvent.description.trim() || !newEvent.location.trim()) && styles.modernSubmitButtonDisabled,
+                    isMobile && styles.modernSubmitButtonMobile
+                  ]}
+                  onPress={isEdit ? handleUpdateEvent : handleCreateEvent}
+                  disabled={!newEvent.title.trim() || !newEvent.description.trim() || !newEvent.location.trim()}
+                >
+                  <Feather
+                    name={isEdit ? "check-circle" : "plus-circle"}
+                    size={isMobile ? 16 : 18}
+                    color="#ffffff"
+                  />
+                  <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
+                    {isEdit ? 'Update' : 'Create'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modernCancelButton, isMobile && styles.modernCancelButtonMobile]}
+                  onPress={handleCloseForm}
+                >
+                  <Text style={[styles.modernCancelButtonText, isMobile && styles.modernCancelButtonTextMobile]}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </View>
+    </Modal>
   );
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Events Management</Text>
-          <Text style={styles.headerSubtitle}>Create, manage, and monitor campus events</Text>
-        </View>
-
-        {/* Stats */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{events.length}</Text>
-            <Text style={styles.statLabel}>Total Events</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>
-              {events.filter(event => event.date > new Date()).length}
-            </Text>
-            <Text style={styles.statLabel}>Upcoming</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>
-              {events.filter(event => event.date <= new Date()).length}
-            </Text>
-            <Text style={styles.statLabel}>Past</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.mainContent}>
-        {/* Controls */}
-        <View style={styles.controlsContainer}>
-          <View style={styles.filtersContainer}>
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                activeFilter === 'all' && styles.filterButtonActive
-              ]}
-              onPress={() => handleFilterChange('all')}
-            >
-              <Feather name="grid" size={14} color={activeFilter === 'all' ? '#ffffff' : '#64748b'} />
-              <Text style={[
-                styles.filterButtonText,
-                activeFilter === 'all' && styles.filterButtonTextActive
-              ]}>
-                All Events
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                activeFilter === 'upcoming' && styles.filterButtonActive
-              ]}
-              onPress={() => handleFilterChange('upcoming')}
-            >
-              <Feather name="calendar" size={14} color={activeFilter === 'upcoming' ? '#ffffff' : '#64748b'} />
-              <Text style={[
-                styles.filterButtonText,
-                activeFilter === 'upcoming' && styles.filterButtonTextActive
-              ]}>
-                Upcoming
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.filterButton,
-                activeFilter === 'past' && styles.filterButtonActive
-              ]}
-              onPress={() => handleFilterChange('past')}
-            >
-              <Feather name="clock" size={14} color={activeFilter === 'past' ? '#ffffff' : '#64748b'} />
-              <Text style={[
-                styles.filterButtonText,
-                activeFilter === 'past' && styles.filterButtonTextActive
-              ]}>
-                Past
-              </Text>
-            </TouchableOpacity>
+      {/* Header with Gradient */}
+      <LinearGradient
+        colors={['#14203d', '#06080b']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
+      >
+        <View style={[styles.headerContent, isMobile && styles.headerContentMobile]}>
+          <View>
+            <Text style={[styles.greetingText, isMobile && styles.greetingTextMobile]}>Welcome back,</Text>
+            <Text style={[styles.userName, isMobile && styles.userNameMobile]}>{userData?.name || 'Admin'}</Text>
+            <Text style={[styles.roleText, isMobile && styles.roleTextMobile]}>Events Manager</Text>
           </View>
 
           <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => setShowCreateForm(true)}
+            style={[styles.profileButton, isMobile && styles.profileButtonMobile]}
+            onPress={() => router.push('/main_admin/profile')}
           >
-            <Feather name="plus" size={16} color="#ffffff" />
-            <Text style={styles.createButtonText}>Create Event</Text>
+            {userData?.photoURL ? (
+              <Image
+                source={{ uri: userData.photoURL }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={[styles.profileImage, styles.profileFallback]}>
+                <Text style={[styles.profileInitials, isMobile && styles.profileInitialsMobile]}>
+                  {userData?.name ? userData.name.charAt(0).toUpperCase() : 'A'}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
-        {/* Events Grid */}
-        <FlatList
-          data={filteredEvents}
-          renderItem={renderEventItem}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={{ gap: 12 }}
-          contentContainerStyle={{ gap: 12 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => setRefreshing(true)} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <View style={styles.emptyStateIcon}>
-                <Feather name="calendar" size={36} color="#cbd5e1" />
-              </View>
-              <Text style={styles.emptyStateTitle}>
-                {activeFilter === 'all' ? 'No events scheduled' :
-                  activeFilter === 'upcoming' ? 'No upcoming events' : 'No past events'}
+        <View style={[styles.dateSection, isMobile && styles.dateSectionMobile]}>
+          <View style={[styles.dateContainer, isMobile && styles.dateContainerMobile]}>
+            <Feather name="calendar" size={isMobile ? 10 : 12} color="#94a3b8" />
+            <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
+              {new Date().toLocaleDateString('en-US', {
+                weekday: isMobile ? 'short' : 'long',
+                year: 'numeric',
+                month: isMobile ? 'short' : 'long',
+                day: 'numeric'
+              })}
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[styles.headerAction, isMobile && styles.headerActionMobile]}
+              onPress={() => setShowCreateForm(true)}
+            >
+              <Feather name="plus" size={isMobile ? 16 : 18} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Stats Grid */}
+      <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#0ea5e9' }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
+            <Feather name="calendar" size={isMobile ? 16 : 20} color="#0ea5e9" />
+          </View>
+          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
+        </View>
+
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#f59e0b' }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#f59e0b15' }]}>
+            <Feather name="clock" size={isMobile ? 16 : 20} color="#f59e0b" />
+          </View>
+          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.upcoming}</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Upcoming</Text>
+        </View>
+
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#64748b' }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#64748b15' }]}>
+            <Feather name="check-circle" size={isMobile ? 16 : 20} color="#64748b" />
+          </View>
+          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.past}</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Past</Text>
+        </View>
+      </View>
+
+      {/* Main Content Grid */}
+      <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
+        {/* Left Grid - Paginated Events */}
+        <View style={[styles.leftGrid, isMobile && styles.leftGridMobile]}>
+          <View style={[styles.leftHeader, isMobile && styles.leftHeaderMobile]}>
+            <Text style={[styles.leftTitle, isMobile && styles.leftTitleMobile]}>Events</Text>
+            <View style={[styles.leftControls, isMobile && styles.leftControlsMobile]}>
+              <Text style={[styles.eventCount, isMobile && styles.eventCountMobile]}>
+                {filterEventsByTime(events, activeFilter).length}
               </Text>
-              <Text style={styles.emptyStateText}>
-                {activeFilter === 'all' ? 'Create your first event to get started' :
-                  activeFilter === 'upcoming' ? 'All caught up! No upcoming events' : 'No past events to display'}
-              </Text>
-              {activeFilter !== 'past' && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={[styles.leftFilters, isMobile && styles.leftFiltersMobile]}
+              >
                 <TouchableOpacity
-                  style={styles.emptyStateButton}
-                  onPress={() => setShowCreateForm(true)}
+                  style={[
+                    styles.leftFilterButton,
+                    activeFilter === 'all' && styles.leftFilterButtonActive,
+                    isMobile && styles.leftFilterButtonMobile
+                  ]}
+                  onPress={() => handleFilterChange('all')}
                 >
-                  <Feather name="plus" size={16} color="#ffffff" />
-                  <Text style={styles.emptyStateButtonText}>Create Event</Text>
+                  <Text style={[
+                    styles.leftFilterButtonText,
+                    activeFilter === 'all' && styles.leftFilterButtonTextActive,
+                    isMobile && styles.leftFilterButtonTextMobile
+                  ]}>All</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.leftFilterButton,
+                    activeFilter === 'upcoming' && styles.leftFilterButtonActive,
+                    isMobile && styles.leftFilterButtonMobile
+                  ]}
+                  onPress={() => handleFilterChange('upcoming')}
+                >
+                  <Text style={[
+                    styles.leftFilterButtonText,
+                    activeFilter === 'upcoming' && styles.leftFilterButtonTextActive,
+                    isMobile && styles.leftFilterButtonTextMobile
+                  ]}>Upcoming</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.leftFilterButton,
+                    activeFilter === 'past' && styles.leftFilterButtonActive,
+                    isMobile && styles.leftFilterButtonMobile
+                  ]}
+                  onPress={() => handleFilterChange('past')}
+                >
+                  <Text style={[
+                    styles.leftFilterButtonText,
+                    activeFilter === 'past' && styles.leftFilterButtonTextActive,
+                    isMobile && styles.leftFilterButtonTextMobile
+                  ]}>Past</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size={isMobile ? "small" : "large"} color="#0ea5e9" />
+              <Text style={[styles.loadingText, isMobile && styles.loadingTextMobile]}>Loading events...</Text>
+            </View>
+          ) : (
+            <>
+              {/* Events List */}
+              <View style={styles.eventsListContainer}>
+                <FlatList
+                  data={paginatedEvents}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderPaginatedItem}
+                  style={styles.paginatedList}
+                  showsVerticalScrollIndicator={true}
+                  ListEmptyComponent={
+                    <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                      <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
+                        <Feather name="calendar" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                      </View>
+                      <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No events found</Text>
+                      <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
+                        {activeFilter === 'all' ? 'Create your first event to get started' :
+                          activeFilter === 'upcoming' ? 'No upcoming events scheduled' : 'No past events to display'}
+                      </Text>
+                    </View>
+                  }
+                />
+              </View>
+
+              {/* Pagination */}
+              {renderPagination()}
+            </>
+          )}
+        </View>
+
+        {/* Right Grid - Search */}
+        <View style={[styles.rightGrid, isMobile && styles.rightGridMobile]}>
+          <View style={[styles.rightHeader, isMobile && styles.rightHeaderMobile]}>
+            <Text style={[styles.searchTitle, isMobile && styles.searchTitleMobile]}>Search Events</Text>
+
+            <View style={[styles.searchContainer, isMobile && styles.searchContainerMobile]}>
+              <Feather name="search" size={isMobile ? 14 : 16} color="#64748b" />
+              <TextInput
+                style={[styles.searchInput, isMobile && styles.searchInputMobile]}
+                placeholder="Type to search..."
+                value={searchQuery}
+                onChangeText={handleSearch}
+                autoCapitalize="none"
+                placeholderTextColor="#94a3b8"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={clearSearch} style={styles.searchClearButton}>
+                  <Feather name="x" size={isMobile ? 14 : 16} color="#64748b" />
                 </TouchableOpacity>
               )}
             </View>
-          }
-        />
+
+            {searchQuery && (
+              <View style={[styles.searchStats, isMobile && styles.searchStatsMobile]}>
+                <Text style={[styles.resultsCount, isMobile && styles.resultsCountMobile]}>
+                  Found <Text style={styles.resultsHighlight}>{searchResults.length}</Text> {isMobile ? '' : 'results'}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.searchResultsContainer}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#0ea5e9" />
+              </View>
+            ) : (
+              <FlatList
+                data={searchResults}
+                keyExtractor={(item) => item.id}
+                renderItem={renderSearchResultItem}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  searchQuery ? (
+                    <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                      <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
+                        <Feather name="search" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                      </View>
+                      <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No matches</Text>
+                      <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
+                        Try different keywords
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                      <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
+                        <Feather name="search" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                      </View>
+                      <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>Start searching</Text>
+                      <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
+                        Type to find events
+                      </Text>
+                    </View>
+                  )
+                }
+              />
+            )}
+          </View>
+        </View>
       </View>
 
       {/* Create/Edit Modal */}
-      <Modal
-        visible={showCreateForm || showEditForm}
-        animationType="slide"
-        presentationStyle="fullScreen"
-      >
-        {renderForm(showEditForm)}
-      </Modal>
+      {renderForm(showEditForm)}
 
-      <DateTimePickerModal
-        isVisible={isDatePickerVisible}
-        mode="datetime"
-        onConfirm={handleConfirmDate}
-        onCancel={() => setDatePickerVisibility(false)}
-        minimumDate={new Date()}
-        date={newEvent.date}
-      />
+      {Platform.OS === 'web' ? (
+        <Modal
+          visible={isDatePickerVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setDatePickerVisibility(false)}
+        >
+          <View style={styles.modernModalOverlay}>
+            <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile, { maxWidth: 400 }]}>
+              <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+                <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
+                  <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+                    <Feather name="calendar" size={isMobile ? 16 : 20} color="#0ea5e9" />
+                  </View>
+                  <View style={styles.modernModalTitleContainer}>
+                    <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                      Select Date & Time
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setDatePickerVisibility(false)}
+                  style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+                >
+                  <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+                </TouchableOpacity>
+              </View>
 
-      {/* Location Picker Modal - Simplified version */}
+              <View style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+                <input
+                  type="datetime-local"
+                  value={formatDateForWebInput(newEvent.date)}
+                  onChange={handleWebDateChange}
+                  min={formatDateForWebInput(new Date())}
+                  step="900"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    fontSize: '16px',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    marginBottom: '12px',
+                    backgroundColor: '#f8fafc',
+                    color: '#1e293b',
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                  }}
+                />
+                <Text style={{
+                  fontSize: 12,
+                  color: '#64748b',
+                  marginBottom: 20,
+                  textAlign: 'center' as const
+                }}>
+                  Format: YYYY-MM-DD HH:MM (24-hour)
+                </Text>
+
+                <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
+                  <TouchableOpacity
+                    style={[styles.modernSubmitButton, isMobile && styles.modernSubmitButtonMobile]}
+                    onPress={() => setDatePickerVisibility(false)}
+                  >
+                    <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
+                      Confirm
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        <DateTimePickerModal
+          isVisible={isDatePickerVisible}
+          mode="datetime"
+          onConfirm={handleConfirmDate}
+          onCancel={() => setDatePickerVisibility(false)}
+          minimumDate={new Date()}
+          date={newEvent.date}
+        />
+      )}
+
+      {/* Location Picker Modal */}
       <Modal
         visible={showLocationPicker}
         transparent={true}
         animationType="slide"
         onRequestClose={() => setShowLocationPicker(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.locationModal}>
-            <View style={styles.locationModalHeader}>
-              <Text style={styles.modalTitle}>Location Details</Text>
-              <TouchableOpacity onPress={() => setShowLocationPicker(false)}>
-                <Feather name="x" size={24} color="#64748b" />
+        <View style={styles.modernModalOverlay}>
+          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
+            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+              <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
+                <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+                  <Feather name="map-pin" size={isMobile ? 16 : 20} color="#0ea5e9" />
+                </View>
+                <View style={styles.modernModalTitleContainer}>
+                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                    Location Details
+                  </Text>
+                  <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>
+                    Enter event location
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowLocationPicker(false)}
+                style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+              >
+                <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 400 }}>
-              {/* Simplified location picker content */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Location Name</Text>
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location Name</Text>
                 <TextInput
                   placeholder="e.g., Main Campus, Expansion, etc."
                   value={newEvent.location}
@@ -1576,36 +1827,190 @@ export default function MainAdminEvents() {
                 />
               </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Location Description (Optional)</Text>
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location Description (Optional)</Text>
                 <TextInput
                   placeholder="Describe the venue, facilities, or special features..."
                   value={newEvent.locationDescription}
                   onChangeText={(text: string) => setNewEvent(prev => ({ ...prev, locationDescription: text }))}
-                  style={styles.textArea}
+                  style={[styles.modernTextArea, isMobile && styles.modernFormInputMobile]}
                   multiline
                   numberOfLines={3}
                 />
               </View>
 
-              <TouchableOpacity
-                style={[
-                  styles.submitButton,
-                  !newEvent.location && styles.submitButtonDisabled
-                ]}
-                onPress={handleLocationSelect}
-                disabled={!newEvent.location}
-              >
-                <Text style={styles.submitButtonText}>
-                  {newEvent.location ? 'Save Location' : 'Enter Location Name'}
-                </Text>
-              </TouchableOpacity>
+              <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
+                <TouchableOpacity
+                  style={[
+                    styles.modernSubmitButton,
+                    !newEvent.location && styles.modernSubmitButtonDisabled,
+                    isMobile && styles.modernSubmitButtonMobile
+                  ]}
+                  onPress={handleLocationSelect}
+                  disabled={!newEvent.location}
+                >
+                  <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
+                    Save Location
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* Other modals can be implemented similarly */}
+      {/* Coordinates Modal */}
+      <Modal
+        visible={showCoordinatesModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowCoordinatesModal(false)}
+      >
+        <View style={styles.modernModalOverlay}>
+          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
+            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+              <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
+                <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+                  <Feather name="map" size={isMobile ? 16 : 20} color="#f59e0b" />
+                </View>
+                <View style={styles.modernModalTitleContainer}>
+                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                    Verification Location
+                  </Text>
+                  <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>
+                    Set coordinates for attendance verification
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowCoordinatesModal(false)}
+                style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+              >
+                <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+              <TouchableOpacity
+                style={[styles.modernLocationButton, isMobile && styles.modernFormInputMobile]}
+                onPress={getCurrentLocation}
+                disabled={locationLoading}
+              >
+                <Feather name="crosshair" size={20} color="#0ea5e9" />
+                <View style={styles.modernLocationButtonText}>
+                  <Text style={styles.modernLocationButtonTitle}>
+                    {locationLoading ? 'Getting location...' : 'Get Current Location'}
+                  </Text>
+                  <Text style={styles.modernLocationButtonSubtitle}>
+                    Use device GPS to set coordinates
+                  </Text>
+                </View>
+                {locationLoading && <ActivityIndicator size="small" color="#0ea5e9" />}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modernLocationButton}
+                onPress={openWebMap}
+              >
+                <Feather name="globe" size={20} color="#10b981" />
+                <View style={styles.modernLocationButtonText}>
+                  <Text style={styles.modernLocationButtonTitle}>Open Google Maps</Text>
+                  <Text style={styles.modernLocationButtonSubtitle}>
+                    Find coordinates on the web
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Latitude</Text>
+                <TextInput
+                  placeholder="e.g., 14.599512"
+                  value={eventCoordinates.latitude}
+                  onChangeText={(text: string) => handleCoordinateChange('latitude', text)}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Longitude</Text>
+                <TextInput
+                  placeholder="e.g., 120.984219"
+                  value={eventCoordinates.longitude}
+                  onChangeText={(text: string) => handleCoordinateChange('longitude', text)}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Verification Radius (meters)</Text>
+                <TextInput
+                  placeholder="e.g., 100"
+                  value={eventCoordinates.radius}
+                  onChangeText={(text: string) => handleCoordinateChange('radius', text)}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.modernLocationButtonSubtitle}>
+                  Recommended: 50-200 meters
+                </Text>
+              </View>
+
+              <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
+                <TouchableOpacity
+                  style={[styles.modernSubmitButton, isMobile && styles.modernSubmitButtonMobile]}
+                  onPress={saveCoordinates}
+                >
+                  <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
+                    Save Coordinates
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      {/* Event Details Modal */}
+      <Modal
+        visible={selectedEvent !== null}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSelectedEvent(null)}
+      >
+        <View style={styles.modernModalOverlay}>
+          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
+            {/* Modal Header */}
+            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+              <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
+                <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+                  <Feather name="calendar" size={isMobile ? 16 : 20} color="#0ea5e9" />
+                </View>
+                <View style={styles.modernModalTitleContainer}>
+                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                    Event Details
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setSelectedEvent(null)}
+                style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+              >
+                <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Modal Content */}
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+              {selectedEvent && renderSelectedDetail(
+                events.find(e => e.id === selectedEvent)!,
+                selectedEventUserLocation,
+                selectedEventIsWithinRange,
+                checkingSelectedEventLocation,
+                () => checkSelectedEventLocation(selectedEvent),
+                openLocationInMaps
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

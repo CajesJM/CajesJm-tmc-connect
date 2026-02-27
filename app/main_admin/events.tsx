@@ -1393,8 +1393,6 @@ export default function MainAdminEvents() {
                 </TouchableOpacity>
               </View>
 
-              
-
               <TouchableOpacity
                 style={styles.modernCoordinatesButton}
                 onPress={() => setShowCoordinatesModal(true)}

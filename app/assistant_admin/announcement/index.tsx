@@ -64,7 +64,7 @@ export default function AdminAnnouncementList() {
       <Text style={styles.cardBody} numberOfLines={2}>{item.body}</Text>
 
       <View style={styles.row}>
-       <Link href={`/admin/announcement/${item.id}`} asChild>
+       <Link href={`/assistant_admin/announcement/${item.id}`} asChild>
           <TouchableOpacity style={styles.smallBtn}>
             <Text style={styles.smallBtnText}>Edit</Text>
           </TouchableOpacity>
@@ -93,7 +93,7 @@ export default function AdminAnnouncementList() {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Announcements</Text>
-        <Link href="/admin/announcement/create" asChild>
+        <Link href="/assistant_admin/announcement/create" asChild>
           <TouchableOpacity style={styles.createBtn}>
             <Text style={styles.createBtnText}>Create</Text>
           </TouchableOpacity>

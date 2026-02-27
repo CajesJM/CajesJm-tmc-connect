@@ -2,7 +2,7 @@ import { Feather, FontAwesome6, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePathname, useRouter } from 'expo-router';
-import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
 import {
@@ -23,7 +23,7 @@ import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebaseConfig';
 import { Notification, notificationService } from '../../utils/notifications';
 
-import { dashboardStyles as styles } from '../../styles/dashboardStyles';
+import { dashboardStyles as styles } from '../../styles/main-admin/dashboardStyles';
 import { generateDashboardPDF, sharePDF } from '../../utils/pdfGenerator';
 import MainAdminAnnouncements from './announcements';
 import MainAdminAttendance from './attendance';
@@ -31,7 +31,6 @@ import MainAdminEvents from './events';
 import MainAdminProfile from './profile';
 import UserManagement from './users';
 
-// Define types
 interface Activity {
   id: string;
   type: 'event' | 'attendance' | 'announcement' | 'user';
@@ -48,6 +47,15 @@ interface MonthlyStats {
   events: number;
   attendance: number;
   announcements: number;
+}
+interface PendingApproval {
+  id: string;
+  type: 'announcement' | 'event';
+  title: string;
+  description: string;
+  requestedBy: string;
+  requestedAt: Date;
+  data: any;
 }
 
 interface Event {
@@ -106,7 +114,6 @@ export default function MainAdminDashboard() {
   const isTablet = width >= 768 && width < 1024;
   const chartWidth = isMobile ? width - 64 : isTablet ? width / 2 - 48 : width - 400;
 
-  // State for real-time data
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [recentAnnouncements, setRecentAnnouncements] = useState<Announcement[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -119,6 +126,10 @@ export default function MainAdminDashboard() {
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
+  const [approvalCount, setApprovalCount] = useState(0);
+
+
   const getActiveTabFromPath = () => {
     if (pathname.includes('/main_admin/events')) return 'events';
     if (pathname.includes('/main_admin/attendance')) return 'attendance';
@@ -128,14 +139,13 @@ export default function MainAdminDashboard() {
     return 'overview';
   };
 
-  const activeTab = getActiveTabFromPath();
 
-  // Fetch upcoming events in real-time
+  const activeTab = getActiveTabFromPath();
+  
   const fetchUpcomingEvents = () => {
     setEventsLoading(true);
     const now = new Date();
 
-    // Query events that haven't happened yet, sorted by date
     const eventsQuery = query(
       collection(db, 'events'),
       orderBy('date', 'asc'),
@@ -174,7 +184,63 @@ export default function MainAdminDashboard() {
     });
   };
 
-  // Fetch recent announcements in real-time
+
+  const fetchPendingApprovals = () => {
+  
+    const pendingAnnouncementsQuery = query(
+      collection(db, 'updates'),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const pendingEventsQuery = query(
+      collection(db, 'events'),
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribeAnnouncements = onSnapshot(pendingAnnouncementsQuery, (snapshot) => {
+      const announcements = snapshot.docs.map(doc => ({
+        id: doc.id,
+        type: 'announcement' as const,
+        title: doc.data().title || 'New Announcement',
+        description: `Created by ${doc.data().createdByName || doc.data().createdBy || 'Assistant Admin'}`,
+        requestedBy: doc.data().createdByName || doc.data().createdBy || 'Assistant Admin',
+        requestedAt: doc.data().createdAt?.toDate() || new Date(),
+        data: { ...doc.data(), id: doc.id }
+      }));
+
+      updatePendingApprovals(announcements, 'announcement');
+    });
+
+    const unsubscribeEvents = onSnapshot(pendingEventsQuery, (snapshot) => {
+      const events = snapshot.docs.map(doc => ({
+        id: doc.id,
+        type: 'event' as const,
+        title: doc.data().title || 'New Event',
+        description: `Created by ${doc.data().createdByName || doc.data().createdBy || 'Assistant Admin'}`,
+        requestedBy: doc.data().createdByName || doc.data().createdBy || 'Assistant Admin',
+        requestedAt: doc.data().createdAt?.toDate() || new Date(),
+        data: { ...doc.data(), id: doc.id }
+      }));
+
+      updatePendingApprovals(events, 'event');
+    });
+
+    return () => {
+      unsubscribeAnnouncements();
+      unsubscribeEvents();
+    };
+  };
+
+  const updatePendingApprovals = (newItems: PendingApproval[], type: string) => {
+    setPendingApprovals(prev => {
+      const filtered = prev.filter(item => item.type !== type);
+      const combined = [...filtered, ...newItems];
+      return combined.sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime());
+    });
+  };
+
   const fetchRecentAnnouncements = () => {
     setAnnouncementsLoading(true);
 
@@ -205,7 +271,7 @@ export default function MainAdminDashboard() {
     });
   };
 
-  //Notifications
+
   useEffect(() => {
     fetchDashboardStats();
 
@@ -227,6 +293,7 @@ export default function MainAdminDashboard() {
     const unsubscribeActivities = setupRealtimeActivities();
     const unsubscribeEvents = fetchUpcomingEvents();
     const unsubscribeAnnouncements = fetchRecentAnnouncements();
+    const unsubscribeApprovals = fetchPendingApprovals();
     calculateMonthlyStats();
 
     if (userData?.email) {
@@ -234,7 +301,7 @@ export default function MainAdminDashboard() {
         userData.email,
         (notifs) => {
           setNotifications(notifs);
-          setUnreadCount(notifs.filter(n => !n.read).length);
+          setUnreadCount(notifs.filter(n => !n.read).length + pendingApprovals.length);
         }
       );
 
@@ -242,17 +309,95 @@ export default function MainAdminDashboard() {
         unsubscribeActivities();
         unsubscribeEvents();
         unsubscribeAnnouncements();
+        unsubscribeApprovals(); 
         unsubscribeNotifications();
         notificationService.cleanup();
       };
     }
-
     return () => {
       unsubscribeActivities();
       unsubscribeEvents();
       unsubscribeAnnouncements();
+      unsubscribeApprovals();
     };
-  }, [userData]);
+  }, [userData, pendingApprovals.length]);
+
+  const handleApprove = async (approval: PendingApproval) => {
+    try {
+      const collectionName = approval.type === 'announcement' ? 'updates' : 'events';
+      const docRef = doc(db, collectionName, approval.id);
+
+      await updateDoc(docRef, {
+        status: 'approved',
+        approvedAt: new Date(),
+        approvedBy: userData?.email
+      });
+
+      if (approval.data.createdBy) {
+        await notificationService.createNotification({
+          userId: approval.data.createdBy, 
+          title: `${approval.type === 'announcement' ? 'Announcement' : 'Event'} Approved`,
+          message: `Your "${approval.title}" has been approved by the main admin.`,
+          type: approval.type,
+          timestamp: new Date(),
+          data: { [`${approval.type}Id`]: approval.id }
+        });
+      }
+
+      Alert.alert('Success', `${approval.type} approved successfully!`);
+    } catch (error) {
+      console.error('Error approving:', error);
+      Alert.alert('Error', 'Failed to approve. Please try again.');
+    }
+  };
+
+  const handleReject = async (approval: PendingApproval) => {
+    Alert.alert(
+      'Reject Request',
+      `Are you sure you want to reject "${approval.title}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reject',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const collectionName = approval.type === 'announcement' ? 'updates' : 'events';
+              const docRef = doc(db, collectionName, approval.id);
+
+              await updateDoc(docRef, {
+                status: 'rejected',
+                rejectedAt: new Date(),
+                rejectedBy: userData?.email
+              });
+
+              if (approval.data.createdBy) {
+                await notificationService.createNotification({
+                  userId: approval.data.createdBy, 
+                  title: `${approval.type === 'announcement' ? 'Announcement' : 'Event'} Rejected`,
+                  message: `Your "${approval.title}" has been rejected by the main admin.`,
+                  type: approval.type,
+                  timestamp: new Date(), 
+                  data: { [`${approval.type}Id`]: approval.id }
+                });
+              }
+
+              Alert.alert('Rejected', `${approval.type} has been rejected.`);
+            } catch (error) {
+              console.error('Error rejecting:', error);
+              Alert.alert('Error', 'Failed to reject. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  useEffect(() => {
+    const unreadNotifications = notifications.filter(n => !n.read).length;
+    setUnreadCount(unreadNotifications + pendingApprovals.length);
+    setApprovalCount(pendingApprovals.length);
+  }, [pendingApprovals, notifications]);
 
   useEffect(() => {
     updateDisplayedActivities();
@@ -265,6 +410,7 @@ export default function MainAdminDashboard() {
       calculateMonthlyStats()
     ]).finally(() => setRefreshing(false));
   }, []);
+
 
   const updateDisplayedActivities = () => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -472,7 +618,7 @@ export default function MainAdminDashboard() {
       setDownloadLoading(false);
     }
   };
-  // Notification handlers
+
   const handleNotificationPress = async (notification: Notification) => {
     if (!notification.read) {
       await notificationService.markAsRead(notification.id);
@@ -510,7 +656,6 @@ export default function MainAdminDashboard() {
     }
   };
 
-  // Profile image handlers
   const handleProfileImagePress = async () => {
     try {
       if (Platform.OS === 'web') {
@@ -562,15 +707,13 @@ export default function MainAdminDashboard() {
 
       let blob: Blob;
       if (imageUri instanceof File) {
-        // Web: File object
+    
         blob = imageUri;
       } else {
-        // Mobile: URI string
         const response = await fetch(imageUri);
         blob = await response.blob();
       }
 
-      // Upload to Firebase Storage
       const storage = getStorage();
       const fileName = `profile_${userData?.email}_${Date.now()}.jpg`;
       const storageRef = ref(storage, `profileImages/${fileName}`);
@@ -662,28 +805,28 @@ export default function MainAdminDashboard() {
   };
 
   const navigateTo = (screen: string, id?: string) => {
-  switch (screen) {
-    case 'events':
-      router.push(id ? `/main_admin/events?id=${id}` : '/main_admin/events');
-      break;
-    case 'attendance':
-      router.push('/main_admin/attendance');
-      break;
-    case 'announcements':
-      router.push(id ? `/main_admin/announcements?id=${id}` : '/main_admin/announcements');
-      break;
-    case 'users':
-      router.push('/main_admin/users');
-      break;
-    case 'profile':
-      router.push('/main_admin/profile');
-      break;
-    case 'overview':
-    default:
-      console.log('Already on overview');
-      break;
-  }
-};
+    switch (screen) {
+      case 'events':
+        router.push(id ? `/main_admin/events?id=${id}` : '/main_admin/events');
+        break;
+      case 'attendance':
+        router.push('/main_admin/attendance');
+        break;
+      case 'announcements':
+        router.push(id ? `/main_admin/announcements?id=${id}` : '/main_admin/announcements');
+        break;
+      case 'users':
+        router.push('/main_admin/users');
+        break;
+      case 'profile':
+        router.push('/main_admin/profile');
+        break;
+      case 'overview':
+      default:
+        console.log('Already on overview');
+        break;
+    }
+  };
 
   const getActivityIcon = (activity: Activity) => {
     switch (activity.type) {
@@ -792,7 +935,7 @@ export default function MainAdminDashboard() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0ea5e9" />
       }
     >
-   
+
       <LinearGradient
         colors={['#14203d', '#06080b']}
         start={{ x: 0, y: 0 }}
@@ -855,16 +998,15 @@ export default function MainAdminDashboard() {
               )}
             </TouchableOpacity>
 
-            {/* Notification Bell with Badge */}
             <TouchableOpacity
               style={styles.headerAction}
               onPress={() => setNotificationModalVisible(true)}
             >
               <Feather name="bell" size={18} color="#ffffff" />
-              {unreadCount > 0 && (
-                <View style={styles.notificationBadge}>
+              {(unreadCount > 0 || approvalCount > 0) && (
+                <View style={[styles.notificationBadge, approvalCount > 0 && styles.approvalBadge]}>
                   <Text style={styles.notificationBadgeText}>
-                    {unreadCount > 9 ? '9+' : unreadCount}
+                    {unreadCount + approvalCount > 9 ? '9+' : unreadCount + approvalCount}
                   </Text>
                 </View>
               )}
@@ -873,16 +1015,18 @@ export default function MainAdminDashboard() {
         </View>
       </LinearGradient>
 
-      {/* Notification Modal */}
       <NotificationModal
         visible={notificationModalVisible}
         onClose={() => setNotificationModalVisible(false)}
         notifications={notifications}
         onNotificationPress={handleNotificationPress}
         onMarkAllRead={handleMarkAllRead}
+        pendingApprovals={pendingApprovals}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        approvalCount={approvalCount}
       />
-
-      {/* Stats Grid */}
+   
       <View style={styles.statsGrid}>
         {renderStatCard(
           'Total Users',
@@ -921,7 +1065,6 @@ export default function MainAdminDashboard() {
         )}
       </View>
 
-      {/* Quick Actions Carousel */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -1038,7 +1181,6 @@ export default function MainAdminDashboard() {
 
       {/* Two Column Layout */}
       <View style={styles.twoColumnLayout}>
-        {/* Recent Activity */}
         <View style={[styles.column, styles.activityColumn]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
@@ -1079,7 +1221,6 @@ export default function MainAdminDashboard() {
 
         {/* Upcoming Events & Announcements */}
         <View style={[styles.column, styles.upcomingColumn]}>
-          {/* Upcoming Events with Real Data */}
           <View style={styles.upcomingCard}>
             <View style={styles.upcomingHeader}>
               <Text style={styles.upcomingTitle}>Upcoming Events</Text>
@@ -1250,7 +1391,6 @@ export default function MainAdminDashboard() {
 
   return (
     <View style={styles.container}>
-      {/* Content Area */}
       <View style={styles.contentArea}>
         {renderContent()}
       </View>

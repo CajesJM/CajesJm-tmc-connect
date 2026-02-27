@@ -1,19 +1,8 @@
-import {
-    collection,
-    doc,
-    getDocs,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
-    Timestamp,
-    updateDoc,
-    where
-} from 'firebase/firestore';
+import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebaseConfig';
-
 export interface Notification {
     id: string;
+    userId: string;
     title: string;
     message: string;
     type: 'event' | 'announcement' | 'attendance' | 'user' | 'system';
@@ -26,7 +15,6 @@ export interface Notification {
 class NotificationService {
     private listeners: (() => void)[] = [];
 
-    // Listen for real-time notifications
     listenForNotifications(
         userId: string,
         callback: (notifications: Notification[]) => void
@@ -52,7 +40,6 @@ class NotificationService {
         return unsubscribe;
     }
 
-    // Mark notification as read
     async markAsRead(notificationId: string) {
         try {
             const notificationRef = doc(db, 'notifications', notificationId);
@@ -64,7 +51,6 @@ class NotificationService {
         }
     }
 
-    // Mark all as read
     async markAllAsRead(userId: string) {
         try {
             const unreadQuery = query(
@@ -82,11 +68,10 @@ class NotificationService {
         }
     }
 
-    // Create notification (can be called from other services)
     async createNotification(notification: Omit<Notification, 'id' | 'read'>) {
         try {
             const notificationsRef = collection(db, 'notifications');
-            await updateDoc(doc(notificationsRef), {
+            await addDoc(notificationsRef, {
                 ...notification,
                 read: false,
                 timestamp: Timestamp.now(),
@@ -96,7 +81,6 @@ class NotificationService {
         }
     }
 
-    // Clean up listeners
     cleanup() {
         this.listeners.forEach(unsubscribe => unsubscribe());
         this.listeners = [];

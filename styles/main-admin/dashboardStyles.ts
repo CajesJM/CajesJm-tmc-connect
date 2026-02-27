@@ -111,9 +111,6 @@ export const dashboardStyles = StyleSheet.create({
     fontWeight: '700',
     paddingHorizontal: 3,
   },
-
-
-  // Stats Grid
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -297,7 +294,6 @@ export const dashboardStyles = StyleSheet.create({
     flex: 0.8,
   },
 
-  // Section Header
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -310,8 +306,6 @@ export const dashboardStyles = StyleSheet.create({
     fontWeight: '700',
     color: '#0f172a',
   },
-
-  // Activity List
   activityList: {
     backgroundColor: '#ffffff',
     borderRadius: 24,
@@ -375,7 +369,7 @@ export const dashboardStyles = StyleSheet.create({
     marginTop: 12,
   },
 
-  // Upcoming Card
+
   upcomingCard: {
     backgroundColor: '#ffffff',
     borderRadius: 24,
@@ -462,7 +456,7 @@ export const dashboardStyles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
 
-  // Announcement Card
+
   announcementCard: {
     backgroundColor: '#ffffff',
     borderRadius: 24,
@@ -524,7 +518,7 @@ export const dashboardStyles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Quick Stats Grid
+
   quickStatsGrid: {
     flexDirection: 'row',
     gap: 12,
@@ -563,7 +557,7 @@ export const dashboardStyles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
 
-  // Pagination
+
   paginationContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -643,4 +637,7 @@ export const dashboardStyles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
+  approvalBadge: {
+  backgroundColor: '#f59e0b',
+},
 });

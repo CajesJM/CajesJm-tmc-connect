@@ -1,19 +1,39 @@
-import {
-  Feather
-} from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { collection, doc, getDoc, getDocs, onSnapshot, updateDoc } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  TextInput as RNTextInput,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
+} from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
+import { useAuth } from '../../context/AuthContext';
 import { db } from "../../lib/firebaseConfig";
+import { attendanceStyles } from '../../styles/main-admin/attendanceStyles';
 
 interface Event {
   id: string;
   title: string;
   location: string;
   date: string;
-  coordinates?: any;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+    radius: number;
+  };
   qrExpiration?: string | null;
+  isActive?: boolean;
 }
 
 interface AttendanceRecord {
@@ -31,511 +51,60 @@ interface AttendanceRecord {
   };
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    color: '#cbd5e1',
-    fontSize: 14,
-  },
-  mainContent: {
-    padding: 16,
-  },
-  card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  eventSelector: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  eventSelectorText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1e293b',
-  },
-  eventSelectorPlaceholder: {
-    flex: 1,
-    fontSize: 16,
-    color: '#94a3b8',
-  },
-  eventSelectorIcon: {
-    marginLeft: 8,
-  },
-  qrContainer: {
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  eventInfo: {
-    width: '100%',
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  eventName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  eventDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  eventDetailText: {
-    fontSize: 14,
-    color: '#64748b',
-    marginLeft: 4,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginTop: 8,
-  },
-  statusBadgeActive: {
-    backgroundColor: '#dcfce7',
-    borderWidth: 1,
-    borderColor: '#86efac',
-  },
-  statusBadgeExpired: {
-    backgroundColor: '#fee2e2',
-    borderWidth: 1,
-    borderColor: '#fca5a5',
-  },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  statusBadgeTextActive: {
-    color: '#16a34a',
-  },
-  statusBadgeTextExpired: {
-    color: '#dc2626',
-  },
-  qrCodeContainer: {
-    marginVertical: 20,
-  },
-  qrInfo: {
-    marginTop: 12,
-    alignItems: 'center',
-  },
-  qrHint: {
-    fontSize: 12,
-    color: '#64748b',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  expiredContainer: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  expiredIcon: {
-    marginBottom: 12,
-  },
-  expiredText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#dc2626',
-    textAlign: 'center',
-  },
-  expiredSubtext: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  actionButtonPrimary: {
-    backgroundColor: '#0ea5e9',
-  },
-  actionButtonSecondary: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  actionButtonTextPrimary: {
-    color: '#ffffff',
-  },
-  actionButtonTextSecondary: {
-    color: '#475569',
-  },
-  attendanceStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 4,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    marginTop: 4,
-  },
-  filtersContainer: {
-    marginBottom: 20,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  filterChipActive: {
-    backgroundColor: '#0ea5e9',
-    borderColor: '#0ea5e9',
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  filterChipTextActive: {
-    color: '#ffffff',
-  },
-  attendanceList: {
-    maxHeight: 400,
-  },
-  blockSection: {
-    marginBottom: 16,
-  },
-  blockHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  blockTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  blockCount: {
-    fontSize: 12,
-    color: '#64748b',
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  attendanceItem: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  studentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  studentName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    flex: 1,
-  },
-  studentId: {
-    fontSize: 12,
-    color: '#64748b',
-    marginLeft: 8,
-  },
-  locationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  locationBadgeValid: {
-    backgroundColor: '#dcfce7',
-  },
-  locationBadgeInvalid: {
-    backgroundColor: '#fee2e2',
-  },
-  locationBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginLeft: 2,
-  },
-  locationBadgeTextValid: {
-    color: '#16a34a',
-  },
-  locationBadgeTextInvalid: {
-    color: '#dc2626',
-  },
-  studentDetails: {
-    fontSize: 12,
-    color: '#64748b',
-    marginBottom: 2,
-  },
-  timestamp: {
-    fontSize: 11,
-    color: '#94a3b8',
-    marginTop: 4,
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  eventsList: {
-    maxHeight: 400,
-  },
-  eventItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  eventItemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  eventItemDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  eventItemDetailText: {
-    fontSize: 14,
-    color: '#64748b',
-    marginLeft: 4,
-  },
-  loadingContainer: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 8,
-  },
-  expirationModalContent: {
-    padding: 20,
-  },
-  expirationOption: {
-    padding: 16,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  expirationOptionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  customInput: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  modalButtonPrimary: {
-    backgroundColor: '#0ea5e9',
-  },
-  modalButtonSecondary: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  modalButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  modalButtonTextPrimary: {
-    color: '#ffffff',
-  },
-  modalButtonTextSecondary: {
-    color: '#475569',
-  },
-  expirationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fffbeb',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginTop: 8,
-  },
-  expirationBadgeText: {
-    fontSize: 11,
-    color: '#d97706',
-    marginLeft: 4,
-  },
-  locationVerificationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginTop: 8,
-  },
-  locationVerificationText: {
-    fontSize: 11,
-    color: '#16a34a',
-    marginLeft: 4,
-  },
-});
+const TextInput = ({
+  style,
+  value,
+  onChangeText,
+  placeholder,
+  ...props
+}: {
+  style?: any;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+  [key: string]: any;
+}) => (
+  <RNTextInput
+    style={[attendanceStyles.modernFormInput, style]}
+    value={value}
+    onChangeText={onChangeText}
+    placeholder={placeholder}
+    placeholderTextColor="#94a3b8"
+    {...props}
+  />
+);
 
 export default function MainAdminAttendance() {
+  const { user, userData } = useAuth();
+  const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
+
+  const isMobile = screenWidth < 640;
+  const isTablet = screenWidth >= 640 && screenWidth < 1024;
+  const isDesktop = screenWidth >= 1024;
+
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [showEventModal, setShowEventModal] = useState<boolean>(false);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [selectedYearLevel, setSelectedYearLevel] = useState<string>('all');
   const [selectedBlock, setSelectedBlock] = useState<string>('all');
   const [showExpirationModal, setShowExpirationModal] = useState<boolean>(false);
   const [customExpiration, setCustomExpiration] = useState<string>('');
+  const [showStopConfirmModal, setShowStopConfirmModal] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<string>('');
+  const [qrValue, setQrValue] = useState<string>('');
+
+ 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10); // 10 items per page
+  const [paginatedBlocks, setPaginatedBlocks] = useState<[string, AttendanceRecord[]][]>([]);
+  const [totalPages, setTotalPages] = useState(1);
 
   const isValidDate = (dateString: any): boolean => {
     if (!dateString) return false;
-
     try {
       const date = new Date(dateString);
       return !isNaN(date.getTime());
@@ -560,6 +129,7 @@ export default function MainAdminAttendance() {
             date: eventData.date || '',
             coordinates: eventData.coordinates || null,
             qrExpiration: eventData.qrExpiration || null,
+            isActive: eventData.isActive !== false,
           };
         });
         setEvents(eventsList);
@@ -583,6 +153,7 @@ export default function MainAdminAttendance() {
           date: eventData.date || '',
           coordinates: eventData.coordinates || null,
           qrExpiration: eventData.qrExpiration || null,
+          isActive: eventData.isActive !== false,
         };
       });
       setEvents(updatedEvents);
@@ -592,8 +163,9 @@ export default function MainAdminAttendance() {
   }, []);
 
   const isQRCodeExpired = (event: Event | null): boolean => {
-    if (!event || !event.qrExpiration) return false;
-
+    if (!event) return false;
+    if (event.isActive === false) return true;
+    if (!event.qrExpiration) return false;
     try {
       const expirationTime = new Date(event.qrExpiration);
       const now = new Date();
@@ -603,21 +175,123 @@ export default function MainAdminAttendance() {
     }
   };
 
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    if (selectedEvent && selectedEvent.qrExpiration && !isQRCodeExpired(selectedEvent)) {
+      const updateTimeLeft = () => {
+        const now = new Date();
+        const expiration = new Date(selectedEvent.qrExpiration!);
+        const diff = expiration.getTime() - now.getTime();
+
+        if (diff <= 0) {
+          setTimeLeft('Expired');
+          const updatedEvent = { ...selectedEvent, isActive: false };
+          setSelectedEvent(updatedEvent);
+          return;
+        }
+
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+        if (hours > 0) {
+          setTimeLeft(`${hours}h ${minutes}m`);
+        } else if (minutes > 0) {
+          setTimeLeft(`${minutes}m ${seconds}s`);
+        } else {
+          setTimeLeft(`${seconds}s`);
+        }
+      };
+
+      updateTimeLeft();
+      intervalId = setInterval(updateTimeLeft, 1000);
+    } else {
+      setTimeLeft('');
+    }
+
+    return () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [selectedEvent]);
+
+  const stopAttendance = () => {
+    if (!selectedEvent) return;
+    if (selectedEvent.isActive === false) {
+      Alert.alert("Info", "Attendance is already stopped for this event");
+      return;
+    }
+    setShowStopConfirmModal(true);
+  };
+
+  const confirmStopAttendance = async () => {
+    if (!selectedEvent) return;
+
+    try {
+      setLoading(true);
+      const now = new Date().toISOString();
+
+      const eventRef = doc(db, 'events', selectedEvent.id);
+      await updateDoc(eventRef, {
+        isActive: false,
+        qrExpiration: now
+      });
+
+      // Update local state
+      const updatedEvent = {
+        ...selectedEvent,
+        isActive: false,
+        qrExpiration: now
+      };
+      setSelectedEvent(updatedEvent);
+
+      // Update in events list
+      setEvents(prev => prev.map(e =>
+        e.id === selectedEvent.id ? updatedEvent : e
+      ));
+
+      setShowStopConfirmModal(false);
+
+      Alert.alert("Success", "Attendance stopped successfully!");
+
+    } catch (error) {
+      console.error('Error stopping attendance:', error);
+      Alert.alert("Error", "Failed to stop attendance. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const generateEventQRCode = (event: Event) => {
     if (!event) return;
 
-    let expirationTime: Date;
+    // Generate static QR value ONCE - doesn't change on re-renders
+    const qrData = JSON.stringify({
+      type: 'attendance',
+      eventId: event.id,
+      eventTitle: event.title,
+      generatedAt: new Date().toISOString(), // Fixed at generation time
+      expiresAt: event.qrExpiration && isValidDate(event.qrExpiration)
+        ? event.qrExpiration
+        : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      usesManualExpiration: !!(event.qrExpiration && isValidDate(event.qrExpiration)),
+      eventLocation: event.coordinates
+    });
 
-    if (event.qrExpiration && isValidDate(event.qrExpiration)) {
-      expirationTime = new Date(event.qrExpiration);
-    } else {
-      expirationTime = new Date();
-      expirationTime.setHours(expirationTime.getHours() + 24);
-    }
-
+    setQrValue(qrData); // Store in state
     setSelectedEvent(event);
     setShowEventModal(false);
     fetchAttendanceRecords(event.id);
+  };
+
+  const refreshAttendance = async () => {
+    if (!selectedEvent) return;
+
+    setRefreshing(true);
+    await fetchAttendanceRecords(selectedEvent.id);
+    setRefreshing(false);
   };
 
   const setManualExpiration = async () => {
@@ -639,15 +313,39 @@ export default function MainAdminAttendance() {
     try {
       const eventRef = doc(db, 'events', selectedEvent.id);
       await updateDoc(eventRef, {
-        qrExpiration: customExpiration
+        qrExpiration: customExpiration,
+        isActive: true
       });
+
+      // Regenerate QR with new expiration
+      const updatedEvent = {
+        ...selectedEvent,
+        qrExpiration: customExpiration,
+        isActive: true
+      };
+
+      // Generate new QR value
+      const newQrData = JSON.stringify({
+        type: 'attendance',
+        eventId: updatedEvent.id,
+        eventTitle: updatedEvent.title,
+        generatedAt: new Date().toISOString(),
+        expiresAt: customExpiration,
+        usesManualExpiration: true,
+        eventLocation: updatedEvent.coordinates
+      });
+
+      setQrValue(newQrData);
+      setSelectedEvent(updatedEvent);
+
+      // Update events list
+      setEvents(prev => prev.map(e =>
+        e.id === selectedEvent.id ? updatedEvent : e
+      ));
 
       Alert.alert("Success", "Expiration date set successfully!");
       setShowExpirationModal(false);
       setCustomExpiration('');
-
-      const updatedEvent = { ...selectedEvent, qrExpiration: customExpiration };
-      setSelectedEvent(updatedEvent);
 
     } catch (error) {
       console.error('Error setting expiration:', error);
@@ -669,6 +367,11 @@ export default function MainAdminAttendance() {
       const updatedEvent = { ...selectedEvent, qrExpiration: null };
       setSelectedEvent(updatedEvent as Event);
 
+      // Update in events list
+      setEvents(prev => prev.map(e =>
+        e.id === selectedEvent.id ? updatedEvent : e
+      ));
+
     } catch (error) {
       console.error('Error clearing expiration:', error);
       Alert.alert("Error", "Failed to clear expiration date");
@@ -684,6 +387,8 @@ export default function MainAdminAttendance() {
         const eventData = eventDoc.data();
         if (eventData.attendees && Array.isArray(eventData.attendees)) {
           setAttendanceRecords(eventData.attendees);
+          // Reset to first page when new records are loaded
+          setCurrentPage(1);
         } else {
           setAttendanceRecords([]);
         }
@@ -696,18 +401,35 @@ export default function MainAdminAttendance() {
 
   const clearSelection = () => {
     setSelectedEvent(null);
+    setQrValue('');
     setAttendanceRecords([]);
     setSelectedYearLevel('all');
     setSelectedBlock('all');
+    setTimeLeft('');
+    setCurrentPage(1);
   };
 
   const formatDate = (dateString: string) => {
     if (!dateString || !isValidDate(dateString)) return null;
-
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const formatShortDate = (dateString: string) => {
+    if (!dateString || !isValidDate(dateString)) return null;
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -730,7 +452,7 @@ export default function MainAdminAttendance() {
     return options;
   };
 
-  const getFilteredAttendanceRecords = () => {
+  const getFilteredAttendanceRecords = useMemo(() => {
     let filtered = attendanceRecords;
 
     if (selectedYearLevel !== 'all') {
@@ -746,15 +468,14 @@ export default function MainAdminAttendance() {
     }
 
     return filtered;
-  };
+  }, [attendanceRecords, selectedYearLevel, selectedBlock]);
 
-  const getStudentsByBlock = () => {
-    const filteredRecords = getFilteredAttendanceRecords();
+  const getStudentsByBlock = useMemo(() => {
+    const filteredRecords = getFilteredAttendanceRecords;
     const blocks: { [key: string]: AttendanceRecord[] } = {};
 
     filteredRecords.forEach(record => {
       const block = record.block || 'No Block';
-
       if (!blocks[block]) {
         blocks[block] = [];
       }
@@ -775,454 +496,763 @@ export default function MainAdminAttendance() {
     });
 
     return sortedBlocks;
-  };
+  }, [getFilteredAttendanceRecords]);
 
-  const yearLevels = [...new Set(attendanceRecords.map(record => record.yearLevel))].sort();
-  const blocks = [...new Set(attendanceRecords.map(record => record.block).filter(Boolean))].sort();
-  const filteredRecords = getFilteredAttendanceRecords();
-  const studentsByBlock = getStudentsByBlock();
+  // Apply pagination to blocks
+  useEffect(() => {
+    const blocksArray = Object.entries(getStudentsByBlock);
+    const total = Math.ceil(blocksArray.length / itemsPerPage);
+    setTotalPages(total || 1);
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setPaginatedBlocks(blocksArray.slice(startIndex, endIndex));
+  }, [getStudentsByBlock, currentPage, itemsPerPage]);
+
+  const availableBlocks = useMemo(() => {
+    const uniqueBlocks = [...new Set(attendanceRecords.map(record => record.block).filter(Boolean))];
+    return uniqueBlocks.slice(0, 6); // Limit to 6 blocks
+  }, [attendanceRecords]);
+
+  const availableYearLevels = useMemo(() => {
+    return [...new Set(attendanceRecords.map(record => record.yearLevel).filter(Boolean))];
+  }, [attendanceRecords]);
 
   const isCurrentQRExpired = selectedEvent ? isQRCodeExpired(selectedEvent) : false;
 
-  const DEFAULT_YEAR_LEVELS = ['1', '2', '3', '4'];
-  const DEFAULT_BLOCKS = ['1', '2', '3', '4', '5', '6'];
+  const stats = useMemo(() => ({
+    total: getFilteredAttendanceRecords.length,
+    verified: getFilteredAttendanceRecords.filter(r => r.location?.isWithinRadius).length,
+    blocksCount: availableBlocks.length
+  }), [getFilteredAttendanceRecords, availableBlocks]);
 
-  return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Attendance Management</Text>
-        <Text style={styles.headerSubtitle}>
-          Generate QR codes and monitor real-time attendance
-        </Text>
+  // Pagination handlers
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <View style={[attendanceStyles.paginationContainer, isMobile && attendanceStyles.paginationContainerMobile]}>
+        <TouchableOpacity
+          style={[attendanceStyles.paginationButton, currentPage === 1 && attendanceStyles.paginationButtonDisabled]}
+          onPress={handlePrevPage}
+          disabled={currentPage === 1}
+        >
+          <Feather name="chevron-left" size={16} color={currentPage === 1 ? '#cbd5e1' : '#0ea5e9'} />
+          <Text style={[attendanceStyles.paginationButtonText, currentPage === 1 && attendanceStyles.paginationButtonTextDisabled]}>
+            Prev
+          </Text>
+        </TouchableOpacity>
+
+        <View style={attendanceStyles.pageInfo}>
+          <Text style={attendanceStyles.pageInfoText}>
+            Page {currentPage} of {totalPages}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[attendanceStyles.paginationButton, currentPage === totalPages && attendanceStyles.paginationButtonDisabled]}
+          onPress={handleNextPage}
+          disabled={currentPage === totalPages}
+        >
+          <Text style={[attendanceStyles.paginationButtonText, currentPage === totalPages && attendanceStyles.paginationButtonTextDisabled]}>
+            Next
+          </Text>
+          <Feather name="chevron-right" size={16} color={currentPage === totalPages ? '#cbd5e1' : '#0ea5e9'} />
+        </TouchableOpacity>
       </View>
+    );
+  };
 
-      <View style={styles.mainContent}>
-        {/* QR Code Generator Card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>QR Code Generator</Text>
+  const renderEventItem = ({ item }: { item: Event }) => {
+    const isExpired = isQRCodeExpired(item);
+    const isActive = item.isActive !== false && !isExpired;
 
-          {/* Event Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Select Event</Text>
-            <TouchableOpacity 
-              style={styles.eventSelector}
-              onPress={() => setShowEventModal(true)}
-            >
-              {selectedEvent ? (
-                <Text style={styles.eventSelectorText}>{selectedEvent.title}</Text>
-              ) : (
-                <Text style={styles.eventSelectorPlaceholder}>Tap to select an event</Text>
-              )}
-              <Feather name="chevron-down" size={20} color="#64748b" style={styles.eventSelectorIcon} />
-            </TouchableOpacity>
-          </View>
-
-          {selectedEvent && (
-            <View style={styles.qrContainer}>
-              {/* Event Info */}
-              <View style={styles.eventInfo}>
-                <Text style={styles.eventName}>{selectedEvent.title}</Text>
-                
-                {formatDate(selectedEvent.date) && (
-                  <View style={styles.eventDetails}>
-                    <Feather name="calendar" size={14} color="#64748b" />
-                    <Text style={styles.eventDetailText}>{formatDate(selectedEvent.date)}</Text>
-                  </View>
-                )}
-
-                <View style={styles.eventDetails}>
-                  <Feather name="map-pin" size={14} color="#64748b" />
-                  <Text style={styles.eventDetailText}>{selectedEvent.location}</Text>
-                </View>
-
-                {selectedEvent.coordinates && (
-                  <View style={styles.locationVerificationBadge}>
-                    <Feather name="shield" size={12} color="#16a34a" />
-                    <Text style={styles.locationVerificationText}>Location Verification</Text>
-                  </View>
-                )}
-
-                {/* QR Status */}
-                <View style={[
-                  styles.statusBadge,
-                  isCurrentQRExpired ? styles.statusBadgeExpired : styles.statusBadgeActive
+    return (
+      <TouchableOpacity
+        style={[attendanceStyles.eventItem, isMobile && attendanceStyles.eventItemMobile]}
+        onPress={() => generateEventQRCode(item)}
+      >
+        <View style={attendanceStyles.eventItemContent}>
+          <Text style={[attendanceStyles.eventItemName, isMobile && attendanceStyles.eventItemNameMobile]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <View style={attendanceStyles.eventItemBadges}>
+            {item.qrExpiration && isValidDate(item.qrExpiration) && (
+              <View style={[
+                attendanceStyles.eventItemExpBadge,
+                isExpired && attendanceStyles.eventItemExpBadgeExpired
+              ]}>
+                <Feather name="clock" size={10} color={isExpired ? "#dc2626" : "#d97706"} />
+                <Text style={[
+                  attendanceStyles.eventItemExpText,
+                  isExpired && attendanceStyles.eventItemExpTextExpired
                 ]}>
-                  {isCurrentQRExpired ? (
-                    <>
-                      <Feather name="x-circle" size={12} color="#dc2626" />
-                      <Text style={[styles.statusBadgeText, styles.statusBadgeTextExpired]}>
-                        QR Expired
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Feather name="check-circle" size={12} color="#16a34a" />
-                      <Text style={[styles.statusBadgeText, styles.statusBadgeTextActive]}>
-                        QR Active
-                      </Text>
-                    </>
-                  )}
-                </View>
+                  {isExpired ? 'Expired' : 'QR'}
+                </Text>
               </View>
-
-              {/* QR Code or Expired Message */}
-              {!isCurrentQRExpired ? (
-                <>
-                  <View style={styles.qrCodeContainer}>
-                    <QRCode
-                      value={JSON.stringify({
-                        type: 'attendance',
-                        eventId: selectedEvent.id,
-                        eventTitle: selectedEvent.title,
-                        timestamp: new Date().toISOString(),
-                        expiresAt: selectedEvent.qrExpiration && isValidDate(selectedEvent.qrExpiration)
-                          ? selectedEvent.qrExpiration
-                          : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-                        usesManualExpiration: !!(selectedEvent.qrExpiration && isValidDate(selectedEvent.qrExpiration)),
-                        eventLocation: selectedEvent.coordinates 
-                      })}
-                      size={180}
-                      color="#1E293B"
-                      backgroundColor="#FFFFFF"
-                    />
-                  </View>
-                  <View style={styles.qrInfo}>
-                    <Text style={styles.qrHint}>Scan this QR code for attendance</Text>
-                    {selectedEvent.coordinates && (
-                      <Text style={styles.qrHint}>
-                        Location verification required within radius
-                      </Text>
-                    )}
-                  </View>
-                </>
-              ) : (
-                <View style={styles.expiredContainer}>
-                  <Feather name="x-circle" size={48} color="#dc2626" style={styles.expiredIcon} />
-                  <Text style={styles.expiredText}>QR Code Expired</Text>
-                  <Text style={styles.expiredSubtext}>Generate a new code to continue</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
-            {selectedEvent && (
-              <>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.actionButtonPrimary]}
-                  onPress={() => setShowExpirationModal(true)}
-                >
-                  <Feather name="clock" size={16} color="#ffffff" />
-                  <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary]}>
-                    Set Expiration
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.actionButtonSecondary]}
-                  onPress={clearSelection}
-                >
-                  <Feather name="refresh-cw" size={16} color="#475569" />
-                  <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary]}>
-                    Change Event
-                  </Text>
-                </TouchableOpacity>
-              </>
+            )}
+            {isActive && (
+              <View style={attendanceStyles.eventItemActiveBadge}>
+                <Feather name="check-circle" size={10} color="#16a34a" />
+                <Text style={attendanceStyles.eventItemActiveText}>Active</Text>
+              </View>
             )}
           </View>
         </View>
 
-        {/* Attendance Records Card */}
-        {selectedEvent && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Attendance Records</Text>
+        {formatShortDate(item.date) && (
+          <Text style={attendanceStyles.eventItemDate} numberOfLines={1}>
+            {formatShortDate(item.date)}
+          </Text>
+        )}
 
-            {/* Stats */}
-            <View style={styles.attendanceStats}>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>{filteredRecords.length}</Text>
-                <Text style={styles.statLabel}>Total</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>
-                  {filteredRecords.filter(r => r.location?.isWithinRadius).length}
-                </Text>
-                <Text style={styles.statLabel}>Verified</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statNumber}>
-                  {blocks.length}
-                </Text>
-                <Text style={styles.statLabel}>Blocks</Text>
-              </View>
+        <View style={attendanceStyles.eventItemFooter}>
+          <Text style={attendanceStyles.eventItemLocation} numberOfLines={1}>
+            <Feather name="map-pin" size={10} color="#64748b" /> {item.location}
+          </Text>
+          {item.coordinates && (
+            <View style={attendanceStyles.eventItemLocBadge}>
+              <Feather name="shield" size={10} color="#16a34a" />
             </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
-            {/* Filters */}
-            <View style={styles.filtersContainer}>
-              <Text style={styles.sectionTitle}>Year Level</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    selectedYearLevel === 'all' && styles.filterChipActive
-                  ]}
-                  onPress={() => setSelectedYearLevel('all')}
-                >
+  const renderBlockSection = ({ item }: { item: [string, AttendanceRecord[]] }) => {
+    const [block, students] = item;
+    return (
+      <View style={attendanceStyles.blockSection}>
+        <View style={attendanceStyles.blockHeader}>
+          <Text style={attendanceStyles.blockTitle}>Block {block}</Text>
+          <Text style={attendanceStyles.blockCount}>{students.length}</Text>
+        </View>
+        {students.map((record, index) => (
+          <View key={index} style={[attendanceStyles.attendanceItem, isMobile && attendanceStyles.attendanceItemMobile]}>
+            <View style={attendanceStyles.studentRow}>
+              <View style={attendanceStyles.studentInfo}>
+                <Text style={[attendanceStyles.studentName, isMobile && attendanceStyles.studentNameMobile]} numberOfLines={1}>
+                  {record.studentName}
+                </Text>
+                <Text style={attendanceStyles.studentId}>{record.studentID}</Text>
+              </View>
+              {record.location && (
+                <View style={[
+                  attendanceStyles.locationBadge,
+                  record.location.isWithinRadius ? attendanceStyles.locationBadgeValid : attendanceStyles.locationBadgeInvalid
+                ]}>
+                  <Feather
+                    name={record.location.isWithinRadius ? "check" : "x"}
+                    size={10}
+                    color={record.location.isWithinRadius ? "#16a34a" : "#dc2626"}
+                  />
                   <Text style={[
-                    styles.filterChipText,
-                    selectedYearLevel === 'all' && styles.filterChipTextActive
+                    attendanceStyles.locationBadgeText,
+                    record.location.isWithinRadius ? attendanceStyles.locationBadgeTextValid : attendanceStyles.locationBadgeTextInvalid
                   ]}>
-                    All
-                  </Text>
-                </TouchableOpacity>
-                {DEFAULT_YEAR_LEVELS.map(yearLevel => (
-                  <TouchableOpacity
-                    key={yearLevel}
-                    style={[
-                      styles.filterChip,
-                      selectedYearLevel === yearLevel && styles.filterChipActive
-                    ]}
-                    onPress={() => setSelectedYearLevel(yearLevel)}
-                  >
-                    <Text style={[
-                      styles.filterChipText,
-                      selectedYearLevel === yearLevel && styles.filterChipTextActive
-                    ]}>
-                      Year {yearLevel}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              <Text style={styles.sectionTitle}>Block</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    selectedBlock === 'all' && styles.filterChipActive
-                  ]}
-                  onPress={() => setSelectedBlock('all')}
-                >
-                  <Text style={[
-                    styles.filterChipText,
-                    selectedBlock === 'all' && styles.filterChipTextActive
-                  ]}>
-                    All Blocks
-                  </Text>
-                </TouchableOpacity>
-                {DEFAULT_BLOCKS.map(block => (
-                  <TouchableOpacity
-                    key={block}
-                    style={[
-                      styles.filterChip,
-                      selectedBlock === block && styles.filterChipActive
-                    ]}
-                    onPress={() => setSelectedBlock(block)}
-                  >
-                    <Text style={[
-                      styles.filterChipText,
-                      selectedBlock === block && styles.filterChipTextActive
-                    ]}>
-                      Block {block}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            {/* Attendance List */}
-            <ScrollView style={styles.attendanceList}>
-              {Object.keys(studentsByBlock).length > 0 ? (
-                Object.entries(studentsByBlock).map(([block, students]) => (
-                  <View key={block} style={styles.blockSection}>
-                    <View style={styles.blockHeader}>
-                      <Text style={styles.blockTitle}>Block {block}</Text>
-                      <Text style={styles.blockCount}>{students.length} students</Text>
-                    </View>
-                    {students.map((record, index) => (
-                      <View key={index} style={styles.attendanceItem}>
-                        <View style={styles.studentHeader}>
-                          <Text style={styles.studentName}>{record.studentName}</Text>
-                          <Text style={styles.studentId}>{record.studentID}</Text>
-                          {record.location && (
-                            <View style={[
-                              styles.locationBadge,
-                              record.location.isWithinRadius ? styles.locationBadgeValid : styles.locationBadgeInvalid
-                            ]}>
-                              <Feather 
-                                name={record.location.isWithinRadius ? "check" : "x"} 
-                                size={10} 
-                                color={record.location.isWithinRadius ? "#16a34a" : "#dc2626"} 
-                              />
-                              <Text style={[
-                                styles.locationBadgeText,
-                                record.location.isWithinRadius ? styles.locationBadgeTextValid : styles.locationBadgeTextInvalid
-                              ]}>
-                                {record.location.isWithinRadius ? 'Verified' : 'Too Far'}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.studentDetails}>
-                          {record.course} • Year {record.yearLevel}
-                        </Text>
-                        <Text style={styles.timestamp}>
-                          {formatDate(record.timestamp || new Date().toISOString())}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                ))
-              ) : (
-                <View style={styles.emptyState}>
-                  <Feather name="users" size={48} color="#cbd5e1" />
-                  <Text style={styles.emptyStateText}>
-                    {attendanceRecords.length === 0 
-                      ? 'No attendance records yet' 
-                      : 'No students match the selected filters'}
+                    {record.location.isWithinRadius ? 'Verified' : 'Too Far'}
                   </Text>
                 </View>
               )}
-            </ScrollView>
+            </View>
+            <Text style={attendanceStyles.studentDetails} numberOfLines={1}>
+              {record.course} • Year {record.yearLevel}
+            </Text>
+            <Text style={attendanceStyles.timestamp}>
+              {formatDate(record.timestamp || new Date().toISOString())}
+            </Text>
           </View>
-        )}
+        ))}
+      </View>
+    );
+  };
+
+  const styles = attendanceStyles;
+
+  return (
+    <View style={styles.container}>
+      {/* Header with Gradient */}
+      <LinearGradient
+        colors={['#14203d', '#06080b']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
+      >
+        <View style={[styles.headerContent, isMobile && styles.headerContentMobile]}>
+          <View>
+            <Text style={[styles.greetingText, isMobile && styles.greetingTextMobile]}>Welcome back,</Text>
+            <Text style={[styles.userName, isMobile && styles.userNameMobile]}>{userData?.name || 'Admin'}</Text>
+            <Text style={[styles.roleText, isMobile && styles.roleTextMobile]}>Attendance Manager</Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.profileButton, isMobile && styles.profileButtonMobile]}
+            onPress={() => router.push('/main_admin/profile')}
+          >
+            {userData?.photoURL ? (
+              <View style={[styles.profileImage, styles.profileFallback]}>
+                <Text style={[styles.profileInitials, isMobile && styles.profileInitialsMobile]}>
+                  {userData?.name ? userData.name.charAt(0).toUpperCase() : 'A'}
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.profileImage, styles.profileFallback]}>
+                <Text style={[styles.profileInitials, isMobile && styles.profileInitialsMobile]}>
+                  {userData?.name ? userData.name.charAt(0).toUpperCase() : 'A'}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.dateSection, isMobile && styles.dateSectionMobile]}>
+          <View style={[styles.dateContainer, isMobile && styles.dateContainerMobile]}>
+            <Feather name="calendar" size={isMobile ? 10 : 12} color="#94a3b8" />
+            <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
+              {new Date().toLocaleDateString('en-US', {
+                weekday: isMobile ? 'short' : 'long',
+                year: 'numeric',
+                month: isMobile ? 'short' : 'long',
+                day: 'numeric'
+              })}
+            </Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Stats Grid */}
+      <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#0ea5e9' }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
+            <Feather name="users" size={isMobile ? 16 : 20} color="#0ea5e9" />
+          </View>
+          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
+        </View>
+
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#16a34a' }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#16a34a15' }]}>
+            <Feather name="check-circle" size={isMobile ? 16 : 20} color="#16a34a" />
+          </View>
+          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.verified}</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Verified</Text>
+        </View>
+
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#f59e0b' }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#f59e0b15' }]}>
+            <Feather name="grid" size={isMobile ? 16 : 20} color="#f59e0b" />
+          </View>
+          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.blocksCount}</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Blocks</Text>
+        </View>
       </View>
 
-      {/* Event Selection Modal */}
-      <Modal
-        visible={showEventModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowEventModal(false)}
+      {/* Main Content - Scrollable */}
+      <ScrollView
+        style={styles.mainScrollView}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={true}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Event</Text>
-              <TouchableOpacity onPress={() => setShowEventModal(false)}>
-                <Feather name="x" size={24} color="#64748b" />
+        <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
+          {/* Left Grid - QR Code Generator */}
+          <View style={[styles.leftGrid, isMobile && styles.leftGridMobile]}>
+            <View style={[styles.leftHeader, isMobile && styles.leftHeaderMobile]}>
+              <Text style={[styles.leftTitle, isMobile && styles.leftTitleMobile]}>QR Code Generator</Text>
+            </View>
+
+            {/* Event Selection */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Select Event</Text>
+              <TouchableOpacity
+                style={[styles.eventSelector, isMobile && styles.eventSelectorMobile]}
+                onPress={() => setShowEventModal(true)}
+              >
+                {selectedEvent ? (
+                  <Text style={[styles.eventSelectorText, isMobile && styles.eventSelectorTextMobile]} numberOfLines={1}>
+                    {selectedEvent.title}
+                  </Text>
+                ) : (
+                  <Text style={styles.eventSelectorPlaceholder}>Tap to select an event</Text>
+                )}
+                <Feather name="chevron-down" size={20} color="#64748b" style={styles.eventSelectorIcon} />
               </TouchableOpacity>
             </View>
 
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <Feather name="loader" size={24} color="#64748b" />
-                <Text style={styles.loadingText}>Loading events...</Text>
-              </View>
-            ) : events.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Feather name="calendar" size={48} color="#cbd5e1" />
-                <Text style={styles.emptyStateText}>No events available</Text>
-              </View>
-            ) : (
-              <ScrollView style={styles.eventsList}>
-                {events.map((event) => (
-                  <TouchableOpacity
-                    key={event.id}
-                    style={styles.eventItem}
-                    onPress={() => generateEventQRCode(event)}
-                  >
-                    <Text style={styles.eventItemName}>{event.title}</Text>
-                    
-                    {formatDate(event.date) && (
-                      <View style={styles.eventItemDetails}>
-                        <Feather name="calendar" size={14} color="#64748b" />
-                        <Text style={styles.eventItemDetailText}>{formatDate(event.date)}</Text>
+            {selectedEvent && (
+              <>
+                <View style={[styles.qrContainer, isMobile && styles.qrContainerMobile]}>
+                  {/* Event Info */}
+                  <View style={styles.eventInfo}>
+                    <Text style={[styles.eventName, isMobile && styles.eventNameMobile]} numberOfLines={1}>
+                      {selectedEvent.title}
+                    </Text>
+
+                    {formatDate(selectedEvent.date) && (
+                      <View style={styles.eventDetails}>
+                        <Feather name="calendar" size={12} color="#64748b" />
+                        <Text style={styles.eventDetailText}>{formatDate(selectedEvent.date)}</Text>
                       </View>
                     )}
 
-                    <View style={styles.eventItemDetails}>
-                      <Feather name="map-pin" size={14} color="#64748b" />
-                      <Text style={styles.eventItemDetailText}>{event.location}</Text>
+                    <View style={styles.eventDetails}>
+                      <Feather name="map-pin" size={12} color="#64748b" />
+                      <Text style={styles.eventDetailText}>{selectedEvent.location}</Text>
                     </View>
 
-                    {event.coordinates && (
+                    {selectedEvent.coordinates && (
                       <View style={styles.locationVerificationBadge}>
                         <Feather name="shield" size={12} color="#16a34a" />
                         <Text style={styles.locationVerificationText}>Location Verification</Text>
                       </View>
                     )}
 
-                    {event.qrExpiration && isValidDate(event.qrExpiration) && (
-                      <View style={styles.expirationBadge}>
-                        <Feather name="clock" size={12} color="#d97706" />
-                        <Text style={styles.expirationBadgeText}>
-                          Expires: {formatDate(event.qrExpiration)}
-                        </Text>
+                    {/* QR Status with Time Left */}
+                    <View style={[
+                      styles.statusBadge,
+                      isCurrentQRExpired ? styles.statusBadgeExpired : styles.statusBadgeActive
+                    ]}>
+                      {isCurrentQRExpired ? (
+                        <>
+                          <Feather name="x-circle" size={12} color="#dc2626" />
+                          <Text style={[styles.statusBadgeText, styles.statusBadgeTextExpired]}>
+                            QR Expired
+                          </Text>
+                        </>
+                      ) : (
+                        <>
+                          <Feather name="check-circle" size={12} color="#16a34a" />
+                          <Text style={[styles.statusBadgeText, styles.statusBadgeTextActive]}>
+                            {timeLeft ? `Expires in ${timeLeft}` : 'QR Active'}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* QR Code or Expired Message */}
+                  {!isCurrentQRExpired ? (
+                    <>
+                      <View style={styles.qrCodeContainer}>
+                        {qrValue ? ( // Check if qrValue exists
+                          <QRCode
+                            value={qrValue} // Use the static state variable
+                            size={isMobile ? 160 : 200}
+                            color="#1E293B"
+                            backgroundColor="#FFFFFF"
+                          />
+                        ) : (
+                          <ActivityIndicator size="large" color="#0ea5e9" />
+                        )}
                       </View>
-                    )}
+                      <View style={styles.qrInfo}>
+                        <Text style={styles.qrHint}>Scan this QR code for attendance</Text>
+                        {selectedEvent.coordinates && (
+                          <Text style={styles.qrHint}>
+                            Location verification required
+                          </Text>
+                        )}
+                      </View>
+                    </>
+                  ) : (
+                    <View style={styles.expiredContainer}>
+                      <Feather name="x-circle" size={48} color="#dc2626" style={styles.expiredIcon} />
+                      <Text style={styles.expiredText}>QR Code Expired</Text>
+                      <Text style={styles.expiredSubtext}>Generate a new code to continue</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Action Buttons */}
+                <View style={[styles.actionButtons, isMobile && styles.actionButtonsMobile]}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.actionButtonPrimary, isMobile && styles.actionButtonMobile]}
+                    onPress={() => setShowExpirationModal(true)}
+                  >
+                    <Feather name="clock" size={16} color="#ffffff" />
+                    <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary, isMobile && styles.actionButtonTextMobile]}>
+                      Set Expiration
+                    </Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.actionButtonDanger, isMobile && styles.actionButtonMobile]}
+                    onPress={stopAttendance}
+                  >
+                    <Feather name="stop-circle" size={16} color="#ffffff" />
+                    <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary, isMobile && styles.actionButtonTextMobile]}>
+                      Stop Attendance
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.actionButtonSecondary, isMobile && styles.actionButtonMobile]}
+                    onPress={clearSelection}
+                  >
+                    <Feather name="refresh-cw" size={16} color="#475569" />
+                    <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary, isMobile && styles.actionButtonTextMobile]}>
+                      Change Event
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
             )}
+          </View>
+
+          {/* Right Grid - Attendance Records */}
+          {selectedEvent && (
+            <View style={[styles.rightGrid, isMobile && styles.rightGridMobile]}>
+              <View style={[styles.rightHeader, isMobile && styles.rightHeaderMobile]}>
+                <View>
+                  <Text style={[styles.rightTitle, isMobile && styles.rightTitleMobile]}>Attendance Records</Text>
+                  <Text style={styles.recordCount}>
+                    {getFilteredAttendanceRecords.length} attendees 
+                    {getFilteredAttendanceRecords.length > itemsPerPage && ` (Page ${currentPage}/${totalPages})`}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={refreshAttendance}
+                  disabled={refreshing}
+                >
+                  <Feather
+                    name="refresh-cw"
+                    size={18}
+                    color={refreshing ? "#94a3b8" : "#0ea5e9"}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Filters */}
+              <View style={styles.filtersContainer}>
+                <Text style={[styles.filterLabel, isMobile && styles.filterLabelMobile]}>Year Level</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterChip,
+                      selectedYearLevel === 'all' && styles.filterChipActive,
+                      isMobile && styles.filterChipMobile
+                    ]}
+                    onPress={() => {
+                      setSelectedYearLevel('all');
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      selectedYearLevel === 'all' && styles.filterChipTextActive,
+                      isMobile && styles.filterChipTextMobile
+                    ]}>
+                      All
+                    </Text>
+                  </TouchableOpacity>
+                  {availableYearLevels.map(yearLevel => (
+                    <TouchableOpacity
+                      key={yearLevel}
+                      style={[
+                        styles.filterChip,
+                        selectedYearLevel === yearLevel && styles.filterChipActive,
+                        isMobile && styles.filterChipMobile
+                      ]}
+                      onPress={() => {
+                        setSelectedYearLevel(yearLevel);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <Text style={[
+                        styles.filterChipText,
+                        selectedYearLevel === yearLevel && styles.filterChipTextActive,
+                        isMobile && styles.filterChipTextMobile
+                      ]}>
+                        Year {yearLevel}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <Text style={[styles.filterLabel, isMobile && styles.filterLabelMobile]}>Block</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterChip,
+                      selectedBlock === 'all' && styles.filterChipActive,
+                      isMobile && styles.filterChipMobile
+                    ]}
+                    onPress={() => {
+                      setSelectedBlock('all');
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <Text style={[
+                      styles.filterChipText,
+                      selectedBlock === 'all' && styles.filterChipTextActive,
+                      isMobile && styles.filterChipTextMobile
+                    ]}>
+                      All Blocks
+                    </Text>
+                  </TouchableOpacity>
+                  {availableBlocks.map(block => (
+                    <TouchableOpacity
+                      key={block}
+                      style={[
+                        styles.filterChip,
+                        selectedBlock === block && styles.filterChipActive,
+                        isMobile && styles.filterChipMobile
+                      ]}
+                      onPress={() => {
+                        setSelectedBlock(block);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <Text style={[
+                        styles.filterChipText,
+                        selectedBlock === block && styles.filterChipTextActive,
+                        isMobile && styles.filterChipTextMobile
+                      ]}>
+                        Block {block}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Attendance List */}
+              <View style={styles.attendanceListContainer}>
+                {paginatedBlocks.length > 0 ? (
+                  <>
+                    <FlatList
+                      data={paginatedBlocks}
+                      keyExtractor={(item) => item[0]}
+                      renderItem={renderBlockSection}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.attendanceListContent}
+                    />
+                    {renderPagination()}
+                  </>
+                ) : (
+                  <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                    <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
+                      <Feather name="users" size={isMobile ? 32 : 40} color="#cbd5e1" />
+                    </View>
+                    <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>
+                      {attendanceRecords.length === 0 ? 'No attendance records yet' : 'No students match the selected filters'}
+                    </Text>
+                    {attendanceRecords.length === 0 && (
+                      <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
+                        Students will appear here once they scan the QR code
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Event Selection Modal */}
+      <Modal
+        visible={showEventModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowEventModal(false)}
+      >
+        <View style={styles.modernModalOverlay}>
+          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
+            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+              <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
+                <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+                  <Feather name="calendar" size={isMobile ? 16 : 20} color="#0ea5e9" />
+                </View>
+                <View style={styles.modernModalTitleContainer}>
+                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                    Select Event
+                  </Text>
+                  <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>
+                    Choose an event to generate QR code
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowEventModal(false)}
+                style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+              >
+                <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#0ea5e9" />
+                  <Text style={[styles.loadingText, isMobile && styles.loadingTextMobile]}>Loading events...</Text>
+                </View>
+              ) : events.length === 0 ? (
+                <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                  <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
+                    <Feather name="calendar" size={isMobile ? 32 : 40} color="#cbd5e1" />
+                  </View>
+                  <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No events available</Text>
+                </View>
+              ) : (
+                events.map(item => renderEventItem({ item }))
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
 
-      {/* Expiration Modal */}
+      {/* Stop Confirmation Modal */}
       <Modal
-        visible={showExpirationModal}
+        visible={showStopConfirmModal}
         transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowExpirationModal(false)}
+        animationType="fade"
+        onRequestClose={() => setShowStopConfirmModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Set QR Expiration</Text>
-              <TouchableOpacity onPress={() => setShowExpirationModal(false)}>
-                <Feather name="x" size={24} color="#64748b" />
+        <View style={styles.modernModalOverlay}>
+          <View style={[styles.modernModalContainer, { maxWidth: 400 }]}>
+            <View style={styles.modernModalHeader}>
+              <View style={styles.modernModalHeaderLeft}>
+                <View style={[styles.modernModalIconContainer, { backgroundColor: '#ef444415' }]}>
+                  <Feather name="alert-triangle" size={20} color="#ef4444" />
+                </View>
+                <View style={styles.modernModalTitleContainer}>
+                  <Text style={styles.modernModalTitle}>Stop Attendance?</Text>
+                  <Text style={styles.modernModalSubtitle}>This action cannot be undone</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowStopConfirmModal(false)}
+                style={styles.modernModalCloseButton}
+              >
+                <Feather name="x" size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.expirationModalContent}>
-              <Text style={styles.sectionTitle}>For Event: {selectedEvent?.title}</Text>
+            <View style={[styles.modernModalContent, { paddingTop: 0 }]}>
+              <Text style={{ fontSize: 14, color: '#64748b', marginBottom: 20, lineHeight: 20 }}>
+                This will immediately expire the QR code. Students will no longer be able to mark their attendance for this event.
+              </Text>
 
-              <Text style={styles.sectionTitle}>Quick Options</Text>
-              {getQuickExpirationOptions().map((option, index) => (
+              <View style={styles.modernFormActions}>
                 <TouchableOpacity
-                  key={index}
-                  style={styles.expirationOption}
-                  onPress={() => setCustomExpiration(option.value)}
+                  style={styles.modernCancelButton}
+                  onPress={() => setShowStopConfirmModal(false)}
                 >
-                  <Text style={styles.expirationOptionText}>{option.label}</Text>
-                </TouchableOpacity>
-              ))}
-
-              <Text style={styles.sectionTitle}>Custom Date & Time</Text>
-              <TextInput
-                style={styles.customInput}
-                placeholder="YYYY-MM-DDTHH:MM"
-                value={customExpiration}
-                onChangeText={setCustomExpiration}
-              />
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonSecondary]}
-                  onPress={() => setShowExpirationModal(false)}
-                >
-                  <Text style={[styles.modalButtonText, styles.modalButtonTextSecondary]}>
-                    Cancel
-                  </Text>
+                  <Text style={styles.modernCancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonPrimary]}
-                  onPress={setManualExpiration}
-                  disabled={!customExpiration}
+                  style={[styles.modernSubmitButton, { backgroundColor: '#ef4444' }]}
+                  onPress={confirmStopAttendance}
                 >
-                  <Text style={[styles.modalButtonText, styles.modalButtonTextPrimary]}>
-                    Set Expiration
-                  </Text>
+                  <Feather name="stop-circle" size={18} color="#ffffff" />
+                  <Text style={styles.modernSubmitButtonText}>Stop Attendance</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
         </View>
       </Modal>
-    </ScrollView>
+
+      {/* Expiration Modal - LARGER SIZE */}
+      <Modal
+        visible={showExpirationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowExpirationModal(false)}
+      >
+        <View style={styles.modernModalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            <View style={[styles.expirationModalContainer, isMobile && styles.expirationModalContainerMobile]}>
+              <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+                <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
+                  <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+                    <Feather name="clock" size={isMobile ? 16 : 20} color="#f59e0b" />
+                  </View>
+                  <View style={styles.modernModalTitleContainer}>
+                    <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                      Set QR Expiration
+                    </Text>
+                    <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>
+                      For: {selectedEvent?.title}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowExpirationModal(false)}
+                  style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+                >
+                  <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={[styles.expirationModalContent, isMobile && styles.expirationModalContentMobile]}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Quick Options</Text>
+                <View style={styles.expirationOptions}>
+                  {getQuickExpirationOptions().map((option, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[styles.expirationOption, isMobile && styles.expirationOptionMobile]}
+                      onPress={() => setCustomExpiration(option.value)}
+                    >
+                      <Text style={[styles.expirationOptionText, isMobile && styles.expirationOptionTextMobile]}>{option.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Custom Date & Time</Text>
+                <TextInput
+                  placeholder="YYYY-MM-DDTHH:MM"
+                  value={customExpiration}
+                  onChangeText={setCustomExpiration}
+                />
+
+                <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
+                  <TouchableOpacity
+                    style={[styles.modernCancelButton, isMobile && styles.modernCancelButtonMobile]}
+                    onPress={() => setShowExpirationModal(false)}
+                  >
+                    <Text style={[styles.modernCancelButtonText, isMobile && styles.modernCancelButtonTextMobile]}>
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.modernSubmitButton,
+                      !customExpiration && styles.modernSubmitButtonDisabled,
+                      isMobile && styles.modernSubmitButtonMobile
+                    ]}
+                    onPress={setManualExpiration}
+                    disabled={!customExpiration}
+                  >
+                    <Feather name="check" size={isMobile ? 16 : 18} color="#ffffff" />
+                    <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
+                      Set Expiration
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+    </View>
   );
 }

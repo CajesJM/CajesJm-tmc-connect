@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-export const eventsStyles = StyleSheet.create({
+export const usersStyles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f8fafc',
@@ -84,25 +84,6 @@ export const eventsStyles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
-    },
-    notificationBadge: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        backgroundColor: '#ef4444',
-        borderRadius: 10,
-        minWidth: 16,
-        height: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#ffffff',
-    },
-    notificationBadgeText: {
-        color: '#ffffff',
-        fontSize: 9,
-        fontWeight: '700',
-        paddingHorizontal: 3,
     },
 
     statsGrid: {
@@ -196,7 +177,7 @@ export const eventsStyles = StyleSheet.create({
         alignItems: 'center',
         gap: 12,
     },
-    eventCount: {
+    userCount: {
         fontSize: 14,
         color: '#64748b',
         backgroundColor: '#f1f5f9',
@@ -257,7 +238,7 @@ export const eventsStyles = StyleSheet.create({
     paginatedInfo: {
         flex: 1,
     },
-    paginatedTitle: {
+    paginatedName: {
         fontSize: 14,
         fontWeight: '600',
         color: '#0f172a',
@@ -267,8 +248,9 @@ export const eventsStyles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
+        flexWrap: 'wrap',
     },
-    paginatedDate: {
+    paginatedEmail: {
         fontSize: 11,
         color: '#94a3b8',
     },
@@ -283,7 +265,7 @@ export const eventsStyles = StyleSheet.create({
         color: '#ffffff',
         textTransform: 'uppercase',
     },
-    paginatedLocation: {
+    paginatedUsername: {
         fontSize: 10,
         color: '#0ea5e9',
         marginLeft: 4,
@@ -305,6 +287,13 @@ export const eventsStyles = StyleSheet.create({
         height: 32,
         borderRadius: 8,
         backgroundColor: '#fef2f2',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    paginatedStatusButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -436,12 +425,10 @@ export const eventsStyles = StyleSheet.create({
         color: '#ffffff',
         textTransform: 'uppercase',
     },
-    searchResultLocation: {
+    searchResultEmail: {
         fontSize: 11,
-        color: '#0ea5e9',
+        color: '#94a3b8',
         marginBottom: 4,
-        flexDirection: 'row',
-        alignItems: 'center',
     },
     searchResultActions: {
         flexDirection: 'row',
@@ -465,11 +452,12 @@ export const eventsStyles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    searchResultDescription: {
-        fontSize: 13,
-        color: '#475569',
-        lineHeight: 18,
-        marginBottom: 8,
+    searchResultStatusButton: {
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     searchResultFooter: {
         flexDirection: 'row',
@@ -479,23 +467,14 @@ export const eventsStyles = StyleSheet.create({
         borderTopColor: '#f1f5f9',
         paddingTop: 8,
     },
-    searchResultDate: {
+    searchResultRole: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
     },
-    searchResultDateText: {
+    searchResultRoleText: {
         fontSize: 11,
         color: '#64748b',
-    },
-    searchResultAttendees: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    searchResultAttendeesText: {
-        fontSize: 10,
-        color: '#94a3b8',
     },
 
     emptyState: {
@@ -624,39 +603,30 @@ export const eventsStyles = StyleSheet.create({
         height: 100,
         textAlignVertical: 'top',
     },
-    modernLocationButton: {
-        backgroundColor: '#f8fafc',
+    modernRoleSelector: {
+        flexDirection: 'row',
+        gap: 8,
+        flexWrap: 'wrap',
+    },
+    modernRoleOption: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 12,
         borderWidth: 1,
         borderColor: '#e2e8f0',
-        borderRadius: 16,
-        padding: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
+        backgroundColor: '#ffffff',
     },
-    modernLocationButtonText: {
-        flex: 1,
+    modernRoleOptionSelected: {
+        backgroundColor: '#0ea5e9',
+        borderColor: '#0ea5e9',
     },
-    modernLocationButtonTitle: {
-        fontSize: 14,
+    modernRoleOptionText: {
+        fontSize: 12,
         fontWeight: '600',
         color: '#1e293b',
-        marginBottom: 4,
     },
-    modernLocationButtonSubtitle: {
-        fontSize: 12,
-        color: '#64748b',
-    },
-    modernCoordinatesButton: {
-        backgroundColor: '#f8fafc',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        borderRadius: 16,
-        padding: 16,
-        marginTop: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
+    modernRoleOptionTextSelected: {
+        color: '#ffffff',
     },
     modernFormActions: {
         flexDirection: 'row',
@@ -693,8 +663,23 @@ export const eventsStyles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
     },
+    fieldNote: {
+        fontSize: 12,
+        color: '#64748b',
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
+    emailText: {
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        fontSize: 14,
+        color: '#64748b',
+    },
 
-    // Mobile Responsive Styles
     headerGradientMobile: {
         paddingTop: 10,
         paddingBottom: 5,
@@ -780,7 +765,7 @@ export const eventsStyles = StyleSheet.create({
     leftControlsMobile: {
         gap: 8,
     },
-    eventCountMobile: {
+    userCountMobile: {
         fontSize: 12,
         paddingHorizontal: 8,
         paddingVertical: 3,
@@ -800,10 +785,10 @@ export const eventsStyles = StyleSheet.create({
         padding: 10,
         gap: 8,
     },
-    paginatedTitleMobile: {
+    paginatedNameMobile: {
         fontSize: 13,
     },
-    paginatedDateMobile: {
+    paginatedEmailMobile: {
         fontSize: 10,
     },
     paginatedEditButtonMobile: {
@@ -812,6 +797,11 @@ export const eventsStyles = StyleSheet.create({
         borderRadius: 6,
     },
     paginatedDeleteButtonMobile: {
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+    },
+    paginatedStatusButtonMobile: {
         width: 28,
         height: 28,
         borderRadius: 6,
@@ -827,49 +817,6 @@ export const eventsStyles = StyleSheet.create({
     },
     pageInfoTextMobile: {
         fontSize: 12,
-    },
-    selectedDetailContainerMobile: {
-        marginTop: 12,
-        padding: 12,
-    },
-    selectedDetailHeaderMobile: {
-        marginBottom: 8,
-        paddingBottom: 6,
-    },
-    selectedDetailTitleMobile: {
-        fontSize: 14,
-    },
-    selectedDetailBadgesMobile: {
-        gap: 6,
-    },
-    detailBadgeMobile: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-    },
-    detailBadgeTextMobile: {
-        fontSize: 9,
-    },
-    selectedDetailLocationMobile: {
-        fontSize: 12,
-        gap: 4,
-    },
-    selectedDetailFooterMobile: {
-        paddingTop: 10,
-    },
-    selectedDetailDateMobile: {
-        gap: 4,
-    },
-
-    selectedDetailActionsMobile: {
-        gap: 8,
-    },
-    selectedDetailEditButtonMobile: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-    },
-    selectedDetailDeleteButtonMobile: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
     },
     rightHeaderMobile: {
         marginBottom: 15,
@@ -887,16 +834,6 @@ export const eventsStyles = StyleSheet.create({
         marginLeft: 8,
         fontSize: 13,
     },
-    filterChipsMobile: {
-        marginBottom: 12,
-    },
-    filterChipMobile: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-    },
-    filterChipTextMobile: {
-        fontSize: 11,
-    },
     searchStatsMobile: {
         marginBottom: 12,
     },
@@ -910,7 +847,7 @@ export const eventsStyles = StyleSheet.create({
     searchResultTitleMobile: {
         fontSize: 13,
     },
-    searchResultLocationMobile: {
+    searchResultEmailMobile: {
         fontSize: 10,
     },
     searchResultEditButtonMobile: {
@@ -923,16 +860,13 @@ export const eventsStyles = StyleSheet.create({
         height: 26,
         borderRadius: 5,
     },
-    searchResultDescriptionMobile: {
-        fontSize: 12,
-        lineHeight: 16,
-        marginBottom: 6,
+    searchResultStatusButtonMobile: {
+        width: 26,
+        height: 26,
+        borderRadius: 5,
     },
-    searchResultDateTextMobile: {
+    searchResultRoleTextMobile: {
         fontSize: 10,
-    },
-    searchResultAttendeesTextMobile: {
-        fontSize: 9,
     },
     emptyStateMobile: {
         paddingVertical: 30,
@@ -1010,110 +944,11 @@ export const eventsStyles = StyleSheet.create({
     modernCancelButtonTextMobile: {
         fontSize: 14,
     },
-    eventImageContainer: {
-        width: 60,
-        height: 60,
-        borderRadius: 8,
-        overflow: 'hidden',
-        marginRight: 8,
-        position: 'relative',
-    },
-    eventImage: {
-        width: '100%',
-        height: '100%',
-    },
-    eventBadge: {
-        position: 'absolute',
-        top: 4,
-        left: 4,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    todayBadge: {
-        backgroundColor: '#16a34a',
-    },
-    tomorrowBadge: {
-        backgroundColor: '#2563eb',
-    },
-    upcomingBadge: {
-        backgroundColor: '#d97706',
-    },
-    pastBadge: {
-        backgroundColor: '#64748b',
-    },
-    eventBadgeText: {
-        fontSize: 8,
-        fontWeight: '700',
-        color: '#ffffff',
-        textTransform: 'uppercase',
-    },
-    todayBadgeText: {
-        color: '#ffffff',
-    },
-    tomorrowBadgeText: {
-        color: '#ffffff',
-    },
-    upcomingBadgeText: {
-        color: '#ffffff',
-    },
-    pastBadgeText: {
-        color: '#ffffff',
-    },
 
-    eventsListContainer: {
-        flex: 1,
-        minHeight: 200,
-    },
-
-    // Compact Detail Styles (matching the form)
-    modernDetailImageContainer: {
-        width: '100%',
-        height: 120,
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginBottom: 16,
-        position: 'relative',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-
-    modernDetailImageContainerMobile: {
-        height: 100,
-    },
-
-    modernDetailImage: {
-        width: '100%',
-        height: '100%',
-    },
-
-    modernDetailImageBadge: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
-    },
-
-    modernDetailTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#0f172a',
-        marginBottom: 16,
-    },
-
-    modernDetailTitleMobile: {
-        fontSize: 16,
-    },
 
     modernDetailSection: {
         marginBottom: 16,
     },
-
     modernDetailLabel: {
         fontSize: 12,
         fontWeight: '600',
@@ -1122,7 +957,6 @@ export const eventsStyles = StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
-
     modernDetailText: {
         fontSize: 14,
         color: '#1e293b',
@@ -1133,223 +967,33 @@ export const eventsStyles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#f1f5f9',
     },
-
-    modernDetailTextMobile: {
-        fontSize: 13,
-        lineHeight: 18,
-        padding: 10,
-    },
-
     modernDetailRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
         marginBottom: 12,
         paddingVertical: 4,
-        flexWrap: 'wrap',
     },
-
     modernDetailRowText: {
         fontSize: 14,
         color: '#334155',
         flex: 1,
     },
-    modernDetailIconButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#eff6ff',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginLeft: 8,
-    },
-    modernDetailIconButtonMobile: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-    },
-    modernDetailRangeHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-
-    rangeIndicator: {
+    inactiveBadge: {
+        backgroundColor: '#64748b',
         paddingHorizontal: 8,
-        paddingVertical: 4,
+        paddingVertical: 2,
         borderRadius: 4,
     },
-
-    rangeIndicatorText: {
+    inactiveBadgeText: {
+        color: '#ffffff',
         fontSize: 10,
-        fontWeight: '600',
-        color: '#ffffff',
-        textTransform: 'uppercase',
+        fontWeight: '700',
     },
-
-    rangeVisualization: {
-        marginTop: 8,
-        marginBottom: 16,
+    statusBadgeActive: {
+        backgroundColor: '#10b981',
     },
-
-    rangeTrack: {
-        height: 8,
-        backgroundColor: '#f1f5f9',
-        borderRadius: 4,
-        overflow: 'hidden',
-        marginBottom: 4,
-    },
-
-    rangeFill: {
-        height: '100%',
-        backgroundColor: '#0ea5e9',
-        borderRadius: 4,
-    },
-
-    rangeTrackText: {
-        fontSize: 11,
-        color: '#64748b',
-        textAlign: 'center',
-    },
-
-    checkLocationButton: {
-        backgroundColor: '#0ea5e9',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 12,
-        marginTop: 8,
-    },
-
-    checkLocationButtonDisabled: {
-        backgroundColor: '#cbd5e1',
-    },
-
-    checkLocationButtonText: {
-        color: '#ffffff',
-        fontSize: 13,
-        fontWeight: '500',
-    },
-    // Map Styles
-    mapContainer: {
-        borderRadius: 12,
-        overflow: 'hidden',
-        marginVertical: 12,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-    },
-
-    map: {
-        width: '100%',
-        height: 200,
-    },
-
-    markerContainer: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: '#0ea5e9',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#ffffff',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 4,
-    },
-
-    markerDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#ffffff',
-    },
-
-    userMarkerContainer: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+    statusBadgeInactive: {
         backgroundColor: '#ef4444',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderWidth: 2,
-        borderColor: '#ffffff',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 4,
     },
-
-    userMarkerDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: '#ffffff',
-    },
-
-    userMarkerPulse: {
-        position: 'absolute',
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(239, 68, 68, 0.3)',
-    },
-
-    mapLegend: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-        padding: 8,
-        backgroundColor: '#f8fafc',
-        borderTopWidth: 1,
-        borderTopColor: '#e2e8f0',
-    },
-
-    legendItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-
-    legendDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-    },
-
-    legendCircle: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        borderWidth: 2,
-        borderColor: '#0ea5e9',
-        backgroundColor: 'transparent',
-    },
-
-    legendText: {
-        fontSize: 10,
-        color: '#64748b',
-    },
-
-    distanceInfo: {
-        backgroundColor: '#f8fafc',
-        borderRadius: 8,
-        padding: 12,
-        marginTop: 8,
-    },
-
-    distanceRow: {
-        marginTop: 4,
-        paddingTop: 4,
-        borderTopWidth: 1,
-        borderTopColor: '#e2e8f0',
-    },
-
 });

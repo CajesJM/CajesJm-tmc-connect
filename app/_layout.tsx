@@ -1,7 +1,11 @@
 import { Stack } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, LogBox, View } from "react-native";
 import { AuthProvider, useAuth } from "../context/AuthContext";
 
+LogBox.ignoreLogs([
+  'Invalid DOM property',
+  'Unknown event handler property',
+]);
 function RootLayoutContent() {
   const { loading } = useAuth();
 

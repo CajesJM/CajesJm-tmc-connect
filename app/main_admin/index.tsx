@@ -89,7 +89,10 @@ export default function MainAdminDashboard() {
     activeUsers: 0,
     totalAttendance: 0,
     userGrowth: 0,
-    eventGrowth: 0
+    eventGrowth: 0,
+    pendingAnnouncements: 0,
+    approvedAnnouncements: 0,
+    rejectedAnnouncements: 0,
   });
 
 
@@ -128,6 +131,47 @@ export default function MainAdminDashboard() {
 
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [approvalCount, setApprovalCount] = useState(0);
+  const [selectedDataset, setSelectedDataset] = useState<string | null>(null);
+
+  const [userRoleStats, setUserRoleStats] = useState<UserRoleStat[]>([
+    { role: 'student', label: 'Students', count: 0, percentage: 0, color: '#0ea5e9', icon: 'school' },
+    { role: 'assistant_admin', label: 'Assistants', count: 0, percentage: 0, color: '#f59e0b', icon: 'shield-checkmark' },
+    { role: 'main_admin', label: 'Admins', count: 0, percentage: 0, color: '#8b5cf6', icon: 'star' },
+  ]);
+
+  interface UserRoleStat {
+    role: 'student' | 'assistant_admin' | 'main_admin';
+    label: string;
+    count: number;
+    percentage: number;
+    color: string;
+    icon: 'school' | 'shield-checkmark' | 'star';
+  }
+
+  const fetchUserRoleStats = async () => {
+    try {
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const users = usersSnapshot.docs.map(doc => doc.data());
+
+      const total = users.length;
+      if (total === 0) return;
+
+      // Use Record type with string keys
+      const roleCounts: Record<string, number> = {
+        student: users.filter(u => u.role === 'student' || !u.role).length,
+        assistant_admin: users.filter(u => u.role === 'assistant_admin').length,
+        main_admin: users.filter(u => u.role === 'main_admin').length,
+      };
+
+      setUserRoleStats(prev => prev.map(role => ({
+        ...role,
+        count: roleCounts[role.role] || 0,
+        percentage: Math.round(((roleCounts[role.role] || 0) / total) * 100)
+      })));
+    } catch (error) {
+      console.error('Error fetching user role stats:', error);
+    }
+  };
 
 
   const getActiveTabFromPath = () => {
@@ -141,7 +185,7 @@ export default function MainAdminDashboard() {
 
 
   const activeTab = getActiveTabFromPath();
-  
+
   const fetchUpcomingEvents = () => {
     setEventsLoading(true);
     const now = new Date();
@@ -186,7 +230,7 @@ export default function MainAdminDashboard() {
 
 
   const fetchPendingApprovals = () => {
-  
+
     const pendingAnnouncementsQuery = query(
       collection(db, 'updates'),
       where('status', '==', 'pending'),
@@ -274,6 +318,7 @@ export default function MainAdminDashboard() {
 
   useEffect(() => {
     fetchDashboardStats();
+    fetchUserRoleStats();
 
     const unsubscribeActivities = setupRealtimeActivities();
     const unsubscribeEvents = fetchUpcomingEvents();
@@ -309,7 +354,7 @@ export default function MainAdminDashboard() {
         unsubscribeActivities();
         unsubscribeEvents();
         unsubscribeAnnouncements();
-        unsubscribeApprovals(); 
+        unsubscribeApprovals();
         unsubscribeNotifications();
         notificationService.cleanup();
       };
@@ -330,67 +375,103 @@ export default function MainAdminDashboard() {
       await updateDoc(docRef, {
         status: 'approved',
         approvedAt: new Date(),
-        approvedBy: userData?.email
+        approvedBy: userData?.email,
       });
 
-      if (approval.data.createdBy) {
+      if (approval.data?.createdBy) {
         await notificationService.createNotification({
-          userId: approval.data.createdBy, 
+          userId: approval.data.createdBy,
           title: `${approval.type === 'announcement' ? 'Announcement' : 'Event'} Approved`,
           message: `Your "${approval.title}" has been approved by the main admin.`,
           type: approval.type,
           timestamp: new Date(),
-          data: { [`${approval.type}Id`]: approval.id }
+          data: { [`${approval.type}Id`]: approval.id },
         });
       }
 
-      Alert.alert('Success', `${approval.type} approved successfully!`);
+      if (Platform.OS === 'web') {
+        window.alert(`${approval.type} approved successfully!`);
+      } else {
+        Alert.alert('Success', `${approval.type} approved successfully!`);
+      }
     } catch (error) {
       console.error('Error approving:', error);
-      Alert.alert('Error', 'Failed to approve. Please try again.');
+      if (Platform.OS === 'web') {
+        window.alert('Failed to approve. Please try again.');
+      } else {
+        Alert.alert('Error', 'Failed to approve. Please try again.');
+      }
+    }
+  };
+  const handleReject = (approval: PendingApproval) => {
+    console.log('🚨 handleReject called with:', approval);
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`Are you sure you want to reject "${approval.title}"?`);
+      if (confirmed) {
+        performReject(approval);
+      }
+    } else {
+      Alert.alert(
+        'Reject Request',
+        `Are you sure you want to reject "${approval.title}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Reject',
+            style: 'destructive',
+            onPress: () => performReject(approval),
+          },
+        ]
+      );
     }
   };
 
-  const handleReject = async (approval: PendingApproval) => {
-    Alert.alert(
-      'Reject Request',
-      `Are you sure you want to reject "${approval.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const collectionName = approval.type === 'announcement' ? 'updates' : 'events';
-              const docRef = doc(db, collectionName, approval.id);
+  const performReject = async (approval: PendingApproval) => {
+    console.log('🔴 Reject button pressed for:', approval.id, approval.type);
+    try {
+      const collectionName = approval.type === 'announcement' ? 'updates' : 'events';
+      const docRef = doc(db, collectionName, approval.id);
+      console.log('Document path:', docRef.path);
 
-              await updateDoc(docRef, {
-                status: 'rejected',
-                rejectedAt: new Date(),
-                rejectedBy: userData?.email
-              });
+      await updateDoc(docRef, {
+        status: 'rejected',
+        rejectedAt: new Date(),
+        rejectedBy: userData?.email || 'unknown',
+      });
+      console.log('✅ Firestore update succeeded');
 
-              if (approval.data.createdBy) {
-                await notificationService.createNotification({
-                  userId: approval.data.createdBy, 
-                  title: `${approval.type === 'announcement' ? 'Announcement' : 'Event'} Rejected`,
-                  message: `Your "${approval.title}" has been rejected by the main admin.`,
-                  type: approval.type,
-                  timestamp: new Date(), 
-                  data: { [`${approval.type}Id`]: approval.id }
-                });
-              }
-
-              Alert.alert('Rejected', `${approval.type} has been rejected.`);
-            } catch (error) {
-              console.error('Error rejecting:', error);
-              Alert.alert('Error', 'Failed to reject. Please try again.');
-            }
-          }
+      // Send notification to the creator (if they exist)
+      if (approval.data?.createdBy) {
+        try {
+          await notificationService.createNotification({
+            userId: approval.data.createdBy,
+            title: `${approval.type === 'announcement' ? 'Announcement' : 'Event'} Rejected`,
+            message: `Your "${approval.title}" has been rejected by the main admin.`,
+            type: approval.type,
+            timestamp: new Date(),
+            data: { [`${approval.type}Id`]: approval.id },
+          });
+          console.log('✅ Notification sent');
+        } catch (notifyError) {
+          console.error('❌ Notification failed:', notifyError);
+          // Continue – notification failure shouldn't break the rejection
         }
-      ]
-    );
+      }
+
+      // Show success message
+      if (Platform.OS === 'web') {
+        window.alert(`${approval.type} has been rejected.`);
+      } else {
+        Alert.alert('Rejected', `${approval.type} has been rejected.`);
+      }
+    } catch (error) {
+      console.error('❌ Error in reject:', error);
+      if (Platform.OS === 'web') {
+        window.alert('Failed to reject. Check console for details.');
+      } else {
+        Alert.alert('Error', 'Failed to reject. Check console for details.');
+      }
+    }
   };
 
   useEffect(() => {
@@ -531,7 +612,12 @@ export default function MainAdminDashboard() {
 
       const months: MonthlyStats[] = [];
 
+      // Query only approved events
       const eventsSnapshot = await getDocs(collection(db, 'events'));
+      const approvedEvents = eventsSnapshot.docs.filter(doc =>
+        doc.data().status === 'approved'
+      );
+
       const announcementsSnapshot = await getDocs(collection(db, 'updates'));
 
       let totalAttendance = 0;
@@ -539,7 +625,7 @@ export default function MainAdminDashboard() {
       const attendanceByMonth: { [key: string]: number } = {};
       const announcementsByMonth: { [key: string]: number } = {};
 
-      eventsSnapshot.docs.forEach(doc => {
+      approvedEvents.forEach(doc => {
         const data = doc.data();
         const eventDate = data.date?.toDate();
         if (eventDate && eventDate >= sixMonthsAgo) {
@@ -700,6 +786,17 @@ export default function MainAdminDashboard() {
       );
     }
   };
+  const calculateGrowth = (data: MonthlyStats[], key: 'events' | 'attendance') => {
+    if (data.length < 2) return 0;
+
+    const firstValue = data[0][key];
+    const lastValue = data[data.length - 1][key];
+
+    if (firstValue === 0) return lastValue > 0 ? 100 : 0;
+
+    const growth = ((lastValue - firstValue) / firstValue) * 100;
+    return Math.round(growth);
+  };
 
   const uploadProfileImage = async (imageUri: string | File) => {
     try {
@@ -707,7 +804,7 @@ export default function MainAdminDashboard() {
 
       let blob: Blob;
       if (imageUri instanceof File) {
-    
+
         blob = imageUri;
       } else {
         const response = await fetch(imageUri);
@@ -753,10 +850,15 @@ export default function MainAdminDashboard() {
         doc.data().active !== false
       ).length;
 
+      // Only count APPROVED events
       const eventsSnapshot = await getDocs(collection(db, 'events'));
-      const totalEvents = eventsSnapshot.size;
+      const approvedEvents = eventsSnapshot.docs.filter(doc =>
+        doc.data().status === 'approved'
+      );
+      const totalEvents = approvedEvents.length;
+
       const now = new Date();
-      const upcomingEvents = eventsSnapshot.docs.filter(doc => {
+      const upcomingEvents = approvedEvents.filter(doc => {
         const eventDate = doc.data().date?.toDate();
         return eventDate && eventDate > now;
       }).length;
@@ -764,10 +866,20 @@ export default function MainAdminDashboard() {
       const announcementsSnapshot = await getDocs(collection(db, 'updates'));
       const totalAnnouncements = announcementsSnapshot.size;
 
+      const pendingAnnouncements = announcementsSnapshot.docs.filter(
+        doc => doc.data().status === 'pending'
+      ).length;
+      const approvedAnnouncements = announcementsSnapshot.docs.filter(
+        doc => doc.data().status === 'approved'
+      ).length;
+      const rejectedAnnouncements = announcementsSnapshot.docs.filter(
+        doc => doc.data().status === 'rejected'
+      ).length;
+
       let activeAttendees = 0;
       let pendingVerifications = 0;
 
-      eventsSnapshot.docs.forEach(doc => {
+      approvedEvents.forEach(doc => {
         const data = doc.data();
         const attendees = data.attendees;
         if (attendees && Array.isArray(attendees)) {
@@ -795,7 +907,10 @@ export default function MainAdminDashboard() {
         activeUsers,
         totalAttendance: activeAttendees,
         userGrowth,
-        eventGrowth
+        eventGrowth,
+        pendingAnnouncements,
+        approvedAnnouncements,
+        rejectedAnnouncements
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -856,9 +971,8 @@ export default function MainAdminDashboard() {
 
   const renderStatCard = (title: string, value: string | number, icon: any, color: string, trend?: number, subtitle?: string) => (
     <TouchableOpacity
-      style={[styles.statCard, { borderLeftColor: color }]}
-      onPress={() => setSelectedStat(selectedStat === title ? null : title)}
-      activeOpacity={0.7}
+      style={styles.statCard}
+
     >
       <View style={styles.statCardHeader}>
         <View style={[styles.statIconContainer, { backgroundColor: `${color}15` }]}>
@@ -986,6 +1100,8 @@ export default function MainAdminDashboard() {
             </Text>
           </View>
           <View style={styles.headerActions}>
+
+
             <TouchableOpacity
               style={styles.headerAction}
               onPress={handleDownloadReport}
@@ -1003,10 +1119,10 @@ export default function MainAdminDashboard() {
               onPress={() => setNotificationModalVisible(true)}
             >
               <Feather name="bell" size={18} color="#ffffff" />
-              {(unreadCount > 0 || approvalCount > 0) && (
+              {(unreadCount > 0) && (
                 <View style={[styles.notificationBadge, approvalCount > 0 && styles.approvalBadge]}>
                   <Text style={styles.notificationBadgeText}>
-                    {unreadCount + approvalCount > 9 ? '9+' : unreadCount + approvalCount}
+                    {unreadCount > 9 ? '9+' : unreadCount}
                   </Text>
                 </View>
               )}
@@ -1026,7 +1142,7 @@ export default function MainAdminDashboard() {
         onReject={handleReject}
         approvalCount={approvalCount}
       />
-   
+
       <View style={styles.statsGrid}>
         {renderStatCard(
           'Total Users',
@@ -1034,16 +1150,16 @@ export default function MainAdminDashboard() {
           <FontAwesome6 name="users" size={20} color="#0ea5e9" />,
           '#0ea5e9',
           dashboardStats.userGrowth,
-          `${dashboardStats.activeUsers} active`
+          `${dashboardStats.activeUsers} currently active`
         )}
 
         {renderStatCard(
-          'Total Events',
-          dashboardStats.totalEvents,
+          'Upcoming Events',
+          dashboardStats.upcomingEvents,
           <Ionicons name="calendar" size={20} color="#f59e0b" />,
           '#f59e0b',
           dashboardStats.eventGrowth,
-          `${dashboardStats.upcomingEvents} upcoming`
+          `of ${dashboardStats.totalEvents} total`
         )}
 
         {renderStatCard(
@@ -1052,133 +1168,308 @@ export default function MainAdminDashboard() {
           <FontAwesome6 name="bullhorn" size={20} color="#8b5cf6" />,
           '#8b5cf6',
           undefined,
-          'Last 30 days'
+          `${dashboardStats.pendingAnnouncements} pending, ${dashboardStats.approvedAnnouncements} approved, ${dashboardStats.rejectedAnnouncements} rejected`
         )}
 
         {renderStatCard(
-          'Attendance',
-          dashboardStats.totalAttendance,
-          <Ionicons name="qr-code" size={20} color="#10b981" />,
-          '#10b981',
+          'Need Approval',
+          pendingApprovals.length,
+          <Ionicons name="time" size={20} color="#ef4444" />,
+          '#ef4444',
           undefined,
-          `${dashboardStats.pendingVerifications} pending`
+          `${pendingApprovals.filter(p => p.type === 'event').length} events, ${pendingApprovals.filter(p => p.type === 'announcement').length} updates`
         )}
       </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.quickActionsContainer}
-        contentContainerStyle={styles.quickActionsContent}
-      >
-        <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('events')}>
-          <LinearGradient
-            colors={['#0ea5e9', '#0284c7']}
-            style={styles.quickActionGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Ionicons name="add-circle" size={24} color="#ffffff" />
-            <Text style={styles.quickActionText}>Create Event</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('announcements')}>
-          <LinearGradient
-            colors={['#f59e0b', '#d97706']}
-            style={styles.quickActionGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <FontAwesome6 name="bullhorn" size={24} color="#ffffff" />
-            <Text style={styles.quickActionText}>Make Announcement</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('attendance')}>
-          <LinearGradient
-            colors={['#10b981', '#059669']}
-            style={styles.quickActionGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Ionicons name="scan" size={24} color="#ffffff" />
-            <Text style={styles.quickActionText}>Scan QR</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('users')}>
-          <LinearGradient
-            colors={['#8b5cf6', '#7c3aed']}
-            style={styles.quickActionGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <FontAwesome6 name="user-plus" size={24} color="#ffffff" />
-            <Text style={styles.quickActionText}>Add User</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </ScrollView>
 
       {/* Charts Section */}
       <View style={styles.chartsContainer}>
         <View style={styles.chartHeader}>
-          <Text style={styles.chartsTitle}>Analytics Overview</Text>
+          <View>
+            <Text style={styles.chartsTitle}>Analytics Overview</Text>
+            <Text style={styles.chartsSubtitle}>Last 6 months activity</Text>
+          </View>
+
+          {/* Interactive Legend */}
           <View style={styles.chartLegend}>
-            <View style={styles.legendItem}>
+            <TouchableOpacity
+              style={[
+                styles.legendItem,
+                styles.legendButton,
+                selectedDataset === 'events' && styles.legendButtonActiveBlue
+              ]}
+              onPress={() => setSelectedDataset(selectedDataset === 'events' ? null : 'events')}
+            >
               <View style={[styles.legendDot, { backgroundColor: '#0ea5e9' }]} />
-              <Text style={styles.legendText}>Events</Text>
-            </View>
-            <View style={styles.legendItem}>
+              <Text style={[
+                styles.legendText,
+                selectedDataset === 'events' && styles.legendTextActive
+              ]}>
+                Events
+              </Text>
+              <View style={[styles.legendValue, { backgroundColor: '#0ea5e915' }]}>
+                <Text style={[styles.legendValueText, { color: '#0ea5e9' }]}>
+                  {monthlyStats.reduce((sum, s) => sum + s.events, 0)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.legendItem,
+                styles.legendButton,
+                selectedDataset === 'attendance' && styles.legendButtonActiveGreen
+              ]}
+              onPress={() => setSelectedDataset(selectedDataset === 'attendance' ? null : 'attendance')}
+            >
               <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
-              <Text style={styles.legendText}>Attendance</Text>
-            </View>
+              <Text style={[
+                styles.legendText,
+                selectedDataset === 'attendance' && styles.legendTextActive
+              ]}>
+                Attendance
+              </Text>
+              <View style={[styles.legendValue, { backgroundColor: '#10b98115' }]}>
+                <Text style={[styles.legendValueText, { color: '#10b981' }]}>
+                  {monthlyStats.reduce((sum, s) => sum + s.attendance, 0)}
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
         {monthlyStats.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <LineChart
-              data={{
-                labels: monthlyStats.map(s => s.month),
-                datasets: [
-                  {
-                    data: monthlyStats.map(s => s.events),
-                    color: () => '#0ea5e9',
-                    strokeWidth: 2
-                  },
-                  {
-                    data: monthlyStats.map(s => s.attendance),
-                    color: () => '#10b981',
-                    strokeWidth: 2
-                  }
-                ]
-              }}
-              width={Math.max(chartWidth, 600)}
-              height={220}
-              chartConfig={{
-                backgroundColor: '#ffffff',
-                backgroundGradientFrom: '#ffffff',
-                backgroundGradientTo: '#ffffff',
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(15, 23, 42, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
-                style: {
-                  borderRadius: 16
-                },
-                propsForDots: {
-                  r: '4',
-                  strokeWidth: '2',
-                  stroke: '#ffffff'
-                }
-              }}
-              bezier
-              style={styles.chart}
+          <View style={styles.chartWrapper}>
+            {/* Custom Gradient Background */}
+            <LinearGradient
+              colors={['#f0f9ff', '#ffffff']}
+              style={styles.chartBackground}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
             />
-          </ScrollView>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chartScrollContent}
+            >
+              <LineChart
+                data={{
+                  labels: monthlyStats.map(s => s.month),
+                  datasets: [
+                    {
+                      data: monthlyStats.map(s => s.events),
+                      color: () => selectedDataset === 'attendance' ? '#0ea5e920' : '#0ea5e9',
+                      strokeWidth: 4
+                    },
+                    {
+                      data: monthlyStats.map(s => s.attendance),
+                      color: () => selectedDataset === 'events' ? '#10b98120' : '#10b981',
+                      strokeWidth: 4
+                    }
+                  ]
+                }}
+                width={Math.max(chartWidth, 350)}
+                height={260}
+                chartConfig={{
+                  backgroundColor: 'transparent',
+                  backgroundGradientFrom: 'transparent',
+                  backgroundGradientTo: 'transparent',
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(15, 23, 42, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
+                  style: {
+                    borderRadius: 16,
+                  },
+                  propsForDots: {
+                    r: '6',
+                    strokeWidth: '3',
+                    stroke: '#ffffff'
+                  },
+                  propsForBackgroundLines: {
+                    stroke: '#e2e8f0',
+                    strokeWidth: 1,
+                    strokeDasharray: '0',
+                  },
+                  propsForLabels: {
+                    fontSize: 12,
+                    fontWeight: '600',
+                  }
+                }}
+                bezier
+                style={styles.chart}
+                withInnerLines={true}
+                withOuterLines={false}
+                withVerticalLines={true}
+                withHorizontalLines={true}
+                fromZero={true}
+                yAxisInterval={1}
+                segments={5}
+                formatYLabel={(value) => {
+                  const num = parseInt(value);
+                  if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+                  return value.toString();
+                }}
+              />
+            </ScrollView>
+
+            {/* X-Axis Label */}
+            <View style={styles.axisLabelContainer}>
+              <Text style={styles.axisLabel}>Timeline (Months)</Text>
+            </View>
+          </View>
         )}
+
+        {/* Colorful Summary Stats Below Chart */}
+        <View style={styles.chartSummary}>
+          {/* Total Approved Events */}
+          <View style={[styles.summaryItem, styles.summaryItemBlue]}>
+            <View style={[styles.summaryIconContainer, { backgroundColor: '#0ea5e915' }]}>
+              <Ionicons name="checkmark-circle" size={20} color="#0ea5e9" />
+            </View>
+            <Text style={[styles.summaryValue, { color: '#0ea5e9' }]}>
+              {dashboardStats.totalEvents}
+            </Text>
+            <Text style={styles.summaryLabel}>Total Events</Text>
+          </View>
+
+          {/* Peak Attendance Month */}
+          <View style={[styles.summaryItem, styles.summaryItemGreen]}>
+            <View style={[styles.summaryIconContainer, { backgroundColor: '#10b98115' }]}>
+              <Ionicons name="people" size={20} color="#10b981" />
+            </View>
+            <Text style={[styles.summaryValue, { color: '#10b981', fontSize: 16 }]}>
+              {monthlyStats.length > 0
+                ? monthlyStats.reduce((max, stat) => stat.attendance > max.attendance ? stat : max, monthlyStats[0]).month
+                : '-'
+              }
+            </Text>
+            <Text style={styles.summaryLabel}>
+              Peak Attendance ({monthlyStats.length > 0
+                ? Math.max(...monthlyStats.map(s => s.attendance))
+                : 0
+              })
+            </Text>
+          </View>
+
+          {/* Growth */}
+          <View style={[styles.summaryItem, styles.summaryItemPurple]}>
+            <View style={[styles.summaryIconContainer, { backgroundColor: '#8b5cf615' }]}>
+              <Ionicons
+                name={calculateGrowth(monthlyStats, 'attendance') >= 0 ? "trending-up" : "trending-down"}
+                size={20}
+                color="#8b5cf6"
+              />
+            </View>
+            <Text style={[styles.summaryValue, { color: '#8b5cf6' }]}>
+              {calculateGrowth(monthlyStats, 'attendance') > 0 ? '+' : ''}
+              {calculateGrowth(monthlyStats, 'attendance')}%
+            </Text>
+            <Text style={styles.summaryLabel}>Attendance Growth</Text>
+          </View>
+        </View>
       </View>
 
+      {/* User Role Distribution - Horizontal Bar Chart */}
+      <View style={styles.roleDistributionContainer}>
+        <View style={styles.roleHeader}>
+          <Text style={styles.roleTitle}>User Distribution</Text>
+          <Text style={styles.roleSubtitle}>By role type</Text>
+        </View>
+
+        {userRoleStats.length > 0 && (
+          <View style={styles.roleBarsContainer}>
+            {userRoleStats.map((role, index) => (
+              <View key={role.role} style={styles.roleBarRow}>
+                <View style={styles.roleLabelContainer}>
+                  <View style={[styles.roleIcon, { backgroundColor: role.color + '20' }]}>
+                    <Ionicons name={role.icon} size={14} color={role.color} />
+                  </View>
+                  <Text style={styles.roleLabel}>{role.label}</Text>
+                </View>
+
+                <View style={styles.roleBarWrapper}>
+                  <View style={styles.roleBarBackground}>
+                    <View
+                      style={[
+                        styles.roleBarFill,
+                        {
+                          width: `${role.percentage}%`,
+                          backgroundColor: role.color
+                        }
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.roleValueContainer}>
+                  <Text style={[styles.roleValue, { color: role.color }]}>{role.count}</Text>
+                  <Text style={styles.rolePercentage}>{role.percentage}%</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+      
+        <View style={styles.roleTotalContainer}>
+          <Text style={styles.roleTotalLabel}>Total Users</Text>
+          <Text style={styles.roleTotalValue}>{dashboardStats.totalUsers}</Text>
+        </View>
+      </View>
+
+      {/* Quick Actions - Now below charts */}
+      <View style={styles.quickActionsSection}>
+        <Text style={styles.quickActionsTitle}>Quick Actions</Text>
+        <View style={styles.quickActionsGrid}>
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('events')}>
+            <LinearGradient
+              colors={['#0ea5e9', '#0284c7']}
+              style={styles.quickActionGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="add-circle" size={24} color="#ffffff" />
+              <Text style={styles.quickActionText}>Create Event</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('announcements')}>
+            <LinearGradient
+              colors={['#f59e0b', '#d97706']}
+              style={styles.quickActionGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <FontAwesome6 name="bullhorn" size={24} color="#ffffff" />
+              <Text style={styles.quickActionText}>Make Announcement</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('attendance')}>
+            <LinearGradient
+              colors={['#10b981', '#059669']}
+              style={styles.quickActionGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Ionicons name="scan" size={24} color="#ffffff" />
+              <Text style={styles.quickActionText}>Scan QR</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('users')}>
+            <LinearGradient
+              colors={['#8b5cf6', '#7c3aed']}
+              style={styles.quickActionGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <FontAwesome6 name="user-plus" size={24} color="#ffffff" />
+              <Text style={styles.quickActionText}>Add User</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
       {/* Two Column Layout */}
       <View style={styles.twoColumnLayout}>
         <View style={[styles.column, styles.activityColumn]}>
@@ -1343,28 +1634,6 @@ export default function MainAdminDashboard() {
                 </TouchableOpacity>
               </View>
             )}
-          </View>
-
-          {/* Quick Stats */}
-          <View style={styles.quickStatsGrid}>
-            <View style={styles.quickStatCard}>
-              <Text style={styles.quickStatValue}>
-                {((dashboardStats.activeUsers / dashboardStats.totalUsers) * 100 || 0).toFixed(1)}%
-              </Text>
-              <Text style={styles.quickStatLabel}>Active Rate</Text>
-            </View>
-            <View style={styles.quickStatCard}>
-              <Text style={styles.quickStatValue}>
-                {Math.round(dashboardStats.totalAttendance / (dashboardStats.totalEvents || 1))}
-              </Text>
-              <Text style={styles.quickStatLabel}>Avg/Event</Text>
-            </View>
-            <View style={styles.quickStatCard}>
-              <Text style={styles.quickStatValue}>
-                {dashboardStats.pendingVerifications}
-              </Text>
-              <Text style={styles.quickStatLabel}>Pending</Text>
-            </View>
           </View>
         </View>
       </View>

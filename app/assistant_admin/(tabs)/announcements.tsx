@@ -1,27 +1,29 @@
+// app/assistant_admin/(tabs)/announcements.tsx
+import { Feather, FontAwesome6, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import {
-  addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
+  addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc
 } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
-  Modal,
-  Platform,
+  Modal, Platform, RefreshControl,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
-  useWindowDimensions
+  useWindowDimensions,
+  View
 } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from "../../../context/AuthContext";
 import { db } from "../../../lib/firebaseConfig";
-import { AnnouncementStyles as styles } from "../../../styles/AnnouncementStyles";
+import { assistantAnnouncementStyles } from '../../../styles/assistant-admin/announcementStyles';
 
 dayjs.extend(relativeTime);
 
@@ -30,22 +32,36 @@ interface Announcement {
   title: string;
   message: string;
   createdAt?: any;
+  priority?: 'normal' | 'important' | 'urgent';
+  status?: 'pending' | 'approved' | 'rejected';          // new
+  createdBy?: string;                                     // email of creator
+  createdByName?: string;                                 // name of creator
 }
 
-export default function AnnouncementScreen() {
+export default function AssistantAdminAnnouncements() {
   const { width: screenWidth } = useWindowDimensions();
-  const isSmallScreen = screenWidth < 375;
-  const isMediumScreen = screenWidth < 768;
-  
+
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [filteredAnnouncements, setFilteredAnnouncements] = useState<Announcement[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'week' | 'month'>('all');
-  const [isLoading, setIsLoading] = useState(true); 
-  const { user } = useAuth();
+  const [activeFilter, setActiveFilter] = useState<'all' | 'week' | 'month' | 'urgent'>('all');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+  const [priority, setPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  const { userData } = useAuth();
+  const router = useRouter();
+  const styles = assistantAnnouncementStyles;
 
   useEffect(() => {
     const q = query(collection(db, "updates"), orderBy("createdAt", "desc"));
@@ -55,47 +71,59 @@ export default function AnnouncementScreen() {
         ...(doc.data() as Omit<Announcement, "id">),
       }));
       setAnnouncements(list);
-      filterAnnouncements(list, activeFilter);
-      setIsLoading(false); 
+      setIsLoading(false);
+      setRefreshing(false);
     }, (error) => {
       console.error("Error fetching announcements:", error);
-      setIsLoading(false); 
+      setIsLoading(false);
+      setRefreshing(false);
     });
     return () => unsubscribe();
   }, []);
 
-  const filterAnnouncements = (announcementsList: Announcement[], filter: 'all' | 'week' | 'month') => {
-    const now = dayjs();
-    let filtered = announcementsList;
+  // Filter and search logic
+  useEffect(() => {
+    let filtered = [...announcements];
 
-    switch (filter) {
+    const now = dayjs();
+    switch (activeFilter) {
       case 'week':
-        filtered = announcementsList.filter(ann => {
-          if (!ann.createdAt) return false;
-          return dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'week'));
-        });
+        filtered = filtered.filter(ann =>
+          ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'week'))
+        );
         break;
       case 'month':
-        filtered = announcementsList.filter(ann => {
-          if (!ann.createdAt) return false;
-          return dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'month'));
-        });
+        filtered = filtered.filter(ann =>
+          ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'month'))
+        );
         break;
-      default:
-        filtered = announcementsList;
+      case 'urgent':
+        filtered = filtered.filter(ann =>
+          ann.priority === 'urgent' || ann.title.toLowerCase().includes('urgent')
+        );
+        break;
+    }
+
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase();
+      filtered = filtered.filter(ann =>
+        ann.title.toLowerCase().includes(searchLower) ||
+        ann.message.toLowerCase().includes(searchLower)
+      );
     }
 
     setFilteredAnnouncements(filtered);
-  };
+    setCurrentPage(1);
+  }, [announcements, activeFilter, searchQuery]);
 
-  const handleFilterChange = (filter: 'all' | 'week' | 'month') => {
-    setActiveFilter(filter);
-    filterAnnouncements(announcements, filter);
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
   };
 
   const handleAddAnnouncement = async () => {
     if (!title.trim() || !message.trim()) {
-      Alert.alert("Error", "Please fill in both title and message");
+      Alert.alert("Validation Error", "Please fill in both title and message");
       return;
     }
 
@@ -103,15 +131,37 @@ export default function AnnouncementScreen() {
       await addDoc(collection(db, "updates"), {
         title: title.trim(),
         message: message.trim(),
+        priority: priority,
+        status: 'pending',                           // requires approval
+        createdBy: userData?.email || 'unknown',
+        createdByName: userData?.name || 'Assistant Admin',
         createdAt: serverTimestamp(),
       });
-      setTitle("");
-      setMessage("");
-      setShowCreateForm(false);
-      Alert.alert("Success", "Announcement created successfully!");
+      resetForm();
+      Alert.alert("Success", "Announcement submitted for approval.");
     } catch (error) {
       console.error("Error adding announcement:", error);
       Alert.alert("Error", "Failed to create announcement");
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId || !title.trim() || !message.trim()) return;
+
+    try {
+      const announcementRef = doc(db, "updates", editingId);
+      await updateDoc(announcementRef, {
+        title: title.trim(),
+        message: message.trim(),
+        priority: priority,
+        status: 'pending',                           // requires re‑approval
+        updatedAt: serverTimestamp(),
+      });
+      resetForm();
+      Alert.alert("Success", "Announcement updated and pending approval.");
+    } catch (error) {
+      console.error("Error updating announcement:", error);
+      Alert.alert("Error", "Failed to update announcement");
     }
   };
 
@@ -119,85 +169,77 @@ export default function AnnouncementScreen() {
     setEditingId(announcement.id);
     setTitle(announcement.title);
     setMessage(announcement.message);
+    setPriority(announcement.priority || 'normal');
     setShowCreateForm(true);
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingId || !title.trim() || !message.trim()) return;
-    
-    try {
-      const announcementRef = doc(db, "updates", editingId);
-      await updateDoc(announcementRef, { 
-        title: title.trim(), 
-        message: message.trim() 
-      });
-      setEditingId(null);
-      setTitle("");
-      setMessage("");
-      setShowCreateForm(false);
-      Alert.alert("Success", "Announcement updated successfully!");
-    } catch (error) {
-      console.error("Error updating announcement:", error);
-      Alert.alert("Error", "Failed to update announcement");
+  const handleDelete = async (id: string, announcementTitle: string) => {
+    if (Platform.OS === 'web') {
+      const isConfirmed = window.confirm(`Are you sure you want to delete "${announcementTitle}"?`);
+      if (isConfirmed) {
+        try {
+          await deleteDoc(doc(db, "updates", id));
+          if (selectedAnnouncement?.id === id) {
+            setSelectedAnnouncement(null);
+            setShowDetailModal(false);
+          }
+          window.alert("Announcement deleted successfully!");
+        } catch (error) {
+          console.error("Error deleting announcement:", error);
+          window.alert("Failed to delete announcement");
+        }
+      }
+    } else {
+      Alert.alert(
+        "Delete Announcement",
+        `Are you sure you want to delete "${announcementTitle}"?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                await deleteDoc(doc(db, "updates", id));
+                if (selectedAnnouncement?.id === id) {
+                  setSelectedAnnouncement(null);
+                  setShowDetailModal(false);
+                }
+                Alert.alert("Success", "Announcement deleted successfully!");
+              } catch (error) {
+                console.error("Error deleting announcement:", error);
+                Alert.alert("Error", "Failed to delete announcement");
+              }
+            }
+          },
+        ]
+      );
     }
   };
 
- const handleDelete = async (id: string, announcementTitle: string) => {
-  if (Platform.OS === 'web') {
-    const isConfirmed = window.confirm(`Are you sure you want to delete "${announcementTitle}"?`);
-    
-    if (isConfirmed) {
-      try {
-        await deleteDoc(doc(db, "updates", id));
-        window.alert("Announcement deleted successfully!");
-      } catch (error) {
-        console.error("Error deleting announcement:", error);
-        window.alert("Failed to delete announcement");
-      }
-    }
-  } else {
-    Alert.alert(
-      "Delete Announcement", 
-      `Are you sure you want to delete "${announcementTitle}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteDoc(doc(db, "updates", id));
-              Alert.alert("Success", "Announcement deleted successfully!");
-            } catch (error) {
-              console.error("Error deleting announcement:", error);
-              Alert.alert("Error", "Failed to delete announcement");
-            }
-          }
-        },
-      ]
-    );
-  }
-};
-
-  const handleCloseCreateForm = () => {
+  const resetForm = () => {
     setEditingId(null);
     setTitle("");
     setMessage("");
+    setPriority('normal');
     setShowCreateForm(false);
   };
 
-  const totalAnnouncements = announcements.length;
-  const todayAnnouncements = announcements.filter(ann => {
-    if (!ann.createdAt) return false;
-    return dayjs(ann.createdAt.toDate()).isSame(dayjs(), 'day');
-  }).length;
-  const thisWeekAnnouncements = announcements.filter(ann => {
-    if (!ann.createdAt) return false;
-    return dayjs(ann.createdAt.toDate()).isAfter(dayjs().subtract(1, 'week'));
-  }).length;
+  const openDetailModal = (announcement: Announcement) => {
+    setSelectedAnnouncement(announcement);
+    setShowDetailModal(true);
+  };
 
-  const formatDate = (date: Date) => {
-    return dayjs(date).format('MMM D, YYYY • h:mm A');
+  const getPriorityColor = (title: string, priority?: string) => {
+    if (priority === 'urgent' || title.toLowerCase().includes('urgent')) return '#ef4444';
+    if (priority === 'important' || title.toLowerCase().includes('important')) return '#f59e0b';
+    return '#0ea5e9';
+  };
+
+  const getPriorityLabel = (title: string, priority?: string) => {
+    if (priority === 'urgent' || title.toLowerCase().includes('urgent')) return 'URGENT';
+    if (priority === 'important' || title.toLowerCase().includes('important')) return 'IMPORTANT';
+    return 'NORMAL';
   };
 
   const isNewAnnouncement = (createdAt: any) => {
@@ -205,403 +247,559 @@ export default function AnnouncementScreen() {
     return dayjs(createdAt.toDate()).isAfter(dayjs().subtract(1, 'day'));
   };
 
-const renderLoading = () => (
-  <View style={styles.loadingContainer}>
-    <ActivityIndicator 
-      size="large" 
-      color="#4F46E5"
-    />
-    <Text style={styles.loadingText}>Loading announcements...</Text>
-  </View>
-);
+  const stats = useMemo(() => {
+    const total = announcements.length;
+    const today = announcements.filter(ann => {
+      if (!ann.createdAt) return false;
+      return dayjs(ann.createdAt.toDate()).isSame(dayjs(), 'day');
+    }).length;
+    const urgent = announcements.filter(ann =>
+      ann.priority === 'urgent' || ann.title.toLowerCase().includes('urgent')
+    ).length;
+    return { total, today, urgent };
+  }, [announcements]);
 
-  const renderAnnouncementItem = ({ item }: { item: Announcement }) => (
-    <View style={[
-      styles.card,
-      isSmallScreen && styles.cardSmall
-    ]}>
-      <View style={[
-        styles.cardHeader,
-        isSmallScreen && styles.cardHeaderSmall
-      ]}>
-        <View style={styles.titleContainer}>
-          {isNewAnnouncement(item.createdAt) && (
-            <View style={styles.newBadge}>
-              <Text style={styles.newBadgeText}>NEW</Text>
-            </View>
-          )}
-          <Text style={[
-            styles.cardTitle,
-            isSmallScreen && styles.cardTitleSmall
-          ]}>{item.title}</Text>
-        </View>
-        <View style={[
-          styles.cardActions,
-          isSmallScreen && styles.cardActionsSmall
-        ]}>
-          <TouchableOpacity
-            style={[
-              styles.editButton,
-              isSmallScreen && styles.editButtonSmall
-            ]}
-            onPress={() => handleEditStart(item)}
-          >
-            <Text style={[
-              styles.editButtonText,
-              isSmallScreen && styles.editButtonTextSmall
-            ]}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.deleteButton,
-              isSmallScreen && styles.deleteButtonSmall
-            ]}
-            onPress={() => handleDelete(item.id, item.title)}
-          >
-            <Text style={[
-              styles.deleteButtonText,
-              isSmallScreen && styles.deleteButtonTextSmall
-            ]}>Delete</Text>
-          </TouchableOpacity>
-        </View>
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
+  const paginatedAnnouncements = filteredAnnouncements.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+          onPress={goToPreviousPage}
+          disabled={currentPage === 1}
+        >
+          <Feather name="chevron-left" size={18} color={currentPage === 1 ? "#cbd5e1" : "#0f172a"} />
+          <Text style={[styles.paginationText, currentPage === 1 && styles.paginationTextDisabled]}>
+            Prev
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.paginationPageInfo}>
+          {currentPage} / {totalPages}
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+          onPress={goToNextPage}
+          disabled={currentPage === totalPages}
+        >
+          <Text style={[styles.paginationText, currentPage === totalPages && styles.paginationTextDisabled]}>
+            Next
+          </Text>
+          <Feather name="chevron-right" size={18} color={currentPage === totalPages ? "#cbd5e1" : "#0f172a"} />
+        </TouchableOpacity>
       </View>
-      
-      <Text style={[
-        styles.cardMessage,
-        isSmallScreen && styles.cardMessageSmall
-      ]}>{item.message}</Text>
-      
-      {item.createdAt && (
-        <View style={[
-          styles.dateContainer,
-          isSmallScreen && styles.dateContainerSmall
-        ]}>
-          <Icon name="clock-outline" size={isSmallScreen ? 10 : 12} color="#6B7280" />
-          <Text style={[
-            styles.timestamp,
-            isSmallScreen && styles.timestampSmall
-          ]}>
-            {dayjs(item.createdAt.toDate()).fromNow()} • {formatDate(item.createdAt.toDate())}
+    );
+  };
+
+  const renderAnnouncementCard = ({ item }: { item: Announcement }) => {
+    const priorityColor = getPriorityColor(item.title, item.priority);
+    const isNew = isNewAnnouncement(item.createdAt);
+    const isPending = item.status === 'pending';
+    const isRejected = item.status === 'rejected';
+    const isApproved = item.status === 'approved';
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => openDetailModal(item)}
+        activeOpacity={0.7}
+      >
+       
+
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {item.title}
+            </Text>
+
+            <View style={styles.cardHeaderRight}>
+              {isNew && (
+                <View style={[styles.badge, { backgroundColor: '#3b82f6' }]}>
+                  <Text style={styles.badgeText}>NEW</Text>
+                </View>
+              )}
+              {isPending && (
+                <View style={[styles.badge, { backgroundColor: '#f59e0b' }]}>
+                  <Text style={styles.badgeText}>PENDING</Text>
+                </View>
+              )}
+              {isRejected && (
+                <View style={[styles.badge, { backgroundColor: '#ef4444' }]}>
+                  <Text style={styles.badgeText}>REJECTED</Text>
+                </View>
+              )}
+              {isApproved && (
+                <View style={[styles.badge, { backgroundColor: '#10b981' }]}>
+                  <Text style={styles.badgeText}>APPROVED</Text>
+                </View>
+              )}
+              <View style={[styles.priorityDotSmall, { backgroundColor: priorityColor }]} />
+
+              <Text style={styles.cardTime}>
+                {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
+              </Text>
+
+              <View style={styles.cardActionsRow}>
+                <TouchableOpacity
+                  style={styles.cardActionButtonSmall}
+                  onPress={() => handleEditStart(item)}
+                >
+                  <Feather name="edit-2" size={14} color="#3b82f6" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.cardActionButtonSmall, styles.cardActionButtonDangerSmall]}
+                  onPress={() => handleDelete(item.id, item.title)}
+                >
+                  <Feather name="trash-2" size={14} color="#ef4444" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.cardMessage} numberOfLines={1}>
+            {item.message}
           </Text>
         </View>
-      )}
+      </TouchableOpacity>
+    );
+  };
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyStateIcon}>
+        <FontAwesome6 name="bullhorn" size={40} color="#cbd5e1" />
+      </View>
+      <Text style={styles.emptyStateTitle}>No announcements</Text>
+      <Text style={styles.emptyStateText}>
+        {searchQuery ? 'Try different search terms' : 'Pull down to refresh or create a new announcement'}
+      </Text>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <View style={[
-        styles.header,
-        isSmallScreen && styles.headerSmall
-      ]}>
-        <View style={[
-          styles.headerIcon,
-          isSmallScreen && styles.headerIconSmall
-        ]}>
-          <Icon name="bullhorn" size={isSmallScreen ? 16 : 20} color="#FFFFFF" />
+      {/* Header */}
+      <LinearGradient
+        colors={['#14203d', '#06080b']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.greeting}>Welcome back,</Text>
+            <Text style={styles.userName}>{userData?.name || 'Assistant'}</Text>
+            <Text style={styles.role}>Assistant Admin</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={() => router.push('/assistant_admin/profile')}
+          >
+            {userData?.photoURL ? (
+              <Image source={{ uri: userData.photoURL }} style={styles.profileImage} />
+            ) : (
+              <View style={[styles.profileImage, styles.profileFallback]}>
+                <Text style={styles.profileInitials}>
+                  {userData?.name ? userData.name.charAt(0).toUpperCase() : 'A'}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
-        <Text style={[
-          styles.headerTitle,
-          isSmallScreen && styles.headerTitleSmall
-        ]}>Announcements</Text>
-        <Text style={[
-          styles.headerSubtitle,
-          isSmallScreen && styles.headerSubtitleSmall
-        ]}>
-          Manage campus announcements and updates
-        </Text>
+
+        <View style={styles.headerBottom}>
+          <View style={styles.dateContainer}>
+            <Feather name="calendar" size={12} color="#94a3b8" />
+            <Text style={styles.dateText}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+              })}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setShowCreateForm(true)}
+          >
+            <Feather name="plus" size={20} color="#ffffff" />
+            <Text style={styles.addButtonText}>New</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+
+      {/* Stats Row */}
+      <View style={styles.statsContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.statsScroll}
+        >
+          <View style={[styles.statCard, {borderRightWidth: 3, borderRightColor: '#1266d4'}]}>
+            <View style={[styles.statIcon, { backgroundColor: '#0ea5e915' }]}>
+              <Ionicons name="document-text" size={18} color="#0ea5e9" />
+            </View>
+            <Text style={styles.statNumber}>{stats.total}</Text>
+            <Text style={styles.statLabel}>Total</Text>
+          </View>
+
+          <View style={[styles.statCard, {borderRightWidth: 3, borderRightColor: '#1266d4'}]}>
+            <View style={[styles.statIcon, { backgroundColor: '#10b98115' }]}>
+              <Feather name="sun" size={18} color="#10b981" />
+            </View>
+            <Text style={styles.statNumber}>{stats.today}</Text>
+            <Text style={styles.statLabel}>Today</Text>
+          </View>
+
+          <View style={[styles.statCard, {borderRightWidth: 3, borderRightColor: '#1266d4'}]}>
+            <View style={[styles.statIcon, { backgroundColor: '#ef444415' }]}>
+              <MaterialIcons name="priority-high" size={18} color="#ef4444" />
+            </View>
+            <Text style={styles.statNumber}>{stats.urgent}</Text>
+            <Text style={styles.statLabel}>Urgent</Text>
+          </View>
+        </ScrollView>
       </View>
 
-      {isLoading ? (
-        renderLoading()
-      ) : (
-        <>
-          <View style={[
-            styles.statsContainer,
-            isSmallScreen && styles.statsContainerSmall
-          ]}>
-            <View style={[
-              styles.statCard,
-              isSmallScreen && styles.statCardSmall
-            ]}>
-              <Text style={[
-                styles.statNumber,
-                isSmallScreen && styles.statNumberSmall
-              ]}>{totalAnnouncements}</Text>
-              <Text style={[
-                styles.statLabel,
-                isSmallScreen && styles.statLabelSmall
-              ]}>Total</Text>
-            </View>
-            <View style={[
-              styles.statCard,
-              isSmallScreen && styles.statCardSmall
-            ]}>
-              <Text style={[
-                styles.statNumber,
-                isSmallScreen && styles.statNumberSmall
-              ]}>{todayAnnouncements}</Text>
-              <Text style={[
-                styles.statLabel,
-                isSmallScreen && styles.statLabelSmall
-              ]}>Today</Text>
-            </View>
-            <View style={[
-              styles.statCard,
-              isSmallScreen && styles.statCardSmall
-            ]}>
-              <Text style={[
-                styles.statNumber,
-                isSmallScreen && styles.statNumberSmall
-              ]}>{thisWeekAnnouncements}</Text>
-              <Text style={[
-                styles.statLabel,
-                isSmallScreen && styles.statLabelSmall
-              ]}>This Week</Text>
-            </View>
-          </View>
-
-          <View style={[
-            styles.filterSection,
-            isSmallScreen && styles.filterSectionSmall
-          ]}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={styles.filterScrollView}
-            >
-              <View style={styles.filterChips}>
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    activeFilter === 'all' && styles.filterChipActive,
-                    isSmallScreen && styles.filterChipSmall
-                  ]}
-                  onPress={() => handleFilterChange('all')}
-                >
-                  <Text style={[
-                    styles.filterChipText,
-                    activeFilter === 'all' && styles.filterChipTextActive,
-                    isSmallScreen && styles.filterChipTextSmall
-                  ]}>All</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    activeFilter === 'week' && styles.filterChipActive,
-                    isSmallScreen && styles.filterChipSmall
-                  ]}
-                  onPress={() => handleFilterChange('week')}
-                >
-                  <Text style={[
-                    styles.filterChipText,
-                    activeFilter === 'week' && styles.filterChipTextActive,
-                    isSmallScreen && styles.filterChipTextSmall
-                  ]}>This Week</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.filterChip,
-                    activeFilter === 'month' && styles.filterChipActive,
-                    isSmallScreen && styles.filterChipSmall
-                  ]}
-                  onPress={() => handleFilterChange('month')}
-                >
-                  <Text style={[
-                    styles.filterChipText,
-                    activeFilter === 'month' && styles.filterChipTextActive,
-                    isSmallScreen && styles.filterChipTextSmall
-                  ]}>This Month</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-
-            <TouchableOpacity 
-              style={[
-                styles.createButton,
-                isSmallScreen && styles.createButtonSmall
-              ]}
-              onPress={() => setShowCreateForm(true)}
-            >
-              <Icon name="plus" size={isSmallScreen ? 14 : 16} color="#FFFFFF" />
-              {!isSmallScreen && (
-                <Text style={styles.createButtonText}>Create</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <View style={[
-            styles.resultsInfo,
-            isSmallScreen && styles.resultsInfoSmall
-          ]}>
-            <Text style={[
-              styles.resultsText,
-              isSmallScreen && styles.resultsTextSmall
-            ]}>
-              {filteredAnnouncements.length} announcement{filteredAnnouncements.length !== 1 ? 's' : ''}
-              {activeFilter === 'week' ? ' this week' : activeFilter === 'month' ? ' this month' : ''}
-            </Text>
-          </View>
-
-          <FlatList
-            data={filteredAnnouncements}
-            keyExtractor={(item) => item.id}
-            renderItem={renderAnnouncementItem}
-            contentContainerStyle={[
-              styles.listContent,
-              isSmallScreen && styles.listContentSmall
-            ]}
-            ListEmptyComponent={
-              <View style={[
-                styles.emptyState,
-                isSmallScreen && styles.emptyStateSmall
-              ]}>
-                <Icon name="bullhorn-outline" size={isSmallScreen ? 36 : 48} color="#9CA3AF" />
-                <Text style={[
-                  styles.emptyStateTitle,
-                  isSmallScreen && styles.emptyStateTitleSmall
-                ]}>
-                  {activeFilter === 'all' ? 'No announcements' : 
-                  activeFilter === 'week' ? 'No announcements this week' : 
-                  'No announcements this month'}
-                </Text>
-                <Text style={[
-                  styles.emptyStateText,
-                  isSmallScreen && styles.emptyStateTextSmall
-                ]}>
-                  {activeFilter === 'all' ? 'Create your first announcement to get started' :
-                  activeFilter === 'week' ? 'No announcements created in the past 7 days' :
-                  'No announcements created in the past 30 days'}
-                </Text>
-                {activeFilter === 'all' && (
-                  <TouchableOpacity 
-                    style={[
-                      styles.emptyStateButton,
-                      isSmallScreen && styles.emptyStateButtonSmall
-                    ]}
-                    onPress={() => setShowCreateForm(true)}
-                  >
-                    <Text style={[
-                      styles.emptyStateButtonText,
-                      isSmallScreen && styles.emptyStateButtonTextSmall
-                    ]}>Create Announcement</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            }
+      {/* Search Bar */}
+      <View style={styles.searchSection}>
+        <View style={styles.searchBar}>
+          <Feather name="search" size={18} color="#64748b" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search announcements..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#94a3b8"
           />
-        </>
-      )}
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClear}>
+              <Feather name="x" size={18} color="#64748b" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
 
+      {/* Filter Chips */}
+      <View style={styles.filterSection}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {(['all', 'week', 'month', 'urgent'] as const).map((filter) => (
+            <TouchableOpacity
+              key={filter}
+              style={[
+                styles.filterChip,
+                activeFilter === filter && styles.filterChipActive
+              ]}
+              onPress={() => setActiveFilter(filter)}
+            >
+              <Text style={[
+                styles.filterChipText,
+                activeFilter === filter && styles.filterChipTextActive
+              ]}>
+                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Announcements List with Pagination */}
+      <FlatList
+        data={paginatedAnnouncements}
+        keyExtractor={(item) => item.id}
+        renderItem={renderAnnouncementCard}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0ea5e9']} />
+        }
+        ListEmptyComponent={renderEmptyState}
+        ListFooterComponent={renderPagination}
+        ListFooterComponentStyle={styles.paginationWrapper}
+      />
+
+      {/* Create/Edit Modal */}
       <Modal
         visible={showCreateForm}
+        transparent={true}
         animationType="slide"
-        presentationStyle={isSmallScreen ? "fullScreen" : "formSheet"}
+        onRequestClose={resetForm}
       >
-        <View style={styles.modalContainer}>
-          <View style={[
-            styles.modalHeader,
-            isSmallScreen && styles.modalHeaderSmall
-          ]}>
-            <TouchableOpacity onPress={handleCloseCreateForm} style={styles.backButton}>
-              <Icon name="arrow-left" size={isSmallScreen ? 18 : 20} color="#4F46E5" />
-              <Text style={[
-                styles.backButtonText,
-                isSmallScreen && styles.backButtonTextSmall
-              ]}>Back</Text>
-            </TouchableOpacity>
-            <Text style={[
-              styles.modalTitle,
-              isSmallScreen && styles.modalTitleSmall
-            ]}>
-              {editingId ? 'Edit Announcement' : 'Create Announcement'}
-            </Text>
-            <View style={styles.placeholder} />
-          </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <View style={styles.modalIconContainer}>
+                  <FontAwesome6
+                    name={editingId ? "pen-to-square" : "bullhorn"}
+                    size={20}
+                    color="#0ea5e9"
+                  />
+                </View>
+                <View>
+                  <Text style={styles.modalTitle}>
+                    {editingId ? 'Edit Announcement' : 'New Announcement'}
+                  </Text>
+                  <Text style={styles.modalSubtitle}>
+                    {editingId ? 'Update announcement details' : 'Create a new announcement'}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={resetForm} style={styles.modalClose}>
+                <Feather name="x" size={24} color="#64748b" />
+              </TouchableOpacity>
+            </View>
 
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.keyboardAvoidingView}
-          >
-            <ScrollView style={styles.modalContent} contentContainerStyle={[
-              styles.modalContentContainer,
-              isSmallScreen && styles.modalContentContainerSmall
-            ]}>
-              <View style={styles.formSection}>
-                <Text style={[
-                  styles.label,
-                  isSmallScreen && styles.labelSmall
-                ]}>Title</Text>
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              {/* Priority Selector */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Priority Level</Text>
+                <View style={styles.priorityContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.priorityButton,
+                      priority === 'normal' && styles.priorityButtonActive,
+                      priority === 'normal' && { borderColor: '#0ea5e9', backgroundColor: '#0ea5e915' }
+                    ]}
+                    onPress={() => setPriority('normal')}
+                  >
+                    <View style={[styles.priorityDot, { backgroundColor: '#0ea5e9' }]} />
+                    <Text style={[
+                      styles.priorityButtonText,
+                      priority === 'normal' && styles.priorityButtonTextActive
+                    ]}>Normal</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.priorityButton,
+                      priority === 'important' && styles.priorityButtonActive,
+                      priority === 'important' && { borderColor: '#f59e0b', backgroundColor: '#f59e0b15' }
+                    ]}
+                    onPress={() => setPriority('important')}
+                  >
+                    <View style={[styles.priorityDot, { backgroundColor: '#f59e0b' }]} />
+                    <Text style={[
+                      styles.priorityButtonText,
+                      priority === 'important' && styles.priorityButtonTextActive
+                    ]}>Important</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.priorityButton,
+                      priority === 'urgent' && styles.priorityButtonActive,
+                      priority === 'urgent' && { borderColor: '#ef4444', backgroundColor: '#ef444415' }
+                    ]}
+                    onPress={() => setPriority('urgent')}
+                  >
+                    <View style={[styles.priorityDot, { backgroundColor: '#ef4444' }]} />
+                    <Text style={[
+                      styles.priorityButtonText,
+                      priority === 'urgent' && styles.priorityButtonTextActive
+                    ]}>Urgent</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Title Input */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Title</Text>
                 <TextInput
-                  style={[
-                    styles.input,
-                    isSmallScreen && styles.inputSmall
-                  ]}
+                  style={styles.formInput}
                   placeholder="Enter announcement title"
+                  placeholderTextColor="#94a3b8"
                   value={title}
                   onChangeText={setTitle}
+                  maxLength={100}
                 />
               </View>
 
-              <View style={styles.formSection}>
-                <Text style={[
-                  styles.label,
-                  isSmallScreen && styles.labelSmall
-                ]}>Message</Text>
+              {/* Message Input */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Message</Text>
                 <TextInput
-                  style={[
-                    styles.input, 
-                    styles.textArea,
-                    isSmallScreen && styles.inputSmall,
-                    isSmallScreen && styles.textAreaSmall
-                  ]}
+                  style={[styles.formInput, styles.formTextArea]}
                   placeholder="Write your announcement message..."
+                  placeholderTextColor="#94a3b8"
                   value={message}
                   onChangeText={setMessage}
                   multiline
-                  numberOfLines={isSmallScreen ? 4 : 6}
+                  numberOfLines={6}
                   textAlignVertical="top"
+                  maxLength={500}
                 />
+                <Text style={styles.characterCount}>
+                  {message.length}/500
+                </Text>
               </View>
 
-              <View style={[
-                styles.buttonContainer,
-                isSmallScreen && styles.buttonContainerSmall
-              ]}>
-                <TouchableOpacity 
+              {/* Action Buttons */}
+              <View style={styles.formActions}>
+                <TouchableOpacity
                   style={[
                     styles.submitButton,
-                    (!title.trim() || !message.trim()) && styles.submitButtonDisabled,
-                    isSmallScreen && styles.submitButtonSmall
+                    (!title.trim() || !message.trim()) && styles.submitButtonDisabled
                   ]}
                   onPress={editingId ? handleSaveEdit : handleAddAnnouncement}
                   disabled={!title.trim() || !message.trim()}
                 >
-                  <Text style={[
-                    styles.submitButtonText,
-                    isSmallScreen && styles.submitButtonTextSmall
-                  ]}>
-                    {editingId ? 'Save Changes' : 'Create Announcement'}
+                  <Feather
+                    name={editingId ? "check-circle" : "send"}
+                    size={18}
+                    color="#ffffff"
+                  />
+                  <Text style={styles.submitButtonText}>
+                    {editingId ? 'Save Changes' : 'Submit for Approval'}
                   </Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[
-                    styles.cancelButton,
-                    isSmallScreen && styles.cancelButtonSmall
-                  ]}
-                  onPress={handleCloseCreateForm}
+
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={resetForm}
                 >
-                  <Text style={[
-                    styles.cancelButtonText,
-                    isSmallScreen && styles.cancelButtonTextSmall
-                  ]}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
-          </KeyboardAvoidingView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Detail View Modal */}
+      <Modal
+        visible={showDetailModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowDetailModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.detailModalContainer}>
+            {selectedAnnouncement && (
+              <>
+                <View style={styles.detailModalHeader}>
+                  <View style={styles.detailModalHeaderLeft}>
+                    <View style={[
+                      styles.detailPriorityIndicator,
+                      { backgroundColor: getPriorityColor(selectedAnnouncement.title, selectedAnnouncement.priority) }
+                    ]} />
+                    <Text style={styles.detailModalTitle}>Announcement Details</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setShowDetailModal(false)}
+                    style={styles.detailModalClose}
+                  >
+                    <Feather name="x" size={24} color="#64748b" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.detailModalContent} showsVerticalScrollIndicator={false}>
+                  <View style={styles.detailBadges}>
+                    {isNewAnnouncement(selectedAnnouncement.createdAt) && (
+                      <View style={[styles.detailBadge, { backgroundColor: '#3b82f6' }]}>
+                        <Text style={styles.detailBadgeText}>NEW</Text>
+                      </View>
+                    )}
+                    {selectedAnnouncement.status === 'pending' && (
+                      <View style={[styles.detailBadge, { backgroundColor: '#f59e0b' }]}>
+                        <Text style={styles.detailBadgeText}>PENDING</Text>
+                      </View>
+                    )}
+                    {selectedAnnouncement.status === 'rejected' && (
+                      <View style={[styles.detailBadge, { backgroundColor: '#ef4444' }]}>
+                        <Text style={styles.detailBadgeText}>REJECTED</Text>
+                      </View>
+                    )}
+                    {selectedAnnouncement.status === 'approved' && (
+                      <View style={[styles.detailBadge, { backgroundColor: '#10b981' }]}>
+                        <Text style={styles.detailBadgeText}>APPROVED</Text>
+                      </View>
+                    )}
+                    <View style={[
+                      styles.detailBadge,
+                      { backgroundColor: getPriorityColor(selectedAnnouncement.title, selectedAnnouncement.priority) }
+                    ]}>
+                      <Text style={styles.detailBadgeText}>
+                        {getPriorityLabel(selectedAnnouncement.title, selectedAnnouncement.priority)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.detailTitle}>{selectedAnnouncement.title}</Text>
+
+                  <View style={styles.detailMeta}>
+                    <View style={styles.detailMetaItem}>
+                      <Feather name="clock" size={14} color="#64748b" />
+                      <Text style={styles.detailMetaText}>
+                        {selectedAnnouncement.createdAt
+                          ? dayjs(selectedAnnouncement.createdAt.toDate()).format('MMM D, YYYY • h:mm A')
+                          : 'Just now'}
+                      </Text>
+                    </View>
+                    {selectedAnnouncement.createdByName && (
+                      <View style={styles.detailMetaItem}>
+                        <Feather name="user" size={14} color="#64748b" />
+                        <Text style={styles.detailMetaText}>
+                          Created by {selectedAnnouncement.createdByName}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.detailMessageContainer}>
+                    <Text style={styles.detailMessage}>
+                      {selectedAnnouncement.message}
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailActions}>
+                    <TouchableOpacity
+                      style={styles.detailEditButton}
+                      onPress={() => {
+                        setShowDetailModal(false);
+                        handleEditStart(selectedAnnouncement);
+                      }}
+                    >
+                      <Feather name="edit-2" size={18} color="#3b82f6" />
+                      <Text style={styles.detailEditButtonText}>Edit Announcement</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.detailDeleteButton}
+                      onPress={() => handleDelete(
+                        selectedAnnouncement.id,
+                        selectedAnnouncement.title
+                      )}
+                    >
+                      <Feather name="trash-2" size={18} color="#ef4444" />
+                      <Text style={styles.detailDeleteButtonText}>Delete Announcement</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </>
+            )}
+          </View>
         </View>
       </Modal>
     </View>

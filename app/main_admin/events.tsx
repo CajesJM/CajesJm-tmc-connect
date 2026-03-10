@@ -44,6 +44,7 @@ interface Event {
     longitude: number;
     radius: number;
   };
+  status?: 'pending' | 'approved' | 'rejected';
 }
 
 interface CoordinatesState {
@@ -178,7 +179,8 @@ export default function MainAdminEvents() {
             createdAt: data.createdAt.toDate(),
             attendees: data.attendees || [],
             locationDescription: data.locationDescription,
-            coordinates: data.coordinates
+            coordinates: data.coordinates,
+            status: data.status || 'approved',
           });
         });
         setEvents(eventsData);
@@ -235,6 +237,14 @@ export default function MainAdminEvents() {
         return eventsList;
     }
   };
+  const getStatusBadgeStyle = (status?: string) => {
+    switch (status) {
+      case 'pending': return { backgroundColor: '#f59e0b' };
+      case 'approved': return { backgroundColor: '#10b981' };
+      case 'rejected': return { backgroundColor: '#ef4444' };
+      default: return { backgroundColor: '#64748b' };
+    }
+  };
 
   const filterEvents = (eventsList: Event[], filter: 'all' | 'upcoming' | 'past') => {
     const filtered = filterEventsByTime(eventsList, filter);
@@ -259,10 +269,9 @@ export default function MainAdminEvents() {
     setSelectedCampusLocation(location);
     setSelectedLocationImage(location.image);
     setShowImagePicker(false);
-
-    if (!newEvent.location) {
-      setNewEvent(prev => ({ ...prev, location: location.name }));
-    }
+    // Always set the location name to the selected campus
+    setNewEvent(prev => ({ ...prev, location: location.name }));
+    // Then open the location picker so user can modify if needed
     setTimeout(() => setShowLocationPicker(true), 100);
   };
 
@@ -421,47 +430,47 @@ export default function MainAdminEvents() {
   };
 
   const openLocationInMaps = async (location: string, coordinates?: { latitude: number, longitude: number }) => {
-  try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    let origin = '';
-    
-    if (status === 'granted') {
-      const userLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Low,
-      });
-      origin = `${userLocation.coords.latitude},${userLocation.coords.longitude}`;
-    }
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      let origin = '';
 
-    if (coordinates) {
-      const { latitude, longitude } = coordinates;
-      const destination = `${latitude},${longitude}`;
-      
-      let url: string;
-      if (Platform.OS === 'ios') {
-        url = origin 
-          ? `http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=d`
-          : `http://maps.apple.com/?daddr=${destination}&dirflg=d`;
-      } else {
-    
-        url = origin
-          ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`
-          : `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+      if (status === 'granted') {
+        const userLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Low,
+        });
+        origin = `${userLocation.coords.latitude},${userLocation.coords.longitude}`;
       }
-      
-      await Linking.openURL(url);
-    } else {
-    
-      const query = encodeURIComponent(location);
-      const url = Platform.OS === 'ios'
-        ? `http://maps.apple.com/?q=${query}`
-        : `https://www.google.com/maps/search/?api=1&query=${query}`;
-      await Linking.openURL(url);
+
+      if (coordinates) {
+        const { latitude, longitude } = coordinates;
+        const destination = `${latitude},${longitude}`;
+
+        let url: string;
+        if (Platform.OS === 'ios') {
+          url = origin
+            ? `http://maps.apple.com/?saddr=${origin}&daddr=${destination}&dirflg=d`
+            : `http://maps.apple.com/?daddr=${destination}&dirflg=d`;
+        } else {
+
+          url = origin
+            ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`
+            : `https://www.google.com/maps/dir/?api=1&destination=${destination}&travelmode=driving`;
+        }
+
+        await Linking.openURL(url);
+      } else {
+
+        const query = encodeURIComponent(location);
+        const url = Platform.OS === 'ios'
+          ? `http://maps.apple.com/?q=${query}`
+          : `https://www.google.com/maps/search/?api=1&query=${query}`;
+        await Linking.openURL(url);
+      }
+    } catch (error) {
+      console.error('Error opening maps:', error);
+      Alert.alert('Error', 'Could not open maps application');
     }
-  } catch (error) {
-    console.error('Error opening maps:', error);
-    Alert.alert('Error', 'Could not open maps application');
-  }
-};
+  };
 
   const checkSelectedEventLocation = async (selectedEventId: string) => {
     const selected = events.find(e => e.id === selectedEventId);
@@ -934,6 +943,12 @@ export default function MainAdminEvents() {
             <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
               {formatShortDate(item.date)}
             </Text>
+            {/* Status badge */}
+            {item.status && (
+              <View style={[styles.paginatedBadge, getStatusBadgeStyle(item.status)]}>
+                <Text style={styles.paginatedBadgeText}>{item.status.toUpperCase()}</Text>
+              </View>
+            )}
             {daysUntil.type === 'today' && (
               <View style={[styles.paginatedBadge, { backgroundColor: '#16a34a' }]}>
                 <Text style={styles.paginatedBadgeText}>TODAY</Text>
@@ -978,6 +993,11 @@ export default function MainAdminEvents() {
               {item.title}
             </Text>
             <View style={styles.searchResultBadges}>
+              {item.status && (
+                <View style={[styles.searchResultBadge, getStatusBadgeStyle(item.status)]}>
+                  <Text style={styles.searchResultBadgeText}>{item.status.toUpperCase()}</Text>
+                </View>
+              )}
               {daysUntil.type === 'today' && (
                 <View style={[styles.searchResultBadge, { backgroundColor: '#16a34a' }]}>
                   <Text style={styles.searchResultBadgeText}>TODAY</Text>
@@ -1504,7 +1524,7 @@ export default function MainAdminEvents() {
 
       {/* Stats Grid */}
       <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#0ea5e9' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
             <Feather name="calendar" size={isMobile ? 16 : 20} color="#0ea5e9" />
           </View>
@@ -1512,7 +1532,7 @@ export default function MainAdminEvents() {
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
         </View>
 
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#f59e0b' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#f59e0b15' }]}>
             <Feather name="clock" size={isMobile ? 16 : 20} color="#f59e0b" />
           </View>
@@ -1520,7 +1540,7 @@ export default function MainAdminEvents() {
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Upcoming</Text>
         </View>
 
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#64748b' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#64748b15' }]}>
             <Feather name="check-circle" size={isMobile ? 16 : 20} color="#64748b" />
           </View>
@@ -1816,27 +1836,57 @@ export default function MainAdminEvents() {
             </View>
 
             <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+              {/* Location Name */}
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location Name</Text>
                 <TextInput
-                  placeholder="e.g., Main Campus, Expansion, etc."
+                  placeholder="e.g., Main Hall, Room 101"
                   value={newEvent.location}
-                  onChangeText={(text: string) => setNewEvent(prev => ({ ...prev, location: text }))}
+                  onChangeText={(text) => setNewEvent(prev => ({ ...prev, location: text }))}
                 />
               </View>
 
+              {/* Location Description */}
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location Description (Optional)</Text>
                 <TextInput
-                  placeholder="Describe the venue, facilities, or special features..."
+                  placeholder="Describe the venue..."
                   value={newEvent.locationDescription}
-                  onChangeText={(text: string) => setNewEvent(prev => ({ ...prev, locationDescription: text }))}
+                  onChangeText={(text) => setNewEvent(prev => ({ ...prev, locationDescription: text }))}
                   style={[styles.modernTextArea, isMobile && styles.modernFormInputMobile]}
                   multiline
                   numberOfLines={3}
                 />
               </View>
 
+              {/* Image Selection – exactly like assistant admin */}
+              <View style={styles.modernFormGroup}>
+                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location Image</Text>
+                <TouchableOpacity
+                  style={[styles.modernLocationButton, { paddingVertical: 12, paddingHorizontal: 16 }]}
+                  onPress={() => {
+                    setShowLocationPicker(false);          // close location picker
+                    setTimeout(() => setShowImagePicker(true), 100); // open image picker
+                  }}
+                >
+                  <View style={styles.modernLocationButtonText}>
+                    <Text style={styles.modernLocationButtonTitle}>
+                      {selectedCampusLocation ? selectedCampusLocation.name : 'Choose Campus Location'}
+                    </Text>
+                    <Text style={styles.modernLocationButtonSubtitle}>
+                      {selectedCampusLocation ? 'Tap to change' : 'Select from campus locations'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                {selectedCampusLocation && (
+                  <Image
+                    source={selectedCampusLocation.image}
+                    style={[styles.selectedImagePreview, { marginTop: 8, alignSelf: 'center' }]}
+                  />
+                )}
+              </View>
+
+              {/* Save Button */}
               <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
                 <TouchableOpacity
                   style={[
@@ -1853,6 +1903,69 @@ export default function MainAdminEvents() {
                 </TouchableOpacity>
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Image Picker Modal */}
+      <Modal
+        visible={showImagePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowImagePicker(false)}
+      >
+        <View style={styles.modernModalOverlay}>
+          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile, { maxHeight: 500 }]}>
+            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+              <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
+                <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+                  <Feather name="image" size={isMobile ? 16 : 20} color="#0ea5e9" />
+                </View>
+                <View style={styles.modernModalTitleContainer}>
+                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                    Choose Campus Location
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowImagePicker(false)}
+                style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+              >
+                <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={CAMPUS_LOCATIONS}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ padding: 16 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    padding: 12,
+                    backgroundColor: '#f8fafc',
+                    borderRadius: 12,
+                    marginBottom: 8,
+                    borderWidth: 1,
+                    borderColor: selectedCampusLocation?.id === item.id ? '#0ea5e9' : '#e2e8f0',
+                  }}
+                  onPress={() => handleSelectCampusImage(item)}
+                >
+                  <Image source={item.image} style={{ width: 50, height: 50, borderRadius: 8, marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#0f172a' }}>{item.name}</Text>
+                    {item.description && (
+                      <Text style={{ fontSize: 11, color: '#64748b' }}>{item.description}</Text>
+                    )}
+                  </View>
+                  {selectedCampusLocation?.id === item.id && (
+                    <Feather name="check-circle" size={20} color="#0ea5e9" />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
           </View>
         </View>
       </Modal>

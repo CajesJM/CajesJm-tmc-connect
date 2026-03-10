@@ -1,126 +1,213 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Tabs, useRouter } from 'expo-router';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Dimensions, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+const { width } = Dimensions.get('window');
 
 export default function StudentTabsLayout() {
+  const router = useRouter();
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+
+    return () => pulse.stop();
+  }, []);
+
+  const rotate = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   return (
     <View style={{ flex: 1 }}>
       <Tabs
-        screenOptions={{
-          tabBarActiveTintColor: '#6366f1',
-          tabBarInactiveTintColor: '#64748b',
+        screenOptions={({ route }) => ({
+          tabBarActiveTintColor: '#0ea5e9',
+          tabBarInactiveTintColor: '#94a3b8',
           tabBarStyle: {
+            position: 'absolute',
+            bottom: 16,
+            left: 16,
+            right: 16,
+            height: 80,
             backgroundColor: '#ffffff',
-            height: 70,
-            marginHorizontal: 16,
-            marginBottom: 16,
-            borderRadius: 20,
-            borderWidth: 1.5,
-            borderColor: '#e2e8f0',
-            shadowColor: '#000',
-            shadowOffset: {
-              width: 0,
-              height: 4,
-            },
-            shadowOpacity: 0.1,
-            shadowRadius: 12,
-            elevation: 6,
+            borderRadius: 24,
+            borderWidth: 0,
+            shadowColor: '#0ea5e9',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.15,
+            shadowRadius: 24,
+            elevation: 10,
+            paddingHorizontal: 8,
+            paddingTop: 12,
+            paddingBottom: 12,
           },
           headerShown: false,
+          tabBarShowLabel: true,
           tabBarLabelStyle: {
             fontSize: 11,
             fontWeight: '600',
-            marginBottom: 0,
+            marginTop: 4,
           },
-          tabBarItemStyle: {
-            borderRadius: 12,
-            marginHorizontal: 2,
-            marginVertical: 4,
-            height: 50,
-          },
-        }}
+        })}
       >
+        {/* Dashboard Tab */}
         <Tabs.Screen
-          name="announcements"
+          name="index"
           options={{
-            title: 'Announcements',
-            tabBarIcon: ({ color, size, focused }) => (
-              <View style={{
-                backgroundColor: focused ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                padding: 6,
-                borderRadius: 10,
-                borderWidth: focused ? 1 : 0,
-                borderColor: focused ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
-              }}>
-                <Ionicons 
-                  name={focused ? "megaphone" : "megaphone-outline"} 
-                  size={20} 
-                  color={focused ? '#6366f1' : color} 
+            title: 'Home',
+            tabBarIcon: ({ color, focused }) => (
+              <Animated.View 
+                style={[
+                  styles.iconContainer, 
+                  focused && styles.activeIconContainer,
+                  { transform: [{ scale: focused ? 1.1 : 1 }] }
+                ]}
+              >
+                <Ionicons
+                  name={focused ? 'home' : 'home-outline'}
+                  size={22}
+                  color={focused ? '#0ea5e9' : color}
                 />
-              </View>
+                {focused && <View style={styles.activeIndicator} />}
+              </Animated.View>
             ),
           }}
         />
+
+        {/* Announcements Tab */}
+        <Tabs.Screen
+          name="announcements"
+          options={{
+            title: 'News',
+            tabBarIcon: ({ color, focused }) => (
+              <Animated.View 
+                style={[
+                  styles.iconContainer, 
+                  focused && styles.activeIconContainer,
+                  { transform: [{ scale: focused ? 1.1 : 1 }] }
+                ]}
+              >
+                <Ionicons
+                  name={focused ? 'notifications' : 'notifications-outline'}
+                  size={22}
+                  color={focused ? '#0ea5e9' : color}
+                />
+                {focused && <View style={styles.activeIndicator} />}
+              </Animated.View>
+            ),
+          }}
+        />
+
+        {/* QR Scanner – Center Floating Button */}
+        <Tabs.Screen
+          name="attendance"
+          options={{
+            title: '',
+            tabBarIcon: () => null,
+            tabBarLabel: () => null,
+            tabBarButton: (props) => {
+              const { onPress, accessibilityState } = props;
+              const isSelected = accessibilityState?.selected;
+
+              return (
+                <View style={styles.qrButtonContainer}>
+                  <TouchableOpacity
+                    onPress={onPress}
+                    activeOpacity={0.8}
+                    style={styles.qrButtonWrapper}
+                  >
+                    <Animated.View 
+                      style={[
+                        styles.qrButtonOuter,
+                        { transform: [{ scale: pulseAnim }] }
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={isSelected ? ['#0ea5e9', '#0284c7'] : ['#3b82f6', '#2563eb']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.qrButtonGradient}
+                      >
+                        <Animated.View style={{ transform: [{ rotate }] }}>
+                          <Ionicons name="scan-outline" size={28} color="#ffffff" />
+                        </Animated.View>
+                      </LinearGradient>
+                    </Animated.View>
+                    
+                    {/* Glow effect */}
+                    <View style={styles.qrButtonGlow} />
+                  </TouchableOpacity>
+                  
+                  <Text style={styles.qrButtonLabel}>Scan</Text>
+                </View>
+              );
+            },
+          }}
+        />
+
+        {/* Events Tab */}
         <Tabs.Screen
           name="events"
           options={{
             title: 'Events',
-            tabBarIcon: ({ color, size, focused }) => (
-              <View style={{
-                backgroundColor: focused ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                padding: 6,
-                borderRadius: 10,
-                borderWidth: focused ? 1 : 0,
-                borderColor: focused ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
-              }}>
-                <Ionicons 
-                  name={focused ? "calendar" : "calendar-outline"} 
-                  size={20} 
-                  color={focused ? '#6366f1' : color} 
+            tabBarIcon: ({ color, focused }) => (
+              <Animated.View 
+                style={[
+                  styles.iconContainer, 
+                  focused && styles.activeIconContainer,
+                  { transform: [{ scale: focused ? 1.1 : 1 }] }
+                ]}
+              >
+                <Ionicons
+                  name={focused ? 'calendar' : 'calendar-outline'}
+                  size={22}
+                  color={focused ? '#0ea5e9' : color}
                 />
-              </View>
+                {focused && <View style={styles.activeIndicator} />}
+              </Animated.View>
             ),
           }}
         />
-        <Tabs.Screen
-          name="attendance"
-          options={{
-            title: 'Attendance',
-            tabBarIcon: ({ color, size, focused }) => (
-              <View style={{
-                backgroundColor: focused ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                padding: 6,
-                borderRadius: 10,
-                borderWidth: focused ? 1 : 0,
-                borderColor: focused ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
-              }}>
-                <Ionicons 
-                  name={focused ? "checkmark-circle" : "checkmark-circle-outline"} 
-                  size={20} 
-                  color={focused ? '#6366f1' : color} 
-                />
-              </View>
-            ),
-          }}
-        />
+
+        {/* Profile Tab */}
         <Tabs.Screen
           name="profile"
           options={{
             title: 'Profile',
-            tabBarIcon: ({ color, size, focused }) => (
-              <View style={{
-                backgroundColor: focused ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                padding: 6,
-                borderRadius: 10,
-                borderWidth: focused ? 1 : 0,
-                borderColor: focused ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
-              }}>
-                <Ionicons 
-                  name={focused ? "person" : "person-outline"} 
-                  size={20} 
-                  color={focused ? '#6366f1' : color} 
+            tabBarIcon: ({ color, focused }) => (
+              <Animated.View 
+                style={[
+                  styles.iconContainer, 
+                  focused && styles.activeIconContainer,
+                  { transform: [{ scale: focused ? 1.1 : 1 }] }
+                ]}
+              >
+                <Ionicons
+                  name={focused ? 'person' : 'person-outline'}
+                  size={22}
+                  color={focused ? '#0ea5e9' : color}
                 />
-              </View>
+                {focused && <View style={styles.activeIndicator} />}
+              </Animated.View>
             ),
           }}
         />
@@ -128,3 +215,71 @@ export default function StudentTabsLayout() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 14,
+    position: 'relative',
+  },
+  activeIconContainer: {
+    backgroundColor: 'rgba(14, 165, 233, 0.1)',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 4,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#0ea5e9',
+  },
+
+  // QR Button Styles
+  qrButtonContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -30,
+  },
+  qrButtonWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qrButtonOuter: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    padding: 4,
+    backgroundColor: '#ffffff',
+    shadowColor: '#0ea5e9',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  qrButtonGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  qrButtonGlow: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(14, 165, 233, 0.15)',
+    zIndex: -1,
+  },
+  qrButtonLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0ea5e9',
+    marginTop: 4,
+  },
+});

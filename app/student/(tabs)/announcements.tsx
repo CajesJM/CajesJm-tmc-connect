@@ -1,12 +1,28 @@
+import { Feather } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query, Unsubscribe } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { collection, onSnapshot, orderBy, query, Unsubscribe, where } from 'firebase/firestore';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View
+} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../../../context/AuthContext';
 import { auth, db } from '../../../lib/firebaseConfig';
-import { StudentAnnouncementStyles as styles } from '../../../styles/StudentAnnouncementStyles';
+import { studentAnnouncementStyles } from '../../../styles/student/announcementStyle';
 
 dayjs.extend(relativeTime);
 
@@ -15,17 +31,32 @@ interface Announcement {
   title: string;
   message: string;
   createdAt?: any;
+  priority?: 'normal' | 'important' | 'urgent';
+  status?: 'approved';
+  createdByName?: string;
 }
 
 type TimeFilter = 'all' | 'today' | 'week' | 'month';
 
 export default function StudentAnnouncements() {
+  const { width: screenWidth } = useWindowDimensions();
+  const isMobile = screenWidth < 640;
+  const { userData } = useAuth();
+  const router = useRouter();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [filteredAnnouncements, setFilteredAnnouncements] = useState<Announcement[]>([]);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isUserAuthenticated, setIsUserAuthenticated] = useState(false);
+  const [queryError, setQueryError] = useState<string | null>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  const styles = studentAnnouncementStyles;
 
   useEffect(() => {
     let unsubscribeAnnouncements: Unsubscribe | null = null;
@@ -42,6 +73,7 @@ export default function StudentAnnouncements() {
 
       if (authenticated) {
         setLoading(true);
+        setQueryError(null);
         unsubscribeAnnouncements = setupAnnouncementsListener();
       } else {
         setAnnouncements([]);
@@ -58,26 +90,37 @@ export default function StudentAnnouncements() {
   }, []);
 
   const setupAnnouncementsListener = (): Unsubscribe => {
-    const q = query(collection(db, "updates"), orderBy("createdAt", "desc"));
-    
-    return onSnapshot(q, 
+    const q = query(
+      collection(db, 'updates'),
+      where('status', '==', 'approved'),
+      orderBy('createdAt', 'desc')
+    );
+
+    return onSnapshot(
+      q,
       (snapshot) => {
-  
         if (auth.currentUser) {
           const list: Announcement[] = snapshot.docs.map((doc) => ({
             id: doc.id,
-            ...(doc.data() as Omit<Announcement, "id">),
+            ...(doc.data() as Omit<Announcement, 'id'>),
           }));
           setAnnouncements(list);
           filterAnnouncements(list, timeFilter);
           setLoading(false);
           setRefreshing(false);
+          setQueryError(null);
         }
-      }, 
+      },
       (error) => {
-     
+        console.error('Error fetching announcements:', error);
         if (auth.currentUser) {
-          console.error("Error fetching announcements:", error);
+          if (error.code === 'failed-precondition') {
+            setQueryError(
+              'The announcements index is still being built. Please wait a moment and refresh.'
+            );
+          } else {
+            setQueryError('Failed to load announcements. Please try again later.');
+          }
         }
         setLoading(false);
         setRefreshing(false);
@@ -87,7 +130,23 @@ export default function StudentAnnouncements() {
 
   useEffect(() => {
     filterAnnouncements(announcements, timeFilter);
+    setCurrentPage(1); // reset pagination on filter change
   }, [timeFilter, announcements]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase();
+      const filtered = announcements.filter(
+        (ann) =>
+          ann.title.toLowerCase().includes(searchLower) ||
+          ann.message.toLowerCase().includes(searchLower)
+      );
+      setFilteredAnnouncements(filtered);
+      setCurrentPage(1);
+    } else {
+      filterAnnouncements(announcements, timeFilter);
+    }
+  }, [searchQuery, announcements]);
 
   const filterAnnouncements = (announcementsList: Announcement[], filter: TimeFilter) => {
     const now = dayjs();
@@ -95,24 +154,23 @@ export default function StudentAnnouncements() {
 
     switch (filter) {
       case 'today':
-        filtered = announcementsList.filter(ann =>
-          ann.createdAt && dayjs(ann.createdAt.toDate()).isSame(now, 'day')
+        filtered = announcementsList.filter(
+          (ann) => ann.createdAt && dayjs(ann.createdAt.toDate()).isSame(now, 'day')
         );
         break;
       case 'week':
-        filtered = announcementsList.filter(ann =>
-          ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'week'))
+        filtered = announcementsList.filter(
+          (ann) => ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'week'))
         );
         break;
       case 'month':
-        filtered = announcementsList.filter(ann =>
-          ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'month'))
+        filtered = announcementsList.filter(
+          (ann) => ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'month'))
         );
         break;
       default:
         filtered = announcementsList;
     }
-
     setFilteredAnnouncements(filtered);
   };
 
@@ -121,104 +179,260 @@ export default function StudentAnnouncements() {
     return dayjs(createdAt.toDate()).isAfter(dayjs().subtract(1, 'day'));
   };
 
-  const isUrgentAnnouncement = (title: string) => {
-    const urgentKeywords = ['urgent', 'important', 'emergency', 'critical', 'immediate'];
-    return urgentKeywords.some(keyword => 
-      title.toLowerCase().includes(keyword)
-    );
+  const getPriorityColor = (priority?: string, title?: string) => {
+    if (priority === 'urgent' || title?.toLowerCase().includes('urgent')) return '#ef4444';
+    if (priority === 'important' || title?.toLowerCase().includes('important')) return '#f59e0b';
+    return '#0ea5e9';
   };
 
-  const getTotalStats = () => {
-    const now = dayjs();
-    const todayCount = announcements.filter(ann =>
-      ann.createdAt && dayjs(ann.createdAt.toDate()).isSame(now, 'day')
-    ).length;
-    const newCount = announcements.filter(ann =>
-      ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(3, 'day'))
-    ).length;
-    const urgentCount = announcements.filter(ann =>
-      isUrgentAnnouncement(ann.title)
-    ).length;
-
-    return { total: announcements.length, today: todayCount, new: newCount, urgent: urgentCount };
+  const getPriorityLabel = (priority?: string, title?: string) => {
+    if (priority === 'urgent' || title?.toLowerCase().includes('urgent')) return 'URGENT';
+    if (priority === 'important' || title?.toLowerCase().includes('important')) return 'IMPORTANT';
+    return 'NORMAL';
   };
+
+  const stats = useMemo(() => {
+    const total = announcements.length;
+    const today = announcements.filter(
+      (ann) => ann.createdAt && dayjs(ann.createdAt.toDate()).isSame(dayjs(), 'day')
+    ).length;
+    const important = announcements.filter(
+      (ann) => ann.priority === 'important' || ann.title?.toLowerCase().includes('important')
+    ).length;
+    const urgent = announcements.filter(
+      (ann) => ann.priority === 'urgent' || ann.title?.toLowerCase().includes('urgent')
+    ).length;
+    return { total, today, important, urgent };
+  }, [announcements]);
 
   const handleRefresh = () => {
-    if (!isUserAuthenticated) {
-      setRefreshing(false);
-      return;
-    }
+    if (!isUserAuthenticated) return;
     setRefreshing(true);
-    // The listener will automatically update when new data comes in
     setRefreshing(false);
   };
 
-  const stats = getTotalStats();
+  // Pagination
+  const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
+  const paginatedAnnouncements = filteredAnnouncements.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
-  const renderAnnouncementItem = ({ item }: { item: Announcement }) => (
-    <View style={[
-      styles.card,
-      isUrgentAnnouncement(item.title) && styles.urgentCard
-    ]}>
-      <View style={styles.cardHeader}>
-        <View style={styles.titleContainer}>
-          {isUrgentAnnouncement(item.title) && (
-            <Icon name="alert-circle" size={14} color="#DC2626" style={styles.urgentIcon} />
-          )}
-          <Text style={[
-            styles.cardTitle,
-            isUrgentAnnouncement(item.title) && styles.urgentTitle
-          ]} numberOfLines={2}>
-            {item.title}
+  const goToPreviousPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  };
+
+  const openDetailModal = (announcement: Announcement) => {
+    setSelectedAnnouncement(announcement);
+    setShowDetailModal(true);
+  };
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+          onPress={goToPreviousPage}
+          disabled={currentPage === 1}
+        >
+          <Feather name="chevron-left" size={18} color={currentPage === 1 ? '#cbd5e1' : '#0f172a'} />
+          <Text style={[styles.paginationText, currentPage === 1 && styles.paginationTextDisabled]}>
+            Prev
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.paginationPageInfo}>
+          {currentPage} / {totalPages}
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+          onPress={goToNextPage}
+          disabled={currentPage === totalPages}
+        >
+          <Text style={[styles.paginationText, currentPage === totalPages && styles.paginationTextDisabled]}>
+            Next
+          </Text>
+          <Feather name="chevron-right" size={18} color={currentPage === totalPages ? '#cbd5e1' : '#0f172a'} />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderAnnouncementCard = ({ item }: { item: Announcement }) => {
+    const priorityColor = getPriorityColor(item.priority, item.title);
+    const isNew = isNewAnnouncement(item.createdAt);
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => openDetailModal(item)}
+        activeOpacity={0.7}
+      >
+
+        <View style={styles.cardContent}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View style={styles.cardHeaderRight}>
+              {isNew && (
+                <View style={[styles.badge, { backgroundColor: '#3b82f6' }]}>
+                  <Text style={styles.badgeText}>NEW</Text>
+                </View>
+              )}
+              <View style={[styles.priorityDotSmall, { backgroundColor: priorityColor }]} />
+              <Text style={styles.cardTime}>
+                {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.cardMessage} numberOfLines={1}>
+            {item.message}
           </Text>
         </View>
-        <View style={styles.badgeContainer}>
-          {isNewAnnouncement(item.createdAt) && (
-            <View style={styles.newBadge}>
-              <Text style={styles.newBadgeText}>NEW</Text>
-            </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Detail Modal
+  const renderDetailModal = () => (
+    <Modal
+      visible={showDetailModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowDetailModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.detailModalContainer}>
+          {selectedAnnouncement && (
+            <>
+              <View style={styles.detailModalHeader}>
+                <View style={styles.detailModalHeaderLeft}>
+                  <View
+                    style={[
+                      styles.detailPriorityIndicator,
+                      {
+                        backgroundColor: getPriorityColor(
+                          selectedAnnouncement.priority,
+                          selectedAnnouncement.title
+                        ),
+                      },
+                    ]}
+                  />
+                  <Text style={styles.detailModalTitle}>Announcement Details</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowDetailModal(false)}
+                  style={styles.detailModalClose}
+                >
+                  <Feather name="x" size={24} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={styles.detailModalContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.detailBadges}>
+                  {isNewAnnouncement(selectedAnnouncement.createdAt) && (
+                    <View style={[styles.detailBadge, { backgroundColor: '#3b82f6' }]}>
+                      <Text style={styles.detailBadgeText}>NEW</Text>
+                    </View>
+                  )}
+                  <View
+                    style={[
+                      styles.detailBadge,
+                      {
+                        backgroundColor: getPriorityColor(
+                          selectedAnnouncement.priority,
+                          selectedAnnouncement.title
+                        ),
+                      },
+                    ]}
+                  >
+                    <Text style={styles.detailBadgeText}>
+                      {getPriorityLabel(selectedAnnouncement.priority, selectedAnnouncement.title)}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.detailTitle}>{selectedAnnouncement.title}</Text>
+
+                <View style={styles.detailMeta}>
+                  <View style={styles.detailMetaItem}>
+                    <Feather name="clock" size={14} color="#64748b" />
+                    <Text style={styles.detailMetaText}>
+                      {selectedAnnouncement.createdAt
+                        ? dayjs(selectedAnnouncement.createdAt.toDate()).format('MMM D, YYYY • h:mm A')
+                        : 'Just now'}
+                    </Text>
+                  </View>
+                  {selectedAnnouncement.createdByName && (
+                    <View style={styles.detailMetaItem}>
+                      <Feather name="user" size={14} color="#64748b" />
+                      <Text style={styles.detailMetaText}>
+                        by {selectedAnnouncement.createdByName}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.detailMessageContainer}>
+                  <Text style={styles.detailMessage}>{selectedAnnouncement.message}</Text>
+                </View>
+              </ScrollView>
+            </>
           )}
         </View>
       </View>
-      
-      <Text style={styles.cardMessage} numberOfLines={3}>
-        {item.message}
-      </Text>
-      
-      {item.createdAt && (
-        <View style={styles.timestampContainer}>
-          <Icon name="clock-outline" size={12} color="#6B7280" />
-          <Text style={styles.timestamp}>
-            {dayjs(item.createdAt.toDate()).format('MMM D • h:mm A')} • {dayjs(item.createdAt.toDate()).fromNow()}
-          </Text>
-        </View>
-      )}
-    </View>
+    </Modal>
   );
 
-  const timeFilters: { key: TimeFilter; label: string;}[] = [
-    { key: 'all', label: 'All' },
-    { key: 'today', label: 'Today' },
-    { key: 'week', label: 'Week' },
-    { key: 'month', label: 'Month'},
-  ];
-
-  // Show loading only when initially loading AND user is authenticated
   if (loading && isUserAuthenticated) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerIcon}>
-            <Icon name="bullhorn" size={20} color="#FFFFFF" />
+        <LinearGradient colors={['#14203d', '#0f172a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.greeting}>Welcome back,</Text>
+              <Text style={styles.userName}>{userData?.name || 'Student'}</Text>
+              <Text style={styles.role}>Student</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() => router.push('/student/profile')}
+            >
+              {userData?.photoURL ? (
+                <Image source={{ uri: userData.photoURL }} style={styles.profileImage} />
+              ) : (
+                <View style={[styles.profileImage, styles.profileFallback]}>
+                  <Text style={styles.profileInitials}>
+                    {userData?.name ? userData.name.charAt(0).toUpperCase() : 'S'}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
-          <Text style={styles.headerTitle}>Announcements</Text>
-          <Text style={styles.headerSubtitle}>
-            Latest campus news and updates
-          </Text>
-        </View>
-
+          <View style={styles.headerBottom}>
+            <View style={styles.dateContainer}>
+              <Feather name="calendar" size={12} color="#94a3b8" />
+              <Text style={styles.dateText}>
+                {new Date().toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </Text>
+            </View>
+          </View>
+        </LinearGradient>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4F46E5" />
+          <ActivityIndicator size="large" color="#0ea5e9" />
           <Text style={styles.loadingText}>Loading announcements...</Text>
         </View>
       </View>
@@ -227,104 +441,170 @@ export default function StudentAnnouncements() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <Icon name="bullhorn" size={20} color="#FFFFFF" />
+      {/* Header */}
+      <LinearGradient colors={['#14203d', '#06080b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.greeting}>Welcome back,</Text>
+            <Text style={styles.userName}>{userData?.name || 'Student'}</Text>
+            <Text style={styles.role}>Student</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={() => router.push('/student/profile')}
+          >
+            {userData?.photoURL ? (
+              <Image source={{ uri: userData.photoURL }} style={styles.profileImage} />
+            ) : (
+              <View style={[styles.profileImage, styles.profileFallback]}>
+                <Text style={styles.profileInitials}>
+                  {userData?.name ? userData.name.charAt(0).toUpperCase() : 'S'}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
-        <Text style={styles.headerTitle}>Announcements</Text>
-        <Text style={styles.headerSubtitle}>
-          Latest campus news and updates
-        </Text>
-      </View>
+        <View style={styles.headerBottom}>
+          <View style={styles.dateContainer}>
+            <Feather name="calendar" size={12} color="#94a3b8" />
+            <Text style={styles.dateText}>
+              {new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </Text>
+          </View>
+        </View>
+      </LinearGradient>
 
       {isUserAuthenticated ? (
         <>
+          {/* Stats */}
           <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{stats.total}</Text>
-              <Text style={styles.statLabel}>Total</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{stats.today}</Text>
-              <Text style={styles.statLabel}>Today</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{stats.new}</Text>
-              <Text style={styles.statLabel}>New</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statNumber}>{stats.urgent}</Text>
-              <Text style={styles.statLabel}>Urgent</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
+              <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+                <View style={[styles.statIcon, { backgroundColor: '#0ea5e915' }]}>
+                  <Icon name="file-document" size={18} color="#0ea5e9" />
+                </View>
+                <Text style={styles.statNumber}>{stats.total}</Text>
+                <Text style={styles.statLabel}>Total</Text>
+              </View>
+              <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+                <View style={[styles.statIcon, { backgroundColor: '#10b98115' }]}>
+                  <Feather name="sun" size={18} color="#10b981" />
+                </View>
+                <Text style={styles.statNumber}>{stats.today}</Text>
+                <Text style={styles.statLabel}>Today</Text>
+              </View>
+              <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+                <View style={[styles.statIcon, { backgroundColor: '#f59e0b15' }]}>
+                  <Icon name="flag" size={18} color="#f59e0b" />
+                </View>
+                <Text style={styles.statNumber}>{stats.important}</Text>
+                <Text style={styles.statLabel}>Important</Text>
+              </View>
+              <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+                <View style={[styles.statIcon, { backgroundColor: '#ef444415' }]}>
+                  <Icon name="alert-circle" size={18} color="#ef4444" />
+                </View>
+                <Text style={styles.statNumber}>{stats.urgent}</Text>
+                <Text style={styles.statLabel}>Urgent</Text>
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchSection}>
+            <View style={styles.searchBar}>
+              <Feather name="search" size={18} color="#64748b" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search announcements..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholderTextColor="#94a3b8"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClear}>
+                  <Feather name="x" size={18} color="#64748b" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
+          {/* Filter Chips */}
           <View style={styles.filterSection}>
-            <Text style={styles.filterTitle}>Filter by:</Text>
-            <View style={styles.filterChips}>
-              {timeFilters.map((filter) => (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+              {(['all', 'today', 'week', 'month'] as const).map((filter) => (
                 <TouchableOpacity
-                  key={filter.key}
-                  style={[
-                    styles.filterChip,
-                    timeFilter === filter.key && styles.filterChipActive
-                  ]}
-                  onPress={() => setTimeFilter(filter.key)}
+                  key={filter}
+                  style={[styles.filterChip, timeFilter === filter && styles.filterChipActive]}
+                  onPress={() => setTimeFilter(filter)}
                 >
-                  <Text style={[
-                    styles.filterChipText,
-                    timeFilter === filter.key && styles.filterChipTextActive
-                  ]}>
-                    {filter.label}
+                  <Text style={[styles.filterChipText, timeFilter === filter && styles.filterChipTextActive]}>
+                    {filter.charAt(0).toUpperCase() + filter.slice(1)}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           </View>
 
           <View style={styles.resultsInfo}>
             <Text style={styles.resultsText}>
               {filteredAnnouncements.length} announcement{filteredAnnouncements.length !== 1 ? 's' : ''}
-              {timeFilter !== 'all' && ` from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
+              {timeFilter !== 'all' && ` from ${timeFilter}`}
+              {searchQuery ? ` matching "${searchQuery}"` : ''}
             </Text>
           </View>
 
-          <FlatList
-            data={filteredAnnouncements}
-            keyExtractor={(item) => item.id}
-            renderItem={renderAnnouncementItem}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <View style={styles.emptyStateIcon}>
-                  <Icon name="bullhorn-outline" size={32} color="#9CA3AF" />
+          {queryError ? (
+            <View style={styles.errorContainer}>
+              <Icon name="alert-circle" size={24} color="#DC2626" />
+              <Text style={styles.errorText}>{queryError}</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={paginatedAnnouncements}
+              keyExtractor={(item) => item.id}
+              renderItem={renderAnnouncementCard}
+              contentContainerStyle={styles.listContainer}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#0ea5e9']} />
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <View style={styles.emptyStateIcon}>
+                    <Icon name="bullhorn-outline" size={40} color="#cbd5e1" />
+                  </View>
+                  <Text style={styles.emptyStateTitle}>No announcements</Text>
+                  <Text style={styles.emptyStateText}>
+                    {searchQuery
+                      ? 'Try different search terms'
+                      : timeFilter !== 'all'
+                        ? `No announcements from ${timeFilter}`
+                        : 'Check back later for new announcements'}
+                  </Text>
                 </View>
-                <Text style={styles.emptyStateText}>
-                  {timeFilter === 'all' ? 'No announcements yet' : `No announcements from ${timeFilters.find(f => f.key === timeFilter)?.label.toLowerCase()}`}
-                </Text>
-                <Text style={styles.emptyStateSubtext}>
-                  {timeFilter === 'all'
-                    ? 'Check back later for new announcements'
-                    : 'Try changing the filter to see more'
-                  }
-                </Text>
-              </View>
-            }
-          />
+              }
+              ListFooterComponent={renderPagination}
+              ListFooterComponentStyle={styles.paginationWrapper}
+            />
+          )}
         </>
       ) : (
         <View style={styles.emptyState}>
           <View style={styles.emptyStateIcon}>
-            <Icon name="account-off" size={32} color="#9CA3AF" />
+            <Icon name="account-off" size={40} color="#cbd5e1" />
           </View>
-          <Text style={styles.emptyStateText}>Please log in to view announcements</Text>
-          <Text style={styles.emptyStateSubtext}>
-            Sign in to see the latest campus updates
-          </Text>
+          <Text style={styles.emptyStateTitle}>Please log in</Text>
+          <Text style={styles.emptyStateText}>Sign in to see the latest campus updates</Text>
         </View>
       )}
+
+      {renderDetailModal()}
     </View>
   );
 }

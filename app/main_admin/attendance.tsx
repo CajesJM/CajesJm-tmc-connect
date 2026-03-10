@@ -735,7 +735,7 @@ export default function MainAdminAttendance() {
 
       {/* Stats Grid */}
       <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#0ea5e9' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
             <Feather name="users" size={isMobile ? 16 : 20} color="#0ea5e9" />
           </View>
@@ -743,7 +743,7 @@ export default function MainAdminAttendance() {
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
         </View>
 
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#16a34a' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#16a34a15' }]}>
             <Feather name="check-circle" size={isMobile ? 16 : 20} color="#16a34a" />
           </View>
@@ -751,7 +751,7 @@ export default function MainAdminAttendance() {
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Verified</Text>
         </View>
 
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#f59e0b' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#f59e0b15' }]}>
             <Feather name="grid" size={isMobile ? 16 : 20} color="#f59e0b" />
           </View>

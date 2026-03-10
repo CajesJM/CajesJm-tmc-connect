@@ -1,13 +1,29 @@
+import { Feather } from '@expo/vector-icons';
 import { Camera, CameraView } from 'expo-camera';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { arrayUnion, doc, DocumentData, getDoc, updateDoc } from 'firebase/firestore';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  AppState,
+  Easing,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { ErrorService } from '../../../lib/errorService';
 import { auth, db } from '../../../lib/firebaseConfig';
 import { locationService } from '../../../lib/locationService';
 import type { AttendanceRecord, EventData, EventLocation, QRCodeData, UserLocation, ValidationResult } from '../../../lib/types';
-import { attendanceStyles as studentAttendanceStyles } from '../../../styles/studentAttendanceStyles';
+import { attendanceStyles as styles } from '../../../styles/student/attendanceStyles';
 
 const convertToEventData = (docData: DocumentData, id: string): EventData => ({
   id,
@@ -26,6 +42,8 @@ const convertToEventData = (docData: DocumentData, id: string): EventData => ({
 
 export default function StudentAttendance() {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
+  const [locationEnabled, setLocationEnabled] = useState<boolean>(true);
   const [scanned, setScanned] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [showResult, setShowResult] = useState(false);
@@ -34,10 +52,15 @@ export default function StudentAttendance() {
   const [cameraReady, setCameraReady] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [scanAttempts, setScanAttempts] = useState(0);
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [permissionType, setPermissionType] = useState<'camera' | 'location' | null>(null);
+
+  // Animation values
+  const [pulseAnim] = useState(new Animated.Value(1));
+  const [slideAnim] = useState(new Animated.Value(0));
 
   const formattedStudentInfo = useMemo(() => {
     if (!currentStudent) return null;
-
     return {
       name: currentStudent.name,
       studentID: currentStudent.studentID,
@@ -48,24 +71,159 @@ export default function StudentAttendance() {
     };
   }, [currentStudent]);
 
-  // Memoized permission request
-  const requestCameraPermission = useCallback(async (): Promise<boolean> => {
+  // Check permissions on mount and when app returns to foreground
+  useEffect(() => {
+    checkAllPermissions();
+    
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        checkAllPermissions();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const checkAllPermissions = async () => {
+    await checkCameraPermission();
+    await checkLocationPermission();
+  };
+
+  // Camera permission check
+  const checkCameraPermission = async () => {
     try {
-      const { status } = await Camera.requestCameraPermissionsAsync();
+      const { status } = await Camera.getCameraPermissionsAsync();
       setHasPermission(status === 'granted');
       return status === 'granted';
+    } catch (error) {
+      console.error('Error checking camera permission:', error);
+      setHasPermission(false);
+      return false;
+    }
+  };
+
+  // Location permission and service check
+  const checkLocationPermission = async () => {
+    try {
+      // Check if location services are enabled
+      const enabled = await Location.hasServicesEnabledAsync();
+      setLocationEnabled(enabled);
+
+      // Check permission status
+      const { status } = await Location.getForegroundPermissionsAsync();
+      setLocationPermission(status === 'granted');
+      
+      return { enabled, granted: status === 'granted' };
+    } catch (error) {
+      console.error('Error checking location permission:', error);
+      setLocationPermission(false);
+      return { enabled: false, granted: false };
+    }
+  };
+
+  // Request camera permission with fallback
+  const requestCameraAccess = async (): Promise<boolean> => {
+    try {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      
+      if (status === 'granted') {
+        setHasPermission(true);
+        return true;
+      } else {
+        setHasPermission(false);
+        setPermissionType('camera');
+        setShowPermissionModal(true);
+        return false;
+      }
     } catch (error) {
       console.error('Error requesting camera permission:', error);
       setHasPermission(false);
       return false;
     }
-  }, []);
+  };
 
+  // Request location permission with fallback
+  const requestLocationAccess = async (): Promise<boolean> => {
+    try {
+      // First check if services are enabled
+      const enabled = await Location.hasServicesEnabledAsync();
+      setLocationEnabled(enabled);
+
+      if (!enabled) {
+        setPermissionType('location');
+        setShowPermissionModal(true);
+        return false;
+      }
+
+      // Then request permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status === 'granted') {
+        setLocationPermission(true);
+        return true;
+      } else {
+        setLocationPermission(false);
+        setPermissionType('location');
+        setShowPermissionModal(true);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error requesting location permission:', error);
+      setLocationPermission(false);
+      return false;
+    }
+  };
+
+  // Open device settings
+  const openSettings = () => {
+    setShowPermissionModal(false);
+    if (Platform.OS === 'ios') {
+      Linking.openURL('app-settings:');
+    } else {
+      Linking.openSettings();
+    }
+  };
+
+  // Pulse animation for scanner
   useEffect(() => {
-    requestCameraPermission();
-  }, [requestCameraPermission]);
+    if (showScanner && !scanned) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 1000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [showScanner, scanned]);
 
-  // Fetch student data
+  // Slide animation for result modal
+  useEffect(() => {
+    if (showResult) {
+      Animated.spring(slideAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 40,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      slideAnim.setValue(0);
+    }
+  }, [showResult]);
+
   useEffect(() => {
     const fetchStudentData = async () => {
       try {
@@ -73,20 +231,14 @@ export default function StudentAttendance() {
         if (user) {
           const userRef = doc(db, 'users', user.uid);
           const userDoc = await getDoc(userRef);
-
           if (userDoc.exists()) {
-            setCurrentStudent({
-              id: user.uid,
-              ...userDoc.data()
-            });
+            setCurrentStudent({ id: user.uid, ...userDoc.data() });
           }
         }
       } catch (error) {
         console.error('Error fetching student data:', error);
-        console.log('Student data fetch error:', error);
       }
     };
-
     fetchStudentData();
   }, []);
 
@@ -101,10 +253,7 @@ export default function StudentAttendance() {
   }, []);
 
   const formatDate = useCallback((dateString: string) => {
-    if (!dateString || !isValidDate(dateString)) {
-      return 'Date not available';
-    }
-
+    if (!dateString || !isValidDate(dateString)) return 'Date not available';
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', {
@@ -119,10 +268,8 @@ export default function StudentAttendance() {
     }
   }, [isValidDate]);
 
-  // Memoized validation function
   const validateQRCode = useCallback(async (qrData: QRCodeData, userLocation?: UserLocation): Promise<ValidationResult> => {
     const now = new Date();
-
     try {
       const eventRef = doc(db, 'events', qrData.eventId);
       const eventDoc = await getDoc(eventRef);
@@ -155,7 +302,7 @@ export default function StudentAttendance() {
           return {
             valid: false,
             error: 'LOCATION_INACCURATE',
-            message: 'Your location accuracy is too low. Please move to an open area and try again or try to turn off and on your device location services.',
+            message: 'Your location accuracy is too low. Please move to an open area and try again.',
             accuracy: userLocation.accuracy,
             event: eventData
           };
@@ -168,7 +315,7 @@ export default function StudentAttendance() {
           return {
             valid: false,
             error: 'QR_CODE_EXPIRED',
-            message: `This QR code expired on ${formatDate(eventData.qrExpiration)}. Please ask your instructor for a new one.`,
+            message: `This QR code expired on ${formatDate(eventData.qrExpiration)}.`,
             expirationTime: manualExpiration,
             event: eventData
           };
@@ -181,7 +328,7 @@ export default function StudentAttendance() {
           return {
             valid: false,
             error: 'QR_CODE_EXPIRED',
-            message: `This QR code expired at ${formatDate(qrData.expiresAt)}. Please ask your instructor for a new one.`,
+            message: `This QR code expired at ${formatDate(qrData.expiresAt)}.`,
             expirationTime: expirationTime,
             event: eventData
           };
@@ -254,14 +401,6 @@ export default function StudentAttendance() {
     }
   }, [currentStudent?.studentID, isValidDate, formatDate]);
 
-  // Retry mechanism
-  const retryScan = useCallback(() => {
-    setScanned(false);
-    setCameraReady(false);
-    setScanAttempts(prev => prev + 1);
-  }, []);
-
-  // Reset scanner function
   const resetScanner = useCallback(() => {
     setScanned(false);
     setScanResult(null);
@@ -270,10 +409,8 @@ export default function StudentAttendance() {
     setScanAttempts(0);
   }, []);
 
-  // Optimized scan handler
   const handleBarCodeScanned = useCallback(async ({ type, data }: { type: string; data: string }) => {
     if (scanned) return;
-
     setScanned(true);
     setIsGettingLocation(true);
 
@@ -303,42 +440,39 @@ export default function StudentAttendance() {
         setIsGettingLocation(false);
         return;
       }
+
       let userLocation: UserLocation | undefined;
+      
+      // Check location permission first
+      const locationStatus = await checkLocationPermission();
+      
+      if (!locationStatus.enabled) {
+        setShowScanner(false);
+        setIsGettingLocation(false);
+        setPermissionType('location');
+        setShowPermissionModal(true);
+        return;
+      }
+
+      if (!locationStatus.granted) {
+        const granted = await requestLocationAccess();
+        if (!granted) {
+          setShowScanner(false);
+          setIsGettingLocation(false);
+          return;
+        }
+      }
+
       try {
-        const hasLocationPermission = await locationService.requestLocationPermission();
-        if (hasLocationPermission) {
-          const locationResult = await locationService.getCurrentLocation();
-          if (locationResult.success && locationResult.location) {
-            userLocation = locationResult.location;
-            console.log('User location obtained:', userLocation);
-          } else {
-            const errorInfo = ErrorService.handleError('LOCATION_UNAVAILABLE', { showAlert: false });
-            Alert.alert(
-              errorInfo.title,
-              'Attendance will be recorded without location verification. Some events may require location verification.',
-              [{ text: 'Continue' }]
-            );
-          }
-        } else {
-          const errorInfo = ErrorService.handleError('LOCATION_PERMISSION_DENIED', { showAlert: false });
-          Alert.alert(
-            errorInfo.title,
-            'Attendance will be recorded without location verification. Some events may require location verification.',
-            [{ text: 'Continue' }]
-          );
+        const locationResult = await locationService.getCurrentLocation();
+        if (locationResult.success && locationResult.location) {
+          userLocation = locationResult.location;
         }
       } catch (locationError) {
         console.warn('Location error:', locationError);
-        Alert.alert(
-          'Location Error',
-          'Unable to verify location. Attendance will be recorded without location verification.',
-          [{ text: 'Continue' }]
-        );
       }
 
       const validation = await validateQRCode(qrData, userLocation);
-
-      // Log the scan attempt
       ErrorService.logScanAttempt(validation, currentStudent.studentID);
 
       if (!validation.valid) {
@@ -407,444 +541,493 @@ export default function StudentAttendance() {
     }
   }, [scanned, currentStudent, validateQRCode]);
 
-  // Open scanner function
   const openScanner = useCallback(async () => {
-    try {
-      const { status } = await Camera.getCameraPermissionsAsync();
-      if (status !== 'granted') {
-        const granted = await requestCameraPermission();
-        if (!granted) {
-          Alert.alert(
-            'Camera Access Required',
-            'Camera permission is needed to scan QR codes. Please enable it in your device settings.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      }
-      resetScanner();
-      setShowScanner(true);
-    } catch (error) {
-      console.error('Error opening scanner:', error);
-      Alert.alert('Error', 'Failed to open camera. Please try again.');
+    // Check camera permission first
+    const hasCamera = await checkCameraPermission();
+    
+    if (!hasCamera) {
+      const granted = await requestCameraAccess();
+      if (!granted) return;
     }
-  }, [requestCameraPermission, resetScanner]);
+
+    // Check location before opening scanner
+    const locationStatus = await checkLocationPermission();
+    
+    if (!locationStatus.enabled || !locationStatus.granted) {
+      Alert.alert(
+        'Location Required',
+        'Location access is needed to verify your attendance at the event venue. Please enable location services.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Enable Location', 
+            onPress: () => {
+              setPermissionType('location');
+              setShowPermissionModal(true);
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    resetScanner();
+    setShowScanner(true);
+  }, [requestCameraAccess, checkLocationPermission, resetScanner]);
 
   const formatTimeRemaining = useCallback((expirationTime: string) => {
     if (!expirationTime || !isValidDate(expirationTime)) return 'Unknown';
-
     const now = new Date();
     const expiration = new Date(expirationTime);
     const diffMs = expiration.getTime() - now.getTime();
-
     if (diffMs <= 0) return 'Expired';
-
     const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 60) return `${diffMins} minutes`;
-
+    if (diffMins < 60) return `${diffMins}m`;
     const diffHours = Math.floor(diffMins / 60);
-    return `${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+    return `${diffHours}h`;
   }, [isValidDate]);
 
-  // Loading states for better UX
-  const getLoadingMessage = useCallback(() => {
-    if (isGettingLocation) {
-      return 'Verifying your location and proximity to event...';
-    }
-    if (!cameraReady) {
-      return 'Initializing camera...';
-    }
-    return 'Ready to scan';
-  }, [isGettingLocation, cameraReady]);
-
-  if (hasPermission === null) {
-    return (
-      <View style={studentAttendanceStyles.container}>
-        <View style={studentAttendanceStyles.header}>
-          <View style={studentAttendanceStyles.headerIcon}>
-            <Text style={{ color: '#FFFFFF', fontSize: 32 }}>📱</Text>
-          </View>
-          <Text style={studentAttendanceStyles.headerTitle}>Attendance Scanner</Text>
-          <Text style={studentAttendanceStyles.headerSubtitle}>Setting up your scanner...</Text>
-          <ActivityIndicator size="large" color="#6366F1" style={{ marginTop: 20 }} />
+  const renderPermissionModal = () => (
+  <Modal
+    visible={showPermissionModal}
+    transparent
+    animationType="fade"
+    onRequestClose={() => setShowPermissionModal(false)}
+  >
+    <View style={styles.permissionOverlay}>
+      <View style={styles.permissionModal}>
+        <View style={styles.permissionModalIcon}>
+          <Feather 
+            name={permissionType === 'camera' ? 'camera' : 'map-pin'} 
+            size={48} 
+            color="#ef4444" 
+          />
         </View>
-      </View>
-    );
-  }
-
-  if (hasPermission === false) {
-    return (
-      <ScrollView
-        style={studentAttendanceStyles.container}
-        contentContainerStyle={studentAttendanceStyles.permissionContainer}
-      >
-        <View style={studentAttendanceStyles.permissionIcon}>
-          <Text style={{ color: '#DC2626', fontSize: 48 }}>📷</Text>
-        </View>
-        <Text style={studentAttendanceStyles.permissionTitle}>Camera Access Required</Text>
-        <Text style={studentAttendanceStyles.permissionText}>
-          To scan QR codes and mark your attendance, please enable camera access for this app.
+        
+        <Text style={styles.permissionModalTitle}>
+          {permissionType === 'camera' ? 'Camera Access Required' : 'Location Access Required'}
+        </Text>
+        
+        <Text style={styles.permissionModalText}>
+          {permissionType === 'camera' 
+            ? 'Camera access is required to scan QR codes for attendance. Please enable it in your device settings.'
+            : 'Location access is required to verify you are at the event venue. Please enable location services in your device settings.'
+          }
         </Text>
 
-        <TouchableOpacity
-          style={studentAttendanceStyles.permissionButton}
-          onPress={openScanner}
-        >
-          <Text style={{ color: '#FFFFFF', fontSize: 24 }}>📷</Text>
-          <Text style={studentAttendanceStyles.permissionButtonText}>Enable Camera Access</Text>
-        </TouchableOpacity>
-
-        {formattedStudentInfo && (
-          <View style={studentAttendanceStyles.studentInfoCard}>
-            <Text style={studentAttendanceStyles.studentInfoTitle}>Your Profile</Text>
-            <View style={studentAttendanceStyles.infoGrid}>
-              <View style={studentAttendanceStyles.infoItem}>
-                <Text style={studentAttendanceStyles.infoLabel}>Name</Text>
-                <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.name}</Text>
-              </View>
-              <View style={studentAttendanceStyles.infoItem}>
-                <Text style={studentAttendanceStyles.infoLabel}>Student ID</Text>
-                <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.studentID}</Text>
-              </View>
-              <View style={studentAttendanceStyles.infoItem}>
-                <Text style={studentAttendanceStyles.infoLabel}>Course</Text>
-                <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.course}</Text>
-              </View>
-              <View style={studentAttendanceStyles.infoItem}>
-                <Text style={studentAttendanceStyles.infoLabel}>Year Level</Text>
-                <Text style={studentAttendanceStyles.infoValue}>Year {formattedStudentInfo.yearLevel}</Text>
-              </View>
-              <View style={studentAttendanceStyles.infoItem}>
-                <Text style={studentAttendanceStyles.infoLabel}>Block</Text>
-                <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.block}</Text>
-              </View>
-              <View style={studentAttendanceStyles.infoItem}>
-                <Text style={studentAttendanceStyles.infoLabel}>Gender</Text>
-                <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.gender}</Text>
-              </View>
-            </View>
+        <View style={styles.permissionModalButtons}>
+          <TouchableOpacity 
+            style={styles.permissionModalCancel}
+            onPress={() => setShowPermissionModal(false)}
+          >
+            <Text style={styles.permissionModalCancelText}>Not Now</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.permissionModalEnable}
+            onPress={openSettings}
+          >
+            <Feather name="settings" size={18} color="#fff" />
+            <Text style={styles.permissionModalEnableText}>Open Settings</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  </Modal>
+);
+  // Loading State
+  if (hasPermission === null) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <LinearGradient colors={['#14203d', '#06080b']} style={styles.loadingContainer}>
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="large" color="#0ea5e9" />
+            <Text style={styles.loadingText}>Initializing Scanner...</Text>
           </View>
-        )}
-      </ScrollView>
+        </LinearGradient>
+      </View>
     );
   }
 
   return (
-    <ScrollView style={studentAttendanceStyles.container} showsVerticalScrollIndicator={false}>
-      <View style={studentAttendanceStyles.header}>
-        <View style={studentAttendanceStyles.headerIcon}>
-          <Text style={{ color: '#FFFFFF', fontSize: 32 }}>📱</Text>
-        </View>
-        <Text style={studentAttendanceStyles.headerTitle}>Attendance Scanner</Text>
-        <Text style={studentAttendanceStyles.headerSubtitle}>
-          Scan event QR codes to mark your attendance automatically
-        </Text>
-      </View>
-      <View style={studentAttendanceStyles.mainCard}>
-        <Text style={studentAttendanceStyles.cardTitle}>Quick Attendance</Text>
-        <Text style={studentAttendanceStyles.instruction}>
-          Simply scan the QR code displayed during your event. Your attendance will be recorded instantly with all your details. And make sure your location is already turned on.
-        </Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Permission Modal */}
+      {renderPermissionModal()}
 
-        <TouchableOpacity style={studentAttendanceStyles.actionButton} onPress={openScanner}>
-          <Text style={{ color: '#FFFFFF', fontSize: 24 }}>📷</Text>
-          <Text style={studentAttendanceStyles.actionButtonText}>Scan QR Code</Text>
-        </TouchableOpacity>
-      </View>
-
-      {formattedStudentInfo && (
-        <View style={studentAttendanceStyles.studentInfoCard}>
-          <Text style={studentAttendanceStyles.studentInfoTitle}>👤 Student Profile</Text>
-          <View style={studentAttendanceStyles.infoGrid}>
-            <View style={studentAttendanceStyles.infoItem}>
-              <Text style={studentAttendanceStyles.infoLabel}>Full Name</Text>
-              <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.name}</Text>
+      {/* Main Content */}
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Header */}
+        <LinearGradient colors={['#14203d', '#06080b']} style={styles.header}>
+          <View style={styles.headerTop}>
+            <View style={styles.headerIcon}>
+              <Feather name="check-square" size={28} color="#0ea5e9" />
             </View>
-            <View style={studentAttendanceStyles.infoItem}>
-              <Text style={studentAttendanceStyles.infoLabel}>Student ID</Text>
-              <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.studentID}</Text>
-            </View>
-            <View style={studentAttendanceStyles.infoItem}>
-              <Text style={studentAttendanceStyles.infoLabel}>Course Program</Text>
-              <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.course}</Text>
-            </View>
-            <View style={studentAttendanceStyles.infoItem}>
-              <Text style={studentAttendanceStyles.infoLabel}>Academic Year</Text>
-              <Text style={studentAttendanceStyles.infoValue}>Year {formattedStudentInfo.yearLevel}</Text>
-            </View>
-            <View style={studentAttendanceStyles.infoItem}>
-              <Text style={studentAttendanceStyles.infoLabel}>Class Block</Text>
-              <Text style={studentAttendanceStyles.infoValue}>Block {formattedStudentInfo.block}</Text>
-            </View>
-            <View style={studentAttendanceStyles.infoItem}>
-              <Text style={studentAttendanceStyles.infoLabel}>Gender</Text>
-              <Text style={studentAttendanceStyles.infoValue}>{formattedStudentInfo.gender}</Text>
+            <View>
+              <Text style={styles.greeting}>Attendance</Text>
+              <Text style={styles.headerTitle}>Scan & Verify</Text>
             </View>
           </View>
-        </View>
-      )}
+          <Text style={styles.headerSubtitle}>
+            Quick QR code scanning for event attendance
+          </Text>
+        </LinearGradient>
 
-      <View style={studentAttendanceStyles.guideSection}>
-        <Text style={studentAttendanceStyles.guideTitle}>How It Works</Text>
+        {/* Permission Status Cards */}
+        {(!hasPermission || !locationPermission || !locationEnabled) && (
+          <View style={styles.permissionAlertCard}>
+            <View style={styles.permissionAlertHeader}>
+              <Feather name="alert-circle" size={20} color="#f59e0b" />
+              <Text style={styles.permissionAlertTitle}>Permissions Required</Text>
+            </View>
+            
+            {!hasPermission && (
+              <TouchableOpacity 
+                style={styles.permissionAlertItem}
+                onPress={() => {
+                  setPermissionType('camera');
+                  setShowPermissionModal(true);
+                }}
+              >
+                <View style={[styles.permissionAlertIcon, { backgroundColor: '#fee2e2' }]}>
+                  <Feather name="camera" size={16} color="#ef4444" />
+                </View>
+                <View style={styles.permissionAlertContent}>
+                  <Text style={styles.permissionAlertItemTitle}>Camera Access</Text>
+                  <Text style={styles.permissionAlertItemDesc}>Needed to scan QR codes</Text>
+                </View>
+                <Feather name="chevron-right" size={20} color="#9ca3af" />
+              </TouchableOpacity>
+            )}
 
-        <View style={studentAttendanceStyles.guideItem}>
-          <View style={studentAttendanceStyles.guideNumber}>
-            <Text style={studentAttendanceStyles.guideNumberText}>1</Text>
+            {(!locationPermission || !locationEnabled) && (
+              <TouchableOpacity 
+                style={styles.permissionAlertItem}
+                onPress={() => {
+                  setPermissionType('location');
+                  setShowPermissionModal(true);
+                }}
+              >
+                <View style={[styles.permissionAlertIcon, { backgroundColor: '#fef3c7' }]}>
+                  <Feather name="map-pin" size={16} color="#f59e0b" />
+                </View>
+                <View style={styles.permissionAlertContent}>
+                  <Text style={styles.permissionAlertItemTitle}>Location Access</Text>
+                  <Text style={styles.permissionAlertItemDesc}>Needed to verify event venue</Text>
+                </View>
+                <Feather name="chevron-right" size={20} color="#9ca3af" />
+              </TouchableOpacity>
+            )}
           </View>
-          <View style={studentAttendanceStyles.guideContent}>
-            <Text style={studentAttendanceStyles.guideStep}>Tap Scan Button</Text>
-            <Text style={studentAttendanceStyles.guideDescription}>
-              Press the Scan QR Code button to open the camera scanner
+        )}
+
+        {/* Quick Scan Card */}
+        <View style={styles.scanCard}>
+          <LinearGradient 
+            colors={hasPermission && locationPermission && locationEnabled 
+              ? ['#0ea5e9', '#0284c7'] 
+              : ['#9ca3af', '#6b7280']
+            } 
+            style={styles.scanGradient}
+          >
+            <View style={styles.scanIconContainer}>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                <Feather name="maximize" size={48} color="#fff" />
+              </Animated.View>
+            </View>
+            <Text style={styles.scanCardTitle}>
+              {hasPermission && locationPermission && locationEnabled 
+                ? 'Ready to Scan' 
+                : 'Setup Required'
+              }
             </Text>
-          </View>
-        </View>
-
-        <View style={studentAttendanceStyles.guideItem}>
-          <View style={studentAttendanceStyles.guideNumber}>
-            <Text style={studentAttendanceStyles.guideNumberText}>2</Text>
-          </View>
-          <View style={studentAttendanceStyles.guideContent}>
-            <Text style={studentAttendanceStyles.guideStep}>Align QR Code</Text>
-            <Text style={studentAttendanceStyles.guideDescription}>
-              Point your camera at the event QR code within the frame
+            <Text style={styles.scanCardSubtitle}>
+              {hasPermission && locationPermission && locationEnabled
+                ? 'Position QR code within the frame to mark attendance'
+                : 'Please enable camera and location permissions to continue'
+              }
             </Text>
-          </View>
-        </View>
-
-        <View style={studentAttendanceStyles.guideItem}>
-          <View style={studentAttendanceStyles.guideNumber}>
-            <Text style={studentAttendanceStyles.guideNumberText}>3</Text>
-          </View>
-          <View style={studentAttendanceStyles.guideContent}>
-            <Text style={studentAttendanceStyles.guideStep}>Location Verification</Text>
-            <Text style={studentAttendanceStyles.guideDescription}>
-              Your location will be verified to ensure you're at the event venue
-            </Text>
-          </View>
-        </View>
-
-        <View style={studentAttendanceStyles.guideItem}>
-          <View style={studentAttendanceStyles.guideNumber}>
-            <Text style={studentAttendanceStyles.guideNumberText}>4</Text>
-          </View>
-          <View style={studentAttendanceStyles.guideContent}>
-            <Text style={studentAttendanceStyles.guideStep}>Confirmation</Text>
-            <Text style={studentAttendanceStyles.guideDescription}>
-              View the confirmation screen with your recorded information
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <Modal visible={showScanner} animationType="slide" onRequestClose={() => setShowScanner(false)}>
-        <View style={studentAttendanceStyles.scannerContainer}>
-          {(!cameraReady || isGettingLocation) && (
-            <View style={studentAttendanceStyles.loadingOverlay}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={studentAttendanceStyles.loadingText}>
-                {getLoadingMessage()}
+            <TouchableOpacity 
+              style={[
+                styles.scanButton,
+                (!hasPermission || !locationPermission || !locationEnabled) && styles.scanButtonDisabled
+              ]} 
+              onPress={openScanner}
+              disabled={!hasPermission || !locationPermission || !locationEnabled}
+            >
+              <Feather name="camera" size={20} color={hasPermission && locationPermission && locationEnabled ? "#0ea5e9" : "#9ca3af"} />
+              <Text style={[
+                styles.scanButtonText,
+                (!hasPermission || !locationPermission || !locationEnabled) && styles.scanButtonTextDisabled
+              ]}>
+                {hasPermission && locationPermission && locationEnabled ? 'Open Scanner' : 'Permissions Required'}
               </Text>
-              {scanAttempts > 0 && (
-                <Text style={[studentAttendanceStyles.loadingText, { fontSize: 14, marginTop: 8 }]}>
-                  Attempt {scanAttempts + 1}
-                </Text>
-              )}
+            </TouchableOpacity>
+          </LinearGradient>
+        </View>
+
+        {/* Student Info Card */}
+        {formattedStudentInfo && (
+          <View style={styles.infoCard}>
+            <View style={styles.infoHeader}>
+              <Feather name="user" size={20} color="#0ea5e9" />
+              <Text style={styles.infoTitle}>Student Information</Text>
+            </View>
+            
+            <View style={styles.infoGrid}>
+              <View style={styles.infoRow}>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Name</Text>
+                  <Text style={styles.infoValue} numberOfLines={1}>
+                    {formattedStudentInfo.name}
+                  </Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Student ID</Text>
+                  <Text style={styles.infoValue}>{formattedStudentInfo.studentID}</Text>
+                </View>
+              </View>
+
+              <View style={styles.infoRow}>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Course</Text>
+                  <Text style={styles.infoValue}>{formattedStudentInfo.course}</Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Year</Text>
+                  <Text style={styles.infoValue}>Year {formattedStudentInfo.yearLevel}</Text>
+                </View>
+              </View>
+
+              <View style={styles.infoRow}>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Block</Text>
+                  <Text style={styles.infoValue}>{formattedStudentInfo.block}</Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Gender</Text>
+                  <Text style={styles.infoValue}>{formattedStudentInfo.gender}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* How It Works */}
+        <View style={styles.guideCard}>
+          <Text style={styles.guideTitle}>How It Works</Text>
+          
+          {[
+            { icon: 'camera', color: '#0ea5e9', title: 'Open Scanner', desc: 'Tap the button to activate camera' },
+            { icon: 'maximize', color: '#8b5cf6', title: 'Scan QR Code', desc: 'Align the code within the frame' },
+            { icon: 'map-pin', color: '#10b981', title: 'Verify Location', desc: 'System checks your proximity' },
+            { icon: 'check-circle', color: '#f59e0b', title: 'Confirm', desc: 'Attendance recorded instantly' }
+          ].map((step, index) => (
+            <View key={index} style={styles.guideStep}>
+              <View style={[styles.stepNumber, { backgroundColor: step.color + '20' }]}>
+                <Feather name={step.icon as any} size={16} color={step.color} />
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={styles.stepTitle}>{step.title}</Text>
+                <Text style={styles.stepDesc}>{step.desc}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Tips Card */}
+        <View style={styles.tipsCard}>
+          <View style={styles.tipsHeader}>
+            <Feather name="info" size={18} color="#f59e0b" />
+            <Text style={styles.tipsTitle}>Pro Tips</Text>
+          </View>
+          <View style={styles.tipItem}>
+            <Feather name="sun" size={14} color="#64748b" />
+            <Text style={styles.tipText}>Ensure good lighting for better scanning</Text>
+          </View>
+          <View style={styles.tipItem}>
+            <Feather name="wifi" size={14} color="#64748b" />
+            <Text style={styles.tipText}>Stable internet connection required</Text>
+          </View>
+          <View style={styles.tipItem}>
+            <Feather name="navigation" size={14} color="#64748b" />
+            <Text style={styles.tipText}>Enable location services for verification</Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Scanner Modal */}
+      <Modal visible={showScanner} animationType="slide" onRequestClose={() => setShowScanner(false)}>
+        <View style={styles.scannerContainer}>
+          <StatusBar barStyle="light-content" backgroundColor="#000" />
+          
+          {(!cameraReady || isGettingLocation) && (
+            <View style={styles.scannerLoading}>
+              <ActivityIndicator size="large" color="#0ea5e9" />
+              <Text style={styles.scannerLoadingText}>
+                {isGettingLocation ? 'Verifying location...' : 'Starting camera...'}
+              </Text>
             </View>
           )}
 
           <CameraView
-            style={studentAttendanceStyles.camera}
+            style={styles.camera}
             onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
             onCameraReady={() => setCameraReady(true)}
           />
 
-          <View style={studentAttendanceStyles.scannerOverlay}>
-            <View style={studentAttendanceStyles.scannerFrame} />
-            <Text style={studentAttendanceStyles.scannerText}>
-              {isGettingLocation ? 'Verifying location...' : 'Align QR code within the frame'}
+          {/* Scanner Overlay */}
+          <View style={styles.scannerOverlay}>
+            <Animated.View style={[styles.scannerFrame, { transform: [{ scale: pulseAnim }] }]}>
+              <View style={styles.cornerTL} />
+              <View style={styles.cornerTR} />
+              <View style={styles.cornerBL} />
+              <View style={styles.cornerBR} />
+            </Animated.View>
+            
+            <Text style={styles.scannerInstruction}>
+              {isGettingLocation ? 'Checking location...' : 'Align QR code within frame'}
             </Text>
 
             {isGettingLocation && (
-              <View style={studentAttendanceStyles.locationStatus}>
-                <ActivityIndicator size="small" color="#FFFFFF" />
-                <Text style={studentAttendanceStyles.locationStatusText}>
-                  Checking your proximity to event...
-                </Text>
+              <View style={styles.locationBadge}>
+                <ActivityIndicator size="small" color="#fff" />
+                <Text style={styles.locationBadgeText}>Verifying proximity...</Text>
               </View>
             )}
           </View>
 
-          <TouchableOpacity style={studentAttendanceStyles.closeButton} onPress={() => setShowScanner(false)}>
-            <Text style={{ color: '#FFFFFF', fontSize: 20 }}>✕</Text>
-            <Text style={studentAttendanceStyles.closeButtonText}>Close Scanner</Text>
-          </TouchableOpacity>
+          {/* Scanner Header */}
+          <View style={styles.scannerHeader}>
+            <TouchableOpacity style={styles.closeScannerBtn} onPress={() => setShowScanner(false)}>
+              <Feather name="x" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.scannerHeaderTitle}>Scan QR Code</Text>
+            <View style={{ width: 40 }} />
+          </View>
         </View>
       </Modal>
 
-      <Modal visible={showResult} transparent animationType="fade" onRequestClose={resetScanner}>
-        <View style={studentAttendanceStyles.resultOverlay}>
-          <View style={studentAttendanceStyles.resultContent}>
+      {/* Result Modal */}
+      <Modal visible={showResult} transparent animationType="none" onRequestClose={resetScanner}>
+        <View style={styles.resultOverlay}>
+          <Animated.View 
+            style={[
+              styles.resultCard,
+              { transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }
+            ]}
+          >
             {scanResult?.success ? (
               <>
-                <Text style={studentAttendanceStyles.successTitle}>
-                  {scanResult.locationVerified ? (
-                    <>
-                      <Icon name="map-marker-check" size={20} color="#10B981" /> Attendance Confirmed!
-                    </>
-                  ) : (
-                    <>
-                      <Icon name="check-circle" size={20} color="#10B981" /> Attendance Confirmed!
-                    </>
-                  )}
-                </Text>
-                <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
+                <View style={styles.resultIconContainer}>
+                  <LinearGradient colors={['#10b981', '#059669']} style={styles.resultIconGradient}>
+                    <Feather name="check" size={40} color="#fff" />
+                  </LinearGradient>
+                </View>
+                
+                <Text style={styles.resultTitle}>Attendance Confirmed!</Text>
+                <Text style={styles.resultMessage}>{scanResult.message}</Text>
 
                 {scanResult.locationVerified && (
-                  <View style={studentAttendanceStyles.locationVerification}>
-                    <Text style={studentAttendanceStyles.locationVerifiedText}>
-                      <Icon name="check-circle" size={16} color="#10B981" /> Location Verified
-                    </Text>
-                    <Text style={studentAttendanceStyles.locationDetails}>
-                      You were {scanResult.distance?.toFixed(0)}m from the event venue
+                  <View style={styles.verifiedBadge}>
+                    <Feather name="map-pin" size={14} color="#10b981" />
+                    <Text style={styles.verifiedText}>
+                      Location Verified • {scanResult.distance?.toFixed(0)}m away
                     </Text>
                   </View>
                 )}
 
-                <View style={studentAttendanceStyles.eventInfo}>
-                  <Text style={studentAttendanceStyles.eventName}>{scanResult.event?.title}</Text>
-                  <Text style={studentAttendanceStyles.eventDetails}>
-                    <Icon name="map-marker" size={16} color="#1e6dffff" /> {scanResult.event?.location}
-                  </Text>
-
-                  {scanResult.event?.date && isValidDate(scanResult.event.date) && (
-                    <Text style={studentAttendanceStyles.eventDetails}>
-                      <Icon name="calendar" size={16} color="#000" /> {formatDate(scanResult.event.date)}
+                <View style={styles.eventDetailsCard}>
+                  <Text style={styles.eventName}>{scanResult.event?.title}</Text>
+                  <View style={styles.eventMeta}>
+                    <Feather name="calendar" size={14} color="#64748b" />
+                    <Text style={styles.eventMetaText}>
+                      {formatDate(scanResult.event?.date)}
                     </Text>
-                  )}
-
-                  {scanResult.qrData?.usesManualExpiration && scanResult.event?.qrExpiration && isValidDate(scanResult.event.qrExpiration) ? (
-                    <Text style={studentAttendanceStyles.eventDetails}>
-                      <Icon name="alarm" size={16} color="#666" /> Manually Controlled • Expires: {formatDate(scanResult.event.qrExpiration)}
-                    </Text>
-                  ) : scanResult.qrData?.expiresAt && isValidDate(scanResult.qrData.expiresAt) ? (
-                    <Text style={studentAttendanceStyles.eventDetails}>
-                      <Icon name="alarm" size={16} color="#666" /> QR Valid: {formatTimeRemaining(scanResult.qrData.expiresAt)} remaining
-                    </Text>
-                  ) : null}
+                  </View>
+                  <View style={styles.eventMeta}>
+                    <Feather name="map-pin" size={14} color="#64748b" />
+                    <Text style={styles.eventMetaText}>{scanResult.event?.location}</Text>
+                  </View>
                 </View>
 
-                <View style={studentAttendanceStyles.attendanceDetails}>
-                  <Text style={studentAttendanceStyles.detailsTitle}>Your Recorded Details</Text>
-                  <Text style={studentAttendanceStyles.detailItem}>🆔 Student ID: {scanResult.studentData.studentID}</Text>
-                  <Text style={studentAttendanceStyles.detailItem}>👤 Name: {scanResult.studentData.studentName}</Text>
-                  <Text style={studentAttendanceStyles.detailItem}>🎓 Course: {scanResult.studentData.course}</Text>
-                  <Text style={studentAttendanceStyles.detailItem}>📚 Year Level: {scanResult.studentData.yearLevel}</Text>
-                  <Text style={studentAttendanceStyles.detailItem}>🧩 Block: {scanResult.studentData.block}</Text>
-                  <Text style={studentAttendanceStyles.detailItem}>👥 Gender: {scanResult.studentData.gender}</Text>
-                  <Text style={studentAttendanceStyles.detailItem}>
-                    <Icon name="clock-outline" size={16} color="#666" /> Time: {new Date(scanResult.studentData.timestamp).toLocaleTimeString()}
-                  </Text>
+                <View style={styles.studentDetails}>
+                  <Text style={styles.detailsTitle}>Recorded Details</Text>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Student ID</Text>
+                    <Text style={styles.detailValue}>{scanResult.studentData.studentID}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Name</Text>
+                    <Text style={styles.detailValue}>{scanResult.studentData.studentName}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Course</Text>
+                    <Text style={styles.detailValue}>{scanResult.studentData.course}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Time</Text>
+                    <Text style={styles.detailValue}>
+                      {new Date(scanResult.studentData.timestamp).toLocaleTimeString()}
+                    </Text>
+                  </View>
                 </View>
 
-                <TouchableOpacity style={studentAttendanceStyles.okButton} onPress={resetScanner}>
-                  <Text style={studentAttendanceStyles.okButtonText}>Great!</Text>
+                <TouchableOpacity style={styles.doneButton} onPress={resetScanner}>
+                  <Text style={styles.doneButtonText}>Done</Text>
                 </TouchableOpacity>
               </>
             ) : (
               <>
-                {scanResult?.error === 'QR_CODE_EXPIRED' ? (
-                  <>
-                    <Text style={studentAttendanceStyles.errorTitle}>
-                      <Icon name="alarm-off" size={20} color="#DC2626" /> QR Code Expired
-                    </Text>
-                    <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
-                    {scanResult.expirationTime && (
-                      <Text style={studentAttendanceStyles.resultText}>
-                        Expired: {formatDate(scanResult.expirationTime.toISOString())}
-                      </Text>
-                    )}
-                  </>
-                ) : scanResult?.error === 'ATTENDANCE_DEADLINE_PASSED' ? (
-                  <>
-                    <Text style={studentAttendanceStyles.errorTitle}>
-                      <Icon name="calendar-remove" size={20} color="#DC2626" /> Deadline Passed
-                    </Text>
-                    <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
-                  </>
-                ) : scanResult?.error === 'EVENT_NOT_STARTED' ? (
-                  <>
-                    <Text style={studentAttendanceStyles.errorTitle}>
-                      <Icon name="timer-sand" size={20} color="#DC2626" /> Event Not Started
-                    </Text>
-                    <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
-                  </>
-                ) : scanResult?.error === 'LOCATION_MISMATCH' ? (
-                  <>
-                    <Text style={studentAttendanceStyles.errorTitle}>
-                      <Icon name="map-marker-radius" size={20} color="#DC2626" /> Too Far From Event
-                    </Text>
-                    <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
-                    <Text style={studentAttendanceStyles.resultText}>
-                      Please go to the event location and try again.
-                    </Text>
-                  </>
-                ) : scanResult?.error === 'LOCATION_INACCURATE' ? (
-                  <>
-                    <Text style={studentAttendanceStyles.errorTitle}>
-                      <Icon name="map-marker-off" size={20} color="#DC2626" /> Location Unclear
-                    </Text>
-                    <Text style={studentAttendanceStyles.resultText}>{scanResult.message}</Text>
-                    <Text style={studentAttendanceStyles.resultText}>
-                      Accuracy: {scanResult.accuracy?.toFixed(0)}m
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={studentAttendanceStyles.errorTitle}>
-                      <Icon name="close-circle" size={20} color="#DC2626" /> Attendance Failed
-                    </Text>
-                    <Text style={studentAttendanceStyles.resultText}>{scanResult?.message}</Text>
-                  </>
-                )}
+                <View style={styles.resultIconContainer}>
+                  <LinearGradient colors={['#ef4444', '#dc2626']} style={styles.resultIconGradient}>
+                    <Feather name="x" size={40} color="#fff" />
+                  </LinearGradient>
+                </View>
 
-                {scanResult?.event && (
-                  <View style={studentAttendanceStyles.eventInfo}>
-                    <Text style={studentAttendanceStyles.eventName}>{scanResult.event.title}</Text>
-                    <Text style={studentAttendanceStyles.eventDetails}>
-                      <Icon name="map-marker" size={16} color="#1e6dffff" /> {scanResult.event.location}
-                    </Text>
+                <Text style={styles.resultTitleError}>Scan Failed</Text>
+                <Text style={styles.resultMessageError}>{scanResult?.message}</Text>
 
-                    {scanResult.event.date && isValidDate(scanResult.event.date) && (
-                      <Text style={studentAttendanceStyles.eventDetails}>
-                        <Icon name="calendar" size={16} color="#000000ff" /> {formatDate(scanResult.event.date)}
-                      </Text>
-                    )}
+                {scanResult?.distance && (
+                  <View style={styles.distanceWarning}>
+                    <Feather name="alert-triangle" size={16} color="#f59e0b" />
+                    <Text style={styles.distanceText}>
+                      You're {scanResult.distance.toFixed(0)}m away (max {scanResult.allowedRadius}m)
+                    </Text>
                   </View>
                 )}
 
-                <View style={studentAttendanceStyles.buttonRow}>
-                  <TouchableOpacity
-                    style={[studentAttendanceStyles.halfButton, { backgroundColor: '#6B7280' }]}
-                    onPress={resetScanner}
-                  >
-                    <Text style={studentAttendanceStyles.okButtonText}>Close</Text>
+                {scanResult?.event && (
+                  <View style={styles.eventDetailsCard}>
+                    <Text style={styles.eventName}>{scanResult.event.title}</Text>
+                    <View style={styles.eventMeta}>
+                      <Feather name="calendar" size={14} color="#64748b" />
+                      <Text style={styles.eventMetaText}>{formatDate(scanResult.event.date)}</Text>
+                    </View>
+                  </View>
+                )}
+
+                <View style={styles.errorActions}>
+                  <TouchableOpacity style={styles.retryButton} onPress={() => { resetScanner(); openScanner(); }}>
+                    <Feather name="refresh-cw" size={18} color="#fff" />
+                    <Text style={styles.retryButtonText}>Try Again</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[studentAttendanceStyles.halfButton, { backgroundColor: '#3B82F6' }]}
-                    onPress={() => {
-                      resetScanner();
-                      openScanner();
-                    }}
-                  >
-                    <Text style={studentAttendanceStyles.okButtonText}>Scan Again</Text>
+                  <TouchableOpacity style={styles.cancelResultButton} onPress={resetScanner}>
+                    <Text style={styles.cancelResultText}>Close</Text>
                   </TouchableOpacity>
                 </View>
               </>
             )}
-          </View>
+          </Animated.View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }

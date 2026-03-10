@@ -33,11 +33,15 @@ interface Announcement {
   title: string;
   message: string;
   createdAt?: any;
+  priority?: 'normal' | 'important' | 'urgent';
+  status?: 'pending' | 'approved' | 'rejected';
+  createdBy?: string;
+  createdByName?: string;
 }
 
 export default function MainAdminAnnouncements() {
   const { width: screenWidth } = useWindowDimensions();
-  
+
   const isMobile = screenWidth < 640;
   const isTablet = screenWidth >= 640 && screenWidth < 1024;
   const isDesktop = screenWidth >= 1024;
@@ -56,7 +60,7 @@ export default function MainAdminAnnouncements() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [itemsPerPage] = useState(isMobile ? 5 : 10);
+  const [itemsPerPage] = useState(isMobile ? 5 : 5);
 
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<string | null>(null);
   const [priority, setPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
@@ -117,6 +121,8 @@ export default function MainAdminAnnouncements() {
         });
       case 'pinned':
         return announcementsList.filter(ann =>
+          ann.priority === 'important' ||
+          ann.priority === 'urgent' ||
           ann.title.toLowerCase().includes('important') ||
           ann.title.toLowerCase().includes('urgent')
         );
@@ -127,7 +133,7 @@ export default function MainAdminAnnouncements() {
 
   const handleFilterChange = (filter: 'all' | 'week' | 'month' | 'pinned') => {
     setActiveFilter(filter);
-    setCurrentPage(1); 
+    setCurrentPage(1);
   };
 
   const handleSearch = (text: string) => {
@@ -140,28 +146,38 @@ export default function MainAdminAnnouncements() {
 
   const handleAddAnnouncement = async () => {
     if (!title.trim() || !message.trim()) {
-      Alert.alert("Validation Error", "Please fill in both title and message");
+      if (Platform.OS === 'web') {
+        window.alert("Please fill in both title and message");
+      } else {
+        Alert.alert("Validation Error", "Please fill in both title and message");
+      }
       return;
     }
 
-    let finalTitle = title.trim();
-    if (priority === 'urgent' && !finalTitle.toLowerCase().includes('urgent')) {
-      finalTitle = `URGENT: ${finalTitle}`;
-    } else if (priority === 'important' && !finalTitle.toLowerCase().includes('important')) {
-      finalTitle = `IMPORTANT: ${finalTitle}`;
-    }
-
     try {
+      // Main admin announcements are auto‑approved
       await addDoc(collection(db, "updates"), {
-        title: finalTitle,
+        title: title.trim(),
         message: message.trim(),
+        priority: priority,
+        status: 'approved',
+        createdBy: userData?.email || 'admin',
+        createdByName: userData?.name || 'Main Admin',
         createdAt: serverTimestamp(),
       });
       resetForm();
-      Alert.alert("Success", "Announcement created successfully!");
+      if (Platform.OS === 'web') {
+        window.alert("Announcement created successfully!");
+      } else {
+        Alert.alert("Success", "Announcement created successfully!");
+      }
     } catch (error) {
       console.error("Error adding announcement:", error);
-      Alert.alert("Error", "Failed to create announcement");
+      if (Platform.OS === 'web') {
+        window.alert("Failed to create announcement");
+      } else {
+        Alert.alert("Error", "Failed to create announcement");
+      }
     }
   };
 
@@ -170,7 +186,9 @@ export default function MainAdminAnnouncements() {
     setTitle(announcement.title);
     setMessage(announcement.message);
 
-    if (announcement.title.toLowerCase().includes('urgent')) {
+    if (announcement.priority) {
+      setPriority(announcement.priority);
+    } else if (announcement.title.toLowerCase().includes('urgent')) {
       setPriority('urgent');
     } else if (announcement.title.toLowerCase().includes('important')) {
       setPriority('important');
@@ -183,24 +201,28 @@ export default function MainAdminAnnouncements() {
 
   const handleSaveEdit = async () => {
     if (!editingId || !title.trim() || !message.trim()) return;
-    let finalTitle = title.trim();
-    if (priority === 'urgent' && !finalTitle.toLowerCase().includes('urgent')) {
-      finalTitle = `URGENT: ${finalTitle}`;
-    } else if (priority === 'important' && !finalTitle.toLowerCase().includes('important')) {
-      finalTitle = `IMPORTANT: ${finalTitle}`;
-    }
 
     try {
       const announcementRef = doc(db, "updates", editingId);
       await updateDoc(announcementRef, {
-        title: finalTitle,
-        message: message.trim()
+        title: title.trim(),
+        message: message.trim(),
+        priority: priority,
+        updatedAt: serverTimestamp(),
       });
       resetForm();
-      Alert.alert("Success", "Announcement updated successfully!");
+      if (Platform.OS === 'web') {
+        window.alert("Announcement updated successfully!");
+      } else {
+        Alert.alert("Success", "Announcement updated successfully!");
+      }
     } catch (error) {
       console.error("Error updating announcement:", error);
-      Alert.alert("Error", "Failed to update announcement");
+      if (Platform.OS === 'web') {
+        window.alert("Failed to update announcement");
+      } else {
+        Alert.alert("Error", "Failed to update announcement");
+      }
     }
   };
 
@@ -210,6 +232,9 @@ export default function MainAdminAnnouncements() {
       if (isConfirmed) {
         try {
           await deleteDoc(doc(db, "updates", id));
+          if (selectedAnnouncement === id) {
+            setSelectedAnnouncement(null);
+          }
           window.alert("Announcement deleted successfully!");
         } catch (error) {
           console.error("Error deleting announcement:", error);
@@ -228,6 +253,9 @@ export default function MainAdminAnnouncements() {
             onPress: async () => {
               try {
                 await deleteDoc(doc(db, "updates", id));
+                if (selectedAnnouncement === id) {
+                  setSelectedAnnouncement(null);
+                }
                 Alert.alert("Success", "Announcement deleted successfully!");
               } catch (error) {
                 console.error("Error deleting announcement:", error);
@@ -267,8 +295,8 @@ export default function MainAdminAnnouncements() {
       return dayjs(ann.createdAt.toDate()).isSame(dayjs(), 'day');
     }).length;
     const urgent = announcements.filter(ann =>
-      ann.title.toLowerCase().includes('urgent') ||
-      ann.title.toLowerCase().includes('important')
+      ann.priority === 'urgent' ||
+      ann.title.toLowerCase().includes('urgent')
     ).length;
     return { total, today, urgent };
   }, [announcements]);
@@ -278,34 +306,36 @@ export default function MainAdminAnnouncements() {
     return dayjs(createdAt.toDate()).isAfter(dayjs().subtract(1, 'day'));
   };
 
-  const isUrgentAnnouncement = (title: string) => {
-    return title.toLowerCase().includes('urgent');
+  const isUrgentAnnouncement = (ann: Announcement) => {
+    return ann.priority === 'urgent' || ann.title.toLowerCase().includes('urgent');
   };
 
-  const isImportantAnnouncement = (title: string) => {
-    return title.toLowerCase().includes('important');
+  const isImportantAnnouncement = (ann: Announcement) => {
+    return ann.priority === 'important' || ann.title.toLowerCase().includes('important');
   };
 
   const formatDate = (date: Date) => {
     return dayjs(date).format('MMM D, YYYY • h:mm A');
   };
 
-  const getPriorityColor = (title: string) => {
-    if (title.toLowerCase().includes('urgent')) return '#ef4444';
-    if (title.toLowerCase().includes('important')) return '#f59e0b';
+  const getPriorityColor = (ann: Announcement) => {
+    if (ann.priority === 'urgent' || ann.title.toLowerCase().includes('urgent')) return '#ef4444';
+    if (ann.priority === 'important' || ann.title.toLowerCase().includes('important')) return '#f59e0b';
     return '#0ea5e9';
   };
 
   const renderPaginatedItem = ({ item, index }: { item: Announcement; index: number }) => {
     const isActive = selectedAnnouncement === item.id;
-    const priorityColor = getPriorityColor(item.title);
+    const priorityColor = getPriorityColor(item);
+    const isPending = item.status === 'pending';
+    const isRejected = item.status === 'rejected';
 
     return (
       <TouchableOpacity
         style={[
-          styles.paginatedItem, 
+          styles.paginatedItem,
           isActive && styles.paginatedItemActive,
-          isMobile && styles.paginatedItemMobile
+          isMobile && styles.paginatedItemMobile,
         ]}
         onPress={() => setSelectedAnnouncement(item.id)}
       >
@@ -322,12 +352,35 @@ export default function MainAdminAnnouncements() {
             <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
               {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
             </Text>
-            {isNewAnnouncement(item.createdAt) && (
-              <View style={[styles.paginatedBadge, { backgroundColor: '#3b82f6' }]}>
-                <Text style={styles.paginatedBadgeText}>NEW</Text>
-              </View>
-            )}
+            <View style={styles.paginatedBadgeContainer}>
+              {isNewAnnouncement(item.createdAt) && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#3b82f6' }]}>
+                  <Text style={styles.paginatedBadgeText}>NEW</Text>
+                </View>
+              )}
+              {isPending && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#f59e0b' }]}>
+                  <Text style={styles.paginatedBadgeText}>PENDING</Text>
+                </View>
+              )}
+              {isRejected && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#ef4444' }]}>
+                  <Text style={styles.paginatedBadgeText}>REJECTED</Text>
+                </View>
+              )}
+              {item.status === 'approved' && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#10b981' }]}>
+                  <Text style={styles.paginatedBadgeText}>APPROVED</Text>
+                </View>
+              )}
+            </View>
           </View>
+          {/* Show creator if available */}
+          {item.createdByName && (
+            <Text style={[styles.paginatedCreator, isMobile && styles.paginatedCreatorMobile]}>
+              by {item.createdByName}
+            </Text>
+          )}
         </View>
         <View style={styles.paginatedActions}>
           <TouchableOpacity
@@ -348,10 +401,12 @@ export default function MainAdminAnnouncements() {
   };
 
   const renderSearchResultItem = ({ item }: { item: Announcement }) => {
-    const priorityColor = getPriorityColor(item.title);
+    const priorityColor = getPriorityColor(item);
+    const isPending = item.status === 'pending';
+    const isRejected = item.status === 'rejected';
 
     return (
-      <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile]}>
+      <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile, isRejected && { opacity: 0.6 }]}>
         <View style={styles.searchResultHeader}>
           <View style={styles.searchResultTitleContainer}>
             <Text style={[styles.searchResultTitle, isMobile && styles.searchResultTitleMobile]} numberOfLines={1}>
@@ -363,9 +418,29 @@ export default function MainAdminAnnouncements() {
                   <Text style={styles.searchResultBadgeText}>NEW</Text>
                 </View>
               )}
-              {isUrgentAnnouncement(item.title) && (
+              {isUrgentAnnouncement(item) && (
                 <View style={[styles.searchResultBadge, { backgroundColor: '#ef4444' }]}>
                   <Text style={styles.searchResultBadgeText}>URGENT</Text>
+                </View>
+              )}
+              {isImportantAnnouncement(item) && !isUrgentAnnouncement(item) && (
+                <View style={[styles.searchResultBadge, { backgroundColor: '#f59e0b' }]}>
+                  <Text style={styles.searchResultBadgeText}>IMPORTANT</Text>
+                </View>
+              )}
+              {isPending && (
+                <View style={[styles.searchResultBadge, { backgroundColor: '#f59e0b' }]}>
+                  <Text style={styles.searchResultBadgeText}>PENDING</Text>
+                </View>
+              )}
+              {isRejected && (
+                <View style={[styles.searchResultBadge, { backgroundColor: '#ef4444' }]}>
+                  <Text style={styles.searchResultBadgeText}>REJECTED</Text>
+                </View>
+              )}
+              {item.status === 'approved' && (
+                <View style={[styles.searchResultBadge, { backgroundColor: '#10b981' }]}>
+                  <Text style={styles.searchResultBadgeText}>APPROVED</Text>
                 </View>
               )}
             </View>
@@ -401,6 +476,11 @@ export default function MainAdminAnnouncements() {
             {item.createdAt ? dayjs(item.createdAt.toDate()).format('MMM D, YYYY') : ''}
           </Text>
         </View>
+        {item.createdByName && (
+          <Text style={[styles.searchResultCreator, isMobile && styles.searchResultCreatorMobile]}>
+            Created by {item.createdByName}
+          </Text>
+        )}
       </View>
     );
   };
@@ -443,7 +523,7 @@ export default function MainAdminAnnouncements() {
 
   return (
     <View style={styles.container}>
-      {/* Header with Gradient (matching dashboard) */}
+      {/* Header with Gradient */}
       <LinearGradient
         colors={['#14203d', '#06080b']}
         start={{ x: 0, y: 0 }}
@@ -499,9 +579,9 @@ export default function MainAdminAnnouncements() {
         </View>
       </LinearGradient>
 
-      {/* Stats Grid - Responsive */}
+      {/* Stats Grid */}
       <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#0ea5e9' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
             <Ionicons name="document-text" size={isMobile ? 16 : 20} color="#0ea5e9" />
           </View>
@@ -509,7 +589,7 @@ export default function MainAdminAnnouncements() {
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
         </View>
 
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#10b981' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, {  borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#10b98115' }]}>
             <Feather name="sun" size={isMobile ? 16 : 20} color="#10b981" />
           </View>
@@ -517,16 +597,16 @@ export default function MainAdminAnnouncements() {
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Today</Text>
         </View>
 
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#f59e0b' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#f59e0b15' }]}>
-            <MaterialIcons name="priority-high" size={isMobile ? 16 : 20} color="#f59e0b" />
+            <MaterialIcons name="priority-high" size={isMobile ? 16 : 20} color="#ef4444" />
           </View>
           <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.urgent}</Text>
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Urgent</Text>
         </View>
       </View>
 
-      {/* Main Content Grid - Responsive */}
+      {/* Main Content Grid */}
       <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
         {/* Left Grid - Paginated Announcements */}
         <View style={[styles.leftGrid, isMobile && styles.leftGridMobile]}>
@@ -630,7 +710,7 @@ export default function MainAdminAnnouncements() {
                 }
               />
 
-              {/* Selected Announcement Detail View - Responsive */}
+              {/* Selected Announcement Detail View */}
               {selectedAnnouncement && (
                 <View style={[styles.selectedDetailContainer, isMobile && styles.selectedDetailContainerMobile]}>
                   <View style={[styles.selectedDetailHeader, isMobile && styles.selectedDetailHeaderMobile]}>
@@ -652,12 +732,27 @@ export default function MainAdminAnnouncements() {
                               <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>NEW</Text>
                             </View>
                           )}
-                          {isUrgentAnnouncement(selected.title) && (
+                          {selected.status === 'pending' && (
+                            <View style={[styles.detailBadge, { backgroundColor: '#f59e0b' }, isMobile && styles.detailBadgeMobile]}>
+                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>PENDING</Text>
+                            </View>
+                          )}
+                          {selected.status === 'rejected' && (
+                            <View style={[styles.detailBadge, { backgroundColor: '#ef4444' }, isMobile && styles.detailBadgeMobile]}>
+                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>REJECTED</Text>
+                            </View>
+                          )}
+                          {selected.status === 'approved' && (
+                            <View style={[styles.detailBadge, { backgroundColor: '#10b981' }, isMobile && styles.detailBadgeMobile]}>
+                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>APPROVED</Text>
+                            </View>
+                          )}
+                          {isUrgentAnnouncement(selected) && (
                             <View style={[styles.detailBadge, { backgroundColor: '#ef4444' }, isMobile && styles.detailBadgeMobile]}>
                               <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>URGENT</Text>
                             </View>
                           )}
-                          {isImportantAnnouncement(selected.title) && (
+                          {isImportantAnnouncement(selected) && !isUrgentAnnouncement(selected) && (
                             <View style={[styles.detailBadge, { backgroundColor: '#f59e0b' }, isMobile && styles.detailBadgeMobile]}>
                               <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>IMPORTANT</Text>
                             </View>
@@ -675,6 +770,14 @@ export default function MainAdminAnnouncements() {
                               {selected.createdAt ? dayjs(selected.createdAt.toDate()).format('MMM D, YYYY') : ''}
                             </Text>
                           </View>
+                          {selected.createdByName && (
+                            <View style={[styles.selectedDetailCreator, isMobile && styles.selectedDetailCreatorMobile]}>
+                              <Feather name="user" size={isMobile ? 12 : 14} color="#64748b" />
+                              <Text style={[styles.selectedDetailCreatorText, isMobile && styles.selectedDetailCreatorTextMobile]}>
+                                by {selected.createdByName}
+                              </Text>
+                            </View>
+                          )}
 
                           <View style={[styles.selectedDetailActions, isMobile && styles.selectedDetailActionsMobile]}>
                             <TouchableOpacity
@@ -777,7 +880,7 @@ export default function MainAdminAnnouncements() {
         </View>
       </View>
 
-      {/* Create/Edit Modal - Responsive */}
+      {/* Create/Edit Modal */}
       <Modal
         visible={showCreateForm}
         transparent={true}

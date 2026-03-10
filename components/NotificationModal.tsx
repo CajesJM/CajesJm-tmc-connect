@@ -1,7 +1,7 @@
 import { Feather, FontAwesome6 } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-  Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View,
+  Modal, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View
 } from 'react-native';
 
 interface PendingApproval {
@@ -41,7 +41,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   const [activeTab, setActiveTab] = useState<'notifications' | 'approvals'>(
     approvalCount > 0 ? 'approvals' : 'notifications'
   );
-  
+
   const unreadCount = notifications.filter(n => !n.read).length;
   const modalWidth = Math.min(width * 0.9, 400);
 
@@ -51,20 +51,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     }
   }, [visible, approvalCount]);
 
-  const handleReject = (approval: PendingApproval) => {
-    Alert.alert(
-      'Reject Request',
-      `Are you sure you want to reject "${approval.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: () => onReject?.(approval),
-        },
-      ]
-    );
-  };
 
   const renderTabs = () => (
     <View style={styles.tabContainer}>
@@ -73,10 +59,10 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
         onPress={() => setActiveTab('approvals')}
       >
         <View style={styles.tabContent}>
-          <FontAwesome6 
-            name="clipboard-check" 
-            size={14} 
-            color={activeTab === 'approvals' ? '#ffffff' : '#64748b'} 
+          <FontAwesome6
+            name="clipboard-check"
+            size={14}
+            color={activeTab === 'approvals' ? '#ffffff' : '#64748b'}
           />
           <Text style={[styles.tabText, activeTab === 'approvals' && styles.activeTabText]}>
             Approvals
@@ -94,10 +80,10 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
         onPress={() => setActiveTab('notifications')}
       >
         <View style={styles.tabContent}>
-          <Feather 
-            name="bell" 
-            size={14} 
-            color={activeTab === 'notifications' ? '#ffffff' : '#64748b'} 
+          <Feather
+            name="bell"
+            size={14}
+            color={activeTab === 'notifications' ? '#ffffff' : '#64748b'}
           />
           <Text style={[styles.tabText, activeTab === 'notifications' && styles.activeTabText]}>
             Notifications
@@ -113,7 +99,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   );
 
   const renderApprovalsList = () => (
-    <ScrollView 
+    <ScrollView
       style={styles.notificationsList}
       showsVerticalScrollIndicator={false}
     >
@@ -143,7 +129,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                 color={approval.type === 'announcement' ? '#f59e0b' : '#0ea5e9'}
               />
             </View>
-            
+
             <View style={styles.approvalContent}>
               <View style={styles.notificationHeader}>
                 <Text style={styles.notificationTitle} numberOfLines={1}>
@@ -161,11 +147,11 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                   </Text>
                 </View>
               </View>
-              
+
               <Text style={styles.notificationMessage} numberOfLines={1}>
                 Requested by {approval.requestedBy}
               </Text>
-              
+
               <Text style={styles.notificationTime}>
                 {formatTime(approval.requestedAt)}
               </Text>
@@ -173,12 +159,12 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
               <View style={styles.approvalActions}>
                 <TouchableOpacity
                   style={[styles.actionButton, styles.rejectButton]}
-                  onPress={() => handleReject(approval)}
+                  onPress={() => onReject?.(approval)}   
                 >
                   <Feather name="x" size={14} color="#dc2626" />
                   <Text style={styles.rejectButtonText}>Reject</Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
                   style={[styles.actionButton, styles.approveButton]}
                   onPress={() => onApprove?.(approval)}
@@ -195,7 +181,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   );
 
   const renderNotificationsList = () => (
-    <ScrollView 
+    <ScrollView
       style={styles.notificationsList}
       showsVerticalScrollIndicator={false}
     >

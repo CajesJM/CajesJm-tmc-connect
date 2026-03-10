@@ -131,6 +131,7 @@ export interface MissedEvent {
   date: string;
   location: string;
   attendanceDeadline?: string;
+  scannedAt?: string; 
 }
 
 // Attendee Type

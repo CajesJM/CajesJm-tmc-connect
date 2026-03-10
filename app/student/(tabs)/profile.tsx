@@ -17,8 +17,14 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../../../context/AuthContext';
 import { auth, db } from '../../../lib/firebaseConfig';
-import type { Attendee, EventData, MissedEvent } from '../../../lib/types';
-import { styles } from '../../../styles/studentsProfile';
+import type { AttendanceRecord, EventData, MissedEvent } from '../../../lib/types';
+import { profileStyles as styles } from '../../../styles/student/profileStyles';
+
+
+interface StudentEvent extends MissedEvent {
+  scannedAt?: string;
+}
+
 
 interface TeamMember {
   id: string;
@@ -35,7 +41,7 @@ interface AboutInfo {
   };
   submittedTo: {
     name: string;
-    profilePhoto?:any;
+    profilePhoto?: any;
     department?: string;
     institution?: string;
   };
@@ -47,7 +53,9 @@ export default function StudentProfile() {
   const { logout, userData } = useAuth();
   const router = useRouter();
   const [missedEvents, setMissedEvents] = useState<MissedEvent[]>([]);
+  const [attendedEvents, setAttendedEvents] = useState<MissedEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'missed' | 'attended'>('attended');
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showImageOptions, setShowImageOptions] = useState(false);
@@ -58,75 +66,38 @@ export default function StudentProfile() {
       members: [
         {
           id: '1',
+          name: 'John Mark Cajes',
+          profilePhoto: require('../../../assets/images/Profile/Jm.jpg'),
+          role: 'Lead Developer',
+          email: 'markcajes@gmail.com'
+        },
+        {
+          id: '2',
           name: 'Ken Suarez',
           profilePhoto: require('../../../assets/images/Profile/ken.jpg'),
           role: 'Lead Developer',
           email: 'kensuarez31@gmail.com'
         },
         {
-          id: '2',
-          name: 'John Mark Cajes',
-          profilePhoto: require('../../../assets/images/Profile/Jm.jpg'),
-          role: '',
-          email: 'markcajes24@gmail.com'
-        },
-        {
           id: '3',
-          name: 'Kenneth Baculpo',
-          profilePhoto: require('../../../assets/images/Profile/kenneth.jpg'),
-          role: '',
-          email: 'johnkennethbaculpo@gmail.com'
+          name: 'Denmerk Apa',
+          profilePhoto: require('../../../assets/images/Profile/denmerk.jpg'),
+          role: 'QA Tester',
+          email: 'denmerk@gmail.com'
         },
         {
           id: '4',
-          name: 'Kristian Jay Ayuban',
-          profilePhoto: require('../../../assets/images/Profile/kian.jpg'),
-          role: '',
-          email: 'ayubankristianjay711@gmail.com'
+          name: 'Sherylann Inanod',
+          profilePhoto: require('../../../assets/images/Profile/Jm.jpg'),
+          role: 'UI/UX Designer',
+          email: 'inanodsherylann@gmail.com'
         },
         {
           id: '5',
-          name: 'Mc Air Jun Olmillo',
-          profilePhoto: require('../../../assets/images/Profile/mcair.jpg'),
+          name: 'Karl James Ayuban',
+          profilePhoto: require('../../../assets/images/Profile/jim.jpg'),
           role: '',
-          email: 'airtatzolmillo@gmail.com'
-
-        },
-         {
-          id: '6',
-          name: 'Cherry Ann Cagoco',
-          profilePhoto: require('../../../assets/images/Profile/cherry.jpg'),
-          role: '',
-          email: 'cherryanncagoco@gmail.com'
-
-        },
-         {
-          id: '7',
-          name: 'Flor Albert Asa ',
-          profilePhoto: require('../../../assets/images/Profile/flor.jpg'),
-          role: '',
-          email: 'afloralbert@gmail.com'
-        },
-          {
-          id: '8',
-          name: 'Christian Bautista',
-          profilePhoto: require('../../../assets/images/Profile/kristian.gif'),
-          role: '',
-          email: 'yashians120704@gmail.com'
-
-        },
-        {
-          id: '9',
-          name: 'Kento Mabanag',
-          role: '',
-          email: 'mabanagkento@gmail.com'
-
-        },
-        {
-          id: '10',
-          name: 'Madelo',
-          role: '',
-          email: 'yashians120704@gmail.com'
+          email: 'ayubankarljames@gmail.com'
 
         },
       ],
@@ -142,53 +113,100 @@ export default function StudentProfile() {
     description: 'TMC Connect - A comprehensive solution for managing campus events, attendance tracking, and student engagement.'
   });
 
-  useEffect(() => {
-    fetchMissedEvents();
-    fetchProfileImage();
-  }, []);
 
-  const fetchMissedEvents = async () => {
+  const fetchEvents = async () => {
     try {
-     
+      setLoading(true);
       const studentID = (userData as any)?.studentID;
-      if (!studentID) return;
+
+      console.log('Student ID:', studentID);
+
+      if (!studentID) {
+        console.log('No student ID found');
+        setLoading(false);
+        return;
+      }
 
       const eventsRef = collection(db, 'events');
       const q = query(
         eventsRef,
-        where('date', '<', new Date().toISOString())
+        where('status', '==', 'approved')
       );
 
       const querySnapshot = await getDocs(q);
-      const events: MissedEvent[] = [];
 
-      for (const doc of querySnapshot.docs) {
-        const eventData = doc.data() as EventData;
+      console.log('Total events found:', querySnapshot.docs.length);
+
+      const missed: StudentEvent[] = [];
+      const attended: StudentEvent[] = [];
+
+      for (const docSnapshot of querySnapshot.docs) {
+        const eventData = docSnapshot.data() as EventData;
+
+        console.log('Event:', eventData.title, 'Date:', eventData.date);
+
+        const eventDate = typeof eventData.date === 'object' && (eventData.date as any)?.toDate
+          ? (eventData.date as any).toDate()
+          : new Date((eventData.date as string) || '');
+
+        const now = new Date();
+
+        if (eventDate > now) {
+          console.log('Event is in future, skipping:', eventData.title);
+          continue;
+        }
+
         const attendees = eventData.attendees || [];
 
-       
-        const attended = attendees.some((attendee: Attendee) =>
-          attendee.studentID === studentID
+        console.log('Attendees:', attendees.length);
+
+        if (!eventData.title || !eventData.location) {
+          console.log('Missing required fields, skipping');
+          continue;
+        }
+
+        const studentAttendance = attendees.find((attendee: AttendanceRecord) =>
+          attendee.studentID === studentID.toString()
         );
 
-        if (!attended && eventData.title && eventData.date && eventData.location) {
-          events.push({
-            id: doc.id,
-            title: eventData.title,
-            date: eventData.date,
-            location: eventData.location,
-            attendanceDeadline: eventData.attendanceDeadline
-          });
+        console.log('Student attendance found:', !!studentAttendance);
+
+        const eventInfo: StudentEvent = {
+          id: docSnapshot.id,
+          title: eventData.title,
+          date: eventDate.toISOString(),
+          location: eventData.location,
+          attendanceDeadline: eventData.attendanceDeadline,
+          scannedAt: studentAttendance?.scannedAt || studentAttendance?.timestamp
+        };
+
+        if (studentAttendance) {
+          attended.push(eventInfo);
+          console.log('Added to attended:', eventData.title);
+        } else {
+          missed.push(eventInfo);
+          console.log('Added to missed:', eventData.title);
         }
       }
 
-      setMissedEvents(events);
+      console.log('Final counts - Attended:', attended.length, 'Missed:', missed.length);
+
+      missed.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      attended.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      setMissedEvents(missed);
+      setAttendedEvents(attended);
     } catch (error) {
-      console.error('Error fetching missed events:', error);
+      console.error('Error fetching events:', error);
     } finally {
       setLoading(false);
     }
   };
+  useEffect(() => {
+    fetchEvents();
+    fetchProfileImage();
+  }, []);
+
 
   const fetchProfileImage = async () => {
     try {
@@ -351,7 +369,7 @@ export default function StudentProfile() {
           </View>
 
           <ScrollView style={styles.aboutContent} showsVerticalScrollIndicator={false}>
-        
+
             {aboutInfo.description && (
               <View style={styles.aboutSection}>
                 <Text style={styles.aboutDescription}>
@@ -360,9 +378,9 @@ export default function StudentProfile() {
               </View>
             )}
 
-    
+
             <View style={styles.aboutSection}>
-           
+
               {aboutInfo.submittedBy.organization && (
                 <Text style={styles.organizationName}>
                   {aboutInfo.submittedBy.organization}
@@ -372,7 +390,7 @@ export default function StudentProfile() {
               <View style={styles.membersList}>
                 {aboutInfo.submittedBy.members.map((member) => (
                   <View key={member.id} style={styles.memberItem}>
-               
+
                     {member.profilePhoto ? (
                       <Image
                         source={member.profilePhoto}
@@ -399,7 +417,7 @@ export default function StudentProfile() {
               </View>
             </View>
 
-         
+
             <View style={styles.aboutSection}>
               <Text style={styles.sectionLabel}>Submitted To</Text>
               <View style={styles.submittedToCard}>
@@ -422,7 +440,7 @@ export default function StudentProfile() {
               </View>
             </View>
 
-      
+
             {aboutInfo.version && (
               <View style={styles.versionSection}>
                 <Text style={styles.versionText}>
@@ -438,9 +456,9 @@ export default function StudentProfile() {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      
 
-     
+
+
       <View style={styles.profileCard}>
         <TouchableOpacity
           style={styles.avatarContainer}
@@ -471,49 +489,118 @@ export default function StudentProfile() {
         <Text style={styles.yearLevel}>Year {userYearLevel} • {userBlock}</Text>
       </View>
 
- 
+
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Missed Events</Text>
-          <Text style={styles.eventsCount}>({missedEvents.length})</Text>
+        {/* Tab Headers */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'attended' && styles.activeTab]}
+            onPress={() => setActiveTab('attended')}
+          >
+            <Icon
+              name="check-circle"
+              size={18}
+              color={activeTab === 'attended' ? '#10B981' : '#6B7280'}
+            />
+            <Text style={[styles.tabText, activeTab === 'attended' && styles.activeTabText]}>
+              Attended
+            </Text>
+            <View style={[styles.badge, { backgroundColor: '#10B98120' }]}>
+              <Text style={[styles.badgeText, { color: '#10B981' }]}>{attendedEvents.length}</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'missed' && styles.activeTab]}
+            onPress={() => setActiveTab('missed')}
+          >
+            <Icon
+              name="calendar-remove"
+              size={18}
+              color={activeTab === 'missed' ? '#DC2626' : '#6B7280'}
+            />
+            <Text style={[styles.tabText, activeTab === 'missed' && styles.activeTabText]}>
+              Missed
+            </Text>
+            <View style={[styles.badge, { backgroundColor: '#DC262620' }]}>
+              <Text style={[styles.badgeText, { color: '#DC2626' }]}>{missedEvents.length}</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {loading ? (
           <ActivityIndicator size="small" color="#3B82F6" style={styles.loading} />
-        ) : missedEvents.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Icon name="check-circle-outline" size={48} color="#10B981" />
-            <Text style={styles.emptyStateText}>Great! You haven't missed any events.</Text>
-          </View>
-        ) : (
-          <View style={styles.eventsList}>
-            {missedEvents.slice(0, 5).map((event) => (
-              <View key={event.id} style={styles.eventItem}>
-                <View style={styles.eventIcon}>
-                  <Icon name="calendar-alert" size={20} color="#DC2626" />
-                </View>
-                <View style={styles.eventDetails}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventDate}>
-                    {formatDate(event.date)} • {event.location}
-                  </Text>
-                  {event.attendanceDeadline && (
-                    <Text style={styles.deadlineText}>
-                      Deadline: {formatDate(event.attendanceDeadline)}
+        ) : activeTab === 'attended' ? (
+        
+          attendedEvents.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Icon name="calendar-clock" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyStateText}>No attended events yet.</Text>
+              <Text style={styles.emptyStateSubtext}>Start attending events to see them here!</Text>
+            </View>
+          ) : (
+            <View style={styles.eventsList}>
+              {attendedEvents.slice(0, 5).map((event) => (
+                <View key={event.id} style={[styles.eventItem, styles.attendedEventItem]}>
+                  <View style={[styles.eventIcon, { backgroundColor: '#10B98115' }]}>
+                    <Icon name="check" size={20} color="#10B981" />
+                  </View>
+                  <View style={styles.eventDetails}>
+                    <Text style={styles.eventTitle}>{event.title}</Text>
+                    <Text style={styles.eventDate}>
+                      {formatDate(event.date)} • {event.location}
                     </Text>
-                  )}
+                    {event.scannedAt && (
+                      <Text style={styles.scannedAtText}>
+                        <Icon name="clock-check" size={12} color="#10B981" /> Scanned at {new Date(event.scannedAt).toLocaleTimeString()}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-            ))}
-            {missedEvents.length > 5 && (
-              <Text style={styles.moreEventsText}>
-                +{missedEvents.length - 5} more missed events
-              </Text>
-            )}
-          </View>
+              ))}
+              {attendedEvents.length > 5 && (
+                <Text style={styles.moreEventsText}>
+                  +{attendedEvents.length - 5} more attended events
+                </Text>
+              )}
+            </View>
+          )
+        ) : (
+          // Missed Events List
+          missedEvents.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Icon name="check-circle-outline" size={48} color="#10B981" />
+              <Text style={styles.emptyStateText}>Great! You haven't missed any events.</Text>
+            </View>
+          ) : (
+            <View style={styles.eventsList}>
+              {missedEvents.slice(0, 5).map((event) => (
+                <View key={event.id} style={styles.eventItem}>
+                  <View style={styles.eventIcon}>
+                    <Icon name="calendar-alert" size={20} color="#DC2626" />
+                  </View>
+                  <View style={styles.eventDetails}>
+                    <Text style={styles.eventTitle}>{event.title}</Text>
+                    <Text style={styles.eventDate}>
+                      {formatDate(event.date)} • {event.location}
+                    </Text>
+                    {event.attendanceDeadline && (
+                      <Text style={styles.deadlineText}>
+                        Deadline: {formatDate(event.attendanceDeadline)}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+              {missedEvents.length > 5 && (
+                <Text style={styles.moreEventsText}>
+                  +{missedEvents.length - 5} more missed events
+                </Text>
+              )}
+            </View>
+          )
         )}
       </View>
-
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -530,9 +617,9 @@ export default function StudentProfile() {
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
 
-         
 
-       
+
+
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => setShowAboutModal(true)}
@@ -556,7 +643,6 @@ export default function StudentProfile() {
         </View>
       </View>
 
-      {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Icon name="logout" size={20} color="#DC2626" />
         <Text style={styles.logoutText}>Logout</Text>

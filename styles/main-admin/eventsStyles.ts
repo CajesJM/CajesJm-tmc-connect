@@ -1351,5 +1351,12 @@ export const eventsStyles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#e2e8f0',
     },
+    selectedImagePreview: {
+        width: 80,
+        height: 80,
+        borderRadius: 12,
+        marginTop: 8,
+        alignSelf: 'center',
+    },
 
 });

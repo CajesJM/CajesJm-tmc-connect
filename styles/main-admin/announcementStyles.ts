@@ -1327,4 +1327,41 @@ export const announcementStyles = StyleSheet.create({
     modernCancelButtonTextMobile: {
         fontSize: 14,
     },
+    paginatedBadgeContainer: {
+        flexDirection: 'row',
+        gap: 4,
+        marginLeft: 8,
+    },
+    paginatedCreator: {
+        fontSize: 11,
+        color: '#64748b',
+        marginTop: 2,
+    },
+    paginatedCreatorMobile: {
+        fontSize: 10,
+    },
+    searchResultCreator: {
+        fontSize: 11,
+        color: '#64748b',
+        marginTop: 4,
+    },
+    searchResultCreatorMobile: {
+        fontSize: 10,
+    },
+    selectedDetailCreator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginTop: 4,
+    },
+    selectedDetailCreatorMobile: {
+        marginTop: 2,
+    },
+    selectedDetailCreatorText: {
+        fontSize: 13,
+        color: '#64748b',
+    },
+    selectedDetailCreatorTextMobile: {
+        fontSize: 11,
+    },
 });

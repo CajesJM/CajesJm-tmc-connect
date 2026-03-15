@@ -26,6 +26,14 @@ import { useAuth } from "../../context/AuthContext";
 import { db } from "../../lib/firebaseConfig";
 import { announcementStyles } from '../../styles/main-admin/announcementStyles';
 
+const showAlert = (title: string, message?: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(message ? `${title}\n${message}` : title);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
 dayjs.extend(relativeTime);
 
 interface Announcement {
@@ -146,11 +154,7 @@ export default function MainAdminAnnouncements() {
 
   const handleAddAnnouncement = async () => {
     if (!title.trim() || !message.trim()) {
-      if (Platform.OS === 'web') {
-        window.alert("Please fill in both title and message");
-      } else {
-        Alert.alert("Validation Error", "Please fill in both title and message");
-      }
+      showAlert("Validation Error", "Please fill in both title and message");
       return;
     }
 
@@ -166,18 +170,10 @@ export default function MainAdminAnnouncements() {
         createdAt: serverTimestamp(),
       });
       resetForm();
-      if (Platform.OS === 'web') {
-        window.alert("Announcement created successfully!");
-      } else {
-        Alert.alert("Success", "Announcement created successfully!");
-      }
+      showAlert("Success", "Announcement created successfully!");
     } catch (error) {
       console.error("Error adding announcement:", error);
-      if (Platform.OS === 'web') {
-        window.alert("Failed to create announcement");
-      } else {
-        Alert.alert("Error", "Failed to create announcement");
-      }
+      showAlert("Error", "Failed to create announcement");
     }
   };
 
@@ -211,18 +207,10 @@ export default function MainAdminAnnouncements() {
         updatedAt: serverTimestamp(),
       });
       resetForm();
-      if (Platform.OS === 'web') {
-        window.alert("Announcement updated successfully!");
-      } else {
-        Alert.alert("Success", "Announcement updated successfully!");
-      }
+      showAlert("Success", "Announcement updated successfully!");
     } catch (error) {
       console.error("Error updating announcement:", error);
-      if (Platform.OS === 'web') {
-        window.alert("Failed to update announcement");
-      } else {
-        Alert.alert("Error", "Failed to update announcement");
-      }
+      showAlert("Error", "Failed to update announcement");
     }
   };
 
@@ -235,10 +223,10 @@ export default function MainAdminAnnouncements() {
           if (selectedAnnouncement === id) {
             setSelectedAnnouncement(null);
           }
-          window.alert("Announcement deleted successfully!");
+          showAlert("Success", "Announcement deleted successfully!");
         } catch (error) {
           console.error("Error deleting announcement:", error);
-          window.alert("Failed to delete announcement");
+          showAlert("Error", "Failed to delete announcement");
         }
       }
     } else {
@@ -256,10 +244,10 @@ export default function MainAdminAnnouncements() {
                 if (selectedAnnouncement === id) {
                   setSelectedAnnouncement(null);
                 }
-                Alert.alert("Success", "Announcement deleted successfully!");
+                showAlert("Success", "Announcement deleted successfully!");
               } catch (error) {
                 console.error("Error deleting announcement:", error);
-                Alert.alert("Error", "Failed to delete announcement");
+                showAlert("Error", "Failed to delete announcement");
               }
             }
           },
@@ -589,7 +577,7 @@ export default function MainAdminAnnouncements() {
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
         </View>
 
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, {  borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#10b98115' }]}>
             <Feather name="sun" size={isMobile ? 16 : 20} color="#10b981" />
           </View>

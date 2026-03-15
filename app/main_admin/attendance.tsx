@@ -17,10 +17,19 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import QRCode from 'react-native-qrcode-svg';
 import { useAuth } from '../../context/AuthContext';
 import { db } from "../../lib/firebaseConfig";
 import { attendanceStyles } from '../../styles/main-admin/attendanceStyles';
+
+const showAlert = (title: string, message?: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(message ? `${title}\n${message}` : title);
+  } else {
+    Alert.alert(title, message);
+  }
+};
 
 interface Event {
   id: string;
@@ -34,6 +43,7 @@ interface Event {
   };
   qrExpiration?: string | null;
   isActive?: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
 }
 
 interface AttendanceRecord {
@@ -96,12 +106,17 @@ export default function MainAdminAttendance() {
   const [showStopConfirmModal, setShowStopConfirmModal] = useState(false);
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [qrValue, setQrValue] = useState<string>('');
+  const [isCustomDatePickerVisible, setCustomDatePickerVisible] = useState(false);
+  const [customExpirationDate, setCustomExpirationDate] = useState<Date | null>(null);
+  const [quickOptions, setQuickOptions] = useState<Array<{ label: string; value: string }>>([]);
 
- 
+
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10); // 10 items per page
   const [paginatedBlocks, setPaginatedBlocks] = useState<[string, AttendanceRecord[]][]>([]);
   const [totalPages, setTotalPages] = useState(1);
+  const [eventPage, setEventPage] = useState(1);
+  const [eventItemsPerPage] = useState(5);
 
   const isValidDate = (dateString: any): boolean => {
     if (!dateString) return false;
@@ -130,12 +145,13 @@ export default function MainAdminAttendance() {
             coordinates: eventData.coordinates || null,
             qrExpiration: eventData.qrExpiration || null,
             isActive: eventData.isActive !== false,
+            status: eventData.status || 'approved',
           };
         });
         setEvents(eventsList);
       } catch (error) {
         console.error('Error fetching events:', error);
-        Alert.alert('Error', 'Failed to load events');
+        showAlert('Error', 'Failed to load events');
       } finally {
         setLoading(false);
       }
@@ -154,6 +170,7 @@ export default function MainAdminAttendance() {
           coordinates: eventData.coordinates || null,
           qrExpiration: eventData.qrExpiration || null,
           isActive: eventData.isActive !== false,
+          status: eventData.status || 'approved',
         };
       });
       setEvents(updatedEvents);
@@ -174,6 +191,19 @@ export default function MainAdminAttendance() {
       return false;
     }
   };
+  useEffect(() => {
+    if (showExpirationModal) {
+      const now = new Date();
+      const options = [
+        { label: '1 hour', value: new Date(now.getTime() + 60 * 60 * 1000).toISOString() },
+        { label: '6 hours', value: new Date(now.getTime() + 6 * 60 * 60 * 1000).toISOString() },
+        { label: '12 hours', value: new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString() },
+        { label: '24 hours', value: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString() },
+        { label: '1 week', value: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString() },
+      ];
+      setQuickOptions(options);
+    }
+  }, [showExpirationModal]);
 
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -220,7 +250,7 @@ export default function MainAdminAttendance() {
   const stopAttendance = () => {
     if (!selectedEvent) return;
     if (selectedEvent.isActive === false) {
-      Alert.alert("Info", "Attendance is already stopped for this event");
+      showAlert("Info", "Attendance is already stopped for this event");
       return;
     }
     setShowStopConfirmModal(true);
@@ -239,7 +269,6 @@ export default function MainAdminAttendance() {
         qrExpiration: now
       });
 
-      // Update local state
       const updatedEvent = {
         ...selectedEvent,
         isActive: false,
@@ -247,18 +276,17 @@ export default function MainAdminAttendance() {
       };
       setSelectedEvent(updatedEvent);
 
-      // Update in events list
       setEvents(prev => prev.map(e =>
         e.id === selectedEvent.id ? updatedEvent : e
       ));
 
       setShowStopConfirmModal(false);
 
-      Alert.alert("Success", "Attendance stopped successfully!");
+      showAlert("Success", "Attendance stopped successfully!");
 
     } catch (error) {
       console.error('Error stopping attendance:', error);
-      Alert.alert("Error", "Failed to stop attendance. Please try again.");
+      showAlert("Error", "Failed to stop attendance. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -267,12 +295,12 @@ export default function MainAdminAttendance() {
   const generateEventQRCode = (event: Event) => {
     if (!event) return;
 
-    // Generate static QR value ONCE - doesn't change on re-renders
+    // Generate static QR value ONCE 
     const qrData = JSON.stringify({
       type: 'attendance',
       eventId: event.id,
       eventTitle: event.title,
-      generatedAt: new Date().toISOString(), // Fixed at generation time
+      generatedAt: new Date().toISOString(),
       expiresAt: event.qrExpiration && isValidDate(event.qrExpiration)
         ? event.qrExpiration
         : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -280,7 +308,7 @@ export default function MainAdminAttendance() {
       eventLocation: event.coordinates
     });
 
-    setQrValue(qrData); // Store in state
+    setQrValue(qrData);
     setSelectedEvent(event);
     setShowEventModal(false);
     fetchAttendanceRecords(event.id);
@@ -298,7 +326,7 @@ export default function MainAdminAttendance() {
     if (!selectedEvent || !customExpiration) return;
 
     if (!isValidDate(customExpiration)) {
-      Alert.alert("Error", "Please enter a valid date and time");
+      showAlert("Error", "Please enter a valid date and time");
       return;
     }
 
@@ -306,7 +334,7 @@ export default function MainAdminAttendance() {
     const now = new Date();
 
     if (expirationDate <= now) {
-      Alert.alert("Error", "Expiration date must be in the future");
+      showAlert("Error", "Expiration date must be in the future");
       return;
     }
 
@@ -324,7 +352,6 @@ export default function MainAdminAttendance() {
         isActive: true
       };
 
-      // Generate new QR value
       const newQrData = JSON.stringify({
         type: 'attendance',
         eventId: updatedEvent.id,
@@ -337,22 +364,20 @@ export default function MainAdminAttendance() {
 
       setQrValue(newQrData);
       setSelectedEvent(updatedEvent);
-
-      // Update events list
       setEvents(prev => prev.map(e =>
         e.id === selectedEvent.id ? updatedEvent : e
       ));
 
-      Alert.alert("Success", "Expiration date set successfully!");
-      setShowExpirationModal(false);
+      setCustomExpirationDate(null);
       setCustomExpiration('');
 
+      showAlert("Success", "Expiration date set successfully!");
+      setShowExpirationModal(false);
     } catch (error) {
       console.error('Error setting expiration:', error);
-      Alert.alert("Error", "Failed to set expiration date");
+      showAlert("Error", "Failed to set expiration date");
     }
   };
-
   const clearManualExpiration = async () => {
     if (!selectedEvent) return;
 
@@ -362,19 +387,18 @@ export default function MainAdminAttendance() {
         qrExpiration: null
       });
 
-      Alert.alert("Success", "Expiration date cleared!");
+      showAlert("Success", "Expiration date cleared!");
 
       const updatedEvent = { ...selectedEvent, qrExpiration: null };
       setSelectedEvent(updatedEvent as Event);
 
-      // Update in events list
       setEvents(prev => prev.map(e =>
         e.id === selectedEvent.id ? updatedEvent : e
       ));
 
     } catch (error) {
       console.error('Error clearing expiration:', error);
-      Alert.alert("Error", "Failed to clear expiration date");
+      showAlert("Error", "Failed to clear expiration date");
     }
   };
 
@@ -387,7 +411,6 @@ export default function MainAdminAttendance() {
         const eventData = eventDoc.data();
         if (eventData.attendees && Array.isArray(eventData.attendees)) {
           setAttendanceRecords(eventData.attendees);
-          // Reset to first page when new records are loaded
           setCurrentPage(1);
         } else {
           setAttendanceRecords([]);
@@ -437,6 +460,42 @@ export default function MainAdminAttendance() {
       });
     } catch (error) {
       return null;
+    }
+  };
+  const formatDateForWebInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+  const handleWebDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const localDateString = event.target.value;
+    if (!localDateString) return;
+
+    try {
+      const [datePart, timePart] = localDateString.split('T');
+      if (!datePart || !timePart) return;
+
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hours, minutes] = timePart.split(':').map(Number);
+
+      if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) return;
+
+      if (year < 2000 || year > 2100) return;
+      if (month < 1 || month > 12) return;
+      if (day < 1 || day > 31) return;
+      if (hours < 0 || hours > 23) return;
+      if (minutes < 0 || minutes > 59) return;
+
+      const selectedDate = new Date(year, month - 1, day, hours, minutes);
+      if (isNaN(selectedDate.getTime())) return;
+
+      setCustomExpirationDate(selectedDate);
+      setCustomExpiration(selectedDate.toISOString());
+    } catch (error) {
+      console.error('Error parsing date:', error);
     }
   };
 
@@ -498,7 +557,7 @@ export default function MainAdminAttendance() {
     return sortedBlocks;
   }, [getFilteredAttendanceRecords]);
 
-  // Apply pagination to blocks
+
   useEffect(() => {
     const blocksArray = Object.entries(getStudentsByBlock);
     const total = Math.ceil(blocksArray.length / itemsPerPage);
@@ -509,9 +568,19 @@ export default function MainAdminAttendance() {
     setPaginatedBlocks(blocksArray.slice(startIndex, endIndex));
   }, [getStudentsByBlock, currentPage, itemsPerPage]);
 
+  const getStatusBadgeStyle = (status?: string) => {
+    switch (status) {
+      case 'pending': return { backgroundColor: '#f59e0b' };
+      case 'approved': return { backgroundColor: '#10b981' };
+      case 'rejected': return { backgroundColor: '#ef4444' };
+      default: return { backgroundColor: '#64748b' };
+    }
+  };
+
+
   const availableBlocks = useMemo(() => {
     const uniqueBlocks = [...new Set(attendanceRecords.map(record => record.block).filter(Boolean))];
-    return uniqueBlocks.slice(0, 6); // Limit to 6 blocks
+    return uniqueBlocks.slice(0, 15); // Limit to 15 blocks
   }, [attendanceRecords]);
 
   const availableYearLevels = useMemo(() => {
@@ -526,7 +595,14 @@ export default function MainAdminAttendance() {
     blocksCount: availableBlocks.length
   }), [getFilteredAttendanceRecords, availableBlocks]);
 
-  // Pagination handlers
+  const eventStatusStats = useMemo(() => {
+    const total = events.length;
+    const pending = events.filter(e => e.status === 'pending').length;
+    const approved = events.filter(e => e.status === 'approved').length;
+    const rejected = events.filter(e => e.status === 'rejected').length;
+    return { total, pending, approved, rejected };
+  }, [events]);
+
   const handleNextPage = () => {
     if (currentPage < totalPages) {
       setCurrentPage(currentPage + 1);
@@ -557,7 +633,7 @@ export default function MainAdminAttendance() {
 
         <View style={attendanceStyles.pageInfo}>
           <Text style={attendanceStyles.pageInfoText}>
-            Page {currentPage} of {totalPages}
+            {currentPage}/{totalPages}
           </Text>
         </View>
 
@@ -574,21 +650,50 @@ export default function MainAdminAttendance() {
       </View>
     );
   };
+  const totalEventPages = Math.ceil(events.length / eventItemsPerPage);
+
+  const paginatedEvents = useMemo(() => {
+    const start = (eventPage - 1) * eventItemsPerPage;
+    const end = start + eventItemsPerPage;
+    return events.slice(start, end);
+  }, [events, eventPage, eventItemsPerPage]);
 
   const renderEventItem = ({ item }: { item: Event }) => {
     const isExpired = isQRCodeExpired(item);
     const isActive = item.isActive !== false && !isExpired;
+    const isApproved = item.status === 'approved';
 
     return (
       <TouchableOpacity
-        style={[attendanceStyles.eventItem, isMobile && attendanceStyles.eventItemMobile]}
-        onPress={() => generateEventQRCode(item)}
+        style={[
+          attendanceStyles.eventItem,
+          isMobile && attendanceStyles.eventItemMobile,
+          !isApproved && { opacity: 0.5 }
+        ]}
+        onPress={() => {
+          if (!isApproved) {
+            showAlert(
+              'Event Not Approved',
+              `This event is ${item.status}. Only approved events can be used for attendance.`
+            );
+            return;
+          }
+          generateEventQRCode(item);
+        }}
+        activeOpacity={isApproved ? 0.7 : 1}
       >
         <View style={attendanceStyles.eventItemContent}>
           <Text style={[attendanceStyles.eventItemName, isMobile && attendanceStyles.eventItemNameMobile]} numberOfLines={1}>
             {item.title}
           </Text>
           <View style={attendanceStyles.eventItemBadges}>
+            {/* Status badge */}
+            <View style={[attendanceStyles.eventItemStatusBadge, getStatusBadgeStyle(item.status)]}>
+              <Text style={attendanceStyles.eventItemStatusText}>
+                {item.status?.toUpperCase() || 'APPROVED'}
+              </Text>
+            </View>
+
             {item.qrExpiration && isValidDate(item.qrExpiration) && (
               <View style={[
                 attendanceStyles.eventItemExpBadge,
@@ -603,7 +708,7 @@ export default function MainAdminAttendance() {
                 </Text>
               </View>
             )}
-            {isActive && (
+            {isActive && isApproved && (
               <View style={attendanceStyles.eventItemActiveBadge}>
                 <Feather name="check-circle" size={10} color="#16a34a" />
                 <Text style={attendanceStyles.eventItemActiveText}>Active</Text>
@@ -735,12 +840,33 @@ export default function MainAdminAttendance() {
 
       {/* Stats Grid */}
       <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
+
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#0ea5e9' }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
+            <Feather name="calendar" size={isMobile ? 16 : 20} color="#0ea5e9" />
+          </View>
+          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{eventStatusStats.total}</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total Events</Text>
+
+          <View style={styles.eventStatusBreakdown}>
+            <View style={[styles.eventStatusBadge, { backgroundColor: '#f59e0b15' }]}>
+              <Text style={[styles.eventStatusBadgeText, { color: '#f59e0b' }]}>P: {eventStatusStats.pending}</Text>
+            </View>
+            <View style={[styles.eventStatusBadge, { backgroundColor: '#10b98115' }]}>
+              <Text style={[styles.eventStatusBadgeText, { color: '#10b981' }]}>A: {eventStatusStats.approved}</Text>
+            </View>
+            <View style={[styles.eventStatusBadge, { backgroundColor: '#ef444415' }]}>
+              <Text style={[styles.eventStatusBadgeText, { color: '#ef4444' }]}>R: {eventStatusStats.rejected}</Text>
+            </View>
+          </View>
+        </View>
+
         <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
             <Feather name="users" size={isMobile ? 16 : 20} color="#0ea5e9" />
           </View>
           <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total Attendees</Text>
         </View>
 
         <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
@@ -748,7 +874,7 @@ export default function MainAdminAttendance() {
             <Feather name="check-circle" size={isMobile ? 16 : 20} color="#16a34a" />
           </View>
           <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.verified}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Verified</Text>
+          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Verified Attendees</Text>
         </View>
 
         <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
@@ -760,7 +886,7 @@ export default function MainAdminAttendance() {
         </View>
       </View>
 
-      {/* Main Content - Scrollable */}
+      {/* Main Content */}
       <ScrollView
         style={styles.mainScrollView}
         contentContainerStyle={styles.mainScrollContent}
@@ -778,7 +904,10 @@ export default function MainAdminAttendance() {
               <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Select Event</Text>
               <TouchableOpacity
                 style={[styles.eventSelector, isMobile && styles.eventSelectorMobile]}
-                onPress={() => setShowEventModal(true)}
+                onPress={() => {
+                  setShowEventModal(true);
+                  setEventPage(1);
+                }}
               >
                 {selectedEvent ? (
                   <Text style={[styles.eventSelectorText, isMobile && styles.eventSelectorTextMobile]} numberOfLines={1}>
@@ -918,7 +1047,7 @@ export default function MainAdminAttendance() {
                 <View>
                   <Text style={[styles.rightTitle, isMobile && styles.rightTitleMobile]}>Attendance Records</Text>
                   <Text style={styles.recordCount}>
-                    {getFilteredAttendanceRecords.length} attendees 
+                    {getFilteredAttendanceRecords.length} attendees
                     {getFilteredAttendanceRecords.length > itemsPerPage && ` (Page ${currentPage}/${totalPages})`}
                   </Text>
                 </View>
@@ -1107,7 +1236,42 @@ export default function MainAdminAttendance() {
                   <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No events available</Text>
                 </View>
               ) : (
-                events.map(item => renderEventItem({ item }))
+                <>
+                  {/* Render paginated events */}
+                  {paginatedEvents.map(item => renderEventItem({ item }))}
+
+                  {totalEventPages > 1 && (
+                    <View style={[attendanceStyles.paginationContainer, isMobile && attendanceStyles.paginationContainerMobile, { marginTop: 16 }]}>
+                      <TouchableOpacity
+                        style={[attendanceStyles.paginationButton, eventPage === 1 && attendanceStyles.paginationButtonDisabled]}
+                        onPress={() => setEventPage(prev => Math.max(1, prev - 1))}
+                        disabled={eventPage === 1}
+                      >
+                        <Feather name="chevron-left" size={16} color={eventPage === 1 ? '#cbd5e1' : '#0ea5e9'} />
+                        <Text style={[attendanceStyles.paginationButtonText, eventPage === 1 && attendanceStyles.paginationButtonTextDisabled]}>
+                          Prev
+                        </Text>
+                      </TouchableOpacity>
+
+                      <View style={attendanceStyles.pageInfo}>
+                        <Text style={attendanceStyles.pageInfoText}>
+                          {eventPage}/{totalEventPages}
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        style={[attendanceStyles.paginationButton, eventPage === totalEventPages && attendanceStyles.paginationButtonDisabled]}
+                        onPress={() => setEventPage(prev => Math.min(totalEventPages, prev + 1))}
+                        disabled={eventPage === totalEventPages}
+                      >
+                        <Text style={[attendanceStyles.paginationButtonText, eventPage === totalEventPages && attendanceStyles.paginationButtonTextDisabled]}>
+                          Next
+                        </Text>
+                        <Feather name="chevron-right" size={16} color={eventPage === totalEventPages ? '#cbd5e1' : '#0ea5e9'} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
               )}
             </ScrollView>
           </View>
@@ -1205,23 +1369,141 @@ export default function MainAdminAttendance() {
               <ScrollView style={[styles.expirationModalContent, isMobile && styles.expirationModalContentMobile]}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Quick Options</Text>
                 <View style={styles.expirationOptions}>
-                  {getQuickExpirationOptions().map((option, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={[styles.expirationOption, isMobile && styles.expirationOptionMobile]}
-                      onPress={() => setCustomExpiration(option.value)}
-                    >
-                      <Text style={[styles.expirationOptionText, isMobile && styles.expirationOptionTextMobile]}>{option.label}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {quickOptions.map((option, index) => {
+                    const isSelected = customExpiration === option.value;
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.expirationOption,
+                          isMobile && styles.expirationOptionMobile,
+                          isSelected && styles.expirationOptionActive,
+                        ]}
+                        onPress={() => setCustomExpiration(option.value)}
+                      >
+                        <Text style={[
+                          styles.expirationOptionText,
+                          isMobile && styles.expirationOptionTextMobile,
+                          isSelected && styles.expirationOptionTextActive,
+                        ]}>
+                          {option.label}
+                        </Text>
+                        {isSelected && (
+                          <Feather name="check" size={16} color="#ffffff" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Custom Date & Time</Text>
-                <TextInput
-                  placeholder="YYYY-MM-DDTHH:MM"
-                  value={customExpiration}
-                  onChangeText={setCustomExpiration}
-                />
+                <TouchableOpacity
+                  style={[styles.modernLocationButton, { marginBottom: 16 }]}
+                  onPress={() => setCustomDatePickerVisible(true)}
+                >
+                  <Feather name="calendar" size={20} color="#0ea5e9" />
+                  <View style={styles.modernLocationButtonText}>
+                    <Text style={styles.modernLocationButtonTitle}>
+                      {customExpirationDate
+                        ? customExpirationDate.toLocaleString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                        : 'Select custom date & time'}
+                    </Text>
+                    <Text style={styles.modernLocationButtonSubtitle}>
+                      {customExpirationDate ? 'Tap to change' : 'Choose expiration date'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+                {Platform.OS === 'web' ? (
+                  <Modal
+                    visible={isCustomDatePickerVisible}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setCustomDatePickerVisible(false)}
+                  >
+                    <View style={styles.modernModalOverlay}>
+                      <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile, { maxWidth: 400 }]}>
+                        <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+                          <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
+                            <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+                              <Feather name="calendar" size={isMobile ? 16 : 20} color="#0ea5e9" />
+                            </View>
+                            <View style={styles.modernModalTitleContainer}>
+                              <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                                Select Date & Time
+                              </Text>
+                            </View>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => setCustomDatePickerVisible(false)}
+                            style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+                          >
+                            <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+                          <input
+                            type="datetime-local"
+                            value={customExpirationDate ? formatDateForWebInput(customExpirationDate) : formatDateForWebInput(new Date())}
+                            onChange={handleWebDateChange}
+                            min={formatDateForWebInput(new Date())}
+                            step="900"
+                            style={{
+                              width: '100%',
+                              padding: '12px',
+                              fontSize: '16px',
+                              borderRadius: '12px',
+                              border: '1px solid #e2e8f0',
+                              marginBottom: '12px',
+                              backgroundColor: '#f8fafc',
+                              color: '#1e293b',
+                              fontFamily: 'inherit',
+                              outline: 'none',
+                            }}
+                          />
+                          <Text style={{
+                            fontSize: 12,
+                            color: '#64748b',
+                            marginBottom: 20,
+                            textAlign: 'center' as const
+                          }}>
+                            Format: YYYY-MM-DD HH:MM (24-hour)
+                          </Text>
+
+                          <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
+                            <TouchableOpacity
+                              style={[styles.modernSubmitButton, isMobile && styles.modernSubmitButtonMobile]}
+                              onPress={() => setCustomDatePickerVisible(false)}
+                            >
+                              <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
+                                Confirm
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </Modal>
+                ) : (
+                  <DateTimePickerModal
+                    isVisible={isCustomDatePickerVisible}
+                    mode="datetime"
+                    onConfirm={(date) => {
+                      setCustomDatePickerVisible(false);
+                      setCustomExpirationDate(date);
+                      setCustomExpiration(date.toISOString());
+                    }}
+                    onCancel={() => setCustomDatePickerVisible(false)}
+                    minimumDate={new Date()}
+                    date={customExpirationDate || new Date()}
+                  />
+                )}
 
                 <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
                   <TouchableOpacity

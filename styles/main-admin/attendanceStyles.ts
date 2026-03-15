@@ -855,11 +855,10 @@ export const attendanceStyles = StyleSheet.create({
         maxWidth: 400,
     },
 
-    // Expiration Modal - LARGER SIZE
     expirationModalContainer: {
-        width: '90%',
-        maxWidth: 600, // Increased from 500
-        maxHeight: '85%', // Increased from 80%
+        width: '150%',
+        maxWidth: 800,
+        maxHeight: '85%',
         backgroundColor: '#ffffff',
         borderRadius: 24,
         overflow: 'hidden',
@@ -871,15 +870,15 @@ export const attendanceStyles = StyleSheet.create({
     },
     expirationModalContainerMobile: {
         width: '95%',
-        maxWidth: 450, 
-        maxHeight: '90%', 
+        maxWidth: 450,
+        maxHeight: '90%',
     },
     expirationModalContent: {
-        padding: 24, 
-        maxHeight: 500, 
+        padding: 24,
+        maxHeight: 500,
     },
     expirationModalContentMobile: {
-        padding: 18, 
+        padding: 18,
         maxHeight: 450,
     },
 
@@ -1037,14 +1036,21 @@ export const attendanceStyles = StyleSheet.create({
         marginBottom: 20,
     },
     expirationOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
         padding: 16,
         backgroundColor: '#f1f5f9',
         borderRadius: 12,
         marginBottom: 8,
-        alignItems: 'center',
     },
     expirationOptionMobile: {
         padding: 12,
+    },
+    expirationOptionActive: {
+        backgroundColor: '#0ea5e9',
+        borderColor: '#0ea5e9',
     },
     expirationOptionText: {
         fontSize: 14,
@@ -1054,7 +1060,9 @@ export const attendanceStyles = StyleSheet.create({
     expirationOptionTextMobile: {
         fontSize: 13,
     },
-
+    expirationOptionTextActive: {
+        color: '#ffffff',
+    },
     // Expiration Badge
     expirationBadge: {
         flexDirection: 'row',
@@ -1071,48 +1079,97 @@ export const attendanceStyles = StyleSheet.create({
         marginLeft: 4,
     },
     paginationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 16,
-    paddingTop: 16,
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-},
-paginationContainerMobile: {
-    gap: 12,
-    paddingTop: 12,
-},
-paginationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 4,
-},
-paginationButtonDisabled: {
-    opacity: 0.5,
-    borderColor: '#f1f5f9',
-},
-paginationButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#0ea5e9',
-},
-paginationButtonTextDisabled: {
-    color: '#cbd5e1',
-},
-pageInfo: {
-    alignItems: 'center',
-},
-pageInfoText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-},
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 16,
+        paddingTop: 16,
+        marginTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: '#f1f5f9',
+    },
+    paginationContainerMobile: {
+        gap: 12,
+        paddingTop: 12,
+    },
+    paginationButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        gap: 4,
+    },
+    paginationButtonDisabled: {
+        opacity: 0.5,
+        borderColor: '#f1f5f9',
+    },
+    paginationButtonText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#0ea5e9',
+    },
+    paginationButtonTextDisabled: {
+        color: '#cbd5e1',
+    },
+    pageInfo: {
+        alignItems: 'center',
+    },
+    pageInfoText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#0f172a',
+    },
+    eventItemStatusBadge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        marginRight: 6,
+    },
+    eventItemStatusText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#ffffff',
+    },
+    eventStatusBreakdown: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginTop: 8,
+        gap: 6,
+    },
+    eventStatusBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    eventStatusBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    modernLocationButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#f8fafc',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        gap: 12,
+    },
+    modernLocationButtonText: {
+        flex: 1,
+    },
+    modernLocationButtonTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#1e293b',
+    },
+    modernLocationButtonSubtitle: {
+        fontSize: 12,
+        color: '#64748b',
+        marginTop: 2,
+    },
 });

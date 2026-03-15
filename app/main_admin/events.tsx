@@ -28,6 +28,14 @@ import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebaseConfig';
 import { eventsStyles as styles } from '../../styles/main-admin/eventsStyles';
 
+const showAlert = (title: string, message?: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(message ? `${title}\n${message}` : title);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
 interface Event {
   id: string;
   title: string;
@@ -190,7 +198,7 @@ export default function MainAdminEvents() {
       },
       (error: unknown) => {
         console.error('Error fetching events:', error);
-        Alert.alert('Error', 'Failed to load events');
+        showAlert('Error', 'Failed to load events');
         setLoading(false);
         setRefreshing(false);
       }
@@ -269,9 +277,7 @@ export default function MainAdminEvents() {
     setSelectedCampusLocation(location);
     setSelectedLocationImage(location.image);
     setShowImagePicker(false);
-    // Always set the location name to the selected campus
     setNewEvent(prev => ({ ...prev, location: location.name }));
-    // Then open the location picker so user can modify if needed
     setTimeout(() => setShowLocationPicker(true), 100);
   };
 
@@ -284,10 +290,9 @@ export default function MainAdminEvents() {
 
       if (status !== 'granted') {
         setLocationLoading(false);
-        Alert.alert(
+        showAlert(
           'Permission Required',
-          'Location permission is needed to automatically detect your location. You can enter coordinates manually instead.',
-          [{ text: 'OK' }]
+          'Location permission is needed to automatically detect your location. You can enter coordinates manually instead.'
         );
         return;
       }
@@ -306,10 +311,9 @@ export default function MainAdminEvents() {
 
       setLocationLoading(false);
 
-      Alert.alert(
+      showAlert(
         'Location Found',
-        `Coordinates set to:\nLat: ${latitude.toFixed(6)}\nLng: ${longitude.toFixed(6)}`,
-        [{ text: 'OK' }]
+        `Coordinates set to:\nLat: ${latitude.toFixed(6)}\nLng: ${longitude.toFixed(6)}`
       );
 
     } catch (error: unknown) {
@@ -319,7 +323,7 @@ export default function MainAdminEvents() {
       let errorMessage = 'Failed to get current location. Please try again or enter coordinates manually.';
 
       setLocationError(errorMessage);
-      Alert.alert('Location Error', errorMessage);
+      showAlert('Location Error', errorMessage);
     }
   };
 
@@ -375,10 +379,9 @@ export default function MainAdminEvents() {
       Linking.openURL(url);
     }
 
-    Alert.alert(
+    showAlert(
       'Google Maps Opened',
-      'Find your event location on Google Maps, then long-press to get coordinates. Come back here to enter them manually.',
-      [{ text: 'OK' }]
+      'Find your event location on Google Maps, then long-press to get coordinates. Come back here to enter them manually.'
     );
   };
 
@@ -388,19 +391,19 @@ export default function MainAdminEvents() {
     const radius = eventCoordinates.radius.trim();
 
     if (!lat || !lng || !radius) {
-      Alert.alert('Missing Information', 'Please fill in all coordinates and radius fields.');
+      showAlert('Missing Information', 'Please fill in all coordinates and radius fields.');
       return;
     }
 
     if (!validateCoordinates(lat, lng)) {
-      Alert.alert(
+      showAlert(
         'Invalid Coordinates',
         'Please enter valid decimal coordinates.\n\n• Latitude: -90 to 90\n• Longitude: -180 to 180\n• Example: 14.599512, 120.984219'
       );
       return;
     }
     if (!validateRadius(radius)) {
-      Alert.alert('Invalid Radius', 'Please enter a valid positive number for the verification radius (e.g., 100).');
+      showAlert('Invalid Radius', 'Please enter a valid positive number for the verification radius (e.g., 100).');
       return;
     }
 
@@ -412,7 +415,7 @@ export default function MainAdminEvents() {
 
     setNewEvent(prev => ({ ...prev, coordinates }));
     setShowCoordinatesModal(false);
-    Alert.alert('Success', 'Location verification coordinates saved!');
+    showAlert('Success', 'Location verification coordinates saved!');
   };
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3;
@@ -468,14 +471,14 @@ export default function MainAdminEvents() {
       }
     } catch (error) {
       console.error('Error opening maps:', error);
-      Alert.alert('Error', 'Could not open maps application');
+      showAlert('Error', 'Could not open maps application');
     }
   };
 
   const checkSelectedEventLocation = async (selectedEventId: string) => {
     const selected = events.find(e => e.id === selectedEventId);
     if (!selected?.coordinates) {
-      Alert.alert('No Location Set', 'This event does not have a verification location set.');
+      showAlert('No Location Set', 'This event does not have a verification location set.');
       return;
     }
 
@@ -484,7 +487,7 @@ export default function MainAdminEvents() {
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location permission is required to check attendance range.');
+        showAlert('Permission Denied', 'Location permission is required to check attendance range.');
         setCheckingSelectedEventLocation(false);
         return;
       }
@@ -509,15 +512,14 @@ export default function MainAdminEvents() {
       const withinRange = distance <= selected.coordinates.radius;
       setIsSelectedEventWithinRange(withinRange);
 
-      Alert.alert(
+      showAlert(
         withinRange ? '✅ You are within range!' : '❌ You are outside the range',
-        `Your distance: ${Math.round(distance)}m\nAllowed radius: ${selected.coordinates.radius}m`,
-        [{ text: 'OK' }]
+        `Your distance: ${Math.round(distance)}m\nAllowed radius: ${selected.coordinates.radius}m`
       );
 
     } catch (error) {
       console.error('Error checking location:', error);
-      Alert.alert('Error', 'Failed to get your location. Please try again.');
+      showAlert('Error', 'Failed to get your location. Please try again.');
     } finally {
       setCheckingSelectedEventLocation(false);
     }
@@ -525,7 +527,7 @@ export default function MainAdminEvents() {
 
   const handleCreateEvent = async () => {
     if (!newEvent.title?.trim() || !newEvent.description?.trim() || !newEvent.location?.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields: Title, Description, and Location');
+      showAlert('Error', 'Please fill in all required fields: Title, Description, and Location');
       return;
     }
 
@@ -551,26 +553,23 @@ export default function MainAdminEvents() {
 
       resetForm();
       setShowCreateForm(false);
-      Alert.alert('Success', 'Event created successfully!');
+      showAlert('Success', 'Event created successfully!');
 
     } catch (error: unknown) {
       console.error('Error creating event:', error);
-      Alert.alert('Error', 'Failed to create event');
+      showAlert('Error', 'Failed to create event');
     } finally {
       setLoading(false);
     }
   };
   const handleWebDateChange = (event: any) => {
-    // Get the local date string from the input (format: YYYY-MM-DDTHH:mm)
     const localDateString = event.target.value;
 
     if (!localDateString) return;
 
     try {
-      // Split date and time
       const [datePart, timePart] = localDateString.split('T');
 
-      // Validate that we have both date and time parts
       if (!datePart || !timePart) {
         console.warn('Invalid date format');
         return;
@@ -579,69 +578,56 @@ export default function MainAdminEvents() {
       const [year, month, day] = datePart.split('-').map(Number);
       const [hours, minutes] = timePart.split(':').map(Number);
 
-      // Validate all components are valid numbers
       if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) {
         console.warn('Invalid date components');
         return;
       }
 
-      // Validate year range (e.g., between 2000 and 2100)
       if (year < 2000 || year > 2100) {
         console.warn('Year out of valid range');
         return;
       }
 
-      // Validate month (1-12)
       if (month < 1 || month > 12) {
         console.warn('Invalid month');
         return;
       }
 
-      // Validate day (1-31) - basic validation
       if (day < 1 || day > 31) {
         console.warn('Invalid day');
         return;
       }
 
-      // Validate hours (0-23)
       if (hours < 0 || hours > 23) {
         console.warn('Invalid hours');
         return;
       }
 
-      // Validate minutes (0-59)
       if (minutes < 0 || minutes > 59) {
         console.warn('Invalid minutes');
         return;
       }
 
-      // Create a new date using local time components
-      // Note: Months are 0-indexed in JavaScript Date
       const localDate = new Date(year, month - 1, day, hours, minutes);
 
-      // Final validation - check if it's a valid date
       if (isNaN(localDate.getTime())) {
         console.warn('Invalid date created');
         return;
       }
 
-      // Optional: Ensure the date is not too far in the past or future
       const now = new Date();
       const maxFutureDate = new Date();
-      maxFutureDate.setFullYear(now.getFullYear() + 5); // Allow up to 5 years in the future
+      maxFutureDate.setFullYear(now.getFullYear() + 5);
 
       if (localDate < now) {
-        // Allow past dates? If not, uncomment the next line
-        // Alert.alert('Invalid Date', 'Please select a future date');
-        // return;
+        // Allow past dates
       }
 
       if (localDate > maxFutureDate) {
-        Alert.alert('Invalid Date', 'Date cannot be more than 5 years in the future');
+        showAlert('Invalid Date', 'Date cannot be more than 5 years in the future');
         return;
       }
 
-      // Set the valid date
       setNewEvent({ ...newEvent, date: localDate });
 
     } catch (error) {
@@ -660,7 +646,7 @@ export default function MainAdminEvents() {
 
   const handleUpdateEvent = async () => {
     if (!editingEvent || !newEvent.title || !newEvent.description || !newEvent.location) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      showAlert('Error', 'Please fill in all required fields');
       return;
     }
 
@@ -690,10 +676,10 @@ export default function MainAdminEvents() {
       resetForm();
       setShowEditForm(false);
       setEditingEvent(null);
-      Alert.alert('Success', 'Event updated successfully!');
+      showAlert('Success', 'Event updated successfully!');
     } catch (error: unknown) {
       console.error('Error updating event:', error);
-      Alert.alert('Error', 'Failed to update event');
+      showAlert('Error', 'Failed to update event');
     } finally {
       setLoading(false);
     }
@@ -738,7 +724,7 @@ export default function MainAdminEvents() {
 
     } catch (error: unknown) {
       console.error('Error setting up edit form:', error);
-      Alert.alert('Error', 'Failed to load event for editing');
+      showAlert('Error', 'Failed to load event for editing');
     }
   };
 
@@ -750,10 +736,10 @@ export default function MainAdminEvents() {
         try {
           const eventRef = doc(db, 'events', eventId);
           await deleteDoc(eventRef);
-          window.alert(`"${eventTitle}" deleted successfully!`);
+          showAlert('Success', `"${eventTitle}" deleted successfully!`);
         } catch (error: unknown) {
           console.error('Error deleting event:', error);
-          window.alert('Failed to delete event. Please check console for details.');
+          showAlert('Error', 'Failed to delete event. Please check console for details.');
         }
       }
     } else {
@@ -772,10 +758,10 @@ export default function MainAdminEvents() {
               try {
                 const eventRef = doc(db, 'events', eventId);
                 await deleteDoc(eventRef);
-                Alert.alert('Success', `"${eventTitle}" deleted successfully!`);
+                showAlert('Success', `"${eventTitle}" deleted successfully!`);
               } catch (error: unknown) {
                 console.error('Error deleting event:', error);
-                Alert.alert('Error', 'Failed to delete event');
+                showAlert('Error', 'Failed to delete event');
               }
             },
           },
@@ -794,7 +780,7 @@ export default function MainAdminEvents() {
       }));
       setShowLocationPicker(false);
     } else {
-      Alert.alert('Error', 'Please enter a location name');
+      showAlert('Error', 'Please enter a location name');
     }
   };
 
@@ -943,7 +929,6 @@ export default function MainAdminEvents() {
             <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
               {formatShortDate(item.date)}
             </Text>
-            {/* Status badge */}
             {item.status && (
               <View style={[styles.paginatedBadge, getStatusBadgeStyle(item.status)]}>
                 <Text style={styles.paginatedBadgeText}>{item.status.toUpperCase()}</Text>
@@ -1063,7 +1048,6 @@ export default function MainAdminEvents() {
 
     return (
       <View>
-        {/* Image */}
         <View style={[styles.modernDetailImageContainer, isMobile && styles.modernDetailImageContainerMobile]}>
           <Image
             source={getLocationImage(selected)}
@@ -1075,12 +1059,10 @@ export default function MainAdminEvents() {
           </View>
         </View>
 
-        {/* Title */}
         <Text style={[styles.modernDetailTitle, isMobile && styles.modernDetailTitleMobile]}>
           {selected.title}
         </Text>
 
-        {/* Description */}
         <View style={styles.modernDetailSection}>
           <Text style={styles.modernDetailLabel}>Description</Text>
           <Text style={[styles.modernDetailText, isMobile && styles.modernDetailTextMobile]}>
@@ -1088,7 +1070,6 @@ export default function MainAdminEvents() {
           </Text>
         </View>
 
-        {/* Date & Time */}
         <View style={styles.modernDetailRow}>
           <Feather name="calendar" size={16} color="#0ea5e9" />
           <Text style={styles.modernDetailRowText}>
@@ -1096,13 +1077,11 @@ export default function MainAdminEvents() {
           </Text>
         </View>
 
-        {/* Location with Icon Button */}
         <View style={styles.modernDetailRow}>
           <Feather name="map-pin" size={16} color="#0ea5e9" />
           <Text style={styles.modernDetailRowText}>
             {selected.location}
           </Text>
-
         </View>
 
         {selected.locationDescription && (
@@ -1114,7 +1093,6 @@ export default function MainAdminEvents() {
           </View>
         )}
 
-        {/* Coordinates with Range Indicator */}
         {selected.coordinates && (
           <View style={styles.modernDetailSection}>
             <View style={styles.modernDetailRangeHeader}>
@@ -1151,7 +1129,6 @@ export default function MainAdminEvents() {
               </Text>
             </View>
 
-            {/* Range Visualization */}
             <View style={styles.rangeVisualization}>
               <View style={styles.rangeTrack}>
                 <View
@@ -1180,7 +1157,6 @@ export default function MainAdminEvents() {
               </Text>
             </View>
 
-            {/* Check Location Button */}
             <TouchableOpacity
               style={[
                 styles.checkLocationButton,
@@ -1203,7 +1179,6 @@ export default function MainAdminEvents() {
           </View>
         )}
 
-        {/* Attendees */}
         <View style={styles.modernDetailRow}>
           <Feather name="users" size={16} color="#64748b" />
           <Text style={styles.modernDetailRowText}>
@@ -1211,7 +1186,6 @@ export default function MainAdminEvents() {
           </Text>
         </View>
 
-        {/* Action Buttons */}
         <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
           <TouchableOpacity
             style={[styles.modernSubmitButton, isMobile && styles.modernSubmitButtonMobile]}
@@ -1859,14 +1833,14 @@ export default function MainAdminEvents() {
                 />
               </View>
 
-              {/* Image Selection – exactly like assistant admin */}
+              {/* Image Selection */}
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location Image</Text>
                 <TouchableOpacity
                   style={[styles.modernLocationButton, { paddingVertical: 12, paddingHorizontal: 16 }]}
                   onPress={() => {
-                    setShowLocationPicker(false);          // close location picker
-                    setTimeout(() => setShowImagePicker(true), 100); // open image picker
+                    setShowLocationPicker(false);
+                    setTimeout(() => setShowImagePicker(true), 100);
                   }}
                 >
                   <View style={styles.modernLocationButtonText}>
@@ -2079,6 +2053,7 @@ export default function MainAdminEvents() {
           </View>
         </View>
       </Modal>
+
       {/* Event Details Modal */}
       <Modal
         visible={selectedEvent !== null}

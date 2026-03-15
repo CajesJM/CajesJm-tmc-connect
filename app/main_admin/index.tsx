@@ -1143,43 +1143,7 @@ export default function MainAdminDashboard() {
         approvalCount={approvalCount}
       />
 
-      <View style={styles.statsGrid}>
-        {renderStatCard(
-          'Total Users',
-          dashboardStats.totalUsers,
-          <FontAwesome6 name="users" size={20} color="#0ea5e9" />,
-          '#0ea5e9',
-          dashboardStats.userGrowth,
-          `${dashboardStats.activeUsers} currently active`
-        )}
-
-        {renderStatCard(
-          'Upcoming Events',
-          dashboardStats.upcomingEvents,
-          <Ionicons name="calendar" size={20} color="#f59e0b" />,
-          '#f59e0b',
-          dashboardStats.eventGrowth,
-          `of ${dashboardStats.totalEvents} total`
-        )}
-
-        {renderStatCard(
-          'Announcements',
-          dashboardStats.totalAnnouncements,
-          <FontAwesome6 name="bullhorn" size={20} color="#8b5cf6" />,
-          '#8b5cf6',
-          undefined,
-          `${dashboardStats.pendingAnnouncements} pending, ${dashboardStats.approvedAnnouncements} approved, ${dashboardStats.rejectedAnnouncements} rejected`
-        )}
-
-        {renderStatCard(
-          'Need Approval',
-          pendingApprovals.length,
-          <Ionicons name="time" size={20} color="#ef4444" />,
-          '#ef4444',
-          undefined,
-          `${pendingApprovals.filter(p => p.type === 'event').length} events, ${pendingApprovals.filter(p => p.type === 'announcement').length} updates`
-        )}
-      </View>
+      
 
       {/* Charts Section */}
       <View style={styles.chartsContainer}>
@@ -1367,6 +1331,44 @@ export default function MainAdminDashboard() {
             <Text style={styles.summaryLabel}>Attendance Growth</Text>
           </View>
         </View>
+      </View>
+
+      <View style={styles.statsGrid}>
+        {renderStatCard(
+          'Total Users',
+          dashboardStats.totalUsers,
+          <FontAwesome6 name="users" size={20} color="#0ea5e9" />,
+          '#0ea5e9',
+          dashboardStats.userGrowth,
+          `${dashboardStats.activeUsers} currently active`
+        )}
+
+        {renderStatCard(
+          'Upcoming Events',
+          dashboardStats.upcomingEvents,
+          <Ionicons name="calendar" size={20} color="#f59e0b" />,
+          '#f59e0b',
+          dashboardStats.eventGrowth,
+          `of ${dashboardStats.totalEvents} total`
+        )}
+
+        {renderStatCard(
+          'Announcements',
+          dashboardStats.totalAnnouncements,
+          <FontAwesome6 name="bullhorn" size={20} color="#8b5cf6" />,
+          '#8b5cf6',
+          undefined,
+          `${dashboardStats.pendingAnnouncements} pending, ${dashboardStats.approvedAnnouncements} approved, ${dashboardStats.rejectedAnnouncements} rejected`
+        )}
+
+        {renderStatCard(
+          'Need Approval',
+          pendingApprovals.length,
+          <Ionicons name="time" size={20} color="#ef4444" />,
+          '#ef4444',
+          undefined,
+          `${pendingApprovals.filter(p => p.type === 'event').length} events, ${pendingApprovals.filter(p => p.type === 'announcement').length} updates`
+        )}
       </View>
 
       {/* User Role Distribution - Horizontal Bar Chart */}

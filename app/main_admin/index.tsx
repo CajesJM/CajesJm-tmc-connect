@@ -4,10 +4,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { usePathname, useRouter } from 'expo-router';
 import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Image,
   Platform,
   RefreshControl,
@@ -18,12 +19,15 @@ import {
   View
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
+import { PieChart } from 'react-native-gifted-charts';
 import { NotificationModal } from '../../components/NotificationModal';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebaseConfig';
 import { Notification, notificationService } from '../../utils/notifications';
 
-import { dashboardStyles as styles } from '../../styles/main-admin/dashboardStyles';
+import { useTheme } from '../../context/ThemeContext';
+import { createDashboardStyles } from '../../styles/main-admin/dashboardStyles';
+
 import { generateDashboardPDF, sharePDF } from '../../utils/pdfGenerator';
 import MainAdminAnnouncements from './announcements';
 import MainAdminAttendance from './attendance';
@@ -68,6 +72,14 @@ interface Event {
   attendees?: any[];
   createdAt?: Date;
 }
+ interface UserRoleStat {
+    role: 'student' | 'assistant_admin' | 'main_admin';
+    label: string;
+    count: number;
+    percentage: number;
+    color: string;
+    icon: 'school' | 'shield-checkmark' | 'star';
+  }
 
 interface Announcement {
   id: string;
@@ -76,6 +88,26 @@ interface Announcement {
   createdAt: Date;
   priority?: 'high' | 'medium' | 'low';
   author?: string;
+}
+interface DonutChartProps {
+  userRoleStats: UserRoleStat[];
+  totalUsers: number;
+  dynamic: {
+    headerGradient: readonly [string, string];
+    chartBackground: readonly [string, string];
+    statCardBorder: string;
+    textPrimary: string;
+    textSecondary: string;
+    textMuted: string;
+    cardBg: string;
+    borderColor: string;
+  };
+  colors: {
+    accent: { primary: string };
+    // you can expand this as needed, but the component only uses colors.accent.primary
+  };
+  isDark: boolean;
+  styles: any; // or define a more precise type from your styles object
 }
 
 export default function MainAdminDashboard() {
@@ -105,17 +137,22 @@ export default function MainAdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [monthlyStats, setMonthlyStats] = useState<MonthlyStats[]>([]);
+  const [yearlyStats, setYearlyStats] = useState<MonthlyStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStat, setSelectedStat] = useState<string | null>(null);
 
   const { width } = useWindowDimensions();
+  
   const router = useRouter();
   const pathname = usePathname();
   const { userData } = useAuth();
+  const { colors, isDark } = useTheme();
+
+  const styles = createDashboardStyles(colors, isDark);
 
   const isMobile = width < 768;
   const isTablet = width >= 768 && width < 1024;
-  const chartWidth = isMobile ? width - 64 : isTablet ? width / 2 - 48 : width - 400;
+  const chartWidth = isMobile ? width - 32 : isTablet ? width / 2 - 48 : width - 400;
 
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [recentAnnouncements, setRecentAnnouncements] = useState<Announcement[]>([]);
@@ -138,15 +175,9 @@ export default function MainAdminDashboard() {
     { role: 'assistant_admin', label: 'Assistants', count: 0, percentage: 0, color: '#f59e0b', icon: 'shield-checkmark' },
     { role: 'main_admin', label: 'Admins', count: 0, percentage: 0, color: '#8b5cf6', icon: 'star' },
   ]);
+  
 
-  interface UserRoleStat {
-    role: 'student' | 'assistant_admin' | 'main_admin';
-    label: string;
-    count: number;
-    percentage: number;
-    color: string;
-    icon: 'school' | 'shield-checkmark' | 'star';
-  }
+ 
 
   const fetchUserRoleStats = async () => {
     try {
@@ -187,47 +218,235 @@ export default function MainAdminDashboard() {
   const activeTab = getActiveTabFromPath();
 
   const fetchUpcomingEvents = () => {
-    setEventsLoading(true);
-    const now = new Date();
+  setEventsLoading(true);
+  const now = new Date();
 
-    const eventsQuery = query(
-      collection(db, 'events'),
-      orderBy('date', 'asc'),
-      limit(5)
-    );
+  const eventsQuery = query(
+    collection(db, 'events'),
+    orderBy('date', 'asc'),
+    limit(20)
+  );
 
-    return onSnapshot(eventsQuery, (snapshot) => {
-      const events = snapshot.docs
-        .map(doc => {
-          const data = doc.data();
-          const eventDate = data.date?.toDate();
+  return onSnapshot(eventsQuery, (snapshot) => {
+    const allEvents = snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        const eventDate = data.date?.toDate();
+        const status = data.status;
+        const isApproved = status === 'approved' || !status;
+        if (!isApproved) return null;
+        if (!eventDate) return null;
+        if (eventDate < now) return null;
 
-          if (eventDate && eventDate >= now) {
-            return {
-              id: doc.id,
-              title: data.title || 'Untitled Event',
-              description: data.description,
-              date: eventDate,
-              time: data.time,
-              location: data.location,
-              attendees: data.attendees || [],
-              createdAt: data.createdAt?.toDate()
-            };
-          }
-          return null;
-        })
-        .filter(event => event !== null)
-        .sort((a, b) => a!.date.getTime() - b!.date.getTime())
-        .slice(0, 3); // Get only the next 3 events
+        return {
+          id: doc.id,
+          title: data.title || 'Untitled Event',
+          description: data.description,
+          date: eventDate,
+          time: data.time,
+          location: data.location,
+          attendees: data.attendees || [],
+          createdAt: data.createdAt?.toDate()
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .slice(0, 3) as Event[];  // ✅ type assertion ensures compatibility
 
-      setUpcomingEvents(events as Event[]);
-      setEventsLoading(false);
-    }, (error) => {
-      console.error('Error fetching events:', error);
-      setEventsLoading(false);
-    });
+    setUpcomingEvents(allEvents);
+    setEventsLoading(false);
+  }, (error) => {
+    console.error('Error fetching events:', error);
+    setEventsLoading(false);
+  });
+};
+function DonutChart({ userRoleStats, totalUsers, dynamic, colors, isDark, styles }: DonutChartProps) {
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+
+  const animationsRef = useRef({
+    positions: userRoleStats.map(() => new Animated.Value(0)),
+    scales: userRoleStats.map(() => new Animated.Value(0)),
+    opacities: userRoleStats.map(() => new Animated.Value(0)),
+  });
+
+  const { positions, scales, opacities } = animationsRef.current;
+
+  // STANDARD SIZE pie data
+  const pieData = userRoleStats.map((role: UserRoleStat, index: number) => ({
+    value: role.count,
+    color: role.color,
+    text: focusedIndex === index ? '' : `${role.percentage}%`,
+    textSize: focusedIndex === index ? 0 : 14,
+    radius: focusedIndex === index ? 100 : 85,
+    strokeWidth: focusedIndex === index ? 5 : 3,
+    strokeColor: focusedIndex === index ? role.color : (isDark ? '#1e293b' : '#ffffff'),
+    label: role.label,
+    icon: role.icon,
+  }));
+
+  const handleSectionPress = (index: number) => {
+    if (typeof index !== 'number' || index < 0 || index >= userRoleStats.length) return;
+    const isSameSection = focusedIndex === index;
+
+    if (focusedIndex !== null && focusedIndex !== index) {
+      Animated.parallel([
+        Animated.timing(positions[focusedIndex], { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(scales[focusedIndex], { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(opacities[focusedIndex], { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start();
+    }
+
+    if (isSameSection) {
+      Animated.parallel([
+        Animated.timing(positions[index], { toValue: 0, duration: 300, useNativeDriver: true }),
+        Animated.timing(scales[index], { toValue: 0, duration: 300, useNativeDriver: true }),
+        Animated.timing(opacities[index], { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start(() => setFocusedIndex(null));
+    } else {
+      setFocusedIndex(index);
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.spring(positions[index], { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+          Animated.spring(scales[index], { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }),
+          Animated.timing(opacities[index], { toValue: 1, duration: 250, useNativeDriver: true }),
+        ]).start();
+      }, 50);
+    }
   };
 
+  const getLabelPosition = (index: number, percentage: number) => {
+    let startAngle = 0;
+    for (let i = 0; i < index; i++) {
+      startAngle += (userRoleStats[i].percentage / 100) * 360;
+    }
+    const sectionAngle = (percentage / 100) * 360;
+    const midAngle = startAngle + sectionAngle / 2;
+    const angleRad = ((midAngle - 90) * Math.PI) / 180;
+    const distance = 150;
+    return { x: Math.cos(angleRad) * distance, y: Math.sin(angleRad) * distance };
+  };
+
+  return (
+    <View style={[styles.donutChartContainer, {
+      backgroundColor: dynamic.cardBg,
+      borderColor: dynamic.borderColor,
+    }]}>
+      <View style={styles.donutHeader}>
+        <View style={styles.donutHeaderLeft}>
+          <Ionicons name="pie-chart" size={18} color={colors.accent.primary} />
+          <Text style={[styles.donutTitle, { color: dynamic.textPrimary }]}>
+            User Distribution
+          </Text>
+        </View>
+        <Text style={[styles.donutTotalBadge, {
+          backgroundColor: isDark ? colors.accent.primary + '30' : colors.accent.primary + '15',
+          color: colors.accent.primary
+        }]}>
+          {totalUsers} total
+        </Text>
+      </View>
+
+      <View style={styles.donutChartWrapper}>
+        <PieChart
+          data={pieData}
+          donut
+          showText={true}
+          textColor={isDark ? '#ffffff' : '#1e293b'}
+          fontWeight="bold"
+          innerRadius={60}
+          innerCircleColor={isDark ? '#1e293b' : '#ffffff'}
+          innerCircleBorderWidth={focusedIndex !== null ? 2 : 0}
+          innerCircleBorderColor={focusedIndex !== null ? userRoleStats[focusedIndex]?.color : 'transparent'}
+          strokeWidth={3}
+          focusOnPress={false}
+          onPress={(item: any, index: number) => {
+            if (typeof index === 'number' && index >= 0) handleSectionPress(index);
+          }}
+          centerLabelComponent={() => (
+            <View style={styles.donutCenterLabel}>
+              <Text style={[styles.donutCenterValue, { color: dynamic.textPrimary }]}>
+                {totalUsers}
+              </Text>
+              <Text style={[styles.donutCenterText, { color: dynamic.textSecondary }]}>
+                Total Users
+              </Text>
+            </View>
+          )}
+        />
+
+        {userRoleStats.map((role: UserRoleStat, index: number) => {
+          const position = getLabelPosition(index, role.percentage);
+          return (
+            <Animated.View
+              key={`label-${index}`}
+              style={[
+                styles.externalLabelContainer,
+                {
+                  transform: [
+                    { translateX: positions[index].interpolate({ inputRange: [0, 1], outputRange: [0, position.x] }) },
+                    { translateY: positions[index].interpolate({ inputRange: [0, 1], outputRange: [0, position.y] }) },
+                    { scale: scales[index] }
+                  ],
+                  opacity: opacities[index],
+                }
+              ]}
+              pointerEvents="none"
+            >
+              <View style={[styles.externalLabelBubble, {
+                backgroundColor: role.color,
+                shadowColor: role.color,
+              }]}>
+                <Text style={styles.externalLabelPercent}>{role.percentage}%</Text>
+              </View>
+              <View style={[styles.externalLabelArrow, { borderTopColor: role.color }]} />
+            </Animated.View>
+          );
+        })}
+      </View>
+
+      <View style={styles.progressLegendContainer}>
+        {userRoleStats.map((role, index) => {
+          const isFocused = focusedIndex === index;
+          return (
+            <TouchableOpacity
+              key={role.role}
+              style={[styles.progressLegendItem, isFocused && styles.progressLegendItemFocused]}
+              activeOpacity={0.8}
+              onPress={() => handleSectionPress(index)}
+            >
+              <View style={styles.progressLegendHeader}>
+                <View style={[styles.progressLegendIcon, {
+                  backgroundColor: role.color + (isDark ? '30' : '20')
+                }, isFocused && { backgroundColor: role.color }]}>
+                  <Ionicons name={role.icon} size={16} color={isFocused ? '#ffffff' : role.color} />
+                </View>
+                <View style={styles.progressLegendInfo}>
+                  <Text style={[styles.progressLegendLabel, { color: dynamic.textPrimary },
+                  isFocused && { color: role.color, fontWeight: '700' }]}>
+                    {role.label}
+                  </Text>
+                  <Text style={[styles.progressLegendCount, { color: dynamic.textSecondary }]}>
+                    {role.count} users
+                  </Text>
+                </View>
+                <Text style={[styles.progressLegendPercent, { color: role.color },
+                isFocused && { fontWeight: '800' }]}>
+                  {role.percentage}%
+                </Text>
+              </View>
+              <View style={[styles.progressBarBackground, { backgroundColor: isDark ? '#334155' : '#e2e8f0' }]}>
+                <Animated.View style={[styles.progressBarFill, {
+                  backgroundColor: role.color,
+                  width: isFocused ? '100%' : `${role.percentage}%`
+                }]} />
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
 
   const fetchPendingApprovals = () => {
 
@@ -277,6 +496,8 @@ export default function MainAdminDashboard() {
     };
   };
 
+
+
   const updatePendingApprovals = (newItems: PendingApproval[], type: string) => {
     setPendingApprovals(prev => {
       const filtered = prev.filter(item => item.type !== type);
@@ -285,18 +506,23 @@ export default function MainAdminDashboard() {
     });
   };
 
-  const fetchRecentAnnouncements = () => {
-    setAnnouncementsLoading(true);
+ const fetchRecentAnnouncements = () => {
+  setAnnouncementsLoading(true);
 
-    const announcementsQuery = query(
-      collection(db, 'updates'),
-      orderBy('createdAt', 'desc'),
-      limit(3)
-    );
+  const announcementsQuery = query(
+    collection(db, 'updates'),
+    orderBy('createdAt', 'desc'),
+    limit(10)
+  );
 
-    return onSnapshot(announcementsQuery, (snapshot) => {
-      const announcements = snapshot.docs.map(doc => {
+  return onSnapshot(announcementsQuery, (snapshot) => {
+    const approvedAnnouncements = snapshot.docs
+      .map(doc => {
         const data = doc.data();
+        const status = data.status;
+        const isApproved = status === 'approved' || !status;
+        if (!isApproved) return null;
+
         return {
           id: doc.id,
           title: data.title || 'Announcement',
@@ -305,16 +531,17 @@ export default function MainAdminDashboard() {
           priority: data.priority || 'medium',
           author: data.author || 'Admin'
         };
-      });
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .slice(0, 3) as Announcement[];  // ✅ type assertion
 
-      setRecentAnnouncements(announcements);
-      setAnnouncementsLoading(false);
-    }, (error) => {
-      console.error('Error fetching announcements:', error);
-      setAnnouncementsLoading(false);
-    });
-  };
-
+    setRecentAnnouncements(approvedAnnouncements);
+    setAnnouncementsLoading(false);
+  }, (error) => {
+    console.error('Error fetching announcements:', error);
+    setAnnouncementsLoading(false);
+  });
+};
 
   useEffect(() => {
     fetchDashboardStats();
@@ -607,71 +834,216 @@ export default function MainAdminDashboard() {
   const calculateMonthlyStats = async () => {
     try {
       const now = new Date();
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(now.getMonth() - 5);
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
 
+      // Generate last 6 months for display
       const months: MonthlyStats[] = [];
+      const monthKeys: string[] = [];
 
-      // Query only approved events
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(currentYear, currentMonth - i, 1);
+        const monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const displayMonth = date.toLocaleString('default', { month: 'long' });
+
+        months.push({
+          month: displayMonth,
+          events: 0,
+          attendance: 0,
+          announcements: 0
+        });
+        monthKeys.push(monthKey);
+      }
+
+      const sixMonthsAgo = new Date(currentYear, currentMonth - 5, 1);
+      const nextMonth = new Date(currentYear, currentMonth + 1, 1);
+
       const eventsSnapshot = await getDocs(collection(db, 'events'));
-      const approvedEvents = eventsSnapshot.docs.filter(doc =>
-        doc.data().status === 'approved'
-      );
 
-      const announcementsSnapshot = await getDocs(collection(db, 'updates'));
+      console.log('🔍 CHECKING ALL EVENTS:');
+
+      // Count events that are APPROVED or AUTO-APPROVED (no status = main admin created)
+      const approvedEvents = eventsSnapshot.docs.filter(doc => {
+        const data = doc.data();
+        const eventDate = data.date?.toDate?.() || data.date;
+
+        // Check if approved: either status='approved' OR no status field (main admin auto-approved)
+        const status = data.status;
+        const isApproved = status === 'approved' || status === undefined || status === null || status === '';
+
+        // Also exclude rejected events
+        const isRejected = status === 'rejected';
+
+        const inRange = eventDate && eventDate >= sixMonthsAgo && eventDate < nextMonth;
+
+        console.log(`  "${data.title}": status=${status} (type: ${typeof status}), isApproved=${isApproved}, isRejected=${isRejected}, inRange=${inRange}`);
+
+        return isApproved && !isRejected && inRange;
+      });
+
+      console.log('✅ Total approved+auto-approved events in range:', approvedEvents.length);
 
       let totalAttendance = 0;
-      const eventsByMonth: { [key: string]: number } = {};
-      const attendanceByMonth: { [key: string]: number } = {};
-      const announcementsByMonth: { [key: string]: number } = {};
 
       approvedEvents.forEach(doc => {
         const data = doc.data();
-        const eventDate = data.date?.toDate();
-        if (eventDate && eventDate >= sixMonthsAgo) {
-          const monthKey = eventDate.toLocaleString('default', { month: 'short', year: 'numeric' });
-          eventsByMonth[monthKey] = (eventsByMonth[monthKey] || 0) + 1;
+        const eventDate = data.date?.toDate?.() || data.date;
 
+        if (!eventDate) return;
+
+        const monthKey = eventDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const monthIndex = monthKeys.indexOf(monthKey);
+
+        if (monthIndex !== -1) {
+          months[monthIndex].events += 1;
           const attendees = data.attendees?.length || 0;
           totalAttendance += attendees;
-          attendanceByMonth[monthKey] = (attendanceByMonth[monthKey] || 0) + attendees;
+          months[monthIndex].attendance += attendees;
+          console.log(`📊 Added "${data.title}" to ${monthKey}`);
         }
       });
 
-      announcementsSnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        const createdAt = data.createdAt?.toDate();
-        if (createdAt && createdAt >= sixMonthsAgo) {
-          const monthKey = createdAt.toLocaleString('default', { month: 'short', year: 'numeric' });
-          announcementsByMonth[monthKey] = (announcementsByMonth[monthKey] || 0) + 1;
-        }
-      });
-
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date();
-        date.setMonth(now.getMonth() - i);
-        const monthKey = date.toLocaleString('default', { month: 'short', year: 'numeric' });
-
-        months.push({
-          month: date.toLocaleString('default', { month: 'short' }),
-          events: eventsByMonth[monthKey] || 0,
-          attendance: attendanceByMonth[monthKey] || 0,
-          announcements: announcementsByMonth[monthKey] || 0
-        });
-      }
+      console.log('📊 Final monthly stats:', months);
 
       setMonthlyStats(months);
-
       setDashboardStats(prev => ({
         ...prev,
         totalAttendance
       }));
 
     } catch (error) {
-      console.error('Error calculating monthly stats:', error);
+      console.error('❌ Error:', error);
     }
   };
 
+  const calculateYearlyStats = async () => {
+    try {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      // Generate last 12 months for display
+      const months: MonthlyStats[] = [];
+      const monthKeys: string[] = [];
+
+      for (let i = 11; i >= 0; i--) { // Changed from 5 to 11 for 12 months
+        const date = new Date(currentYear, currentMonth - i, 1);
+        const monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const displayMonth = date.toLocaleString('default', { month: 'short' }); // Short month name for space
+
+        months.push({
+          month: displayMonth,
+          events: 0,
+          attendance: 0,
+          announcements: 0
+        });
+        monthKeys.push(monthKey);
+      }
+
+      const twelveMonthsAgo = new Date(currentYear, currentMonth - 11, 1);
+      const nextMonth = new Date(currentYear, currentMonth + 1, 1);
+
+      const eventsSnapshot = await getDocs(collection(db, 'events'));
+
+      // Count events that are APPROVED or AUTO-APPROVED
+      const approvedEvents = eventsSnapshot.docs.filter(doc => {
+        const data = doc.data();
+        const eventDate = data.date?.toDate?.() || data.date;
+
+        const status = data.status;
+        const isApproved = status === 'approved' || status === undefined || status === null || status === '';
+        const isRejected = status === 'rejected';
+
+        const inRange = eventDate && eventDate >= twelveMonthsAgo && eventDate < nextMonth;
+
+        return isApproved && !isRejected && inRange;
+      });
+
+      let totalYearlyAttendance = 0;
+
+      approvedEvents.forEach(doc => {
+        const data = doc.data();
+        const eventDate = data.date?.toDate?.() || data.date;
+
+        if (!eventDate) return;
+
+        const monthKey = eventDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+        const monthIndex = monthKeys.indexOf(monthKey);
+
+        if (monthIndex !== -1) {
+          months[monthIndex].events += 1;
+          const attendees = data.attendees?.length || 0;
+          totalYearlyAttendance += attendees;
+          months[monthIndex].attendance += attendees;
+        }
+      });
+
+      setYearlyStats(months);
+
+      // Also update dashboard stats with yearly attendance if needed
+      setDashboardStats(prev => ({
+        ...prev,
+        yearlyAttendance: totalYearlyAttendance
+      }));
+
+    } catch (error) {
+      console.error('❌ Error calculating yearly stats:', error);
+    }
+  };
+
+  // Update useEffect to include yearly stats
+  useEffect(() => {
+    fetchDashboardStats();
+    fetchUserRoleStats();
+
+    const unsubscribeActivities = setupRealtimeActivities();
+    const unsubscribeEvents = fetchUpcomingEvents();
+    const unsubscribeAnnouncements = fetchRecentAnnouncements();
+
+    calculateMonthlyStats();
+    calculateYearlyStats(); // NEW: Calculate 12 months data
+
+    return () => {
+      unsubscribeActivities();
+      unsubscribeEvents();
+      unsubscribeAnnouncements();
+    };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardStats();
+    const unsubscribeActivities = setupRealtimeActivities();
+    const unsubscribeEvents = fetchUpcomingEvents();
+    const unsubscribeAnnouncements = fetchRecentAnnouncements();
+    const unsubscribeApprovals = fetchPendingApprovals();
+    calculateMonthlyStats();
+    calculateYearlyStats(); // NEW: Calculate 12 months data
+
+    if (userData?.email) {
+      const unsubscribeNotifications = notificationService.listenForNotifications(
+        userData.email,
+        (notifs) => {
+          setNotifications(notifs);
+          setUnreadCount(notifs.filter(n => !n.read).length + pendingApprovals.length);
+        }
+      );
+
+      return () => {
+        unsubscribeActivities();
+        unsubscribeEvents();
+        unsubscribeAnnouncements();
+        unsubscribeApprovals();
+        unsubscribeNotifications();
+        notificationService.cleanup();
+      };
+    }
+    return () => {
+      unsubscribeActivities();
+      unsubscribeEvents();
+      unsubscribeAnnouncements();
+      unsubscribeApprovals();
+    };
+  }, [userData, pendingApprovals.length]);
   const handleDownloadReport = async () => {
     try {
       setDownloadLoading(true);
@@ -844,24 +1216,60 @@ export default function MainAdminDashboard() {
     try {
       setLoading(true);
 
+      // Get users first
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const totalUsers = usersSnapshot.size;
       const activeUsers = usersSnapshot.docs.filter(doc =>
         doc.data().active !== false
       ).length;
 
-      // Only count APPROVED events
       const eventsSnapshot = await getDocs(collection(db, 'events'));
-      const approvedEvents = eventsSnapshot.docs.filter(doc =>
-        doc.data().status === 'approved'
-      );
-      const totalEvents = approvedEvents.length;
+
+      let totalEvents = 0;
+      let approvedEvents = 0;
+      let pendingEvents = 0;
+      let rejectedEvents = 0;
+      let upcomingEvents = 0;
+      let totalAttendanceAllTime = 0;
 
       const now = new Date();
-      const upcomingEvents = approvedEvents.filter(doc => {
-        const eventDate = doc.data().date?.toDate();
-        return eventDate && eventDate > now;
-      }).length;
+
+      eventsSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        totalEvents++;
+
+        const status = data.status;
+        const isApproved = status === 'approved' || status === undefined || status === null || status === '';
+        const isPending = status === 'pending';
+        const isRejected = status === 'rejected';
+
+        if (isApproved) approvedEvents++;
+        if (isPending) pendingEvents++;
+        if (isRejected) rejectedEvents++;
+
+        // Check if upcoming (approved and future date)
+        if (isApproved) {
+          const eventDate = data.date?.toDate?.() || data.date;
+          if (eventDate && eventDate > now) {
+            upcomingEvents++;
+          }
+
+          // Count all-time attendance
+          const attendees = data.attendees?.length || 0;
+          totalAttendanceAllTime += attendees;
+        }
+      });
+
+      const pastEvents = approvedEvents - upcomingEvents;
+
+      console.log('📈 Dashboard Stats:', {
+        totalInDB: totalEvents,
+        approved: approvedEvents,
+        pending: pendingEvents,
+        rejected: rejectedEvents,
+        upcoming: upcomingEvents,
+        past: pastEvents
+      });
 
       const announcementsSnapshot = await getDocs(collection(db, 'updates'));
       const totalAnnouncements = announcementsSnapshot.size;
@@ -876,36 +1284,32 @@ export default function MainAdminDashboard() {
         doc => doc.data().status === 'rejected'
       ).length;
 
-      let activeAttendees = 0;
+      // Calculate pending verifications - FIXED to use isApproved logic
       let pendingVerifications = 0;
-
-      approvedEvents.forEach(doc => {
+      eventsSnapshot.docs.forEach(doc => {
         const data = doc.data();
-        const attendees = data.attendees;
-        if (attendees && Array.isArray(attendees)) {
-          activeAttendees += attendees.length;
+        const status = data.status;
+        const isApproved = status === 'approved' || status === undefined || status === null || status === '';
 
-          if (data.coordinates) {
-            const unverified = attendees.filter((a: any) =>
-              !a.location?.isWithinRadius
-            ).length;
-            pendingVerifications += unverified;
-          }
+        if (isApproved && data.coordinates && data.attendees) {
+          const unverified = data.attendees.filter((a: any) => !a.location?.isWithinRadius).length;
+          pendingVerifications += unverified;
         }
       });
 
-      const userGrowth = ((activeUsers - totalUsers * 0.8) / (totalUsers * 0.8)) * 100;
-      const eventGrowth = ((upcomingEvents - totalEvents * 0.3) / (totalEvents * 0.3)) * 100;
+      // Calculate growth percentages (handle division by zero)
+      const userGrowth = totalUsers > 0 ? ((activeUsers - totalUsers * 0.8) / (totalUsers * 0.8)) * 100 : 0;
+      const eventGrowth = approvedEvents > 0 ? ((upcomingEvents - approvedEvents * 0.3) / (approvedEvents * 0.3)) * 100 : 0;
 
       setDashboardStats({
         totalUsers,
-        totalEvents,
+        totalEvents: approvedEvents, // Now counts auto-approved too!
         totalAnnouncements,
-        activeAttendees,
+        activeAttendees: totalAttendanceAllTime,
         upcomingEvents,
         pendingVerifications,
         activeUsers,
-        totalAttendance: activeAttendees,
+        totalAttendance: totalAttendanceAllTime,
         userGrowth,
         eventGrowth,
         pendingAnnouncements,
@@ -913,7 +1317,7 @@ export default function MainAdminDashboard() {
         rejectedAnnouncements
       });
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
+      console.error('❌ Error:', error);
     } finally {
       setLoading(false);
     }
@@ -968,23 +1372,39 @@ export default function MainAdminDashboard() {
     if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
     return date.toLocaleDateString();
   };
+  const getDynamicStyles = () => ({
+    headerGradient: isDark
+      ? ['#0f172a', '#1e293b'] as const
+      : ['#1e40af', '#3b82f6'] as const,
+    chartBackground: isDark
+      ? ['#1e293b', '#121e39'] as const
+      : ['#f0f9ff', '#ffffff'] as const,
+    statCardBorder: isDark ? '#3b82f6' : '#1266d4',
+    textPrimary: colors.text,
+    textSecondary: colors.sidebar.text.secondary,
+    textMuted: colors.sidebar.text.muted,
+    cardBg: colors.card,
+    borderColor: colors.border,
+  });
+
+  const dynamic = getDynamicStyles();
+
 
   const renderStatCard = (title: string, value: string | number, icon: any, color: string, trend?: number, subtitle?: string) => (
-    <TouchableOpacity
-      style={styles.statCard}
-
-    >
+    <TouchableOpacity style={[styles.statCard, {
+      backgroundColor: dynamic.cardBg,
+      borderLeftColor: color,
+      borderRightColor: dynamic.statCardBorder,
+      shadowColor: isDark ? '#000' : '#000',
+      shadowOpacity: isDark ? 0.3 : 0.05,
+    }]}>
       <View style={styles.statCardHeader}>
         <View style={[styles.statIconContainer, { backgroundColor: `${color}15` }]}>
           {icon}
         </View>
         {trend !== undefined && (
           <View style={[styles.trendBadge, { backgroundColor: trend >= 0 ? '#10b98120' : '#ef444420' }]}>
-            <Feather
-              name={trend >= 0 ? 'trending-up' : 'trending-down'}
-              size={12}
-              color={trend >= 0 ? '#10b981' : '#ef4444'}
-            />
+            <Feather name={trend >= 0 ? 'trending-up' : 'trending-down'} size={12} color={trend >= 0 ? '#10b981' : '#ef4444'} />
             <Text style={[styles.trendText, { color: trend >= 0 ? '#10b981' : '#ef4444' }]}>
               {Math.abs(trend).toFixed(1)}%
             </Text>
@@ -992,13 +1412,13 @@ export default function MainAdminDashboard() {
         )}
       </View>
 
-      <Text style={styles.statNumber}>{value}</Text>
-      <Text style={styles.statLabel}>{title}</Text>
-      {subtitle && <Text style={styles.statSubtext}>{subtitle}</Text>}
+      <Text style={[styles.statNumber, { color: dynamic.textPrimary }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: dynamic.textSecondary }]}>{title}</Text>
+      {subtitle && <Text style={[styles.statSubtext, { color: dynamic.textMuted }]}>{subtitle}</Text>}
 
       {selectedStat === title && (
-        <View style={styles.statExpand}>
-          <View style={styles.statProgress}>
+        <View style={[styles.statExpand, { borderTopColor: dynamic.borderColor }]}>
+          <View style={[styles.statProgress, { backgroundColor: dynamic.borderColor }]}>
             <View style={[styles.statProgressBar, { width: '70%', backgroundColor: color }]} />
           </View>
           <Text style={styles.statDetail}>View details →</Text>
@@ -1043,40 +1463,33 @@ export default function MainAdminDashboard() {
 
   const renderOverview = () => (
     <ScrollView
-      style={styles.overviewContainer}
+      style={[styles.overviewContainer, { backgroundColor: colors.background }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0ea5e9" />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent.primary} />
       }
     >
-
+      {/* Header Gradient */}
       <LinearGradient
-        colors={['#14203d', '#06080b']}
+        colors={dynamic.headerGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
       >
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.greetingText}>Welcome back,</Text>
+            <Text style={[styles.greetingText, { color: dynamic.textMuted }]}>Welcome back,</Text>
             <Text style={styles.userName}>{userData?.name || 'Admin'}</Text>
-            <Text style={styles.roleText}>Administrator</Text>
+            <Text style={[styles.roleText, { color: dynamic.textMuted }]}>Administrator</Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={handleProfileImagePress}
-            disabled={uploadingImage}
-          >
+          <TouchableOpacity style={styles.profileButton} onPress={handleProfileImagePress} disabled={uploadingImage}>
             {uploadingImage ? (
               <View style={[styles.profileImage, styles.profileFallback]}>
                 <ActivityIndicator size="small" color="#ffffff" />
               </View>
             ) : userData?.photoURL ? (
-              <Image
-                source={{ uri: userData.photoURL }}
-                style={styles.profileImage}
-              />
+              <Image source={{ uri: userData.photoURL }} style={styles.profileImage} />
             ) : (
               <View style={[styles.profileImage, styles.profileFallback]}>
                 <Text style={styles.profileInitials}>
@@ -1089,41 +1502,21 @@ export default function MainAdminDashboard() {
 
         <View style={styles.dateSection}>
           <View style={styles.dateContainer}>
-            <Feather name="calendar" size={12} color="#94a3b8" />
-            <Text style={styles.dateText}>
-              {new Date().toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
+            <Feather name="calendar" size={12} color={dynamic.textMuted} />
+            <Text style={[styles.dateText, { color: isDark ? dynamic.textSecondary : '#ffffff' }]}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </Text>
           </View>
           <View style={styles.headerActions}>
-
-
-            <TouchableOpacity
-              style={styles.headerAction}
-              onPress={handleDownloadReport}
-              disabled={downloadLoading}
-            >
-              {downloadLoading ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Feather name="download" size={18} color="#ffffff" />
-              )}
+            <TouchableOpacity style={[styles.headerAction, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.1)' }]} onPress={handleDownloadReport} disabled={downloadLoading}>
+              {downloadLoading ? <ActivityIndicator size="small" color="#ffffff" /> : <Feather name="download" size={18} color="#ffffff" />}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.headerAction}
-              onPress={() => setNotificationModalVisible(true)}
-            >
+            <TouchableOpacity style={[styles.headerAction, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.1)' }]} onPress={() => setNotificationModalVisible(true)}>
               <Feather name="bell" size={18} color="#ffffff" />
               {(unreadCount > 0) && (
                 <View style={[styles.notificationBadge, approvalCount > 0 && styles.approvalBadge]}>
-                  <Text style={styles.notificationBadgeText}>
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </Text>
+                  <Text style={styles.notificationBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -1143,370 +1536,538 @@ export default function MainAdminDashboard() {
         approvalCount={approvalCount}
       />
 
-      
+      {/* Charts Grid - Two Column Layout: Line Chart Left, Donut Chart Right */}
+      <View style={styles.chartsGrid}>
+        <View style={[styles.chartColumn, styles.lineChartColumn]}>
+          <View style={[styles.chartsContainer, {
+            backgroundColor: dynamic.cardBg,
+            shadowColor: isDark ? '#000' : '#0ea5e9',
+            shadowOpacity: isDark ? 0.3 : 0.08,
+            marginHorizontal: 0,
+          }]}>
 
-      {/* Charts Section */}
-      <View style={styles.chartsContainer}>
-        <View style={styles.chartHeader}>
-          <View>
-            <Text style={styles.chartsTitle}>Analytics Overview</Text>
-            <Text style={styles.chartsSubtitle}>Last 6 months activity</Text>
-          </View>
-
-          {/* Interactive Legend */}
-          <View style={styles.chartLegend}>
-            <TouchableOpacity
-              style={[
-                styles.legendItem,
-                styles.legendButton,
-                selectedDataset === 'events' && styles.legendButtonActiveBlue
-              ]}
-              onPress={() => setSelectedDataset(selectedDataset === 'events' ? null : 'events')}
-            >
-              <View style={[styles.legendDot, { backgroundColor: '#0ea5e9' }]} />
-              <Text style={[
-                styles.legendText,
-                selectedDataset === 'events' && styles.legendTextActive
-              ]}>
-                Events
-              </Text>
-              <View style={[styles.legendValue, { backgroundColor: '#0ea5e915' }]}>
-                <Text style={[styles.legendValueText, { color: '#0ea5e9' }]}>
-                  {monthlyStats.reduce((sum, s) => sum + s.events, 0)}
-                </Text>
+            <View style={styles.chartHeader}>
+              <View>
+                <Text style={[styles.chartsTitle, { color: dynamic.textPrimary }]}>Analytics Overview</Text>
+                <Text style={[styles.chartsSubtitle, { color: dynamic.textSecondary }]}>Last 6 months activity</Text>
               </View>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.legendItem,
-                styles.legendButton,
-                selectedDataset === 'attendance' && styles.legendButtonActiveGreen
-              ]}
-              onPress={() => setSelectedDataset(selectedDataset === 'attendance' ? null : 'attendance')}
-            >
-              <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
-              <Text style={[
-                styles.legendText,
-                selectedDataset === 'attendance' && styles.legendTextActive
-              ]}>
-                Attendance
-              </Text>
-              <View style={[styles.legendValue, { backgroundColor: '#10b98115' }]}>
-                <Text style={[styles.legendValueText, { color: '#10b981' }]}>
-                  {monthlyStats.reduce((sum, s) => sum + s.attendance, 0)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {monthlyStats.length > 0 && (
-          <View style={styles.chartWrapper}>
-            {/* Custom Gradient Background */}
-            <LinearGradient
-              colors={['#f0f9ff', '#ffffff']}
-              style={styles.chartBackground}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-            />
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chartScrollContent}
-            >
-              <LineChart
-                data={{
-                  labels: monthlyStats.map(s => s.month),
-                  datasets: [
-                    {
-                      data: monthlyStats.map(s => s.events),
-                      color: () => selectedDataset === 'attendance' ? '#0ea5e920' : '#0ea5e9',
-                      strokeWidth: 4
-                    },
-                    {
-                      data: monthlyStats.map(s => s.attendance),
-                      color: () => selectedDataset === 'events' ? '#10b98120' : '#10b981',
-                      strokeWidth: 4
-                    }
-                  ]
-                }}
-                width={Math.max(chartWidth, 350)}
-                height={260}
-                chartConfig={{
-                  backgroundColor: 'transparent',
-                  backgroundGradientFrom: 'transparent',
-                  backgroundGradientTo: 'transparent',
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(15, 23, 42, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(100, 116, 139, ${opacity})`,
-                  style: {
-                    borderRadius: 16,
-                  },
-                  propsForDots: {
-                    r: '6',
-                    strokeWidth: '3',
-                    stroke: '#ffffff'
-                  },
-                  propsForBackgroundLines: {
-                    stroke: '#e2e8f0',
-                    strokeWidth: 1,
-                    strokeDasharray: '0',
-                  },
-                  propsForLabels: {
-                    fontSize: 12,
-                    fontWeight: '600',
-                  }
-                }}
-                bezier
-                style={styles.chart}
-                withInnerLines={true}
-                withOuterLines={false}
-                withVerticalLines={true}
-                withHorizontalLines={true}
-                fromZero={true}
-                yAxisInterval={1}
-                segments={5}
-                formatYLabel={(value) => {
-                  const num = parseInt(value);
-                  if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
-                  return value.toString();
-                }}
-              />
-            </ScrollView>
-
-            {/* X-Axis Label */}
-            <View style={styles.axisLabelContainer}>
-              <Text style={styles.axisLabel}>Timeline (Months)</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Colorful Summary Stats Below Chart */}
-        <View style={styles.chartSummary}>
-          {/* Total Approved Events */}
-          <View style={[styles.summaryItem, styles.summaryItemBlue]}>
-            <View style={[styles.summaryIconContainer, { backgroundColor: '#0ea5e915' }]}>
-              <Ionicons name="checkmark-circle" size={20} color="#0ea5e9" />
-            </View>
-            <Text style={[styles.summaryValue, { color: '#0ea5e9' }]}>
-              {dashboardStats.totalEvents}
-            </Text>
-            <Text style={styles.summaryLabel}>Total Events</Text>
-          </View>
-
-          {/* Peak Attendance Month */}
-          <View style={[styles.summaryItem, styles.summaryItemGreen]}>
-            <View style={[styles.summaryIconContainer, { backgroundColor: '#10b98115' }]}>
-              <Ionicons name="people" size={20} color="#10b981" />
-            </View>
-            <Text style={[styles.summaryValue, { color: '#10b981', fontSize: 16 }]}>
-              {monthlyStats.length > 0
-                ? monthlyStats.reduce((max, stat) => stat.attendance > max.attendance ? stat : max, monthlyStats[0]).month
-                : '-'
-              }
-            </Text>
-            <Text style={styles.summaryLabel}>
-              Peak Attendance ({monthlyStats.length > 0
-                ? Math.max(...monthlyStats.map(s => s.attendance))
-                : 0
-              })
-            </Text>
-          </View>
-
-          {/* Growth */}
-          <View style={[styles.summaryItem, styles.summaryItemPurple]}>
-            <View style={[styles.summaryIconContainer, { backgroundColor: '#8b5cf615' }]}>
-              <Ionicons
-                name={calculateGrowth(monthlyStats, 'attendance') >= 0 ? "trending-up" : "trending-down"}
-                size={20}
-                color="#8b5cf6"
-              />
-            </View>
-            <Text style={[styles.summaryValue, { color: '#8b5cf6' }]}>
-              {calculateGrowth(monthlyStats, 'attendance') > 0 ? '+' : ''}
-              {calculateGrowth(monthlyStats, 'attendance')}%
-            </Text>
-            <Text style={styles.summaryLabel}>Attendance Growth</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.statsGrid}>
-        {renderStatCard(
-          'Total Users',
-          dashboardStats.totalUsers,
-          <FontAwesome6 name="users" size={20} color="#0ea5e9" />,
-          '#0ea5e9',
-          dashboardStats.userGrowth,
-          `${dashboardStats.activeUsers} currently active`
-        )}
-
-        {renderStatCard(
-          'Upcoming Events',
-          dashboardStats.upcomingEvents,
-          <Ionicons name="calendar" size={20} color="#f59e0b" />,
-          '#f59e0b',
-          dashboardStats.eventGrowth,
-          `of ${dashboardStats.totalEvents} total`
-        )}
-
-        {renderStatCard(
-          'Announcements',
-          dashboardStats.totalAnnouncements,
-          <FontAwesome6 name="bullhorn" size={20} color="#8b5cf6" />,
-          '#8b5cf6',
-          undefined,
-          `${dashboardStats.pendingAnnouncements} pending, ${dashboardStats.approvedAnnouncements} approved, ${dashboardStats.rejectedAnnouncements} rejected`
-        )}
-
-        {renderStatCard(
-          'Need Approval',
-          pendingApprovals.length,
-          <Ionicons name="time" size={20} color="#ef4444" />,
-          '#ef4444',
-          undefined,
-          `${pendingApprovals.filter(p => p.type === 'event').length} events, ${pendingApprovals.filter(p => p.type === 'announcement').length} updates`
-        )}
-      </View>
-
-      {/* User Role Distribution - Horizontal Bar Chart */}
-      <View style={styles.roleDistributionContainer}>
-        <View style={styles.roleHeader}>
-          <Text style={styles.roleTitle}>User Distribution</Text>
-          <Text style={styles.roleSubtitle}>By role type</Text>
-        </View>
-
-        {userRoleStats.length > 0 && (
-          <View style={styles.roleBarsContainer}>
-            {userRoleStats.map((role, index) => (
-              <View key={role.role} style={styles.roleBarRow}>
-                <View style={styles.roleLabelContainer}>
-                  <View style={[styles.roleIcon, { backgroundColor: role.color + '20' }]}>
-                    <Ionicons name={role.icon} size={14} color={role.color} />
+              <View style={styles.chartLegend}>
+                <TouchableOpacity
+                  style={[
+                    styles.legendItem,
+                    styles.legendButton,
+                    { backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderColor: isDark ? '#334155' : '#e2e8f0' },
+                    selectedDataset === 'events' && { backgroundColor: isDark ? '#0ea5e930' : '#0ea5e915', borderColor: '#0ea5e9' }
+                  ]}
+                  onPress={() => setSelectedDataset(selectedDataset === 'events' ? null : 'events')}
+                >
+                  <View style={[styles.legendDot, { backgroundColor: '#0ea5e9' }]} />
+                  <Text style={[styles.legendText, { color: selectedDataset === 'events' ? colors.accent.primary : dynamic.textSecondary }]}>Events</Text>
+                  <View style={[styles.legendValue, { backgroundColor: isDark ? '#0ea5e930' : '#0ea5e915' }]}>
+                    <Text style={[styles.legendValueText, { color: '#0ea5e9' }]}>{monthlyStats.reduce((sum, s) => sum + s.events, 0)}</Text>
                   </View>
-                  <Text style={styles.roleLabel}>{role.label}</Text>
-                </View>
+                </TouchableOpacity>
 
-                <View style={styles.roleBarWrapper}>
-                  <View style={styles.roleBarBackground}>
-                    <View
-                      style={[
-                        styles.roleBarFill,
+                <TouchableOpacity
+                  style={[
+                    styles.legendItem,
+                    styles.legendButton,
+                    { backgroundColor: isDark ? '#1e293b' : '#f8fafc', borderColor: isDark ? '#334155' : '#e2e8f0' },
+                    selectedDataset === 'attendance' && { backgroundColor: isDark ? '#10b98130' : '#10b98115', borderColor: '#10b981' }
+                  ]}
+                  onPress={() => setSelectedDataset(selectedDataset === 'attendance' ? null : 'attendance')}
+                >
+                  <View style={[styles.legendDot, { backgroundColor: '#a855f7' }]} />
+                  <Text style={[styles.legendText, { color: selectedDataset === 'attendance' ? '#a855f7' : dynamic.textSecondary }]}>Attendance</Text>
+                  <View style={[styles.legendValue, { backgroundColor: isDark ? '#10b98130' : '#10b98115' }]}>
+                    <Text style={[styles.legendValueText, { color: '#a855f7' }]}>{monthlyStats.reduce((sum, s) => sum + s.attendance, 0)}</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {monthlyStats.length > 0 && (
+              <View style={styles.chartWrapper}>
+                <LinearGradient
+                  colors={dynamic.chartBackground}
+                  style={styles.chartBackground}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chartScrollContent}
+                >
+                  <LineChart
+                    data={{
+                      labels: monthlyStats.map(s => s.month),
+                      datasets: [
                         {
-                          width: `${role.percentage}%`,
-                          backgroundColor: role.color
+                          data: monthlyStats.map(s => s.events),
+                          color: (opacity = 1) => selectedDataset === 'attendance'
+                            ? `rgba(14, 165, 233, ${opacity * 0.7})`
+                            : `rgba(14, 165, 233, ${opacity})`,
+                          strokeWidth: 4
+                        },
+                        {
+                          data: monthlyStats.map(s => s.attendance),
+                          color: (opacity = 1) => selectedDataset === 'events'
+                            ? `rgba(139, 92, 246, ${opacity * 0.7})`
+                            : `rgba(139, 92, 246, ${opacity})`,
+                          strokeWidth: 4
                         }
-                      ]}
-                    />
+                      ]
+                    }}
+                    width={Math.max(chartWidth, 400)}
+                    height={280}
+                    chartConfig={{
+                      backgroundColor: 'transparent',
+                      backgroundGradientFrom: 'transparent',
+                      backgroundGradientTo: 'transparent',
+                      decimalPlaces: 0,
+                      color: (opacity = 1) => isDark ? `rgba(255, 255, 255, ${opacity})` : `rgba(15, 23, 42, ${opacity})`,
+                      labelColor: (opacity = 1) => isDark ? `rgba(148, 163, 184, ${opacity})` : `rgba(100, 116, 139, ${opacity})`,
+                      style: { borderRadius: 16 },
+                      propsForDots: {
+                        r: '0',
+                        strokeWidth: '0',
+                        stroke: isDark ? '#1e293b' : '#ffffff',
+                        fill: isDark ? '#1e293b' : '#ffffff'
+                      },
+                      propsForBackgroundLines: {
+                        stroke: isDark ? 'rgba(51, 65, 85, 0.5)' : 'rgba(226, 232, 240, 0.8)',
+                        strokeWidth: 1,
+                        strokeDasharray: '5, 5'
+                      },
+                      propsForLabels: {
+                        fontSize: 12,
+                        fontWeight: '600',
+                        fontFamily: 'System'
+                      },
+                      fillShadowGradientFrom: '#0ea5e9',
+                      fillShadowGradientFromOpacity: 0.9,
+                      fillShadowGradientTo: '#0ea5e9',
+                      fillShadowGradientToOpacity: 0.05,
+                      useShadowColorFromDataset: true
+                    }}
+                    bezier
+                    style={styles.chart}
+                    withInnerLines={true}
+                    withOuterLines={false}
+                    withVerticalLines={true}
+                    withHorizontalLines={true}
+                    fromZero={true}
+                    yAxisInterval={1}
+                    segments={5}
+                    formatYLabel={(value) => {
+                      const num = parseInt(value);
+                      if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+                      return value.toString();
+                    }}
+                    withShadow={true}
+                    getDotColor={(dataPoint, index) => {
+                      return isDark ? '#ffffff' : '#0ea5e9';
+                    }}
+                  />
+                </ScrollView>
+
+                <View style={styles.axisLabelContainer}>
+                  <Text style={[styles.axisLabel, { color: dynamic.textMuted }]}>Timeline (Last 6 Months)</Text>
+                </View>
+
+
+              </View>
+            )}
+          </View>
+          {/* Chart Summary - Top Stats Cards */}
+          <View style={styles.chartsGrid}>
+            <View style={[styles.summaryItem, {
+              backgroundColor: isDark ? '#0ea5e920' : '#f0f9ff',
+              borderColor: isDark ? '#0ea5e940' : '#0ea5e920'
+            }]}>
+              <View style={[styles.summaryIconContainer, { backgroundColor: isDark ? '#0ea5e930' : '#ffffff' }]}>
+                <Ionicons name="checkmark-circle" size={20} color="#0ea5e9" />
+              </View>
+              <Text style={[styles.summaryValue, { color: '#0ea5e9' }]}>{dashboardStats.totalEvents}</Text>
+              <Text style={[styles.summaryLabel, { color: dynamic.textSecondary }]}>Total Events</Text>
+            </View>
+
+            <View style={[styles.summaryItem, {
+              backgroundColor: isDark ? '#10b98120' : '#f0fdf4',
+              borderColor: isDark ? '#10b98140' : '#10b98120'
+            }]}>
+              <View style={[styles.summaryIconContainer, { backgroundColor: isDark ? '#10b98130' : '#ffffff' }]}>
+                <Ionicons name="people" size={20} color="#10b981" />
+              </View>
+              <Text style={[styles.summaryValue, { color: '#10b981', fontSize: 16 }]}>
+                {monthlyStats.length > 0 ? monthlyStats.reduce((max, stat) => stat.attendance > max.attendance ? stat : max, monthlyStats[0]).month : '-'}
+              </Text>
+              <Text style={[styles.summaryLabel, { color: dynamic.textSecondary }]}>
+                Peak Attendance ({monthlyStats.length > 0 ? Math.max(...monthlyStats.map(s => s.attendance)) : 0})
+              </Text>
+            </View>
+
+            <View style={[styles.summaryItem, {
+              backgroundColor: isDark ? '#8b5cf620' : '#faf5ff',
+              borderColor: isDark ? '#8b5cf640' : '#8b5cf620'
+            }]}>
+              <View style={[styles.summaryIconContainer, { backgroundColor: isDark ? '#8b5cf630' : '#ffffff' }]}>
+                <Ionicons name={calculateGrowth(monthlyStats, 'attendance') >= 0 ? "trending-up" : "trending-down"} size={20} color="#8b5cf6" />
+              </View>
+              <Text style={[styles.summaryValue, { color: '#8b5cf6' }]}>
+                {calculateGrowth(monthlyStats, 'attendance') > 0 ? '+' : ''}{calculateGrowth(monthlyStats, 'attendance')}%
+              </Text>
+              <Text style={[styles.summaryLabel, { color: dynamic.textSecondary }]}>Attendance Growth</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Right Column - Donut Chart (User Distribution) */}
+        <View style={[styles.chartColumn, styles.donutChartColumn]}>
+          <DonutChart
+            userRoleStats={userRoleStats}
+            totalUsers={dashboardStats.totalUsers}
+            dynamic={dynamic}
+            colors={colors}
+            isDark={isDark}
+            styles={styles}
+          />
+        </View>
+      </View>
+
+
+      {/* Two Column Layout - Monthly Activity (Left) + Stats Grid (Right) */}
+      <View style={styles.twoColumnLayout}>
+
+        <View style={[styles.column, styles.monthlyActivityColumn]}>
+          <View style={[styles.customBarChartContainer, {
+            backgroundColor: dynamic.cardBg,
+            borderColor: dynamic.borderColor,
+            height: '100%',
+          }]}>
+            {/* Header */}
+            <View style={styles.customBarChartHeader}>
+              <View style={styles.customBarChartHeaderLeft}>
+                <Ionicons name="bar-chart" size={18} color={colors.accent.primary} />
+                <Text style={[styles.customBarChartTitle, { color: dynamic.textPrimary }]}>
+                  Monthly Activity
+                </Text>
+              </View>
+              <Text style={[styles.customBarChartTotalBadge, {
+                backgroundColor: isDark ? colors.accent.primary + '30' : colors.accent.primary + '15',
+                color: colors.accent.primary
+              }]}>
+                {yearlyStats.reduce((sum, s) => sum + s.events, 0)} events
+              </Text>
+            </View>
+
+            {/* Legend */}
+            <View style={styles.customBarChartLegend}>
+              <View style={styles.customLegendItem}>
+                <View style={[styles.customLegendDot, { backgroundColor: '#0ea5e9' }]} />
+                <Text style={[styles.customLegendText, { color: dynamic.textSecondary }]}>
+                  Events ({yearlyStats.reduce((sum, s) => sum + s.events, 0)})
+                </Text>
+              </View>
+              <View style={styles.customLegendItem}>
+                <View style={[styles.customLegendDot, { backgroundColor: '#a855f7' }]} />
+                <Text style={[styles.customLegendText, { color: dynamic.textSecondary }]}>
+                  Attendance ({yearlyStats.reduce((sum, s) => sum + s.attendance, 0)})
+                </Text>
+              </View>
+            </View>
+
+            {/* Chart Area - 12 Months */}
+            {yearlyStats.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.yearlyBarChartScrollContent}
+              >
+                <View style={styles.yearlyBarsContainer}>
+                  {yearlyStats.map((stat, index) => {
+                    const maxValue = Math.max(
+                      ...yearlyStats.flatMap(s => [s.events, s.attendance])
+                    ) || 1;
+                    const maxBarHeight = 140;
+                    const eventsHeight = (stat.events / maxValue) * maxBarHeight;
+                    const attendanceHeight = (stat.attendance / maxValue) * maxBarHeight;
+
+                    return (
+                      <View key={index} style={styles.yearlyMonthColumn}>
+                        {/* Month Label - Show full month name for yearly view */}
+                        <Text style={[styles.yearlyMonthLabel, { color: dynamic.textSecondary }]}>
+                          {stat.month}
+                        </Text>
+
+                        {/* Bars */}
+                        <View style={styles.yearlyBarsWrapper}>
+                          <View style={styles.yearlyBarPair}>
+                            {/* Events Bar */}
+                            <View style={styles.yearlyBarItem}>
+                              <View
+                                style={[
+                                  styles.yearlyBar,
+                                  {
+                                    backgroundColor: '#0ea5e9',
+                                    height: Math.max(eventsHeight, 4),
+                                  },
+                                ]}
+                              >
+                                {stat.events > 0 && (
+                                  <Text style={styles.yearlyBarValue}>{stat.events}</Text>
+                                )}
+                              </View>
+                            </View>
+
+                            {/* Attendance Bar */}
+                            <View style={styles.yearlyBarItem}>
+                              <View
+                                style={[
+                                  styles.yearlyBar,
+                                  {
+                                    backgroundColor: '#a855f7',
+                                    height: Math.max(attendanceHeight, 4),
+                                  },
+                                ]}
+                              >
+                                {stat.attendance > 0 && (
+                                  <Text style={styles.yearlyBarValue}>{stat.attendance}</Text>
+                                )}
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            )}
+
+            {/* Footer */}
+            <View style={[styles.customBarChartFooter, { borderTopColor: dynamic.borderColor }]}>
+              <Text style={[styles.customBarChartFooterText, { color: dynamic.textSecondary }]}>
+                Last 12 months overview
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Right Side - Stats Grid (2x2) - Same Content, New Style */}
+        <View style={[styles.column, styles.statsColumn]}>
+          <View style={[styles.statsGridContainer, {
+            backgroundColor: dynamic.cardBg,
+            height: '100%',
+          }]}>
+            <View style={styles.statsGridEnhanced}>
+              {/* Total Users - Same Content, Centered Style */}
+              <TouchableOpacity
+                style={[styles.statCardEnhanced, {
+                  backgroundColor: isDark ? 'rgba(14, 165, 233, 0.15)' : '#f0f9ff',
+                  borderColor: isDark ? 'rgba(14, 165, 233, 0.3)' : 'rgba(14, 165, 233, 0.2)',
+                  borderWidth: 1,
+                }]}
+                onPress={() => navigateTo('users')}
+                activeOpacity={0.9}
+              >
+                <View style={[styles.statCardHeaderEnhanced, { justifyContent: 'center' }]}>
+                  <View style={[styles.statIconEnhanced, {
+                    backgroundColor: isDark ? 'rgba(14, 165, 233, 0.25)' : '#ffffff',
+                    shadowColor: '#0ea5e9',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }]}>
+                    <FontAwesome6 name="users" size={22} color="#0ea5e9" />
+                  </View>
+                  {dashboardStats.userGrowth !== 0 && (
+                    <View style={[styles.trendBadgeEnhanced, {
+                      backgroundColor: dashboardStats.userGrowth >= 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                    }]}>
+                      <Feather
+                        name={dashboardStats.userGrowth >= 0 ? 'trending-up' : 'trending-down'}
+                        size={12}
+                        color={dashboardStats.userGrowth >= 0 ? '#10b981' : '#ef4444'}
+                      />
+                      <Text style={[styles.trendTextEnhanced, { color: dashboardStats.userGrowth >= 0 ? '#10b981' : '#ef4444' }]}>
+                        {Math.abs(dashboardStats.userGrowth).toFixed(1)}%
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.statNumberEnhanced, { color: '#0ea5e9', textAlign: 'center' }]}>{dashboardStats.totalUsers}</Text>
+                <Text style={[styles.statLabelEnhanced, { color: dynamic.textSecondary, textAlign: 'center' }]}>Total Users</Text>
+                <Text style={[styles.statSubtextEnhanced, { color: dynamic.textMuted, textAlign: 'center' }]}>
+                  {dashboardStats.activeUsers} currently active
+                </Text>
+              </TouchableOpacity>
+
+              {/* Total Events - Same Content, Centered Style */}
+              <TouchableOpacity
+                style={[styles.statCardEnhanced, {
+                  backgroundColor: isDark ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb',
+                  borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.2)',
+                  borderWidth: 1,
+                }]}
+                onPress={() => navigateTo('events')}
+                activeOpacity={0.9}
+              >
+                <View style={[styles.statCardHeaderEnhanced, { justifyContent: 'center' }]}>
+                  <View style={[styles.statIconEnhanced, {
+                    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.25)' : '#ffffff',
+                    shadowColor: '#f59e0b',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }]}>
+                    <Ionicons name="calendar" size={22} color="#f59e0b" />
                   </View>
                 </View>
-
-                <View style={styles.roleValueContainer}>
-                  <Text style={[styles.roleValue, { color: role.color }]}>{role.count}</Text>
-                  <Text style={styles.rolePercentage}>{role.percentage}%</Text>
+                <Text style={[styles.statNumberEnhanced, { color: '#f59e0b', textAlign: 'center' }]}>{dashboardStats.totalEvents}</Text>
+                <Text style={[styles.statLabelEnhanced, { color: dynamic.textSecondary, textAlign: 'center' }]}>Total Events</Text>
+                <View style={[styles.statStatsRow, { justifyContent: 'center' }]}>
+                  <Text style={[styles.statSubtextEnhanced, { color: '#10b981' }]}>
+                    {dashboardStats.upcomingEvents} upcoming
+                  </Text>
+                  <Text style={styles.statSubtextEnhanced}>•</Text>
+                  <Text style={styles.statSubtextEnhanced}>
+                    {dashboardStats.totalEvents - dashboardStats.upcomingEvents} past
+                  </Text>
                 </View>
-              </View>
-            ))}
+              </TouchableOpacity>
+
+              {/* Announcements - Same Content, Centered Style */}
+              <TouchableOpacity
+                style={[styles.statCardEnhanced, {
+                  backgroundColor: isDark ? 'rgba(139, 92, 246, 0.15)' : '#faf5ff',
+                  borderColor: isDark ? 'rgba(139, 92, 246, 0.3)' : 'rgba(139, 92, 246, 0.2)',
+                  borderWidth: 1,
+                }]}
+                onPress={() => navigateTo('announcements')}
+                activeOpacity={0.9}
+              >
+                <View style={[styles.statCardHeaderEnhanced, { justifyContent: 'center' }]}>
+                  <View style={[styles.statIconEnhanced, {
+                    backgroundColor: isDark ? 'rgba(139, 92, 246, 0.25)' : '#ffffff',
+                    shadowColor: '#8b5cf6',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }]}>
+                    <FontAwesome6 name="bullhorn" size={22} color="#8b5cf6" />
+                  </View>
+                </View>
+                <Text style={[styles.statNumberEnhanced, { color: '#8b5cf6', textAlign: 'center' }]}>{dashboardStats.totalAnnouncements}</Text>
+                <Text style={[styles.statLabelEnhanced, { color: dynamic.textSecondary, textAlign: 'center' }]}>Announcements</Text>
+                <View style={[styles.statStatsRow, { justifyContent: 'center' }]}>
+                  <Text style={[styles.statSubtextEnhanced, { color: '#f59e0b' }]}>
+                    {dashboardStats.pendingAnnouncements} pending
+                  </Text>
+                  <Text style={styles.statSubtextEnhanced}>•</Text>
+                  <Text style={[styles.statSubtextEnhanced, { color: '#10b981' }]}>
+                    {dashboardStats.approvedAnnouncements} approved
+                  </Text>
+                  <Text style={styles.statSubtextEnhanced}>•</Text>
+                  <Text style={[styles.statSubtextEnhanced, { color: '#ef4444' }]}>
+                    {dashboardStats.rejectedAnnouncements} rejected
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Need Approval - Same Content, Centered Style */}
+              <TouchableOpacity
+                style={[styles.statCardEnhanced, {
+                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2',
+                  borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(239, 68, 68, 0.2)',
+                  borderWidth: 1,
+                }]}
+                onPress={() => setNotificationModalVisible(true)}
+                activeOpacity={0.9}
+              >
+                <View style={[styles.statCardHeaderEnhanced, { justifyContent: 'center' }]}>
+                  <View style={[styles.statIconEnhanced, {
+                    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.25)' : '#ffffff',
+                    shadowColor: '#ef4444',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }]}>
+                    <Ionicons name="time" size={22} color="#ef4444" />
+                  </View>
+                  {pendingApprovals.length > 0 && (
+                    <View style={[styles.approvalBadgeEnhanced, {
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                    }]}>
+                      <Text style={styles.approvalBadgeText}>
+                        {pendingApprovals.length > 9 ? '9+' : pendingApprovals.length}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.statNumberEnhanced, { color: '#ef4444', textAlign: 'center' }]}>{pendingApprovals.length}</Text>
+                <Text style={[styles.statLabelEnhanced, { color: dynamic.textSecondary, textAlign: 'center' }]}>Need Approval</Text>
+                <Text style={[styles.statSubtextEnhanced, { color: dynamic.textMuted, textAlign: 'center' }]}>
+                  {pendingApprovals.filter(p => p.type === 'event').length} events •{' '}
+                  {pendingApprovals.filter(p => p.type === 'announcement').length} updates
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
-
-      
-        <View style={styles.roleTotalContainer}>
-          <Text style={styles.roleTotalLabel}>Total Users</Text>
-          <Text style={styles.roleTotalValue}>{dashboardStats.totalUsers}</Text>
         </View>
       </View>
 
-      {/* Quick Actions - Now below charts */}
-      <View style={styles.quickActionsSection}>
-        <Text style={styles.quickActionsTitle}>Quick Actions</Text>
-        <View style={styles.quickActionsGrid}>
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('events')}>
-            <LinearGradient
-              colors={['#0ea5e9', '#0284c7']}
-              style={styles.quickActionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="add-circle" size={24} color="#ffffff" />
-              <Text style={styles.quickActionText}>Create Event</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('announcements')}>
-            <LinearGradient
-              colors={['#f59e0b', '#d97706']}
-              style={styles.quickActionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <FontAwesome6 name="bullhorn" size={24} color="#ffffff" />
-              <Text style={styles.quickActionText}>Make Announcement</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('attendance')}>
-            <LinearGradient
-              colors={['#10b981', '#059669']}
-              style={styles.quickActionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="scan" size={24} color="#ffffff" />
-              <Text style={styles.quickActionText}>Scan QR</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickActionCard} onPress={() => navigateTo('users')}>
-            <LinearGradient
-              colors={['#8b5cf6', '#7c3aed']}
-              style={styles.quickActionGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <FontAwesome6 name="user-plus" size={24} color="#ffffff" />
-              <Text style={styles.quickActionText}>Add User</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </View>
-      {/* Two Column Layout */}
+      {/* Two Column Layout - Recent Activity + Upcoming Events/Announcements */}
       <View style={styles.twoColumnLayout}>
         <View style={[styles.column, styles.activityColumn]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            {activitiesLoading && <ActivityIndicator size="small" color="#0ea5e9" />}
+            <Text style={[styles.sectionTitle, { color: dynamic.textPrimary }]}>Recent Activity</Text>
+            {activitiesLoading && <ActivityIndicator size="small" color={colors.accent.primary} />}
           </View>
 
-          <View style={styles.activityList}>
+          <View style={[styles.activityList, {
+            backgroundColor: dynamic.cardBg,
+            borderColor: dynamic.borderColor,
+            shadowColor: isDark ? '#000' : '#000',
+            shadowOpacity: isDark ? 0.3 : 0.05,
+          }]}>
             {displayedActivities.length > 0 ? (
               <>
                 {displayedActivities.map((activity, index) => (
                   <View key={activity.id} style={[
                     styles.activityItem,
+                    { borderBottomColor: dynamic.borderColor },
                     index === displayedActivities.length - 1 && styles.lastActivityItem
                   ]}>
-                    <View style={[styles.activityIcon, { backgroundColor: `${activity.color}15` }]}>
+                    <View style={[styles.activityIcon, { backgroundColor: `${activity.color}${isDark ? '30' : '15'}` }]}>
                       {getActivityIcon(activity)}
                     </View>
                     <View style={styles.activityContent}>
                       <View style={styles.activityHeader}>
-                        <Text style={styles.activityTitle}>{activity.title}</Text>
-                        <Text style={styles.activityTime}>{formatTimeAgo(activity.timestamp)}</Text>
+                        <Text style={[styles.activityTitle, { color: dynamic.textPrimary }]}>{activity.title}</Text>
+                        <Text style={[styles.activityTime, { color: dynamic.textMuted }]}>{formatTimeAgo(activity.timestamp)}</Text>
                       </View>
-                      <Text style={styles.activityDescription}>{activity.description}</Text>
+                      <Text style={[styles.activityDescription, { color: dynamic.textSecondary }]}>{activity.description}</Text>
                     </View>
                   </View>
                 ))}
-
                 {renderPagination()}
               </>
             ) : (
               <View style={styles.emptyActivity}>
-                <Feather name="activity" size={32} color="#cbd5e1" />
-                <Text style={styles.emptyActivityText}>No recent activity</Text>
+                <Feather name="activity" size={32} color={dynamic.textMuted} />
+                <Text style={[styles.emptyActivityText, { color: dynamic.textMuted }]}>No recent activity</Text>
               </View>
             )}
           </View>
@@ -1514,50 +2075,55 @@ export default function MainAdminDashboard() {
 
         {/* Upcoming Events & Announcements */}
         <View style={[styles.column, styles.upcomingColumn]}>
-          <View style={styles.upcomingCard}>
+          <View style={[styles.upcomingCard, {
+            backgroundColor: dynamic.cardBg,
+            borderColor: dynamic.borderColor,
+            shadowColor: isDark ? '#000' : '#000',
+            shadowOpacity: isDark ? 0.3 : 0.05,
+          }]}>
             <View style={styles.upcomingHeader}>
-              <Text style={styles.upcomingTitle}>Upcoming Events</Text>
+              <Text style={[styles.upcomingTitle, { color: dynamic.textPrimary }]}>Upcoming Events</Text>
               <TouchableOpacity onPress={() => navigateTo('events')}>
-                <Text style={styles.viewAllText}>View all</Text>
+                <Text style={[styles.viewAllText, { color: colors.accent.primary }]}>View all</Text>
               </TouchableOpacity>
             </View>
 
             {eventsLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#0ea5e9" />
-                <Text style={styles.loadingText}>Loading events...</Text>
+                <ActivityIndicator size="small" color={colors.accent.primary} />
+                <Text style={[styles.loadingText, { color: dynamic.textSecondary }]}>Loading events...</Text>
               </View>
             ) : upcomingEvents.length > 0 ? (
               <View style={styles.upcomingList}>
                 {upcomingEvents.map((event) => {
                   const eventDate = event.date;
                   const day = eventDate.getDate().toString().padStart(2, '0');
-                  const month = eventDate.toLocaleString('default', { month: 'short' }).toUpperCase();
+                  const month = eventDate.toLocaleString('default', { month: 'long' }).toUpperCase();
                   const timeString = event.time || eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
                   return (
-                    <TouchableOpacity
-                      key={event.id}
-                      style={styles.upcomingItem}
-                      onPress={() => navigateTo('events', event.id)}
-                    >
-                      <View style={styles.eventDate}>
-                        <Text style={styles.eventDay}>{day}</Text>
-                        <Text style={styles.eventMonth}>{month}</Text>
+                    <TouchableOpacity key={event.id} style={styles.upcomingItem} onPress={() => navigateTo('events', event.id)}>
+                      <View style={[styles.eventDate, {
+                        backgroundColor: isDark ? '#334155' : '#f8fafc',
+                        borderColor: isDark ? '#475569' : '#e2e8f0'
+                      }]}>
+                        <Text style={[styles.eventDay, { color: dynamic.textPrimary }]}>{day}</Text>
+                        <Text style={[styles.eventMonth, { color: dynamic.textSecondary }]}>{month}</Text>
                       </View>
                       <View style={styles.eventInfo}>
-                        <Text style={styles.eventName} numberOfLines={1}>{event.title}</Text>
-                        <Text style={styles.eventTime} numberOfLines={1}>
+                        <Text style={[styles.eventName, { color: dynamic.textPrimary }]} numberOfLines={1}>{event.title}</Text>
+                        <Text style={[styles.eventTime, { color: dynamic.textSecondary }]} numberOfLines={1}>
                           {timeString} • {event.location || 'TBA'}
                         </Text>
                         {event.attendees && (
-                          <Text style={styles.eventAttendees}>
-                            {event.attendees.length} attending
-                          </Text>
+                          <Text style={[styles.eventAttendees, { color: '#10b981' }]}>{event.attendees.length} attending</Text>
                         )}
                       </View>
-                      <TouchableOpacity style={styles.eventAction}>
-                        <Feather name="chevron-right" size={20} color="#94a3b8" />
+                      <TouchableOpacity style={[styles.eventAction, {
+                        backgroundColor: isDark ? '#334155' : '#f8fafc',
+                        borderColor: isDark ? '#475569' : '#e2e8f0'
+                      }]}>
+                        <Feather name="chevron-right" size={20} color={dynamic.textMuted} />
                       </TouchableOpacity>
                     </TouchableOpacity>
                   );
@@ -1565,60 +2131,48 @@ export default function MainAdminDashboard() {
               </View>
             ) : (
               <View style={styles.emptyContainer}>
-                <Feather name="calendar" size={32} color="#cbd5e1" />
-                <Text style={styles.emptyText}>No upcoming events</Text>
-                <TouchableOpacity
-                  style={styles.createButton}
-                  onPress={() => navigateTo('events')}
-                >
+                <Feather name="calendar" size={32} color={dynamic.textMuted} />
+                <Text style={[styles.emptyText, { color: dynamic.textMuted }]}>No upcoming events</Text>
+                <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.accent.primary }]} onPress={() => navigateTo('events')}>
                   <Text style={styles.createButtonText}>Create Event</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
 
-          {/* Recent Announcements with Real Data */}
-          <View style={styles.announcementCard}>
+          {/* Recent Announcements */}
+          <View style={[styles.announcementCard, {
+            backgroundColor: dynamic.cardBg,
+            borderColor: dynamic.borderColor,
+            shadowColor: isDark ? '#000' : '#000',
+            shadowOpacity: isDark ? 0.3 : 0.05,
+          }]}>
             <View style={styles.announcementHeader}>
-              <Text style={styles.announcementTitle}>Recent Announcements</Text>
+              <Text style={[styles.announcementTitle, { color: dynamic.textPrimary }]}>Recent Announcements</Text>
               <TouchableOpacity onPress={() => navigateTo('announcements')}>
-                <Text style={styles.viewAllText}>View all</Text>
+                <Text style={[styles.viewAllText, { color: colors.accent.primary }]}>View all</Text>
               </TouchableOpacity>
             </View>
 
             {announcementsLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#0ea5e9" />
-                <Text style={styles.loadingText}>Loading announcements...</Text>
+                <ActivityIndicator size="small" color={colors.accent.primary} />
+                <Text style={[styles.loadingText, { color: dynamic.textSecondary }]}>Loading announcements...</Text>
               </View>
             ) : recentAnnouncements.length > 0 ? (
               <View style={styles.announcementList}>
                 {recentAnnouncements.map((announcement) => {
                   const timeAgo = formatTimeAgo(announcement.createdAt);
-                  const priorityColor =
-                    announcement.priority === 'high' ? '#ef4444' :
-                      announcement.priority === 'medium' ? '#f59e0b' : '#10b981';
+                  const priorityColor = announcement.priority === 'high' ? '#ef4444' : announcement.priority === 'medium' ? '#f59e0b' : '#10b981';
 
                   return (
-                    <TouchableOpacity
-                      key={announcement.id}
-                      style={styles.announcementItem}
-                      onPress={() => navigateTo('announcements', announcement.id)}
-                    >
-                      <View style={[styles.announcementBadge, { backgroundColor: `${priorityColor}20` }]}>
-                        <FontAwesome6
-                          name="bullhorn"
-                          size={12}
-                          color={priorityColor}
-                        />
+                    <TouchableOpacity key={announcement.id} style={[styles.announcementItem, { borderBottomColor: dynamic.borderColor }]} onPress={() => navigateTo('announcements', announcement.id)}>
+                      <View style={[styles.announcementBadge, { backgroundColor: `${priorityColor}${isDark ? '30' : '20'}` }]}>
+                        <FontAwesome6 name="bullhorn" size={12} color={priorityColor} />
                       </View>
                       <View style={styles.announcementContent}>
-                        <Text style={styles.announcementText} numberOfLines={1}>
-                          {announcement.title}
-                        </Text>
-                        <Text style={styles.announcementTime}>
-                          {timeAgo} • {announcement.author}
-                        </Text>
+                        <Text style={[styles.announcementText, { color: dynamic.textPrimary }]} numberOfLines={1}>{announcement.title}</Text>
+                        <Text style={[styles.announcementTime, { color: dynamic.textMuted }]}>{timeAgo} • {announcement.author}</Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -1626,12 +2180,9 @@ export default function MainAdminDashboard() {
               </View>
             ) : (
               <View style={styles.emptyContainer}>
-                <Feather name="bell" size={32} color="#cbd5e1" />
-                <Text style={styles.emptyText}>No announcements yet</Text>
-                <TouchableOpacity
-                  style={styles.createButton}
-                  onPress={() => navigateTo('announcements')}
-                >
+                <Feather name="bell" size={32} color={dynamic.textMuted} />
+                <Text style={[styles.emptyText, { color: dynamic.textMuted }]}>No announcements yet</Text>
+                <TouchableOpacity style={[styles.createButton, { backgroundColor: colors.accent.primary }]} onPress={() => navigateTo('announcements')}>
                   <Text style={styles.createButtonText}>Create Announcement</Text>
                 </TouchableOpacity>
               </View>
@@ -1661,10 +2212,11 @@ export default function MainAdminDashboard() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.contentArea}>
         {renderContent()}
       </View>
     </View>
   );
 }
+

@@ -4,7 +4,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, Timestamp, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -25,8 +25,9 @@ import {
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { CAMPUS_LOCATIONS, CampusLocation } from '../../constants/campusLocations';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { db } from '../../lib/firebaseConfig';
-import { eventsStyles as styles } from '../../styles/main-admin/eventsStyles';
+import { createEventsStyles } from '../../styles/main-admin/eventsStyles';
 
 const showAlert = (title: string, message?: string) => {
   if (Platform.OS === 'web') {
@@ -35,6 +36,40 @@ const showAlert = (title: string, message?: string) => {
     Alert.alert(title, message);
   }
 };
+
+const FormTextInput = ({
+  style,
+  value,
+  onChangeText,
+  placeholder,
+  multiline,
+  numberOfLines,
+  keyboardType,
+  inputStyle,
+  ...props
+}: {
+  style?: any;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+  multiline?: boolean;
+  numberOfLines?: number;
+  keyboardType?: any;
+  inputStyle?: any;
+  [key: string]: any;
+}) => (
+  <RNTextInput
+    style={[inputStyle, style]}
+    value={value}
+    onChangeText={onChangeText}
+    placeholder={placeholder}
+    placeholderTextColor="#94a3b8"
+    multiline={multiline}
+    numberOfLines={numberOfLines}
+    keyboardType={keyboardType}
+    {...props}
+  />
+);
 
 interface Event {
   id: string;
@@ -75,37 +110,6 @@ interface NewEventState {
   };
 }
 
-const TextInput = ({
-  style,
-  value,
-  onChangeText,
-  placeholder,
-  multiline,
-  numberOfLines,
-  keyboardType,
-  ...props
-}: {
-  style?: any;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder?: string;
-  multiline?: boolean;
-  numberOfLines?: number;
-  keyboardType?: any;
-  [key: string]: any;
-}) => (
-  <RNTextInput
-    style={[styles.modernFormInput, style]}
-    value={value}
-    onChangeText={onChangeText}
-    placeholder={placeholder}
-    placeholderTextColor="#94a3b8"
-    multiline={multiline}
-    numberOfLines={numberOfLines}
-    keyboardType={keyboardType}
-    {...props}
-  />
-);
 
 export default function MainAdminEvents() {
   const { user, userData } = useAuth();
@@ -133,7 +137,7 @@ export default function MainAdminEvents() {
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [selectedLocationImage, setSelectedLocationImage] = useState<any>(null);
   const [selectedCampusLocation, setSelectedCampusLocation] = useState<CampusLocation | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'upcoming' | 'past'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'upcoming' | 'past' | 'today'>('all');
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -148,6 +152,44 @@ export default function MainAdminEvents() {
   const [selectedEventUserLocation, setSelectedEventUserLocation] = useState<{ latitude: number, longitude: number } | null>(null);
   const [selectedEventIsWithinRange, setIsSelectedEventWithinRange] = useState<boolean | null>(null);
   const [checkingSelectedEventLocation, setCheckingSelectedEventLocation] = useState(false);
+  const { colors, isDark } = useTheme();
+
+  const styles = useMemo(
+    () => createEventsStyles(colors, isDark, isMobile, isTablet, isDesktop),
+    [colors, isDark, isMobile, isTablet, isDesktop]
+  );
+
+  const TextInput = ({
+    style,
+    value,
+    onChangeText,
+    placeholder,
+    multiline,
+    numberOfLines,
+    keyboardType,
+    ...props
+  }: {
+    style?: any;
+    value: string;
+    onChangeText: (text: string) => void;
+    placeholder?: string;
+    multiline?: boolean;
+    numberOfLines?: number;
+    keyboardType?: any;
+    [key: string]: any;
+  }) => (
+    <RNTextInput
+      style={[styles.modernFormInput, style]}
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor="#94a3b8"
+      multiline={multiline}
+      numberOfLines={numberOfLines}
+      keyboardType={keyboardType}
+      {...props}
+    />
+  );
 
   const [eventCoordinates, setEventCoordinates] = useState<CoordinatesState>({
     latitude: '',
@@ -234,13 +276,18 @@ export default function MainAdminEvents() {
     }
   }, [searchQuery, events]);
 
-  const filterEventsByTime = (eventsList: Event[], filter: 'all' | 'upcoming' | 'past') => {
+  const filterEventsByTime = (eventsList: Event[], filter: 'all' | 'upcoming' | 'past' | 'today') => {
     const now = new Date();
     switch (filter) {
       case 'upcoming':
         return eventsList.filter(event => event.date > now);
       case 'past':
         return eventsList.filter(event => event.date <= now);
+      case 'today':
+        return eventsList.filter(event => {
+          const eventDate = new Date(event.date);
+          return eventDate.toDateString() === now.toDateString();
+        });
       default:
         return eventsList;
     }
@@ -254,12 +301,12 @@ export default function MainAdminEvents() {
     }
   };
 
-  const filterEvents = (eventsList: Event[], filter: 'all' | 'upcoming' | 'past') => {
+  const filterEvents = (eventsList: Event[], filter: 'all' | 'upcoming' | 'past' | 'today') => {
     const filtered = filterEventsByTime(eventsList, filter);
     setFilteredEvents(filtered);
   };
 
-  const handleFilterChange = (filter: 'all' | 'upcoming' | 'past') => {
+  const handleFilterChange = (filter: 'all' | 'upcoming' | 'past' | 'today') => {
     setActiveFilter(filter);
     setCurrentPage(1);
     setSelectedEvent(null);
@@ -684,6 +731,9 @@ export default function MainAdminEvents() {
       setLoading(false);
     }
   };
+  const headerGradientColors = isDark
+    ? ['#0f172a', '#1e293b'] as const
+    : ['#1e40af', '#3b82f6'] as const;
 
   const handleEditEvent = (event: Event) => {
     try {
@@ -729,44 +779,45 @@ export default function MainAdminEvents() {
   };
 
   const handleDeleteEvent = async (eventId: string, eventTitle: string) => {
-    if (Platform.OS === 'web') {
-      const isConfirmed = window.confirm(`Are you sure you want to delete "${eventTitle}"?`);
-
-      if (isConfirmed) {
-        try {
-          const eventRef = doc(db, 'events', eventId);
-          await deleteDoc(eventRef);
-          showAlert('Success', `"${eventTitle}" deleted successfully!`);
-        } catch (error: unknown) {
-          console.error('Error deleting event:', error);
-          showAlert('Error', 'Failed to delete event. Please check console for details.');
-        }
+    const confirmDelete = () => {
+      if (Platform.OS === 'web') {
+        return window.confirm(`Are you sure you want to delete "${eventTitle}"?`);
+      } else {
+        // We'll handle via Alert, so return a promise
+        return new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'Delete Event',
+            `Are you sure you want to delete "${eventTitle}"? This will also delete all associated penalties.`,
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Delete', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        });
       }
-    } else {
-      Alert.alert(
-        'Delete Event',
-        `Are you sure you want to delete "${eventTitle}"?`,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                const eventRef = doc(db, 'events', eventId);
-                await deleteDoc(eventRef);
-                showAlert('Success', `"${eventTitle}" deleted successfully!`);
-              } catch (error: unknown) {
-                console.error('Error deleting event:', error);
-                showAlert('Error', 'Failed to delete event');
-              }
-            },
-          },
-        ]
+    };
+
+    const confirmed = Platform.OS === 'web' ? confirmDelete() : await confirmDelete();
+    if (!confirmed) return;
+
+    try {
+      // Delete the event document
+      const eventRef = doc(db, 'events', eventId);
+      await deleteDoc(eventRef);
+
+      // Delete all penalties that reference this event
+      const penaltiesQuery = query(
+        collection(db, 'penalties'),
+        where('eventId', '==', eventId)
       );
+      const penaltiesSnapshot = await getDocs(penaltiesQuery);
+      const deletePromises = penaltiesSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+
+      showAlert('Success', `"${eventTitle}" and its associated penalties deleted successfully!`);
+    } catch (error: unknown) {
+      console.error('Error deleting event:', error);
+      showAlert('Error', 'Failed to delete event. Please check console for details.');
     }
   };
 
@@ -863,36 +914,28 @@ export default function MainAdminEvents() {
     return CAMPUS_LOCATIONS[0].image;
   };
 
-  const getDaysUntilEvent = (eventDate: Date) => {
-    const today = new Date();
-    const timeDiff = eventDate.getTime() - today.getTime();
-    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+  const getEventStatusBadge = (eventDate: Date) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const eventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
 
-    if (daysDiff === 0) return { text: 'TODAY', type: 'today' };
-    if (daysDiff === 1) return { text: 'TOMORROW', type: 'tomorrow' };
-    if (daysDiff > 1) return { text: `IN ${daysDiff} DAYS`, type: 'upcoming' };
-    if (daysDiff === -1) return { text: 'YESTERDAY', type: 'past' };
-    return { text: 'PAST EVENT', type: 'past' };
+    const diffTime = eventDay.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return { text: 'TODAY', type: 'today', color: '#16a34a' };
+    if (diffDays === 1) return { text: 'TOMORROW', type: 'tomorrow', color: '#2563eb' };
+    if (diffDays > 1) return { text: 'UPCOMING', type: 'upcoming', color: '#8b5cf6' };
+    return { text: 'PAST', type: 'past', color: '#64748b' };
   };
 
-  const getEventBadgeStyle = (type: string) => {
-    switch (type) {
-      case 'today': return [styles.paginatedBadge, { backgroundColor: '#16a34a' }];
-      case 'tomorrow': return [styles.paginatedBadge, { backgroundColor: '#2563eb' }];
-      case 'upcoming': return [styles.paginatedBadge, { backgroundColor: '#d97706' }];
-      case 'past': return [styles.paginatedBadge, { backgroundColor: '#64748b' }];
-      default: return [styles.paginatedBadge, { backgroundColor: '#64748b' }];
-    }
+  const getEventBadgeStyle = (eventDate: Date) => {
+    const badge = getEventStatusBadge(eventDate);
+    return [styles.paginatedBadge, { backgroundColor: badge.color }];
   };
 
   const getPriorityColor = (eventDate: Date) => {
-    const daysUntil = getDaysUntilEvent(eventDate);
-    switch (daysUntil.type) {
-      case 'today': return '#16a34a';
-      case 'tomorrow': return '#2563eb';
-      case 'upcoming': return '#d97706';
-      default: return '#64748b';
-    }
+    const badge = getEventStatusBadge(eventDate);
+    return badge.color;
   };
 
   const stats = useMemo(() => {
@@ -904,8 +947,7 @@ export default function MainAdminEvents() {
 
   const renderPaginatedItem = ({ item, index }: { item: Event; index: number }) => {
     const isActive = selectedEvent === item.id;
-    const priorityColor = getPriorityColor(item.date);
-    const daysUntil = getDaysUntilEvent(item.date);
+    const priorityColor = getPriorityColor(item.date); // ensure this works (see below)
 
     return (
       <TouchableOpacity
@@ -921,34 +963,50 @@ export default function MainAdminEvents() {
             {(currentPage - 1) * itemsPerPage + index + 1}
           </Text>
         </View>
+
         <View style={styles.paginatedInfo}>
-          <Text style={[styles.paginatedTitle, isMobile && styles.paginatedTitleMobile]} numberOfLines={1}>
-            {item.title}
-          </Text>
+          {/* Title + Badges row */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text style={[styles.paginatedTitle, isMobile && styles.paginatedTitleMobile]} numberOfLines={1}>
+              {item.title}
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              {/* Status badge */}
+              {item.status && (
+                <View style={[styles.paginatedBadge, getStatusBadgeStyle(item.status)]}>
+                  <Text style={styles.paginatedBadgeText}>{item.status.toUpperCase()}</Text>
+                </View>
+              )}
+
+              {/* Event date badge */}
+              {(() => {
+                const badge = getEventStatusBadge(item.date);
+                return (
+                  <View style={[styles.paginatedBadge, { backgroundColor: badge.color }]}>
+                    <Text style={styles.paginatedBadgeText}>{badge.text}</Text>
+                  </View>
+                );
+              })()}
+            </View>
+          </View>
+
+          {/* Date and location (unchanged) */}
           <View style={styles.paginatedMeta}>
             <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
               {formatShortDate(item.date)}
             </Text>
-            {item.status && (
-              <View style={[styles.paginatedBadge, getStatusBadgeStyle(item.status)]}>
-                <Text style={styles.paginatedBadgeText}>{item.status.toUpperCase()}</Text>
-              </View>
-            )}
-            {daysUntil.type === 'today' && (
-              <View style={[styles.paginatedBadge, { backgroundColor: '#16a34a' }]}>
-                <Text style={styles.paginatedBadgeText}>TODAY</Text>
-              </View>
-            )}
-            {daysUntil.type === 'tomorrow' && (
-              <View style={[styles.paginatedBadge, { backgroundColor: '#2563eb' }]}>
-                <Text style={styles.paginatedBadgeText}>TOMORROW</Text>
-              </View>
-            )}
           </View>
-          <Text style={styles.paginatedLocation} numberOfLines={1}>
-            <Feather name="map-pin" size={8} color="#0ea5e9" /> {item.location}
-          </Text>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Feather name="map-pin" size={8} color="#0ea5e9" />
+            <Text style={[styles.paginatedLocation, { marginLeft: 4 }]} numberOfLines={1}>
+              {item.location}
+            </Text>
+          </View>
         </View>
+
+        {/* Action buttons (unchanged) */}
         <View style={styles.paginatedActions}>
           <TouchableOpacity
             style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
@@ -968,7 +1026,7 @@ export default function MainAdminEvents() {
   };
 
   const renderSearchResultItem = ({ item }: { item: Event }) => {
-    const daysUntil = getDaysUntilEvent(item.date);
+    const badge = getEventStatusBadge(item.date);
 
     return (
       <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile]}>
@@ -978,26 +1036,30 @@ export default function MainAdminEvents() {
               {item.title}
             </Text>
             <View style={styles.searchResultBadges}>
+              {/* Status badge */}
               {item.status && (
                 <View style={[styles.searchResultBadge, getStatusBadgeStyle(item.status)]}>
                   <Text style={styles.searchResultBadgeText}>{item.status.toUpperCase()}</Text>
                 </View>
               )}
-              {daysUntil.type === 'today' && (
-                <View style={[styles.searchResultBadge, { backgroundColor: '#16a34a' }]}>
-                  <Text style={styles.searchResultBadgeText}>TODAY</Text>
-                </View>
-              )}
-              {daysUntil.type === 'tomorrow' && (
-                <View style={[styles.searchResultBadge, { backgroundColor: '#2563eb' }]}>
-                  <Text style={styles.searchResultBadgeText}>TOMORROW</Text>
-                </View>
-              )}
+
+              {/* Event date badge */}
+              {(() => {
+                const badge = getEventStatusBadge(item.date);
+                return (
+                  <View style={[styles.searchResultBadge, { backgroundColor: badge.color }]}>
+                    <Text style={styles.searchResultBadgeText}>{badge.text}</Text>
+                  </View>
+                );
+              })()}
             </View>
           </View>
-          <Text style={[styles.searchResultLocation, isMobile && styles.searchResultLocationMobile]}>
-            <Feather name="map-pin" size={10} color="#0ea5e9" /> {item.location}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Feather name="map-pin" size={10} color="#0ea5e9" />
+            <Text style={[styles.searchResultLocation, isMobile && styles.searchResultLocationMobile, { marginLeft: 4 }]} numberOfLines={1}>
+              {item.location}
+            </Text>
+          </View>
           <View style={styles.searchResultActions}>
             <TouchableOpacity
               style={[styles.searchResultEditButton, isMobile && styles.searchResultEditButtonMobile]}
@@ -1044,7 +1106,7 @@ export default function MainAdminEvents() {
     onCheckLocation: () => void,
     onOpenMaps: (location: string, coordinates?: { latitude: number, longitude: number }) => void
   ) => {
-    const daysUntil = getDaysUntilEvent(selected.date);
+    const badge = getEventStatusBadge(selected.date);
 
     return (
       <View>
@@ -1054,8 +1116,8 @@ export default function MainAdminEvents() {
             style={styles.modernDetailImage}
             resizeMode="cover"
           />
-          <View style={[styles.modernDetailImageBadge, getEventBadgeStyle(daysUntil.type)]}>
-            <Text style={styles.eventBadgeText}>{daysUntil.text}</Text>
+          <View style={[styles.modernDetailImageBadge, { backgroundColor: getEventStatusBadge(selected.date).color }]}>
+            <Text style={styles.eventBadgeText}>{badge.text}</Text>
           </View>
         </View>
 
@@ -1332,7 +1394,8 @@ export default function MainAdminEvents() {
 
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Title *</Text>
-                <TextInput
+                <FormTextInput
+                  inputStyle={styles.modernFormInput}
                   placeholder="Enter event title"
                   value={newEvent.title}
                   onChangeText={(text: string) => setNewEvent({ ...newEvent, title: text })}
@@ -1341,7 +1404,8 @@ export default function MainAdminEvents() {
 
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Description *</Text>
-                <TextInput
+                <FormTextInput
+                  inputStyle={styles.modernFormInput}
                   style={[styles.modernTextArea, isMobile && styles.modernFormInputMobile]}
                   placeholder="Describe your event..."
                   value={newEvent.description}
@@ -1442,7 +1506,7 @@ export default function MainAdminEvents() {
     <View style={styles.container}>
       {/* Header with Gradient */}
       <LinearGradient
-        colors={['#14203d', '#06080b']}
+        colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
@@ -1498,24 +1562,23 @@ export default function MainAdminEvents() {
 
       {/* Stats Grid */}
       <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
             <Feather name="calendar" size={isMobile ? 16 : 20} color="#0ea5e9" />
           </View>
           <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
         </View>
 
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#f59e0b15' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
             <Feather name="clock" size={isMobile ? 16 : 20} color="#f59e0b" />
           </View>
           <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.upcoming}</Text>
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Upcoming</Text>
         </View>
-
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#64748b15' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
             <Feather name="check-circle" size={isMobile ? 16 : 20} color="#64748b" />
           </View>
           <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.past}</Text>
@@ -1551,6 +1614,21 @@ export default function MainAdminEvents() {
                     activeFilter === 'all' && styles.leftFilterButtonTextActive,
                     isMobile && styles.leftFilterButtonTextMobile
                   ]}>All</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.leftFilterButton,
+                    activeFilter === 'today' && styles.leftFilterButtonActive,
+                    isMobile && styles.leftFilterButtonMobile
+                  ]}
+                  onPress={() => handleFilterChange('today')}
+                >
+                  <Text style={[
+                    styles.leftFilterButtonText,
+                    activeFilter === 'today' && styles.leftFilterButtonTextActive,
+                    isMobile && styles.leftFilterButtonTextMobile
+                  ]}>Today</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1629,7 +1707,7 @@ export default function MainAdminEvents() {
 
             <View style={[styles.searchContainer, isMobile && styles.searchContainerMobile]}>
               <Feather name="search" size={isMobile ? 14 : 16} color="#64748b" />
-              <TextInput
+              <FormTextInput
                 style={[styles.searchInput, isMobile && styles.searchInputMobile]}
                 placeholder="Type to search..."
                 value={searchQuery}
@@ -1736,17 +1814,17 @@ export default function MainAdminEvents() {
                     padding: '12px',
                     fontSize: '16px',
                     borderRadius: '12px',
-                    border: '1px solid #e2e8f0',
+                    border: `1px solid ${colors.border}`,
                     marginBottom: '12px',
-                    backgroundColor: '#f8fafc',
-                    color: '#1e293b',
+                    backgroundColor: isDark ? colors.card : '#f8fafc',
+                    color: colors.text,
                     fontFamily: 'inherit',
                     outline: 'none',
                   }}
                 />
                 <Text style={{
                   fontSize: 12,
-                  color: '#64748b',
+                  color: colors.sidebar.text.muted,
                   marginBottom: 20,
                   textAlign: 'center' as const
                 }}>
@@ -1813,7 +1891,8 @@ export default function MainAdminEvents() {
               {/* Location Name */}
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location Name</Text>
-                <TextInput
+                <FormTextInput
+                  inputStyle={styles.modernFormInput}
                   placeholder="e.g., Main Hall, Room 101"
                   value={newEvent.location}
                   onChangeText={(text) => setNewEvent(prev => ({ ...prev, location: text }))}
@@ -1823,7 +1902,8 @@ export default function MainAdminEvents() {
               {/* Location Description */}
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location Description (Optional)</Text>
-                <TextInput
+                <FormTextInput
+                  inputStyle={styles.modernFormInput}
                   placeholder="Describe the venue..."
                   value={newEvent.locationDescription}
                   onChangeText={(text) => setNewEvent(prev => ({ ...prev, locationDescription: text }))}
@@ -2008,7 +2088,8 @@ export default function MainAdminEvents() {
 
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Latitude</Text>
-                <TextInput
+                <FormTextInput
+                  inputStyle={styles.modernFormInput}
                   placeholder="e.g., 14.599512"
                   value={eventCoordinates.latitude}
                   onChangeText={(text: string) => handleCoordinateChange('latitude', text)}
@@ -2018,7 +2099,8 @@ export default function MainAdminEvents() {
 
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Longitude</Text>
-                <TextInput
+                <FormTextInput
+                  inputStyle={styles.modernFormInput}
                   placeholder="e.g., 120.984219"
                   value={eventCoordinates.longitude}
                   onChangeText={(text: string) => handleCoordinateChange('longitude', text)}
@@ -2028,7 +2110,8 @@ export default function MainAdminEvents() {
 
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Verification Radius (meters)</Text>
-                <TextInput
+                <FormTextInput
+                  inputStyle={styles.modernFormInput}
                   placeholder="e.g., 100"
                   value={eventCoordinates.radius}
                   onChangeText={(text: string) => handleCoordinateChange('radius', text)}

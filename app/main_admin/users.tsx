@@ -29,8 +29,58 @@ import {
   View
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { db } from '../../lib/firebaseConfig';
-import { usersStyles as styles } from '../../styles/main-admin/usersStyles';
+import { createUsersStyles } from '../../styles/main-admin/usersStyles';
+
+const showAlert = (title: string, message?: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(message ? `${title}\n${message}` : title);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
+// Stable TextInput component that accepts base style via inputStyle prop
+const FormTextInput = ({
+  style,
+  value,
+  onChangeText,
+  placeholder,
+  multiline,
+  numberOfLines,
+  keyboardType,
+  secureTextEntry,
+  editable = true,
+  inputStyle,
+  ...props
+}: {
+  style?: any;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+  multiline?: boolean;
+  numberOfLines?: number;
+  keyboardType?: any;
+  secureTextEntry?: boolean;
+  editable?: boolean;
+  inputStyle?: any;
+  [key: string]: any;
+}) => (
+  <RNTextInput
+    style={[inputStyle, style]}
+    value={value}
+    onChangeText={onChangeText}
+    placeholder={placeholder}
+    placeholderTextColor="#94a3b8"
+    multiline={multiline}
+    numberOfLines={numberOfLines}
+    keyboardType={keyboardType}
+    secureTextEntry={secureTextEntry}
+    editable={editable}
+    {...props}
+  />
+);
 
 interface User {
   id: string;
@@ -48,53 +98,20 @@ interface User {
   deactivatedAt?: string;
 }
 
-const TextInput = ({
-  style,
-  value,
-  onChangeText,
-  placeholder,
-  multiline,
-  numberOfLines,
-  keyboardType,
-  secureTextEntry,
-  editable = true,
-  ...props
-}: {
-  style?: any;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder?: string;
-  multiline?: boolean;
-  numberOfLines?: number;
-  keyboardType?: any;
-  secureTextEntry?: boolean;
-  editable?: boolean;
-  [key: string]: any;
-}) => (
-  <RNTextInput
-    style={[styles.modernFormInput, style]}
-    value={value}
-    onChangeText={onChangeText}
-    placeholder={placeholder}
-    placeholderTextColor="#94a3b8"
-    multiline={multiline}
-    numberOfLines={numberOfLines}
-    keyboardType={keyboardType}
-    secureTextEntry={secureTextEntry}
-    editable={editable}
-    {...props}
-  />
-);
-
 export default function UserManagement() {
   const { user, userData } = useAuth();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
 
   const isMobile = screenWidth < 640;
   const isTablet = screenWidth >= 640 && screenWidth < 1024;
   const isDesktop = screenWidth >= 1024;
-  const isSmallScreen = screenWidth < 375;
+
+  const styles = useMemo(
+    () => createUsersStyles(colors, isDark, isMobile, isTablet, isDesktop),
+    [colors, isDark, isMobile, isTablet, isDesktop]
+  );
 
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
@@ -238,77 +255,51 @@ export default function UserManagement() {
       if (!newUser.studentID?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the Student ID.' };
       }
-
       if (!newUser.course?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the course (e.g., BSIT, BSCS).' };
       }
-
       if (!newUser.yearLevel?.trim()) {
         return { isValid: false, errorMessage: 'Please select the year level.' };
       }
-
       if (!newUser.block?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the block (e.g., 1, 2, 3).' };
       }
-
       if (!newUser.gender?.trim()) {
         return { isValid: false, errorMessage: 'Please select the gender.' };
       }
     }
-
-    // ADMIN-specific validation
     if (newUser.role !== 'student') {
       if (!newUser.password?.trim()) {
         return { isValid: false, errorMessage: 'Please enter a password for the admin account.' };
       }
-
       if (newUser.password.length < 6) {
         return { isValid: false, errorMessage: 'Password must be at least 6 characters long.' };
       }
     }
-
     return { isValid: true, errorMessage: '' };
   };
 
   const handleCreateUser = async () => {
     const validation = validateCreateUser();
     if (!validation.isValid) {
-      if (Platform.OS === 'web') {
-        window.alert(validation.errorMessage);
-      } else {
-        Alert.alert('Validation Error', validation.errorMessage);
-      }
+      showAlert('Validation Error', validation.errorMessage);
       return;
     }
-
     try {
       setModalLoading(true);
-
-      // Check if Student ID already exists (for students)
       if (newUser.role === 'student' && newUser.studentID) {
         const usersCollection = collection(db, 'users');
         const studentIdQuery = query(usersCollection, where('studentID', '==', newUser.studentID.trim()));
         const studentIdSnapshot = await getDocs(studentIdQuery);
-
         if (!studentIdSnapshot.empty) {
           const existingUser = studentIdSnapshot.docs[0].data();
-          if (Platform.OS === 'web') {
-            window.alert(`Student ID "${newUser.studentID}" is already registered to ${existingUser.name}. Please use a different Student ID.`);
-          } else {
-            Alert.alert(
-              'Duplicate Student ID',
-              `Student ID "${newUser.studentID}" is already registered to ${existingUser.name}. Please use a different Student ID.`
-            );
-          }
+          showAlert('Duplicate Student ID', `Student ID "${newUser.studentID}" is already registered to ${existingUser.name}. Please use a different Student ID.`);
           setModalLoading(false);
           return;
         }
       }
-
-      // Check if email already exists in Firebase Auth (for all users)
       const auth = getAuth();
       const password = newUser.role === 'student' ? newUser.studentID : newUser.password;
-
       let userCredential;
       try {
         userCredential = await createUserWithEmailAndPassword(
@@ -318,22 +309,13 @@ export default function UserManagement() {
         );
       } catch (authError: any) {
         if (authError.code === 'auth/email-already-in-use') {
-          if (Platform.OS === 'web') {
-            window.alert(`The email "${newUser.email}" is already registered. Please use a different email address.`);
-          } else {
-            Alert.alert(
-              'Email Already Registered',
-              `The email "${newUser.email}" is already registered. Please use a different email address.`
-            );
-          }
+          showAlert('Email Already Registered', `The email "${newUser.email}" is already registered. Please use a different email address.`);
           setModalLoading(false);
           return;
         }
         throw authError;
       }
-
       const uid = userCredential.user.uid;
-
       const userData: any = {
         username: newUser.username.trim(),
         email: newUser.email.trim(),
@@ -343,7 +325,6 @@ export default function UserManagement() {
         uid: uid,
         active: true,
       };
-
       if (newUser.role === 'student') {
         userData.studentID = newUser.studentID.trim();
         userData.course = newUser.course.trim();
@@ -353,28 +334,17 @@ export default function UserManagement() {
       } else if (newUser.studentID?.trim()) {
         userData.studentID = newUser.studentID.trim();
       }
-
       await setDoc(doc(db, 'users', uid), userData);
-
       const successMessage = newUser.role === 'student'
         ? `Student ${newUser.name} created successfully!\n\nUsername: ${newUser.username}\nPassword: ${newUser.studentID}`
         : `Admin ${newUser.name} created successfully!\n\nEmail: ${newUser.email}\nPassword: ${newUser.password}`;
-
-      if (Platform.OS === 'web') {
-        window.alert(successMessage);
-      } else {
-        Alert.alert('Success', successMessage);
-      }
-
+      showAlert('Success', successMessage);
       setShowCreateModal(false);
       resetForm();
       fetchUsers();
-
     } catch (error: any) {
       console.error('Error creating user:', error);
-
       let errorMessage = 'Failed to create user. Please try again.';
-
       if (error.code === 'auth/weak-password') {
         errorMessage = 'Password is too weak. Please use at least 6 characters.';
       } else if (error.code === 'auth/invalid-email') {
@@ -382,105 +352,68 @@ export default function UserManagement() {
       } else if (error.message) {
         errorMessage = error.message;
       }
-
-      if (Platform.OS === 'web') {
-        window.alert(errorMessage);
-      } else {
-        Alert.alert('Error', errorMessage);
-      }
+      showAlert('Error', errorMessage);
     } finally {
       setModalLoading(false);
     }
   };
 
-  // VALIDATION FOR EDIT USER
   const validateEditUser = (): { isValid: boolean; errorMessage: string } => {
     if (!selectedUser) {
       return { isValid: false, errorMessage: 'No user selected.' };
     }
-
     if (!selectedUser.name?.trim()) {
       return { isValid: false, errorMessage: 'Please enter the full name.' };
     }
-
     if (!selectedUser.role) {
       return { isValid: false, errorMessage: 'Please select a role.' };
     }
-
-    // STUDENT-specific validation for edit
     if (selectedUser.role === 'student') {
       if (!selectedUser.studentID?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the Student ID.' };
       }
-
       if (!selectedUser.course?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the course.' };
       }
-
       if (!selectedUser.yearLevel?.trim()) {
         return { isValid: false, errorMessage: 'Please select the year level.' };
       }
-
       if (!selectedUser.block?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the block.' };
       }
-
       if (!selectedUser.gender?.trim()) {
         return { isValid: false, errorMessage: 'Please select the gender.' };
       }
     }
-
     return { isValid: true, errorMessage: '' };
   };
 
   const handleUpdateUser = async () => {
-    // Run validation first
     const validation = validateEditUser();
     if (!validation.isValid) {
-      if (Platform.OS === 'web') {
-        window.alert(validation.errorMessage);
-      } else {
-        Alert.alert('Validation Error', validation.errorMessage);
-      }
+      showAlert('Validation Error', validation.errorMessage);
       return;
     }
-
     if (!selectedUser) return;
-
     try {
       setModalLoading(true);
-
-      // Check if Student ID changed and if new ID already exists (JavaScript check instead of query)
       if (selectedUser.role === 'student' && selectedUser.studentID) {
         const trimmedStudentID = selectedUser.studentID.trim();
-
-        // Find if another user has this student ID (excluding current user)
         const duplicateUser = users.find(u =>
           u.id !== selectedUser.id &&
           u.studentID?.trim() === trimmedStudentID
         );
-
         if (duplicateUser) {
-          if (Platform.OS === 'web') {
-            window.alert(`Student ID "${trimmedStudentID}" is already registered to ${duplicateUser.name}. Please use a different Student ID.`);
-          } else {
-            Alert.alert(
-              'Duplicate Student ID',
-              `Student ID "${trimmedStudentID}" is already registered to ${duplicateUser.name}. Please use a different Student ID.`
-            );
-          }
+          showAlert('Duplicate Student ID', `Student ID "${trimmedStudentID}" is already registered to ${duplicateUser.name}. Please use a different Student ID.`);
           setModalLoading(false);
           return;
         }
       }
-
       const userRef = doc(db, 'users', selectedUser.id);
-
       const updateData: any = {
         name: selectedUser.name.trim(),
         role: selectedUser.role,
       };
-
       if (selectedUser.role === 'student') {
         updateData.studentID = selectedUser.studentID?.trim() || null;
         updateData.course = selectedUser.course?.trim() || null;
@@ -496,27 +429,14 @@ export default function UserManagement() {
         updateData.block = null;
         updateData.gender = null;
       }
-
       await updateDoc(userRef, updateData);
-
-      if (Platform.OS === 'web') {
-        window.alert('User updated successfully!');
-      } else {
-        Alert.alert('Success', 'User updated successfully!');
-      }
-
+      showAlert('Success', 'User updated successfully!');
       setShowEditModal(false);
       setSelectedUser(null);
       fetchUsers();
     } catch (error: any) {
       console.error('Error updating user:', error);
-      const errorMessage = error.message || 'Failed to update user. Please try again.';
-
-      if (Platform.OS === 'web') {
-        window.alert(errorMessage);
-      } else {
-        Alert.alert('Error', errorMessage);
-      }
+      showAlert('Error', error.message || 'Failed to update user. Please try again.');
     } finally {
       setModalLoading(false);
     }
@@ -575,18 +495,15 @@ export default function UserManagement() {
       const isConfirmed = window.confirm(
         `Are you sure you want to ${action} ${user.name}?`
       );
-
       if (isConfirmed) {
         try {
           setModalLoading(true);
           const userRef = doc(db, 'users', user.id);
-
           await updateDoc(userRef, {
             active: newActiveStatus,
             ...(action === 'deactivate' && { deactivatedAt: new Date().toISOString() }),
             ...(action === 'activate' && { deactivatedAt: null }),
           });
-
           setUsers(prevUsers =>
             prevUsers.map(u =>
               u.id === user.id
@@ -598,7 +515,6 @@ export default function UserManagement() {
                 : u
             )
           );
-
           window.alert(`User ${action}d successfully`);
         } catch (error: any) {
           console.error(`Error ${action}ing user:`, error);
@@ -609,7 +525,6 @@ export default function UserManagement() {
       }
       return;
     }
-
     Alert.alert(
       `${actionTitle} User`,
       `Are you sure you want to ${action} ${user.name}?`,
@@ -622,13 +537,11 @@ export default function UserManagement() {
             try {
               setModalLoading(true);
               const userRef = doc(db, 'users', user.id);
-
               await updateDoc(userRef, {
                 active: newActiveStatus,
                 ...(action === 'deactivate' && { deactivatedAt: new Date().toISOString() }),
                 ...(action === 'activate' && { deactivatedAt: null }),
               });
-
               setUsers(prevUsers =>
                 prevUsers.map(u =>
                   u.id === user.id
@@ -640,7 +553,6 @@ export default function UserManagement() {
                     : u
                 )
               );
-
               Alert.alert('Success', `User ${action}d successfully`);
             } catch (error: any) {
               console.error(`Error ${action}ing user:`, error);
@@ -695,7 +607,7 @@ export default function UserManagement() {
       case 'main_admin': return '#1d4ed8';
       case 'assistant_admin': return '#7c3aed';
       case 'student': return '#15803d';
-      default: return '#64748b';
+      default: return colors.accent.primary;
     }
   };
 
@@ -757,9 +669,12 @@ export default function UserManagement() {
               </Text>
             </View>
           </View>
-          <Text style={styles.paginatedUsername} numberOfLines={1}>
-            <Feather name="at-sign" size={8} color="#0ea5e9" /> {item.username}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Feather name="at-sign" size={8} color={colors.accent.primary} />
+            <Text style={[styles.paginatedUsername, { marginLeft: 4 }]} numberOfLines={1}>
+              {item.username}
+            </Text>
+          </View>
         </View>
         <View style={styles.paginatedActions}>
           <TouchableOpacity
@@ -769,7 +684,7 @@ export default function UserManagement() {
               setShowEditModal(true);
             }}
           >
-            <Feather name="edit-2" size={isMobile ? 12 : 14} color="#3b82f6" />
+            <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
           </TouchableOpacity>
           {!isCurrentUser && (
             <>
@@ -813,7 +728,7 @@ export default function UserManagement() {
             </Text>
             <View style={styles.searchResultBadges}>
               {!item.active && (
-                <View style={[styles.searchResultBadge, { backgroundColor: '#64748b' }]}>
+                <View style={[styles.searchResultBadge, { backgroundColor: colors.sidebar.text.muted }]}>
                   <Text style={styles.searchResultBadgeText}>INACTIVE</Text>
                 </View>
               )}
@@ -824,9 +739,12 @@ export default function UserManagement() {
               </View>
             </View>
             {searchQuery && item.studentID && item.studentID.toLowerCase().includes(searchQuery.toLowerCase()) && (
-              <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile, { color: '#10b981', fontWeight: '600' }]}>
-                <Feather name="hash" size={10} color="#10b981" /> ID: {item.studentID} (matched)
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Feather name="hash" size={10} color="#10b981" />
+                <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile, { color: '#10b981', fontWeight: '600', marginLeft: 4 }]}>
+                  ID: {item.studentID} (matched)
+                </Text>
+              </View>
             )}
           </View>
           <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile]}>
@@ -840,7 +758,7 @@ export default function UserManagement() {
                 setShowEditModal(true);
               }}
             >
-              <Feather name="edit-2" size={isMobile ? 12 : 14} color="#3b82f6" />
+              <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
             </TouchableOpacity>
             {!isCurrentUser && (
               <>
@@ -871,15 +789,17 @@ export default function UserManagement() {
 
         <View style={styles.searchResultFooter}>
           <View style={styles.searchResultRole}>
-            <Feather name="at-sign" size={isMobile ? 8 : 10} color="#64748b" />
-            <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile]}>
-              {item.username}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Feather name="at-sign" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
+              <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile, { marginLeft: 4 }]}>
+                {item.username}
+              </Text>
+            </View>
           </View>
           {item.studentID && (
-            <View style={styles.searchResultRole}>
-              <Feather name="hash" size={isMobile ? 8 : 10} color="#64748b" />
-              <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Feather name="hash" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
+              <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile, { marginLeft: 4 }]}>
                 {item.studentID}
               </Text>
             </View>
@@ -894,30 +814,30 @@ export default function UserManagement() {
 
     return (
       <View>
-        <Text style={[styles.modernDetailLabel]}>User Information</Text>
+        <Text style={styles.modernDetailLabel}>User Information</Text>
         <View style={styles.modernDetailRow}>
-          <Feather name="user" size={16} color="#0ea5e9" />
+          <Feather name="user" size={16} color={colors.accent.primary} />
           <Text style={styles.modernDetailRowText}>
             {selected.name}
           </Text>
         </View>
 
         <View style={styles.modernDetailRow}>
-          <Feather name="mail" size={16} color="#0ea5e9" />
+          <Feather name="mail" size={16} color={colors.accent.primary} />
           <Text style={styles.modernDetailRowText}>
             {selected.email}
           </Text>
         </View>
 
         <View style={styles.modernDetailRow}>
-          <Feather name="at-sign" size={16} color="#0ea5e9" />
+          <Feather name="at-sign" size={16} color={colors.accent.primary} />
           <Text style={styles.modernDetailRowText}>
             @{selected.username}
           </Text>
         </View>
 
         <View style={styles.modernDetailRow}>
-          <Feather name="shield" size={16} color="#0ea5e9" />
+          <Feather name="shield" size={16} color={colors.accent.primary} />
           <Text style={styles.modernDetailRowText}>
             Role: {selected.role.replace('_', ' ').toUpperCase()}
           </Text>
@@ -930,7 +850,7 @@ export default function UserManagement() {
 
         {selected.studentID && (
           <View style={styles.modernDetailRow}>
-            <Feather name="hash" size={16} color="#0ea5e9" />
+            <Feather name="hash" size={16} color={colors.accent.primary} />
             <Text style={styles.modernDetailRowText}>
               Student ID: {selected.studentID}
             </Text>
@@ -939,7 +859,7 @@ export default function UserManagement() {
 
         {selected.course && (
           <View style={styles.modernDetailRow}>
-            <Feather name="book" size={16} color="#0ea5e9" />
+            <Feather name="book" size={16} color={colors.accent.primary} />
             <Text style={styles.modernDetailRowText}>
               Course: {selected.course}
             </Text>
@@ -948,7 +868,7 @@ export default function UserManagement() {
 
         {selected.yearLevel && (
           <View style={styles.modernDetailRow}>
-            <Feather name="calendar" size={16} color="#0ea5e9" />
+            <Feather name="calendar" size={16} color={colors.accent.primary} />
             <Text style={styles.modernDetailRowText}>
               Year Level: {selected.yearLevel}
             </Text>
@@ -957,7 +877,7 @@ export default function UserManagement() {
 
         {selected.block && (
           <View style={styles.modernDetailRow}>
-            <Feather name="grid" size={16} color="#0ea5e9" />
+            <Feather name="grid" size={16} color={colors.accent.primary} />
             <Text style={styles.modernDetailRowText}>
               Block: {selected.block}
             </Text>
@@ -966,7 +886,7 @@ export default function UserManagement() {
 
         {selected.gender && (
           <View style={styles.modernDetailRow}>
-            <Feather name="user" size={16} color="#0ea5e9" />
+            <Feather name="user" size={16} color={colors.accent.primary} />
             <Text style={styles.modernDetailRowText}>
               Gender: {selected.gender}
             </Text>
@@ -1016,7 +936,7 @@ export default function UserManagement() {
           onPress={handlePrevPage}
           disabled={currentPage === 1}
         >
-          <Feather name="chevron-left" size={isMobile ? 14 : 16} color={currentPage === 1 ? '#cbd5e1' : '#0ea5e9'} />
+          <Feather name="chevron-left" size={isMobile ? 14 : 16} color={currentPage === 1 ? colors.sidebar.text.muted : colors.accent.primary} />
           {!isMobile && <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
             Prev
           </Text>}
@@ -1034,8 +954,48 @@ export default function UserManagement() {
           {!isMobile && <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>
             Next
           </Text>}
-          <Feather name="chevron-right" size={isMobile ? 14 : 16} color={currentPage === totalPages ? '#cbd5e1' : '#0ea5e9'} />
+          <Feather name="chevron-right" size={isMobile ? 14 : 16} color={currentPage === totalPages ? colors.sidebar.text.muted : colors.accent.primary} />
         </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const CourseSelector = ({
+    value,
+    onSelect,
+    isMobile
+  }: {
+    value: string;
+    onSelect: (course: string) => void;
+    isMobile: boolean;
+  }) => {
+    const courses = [
+      'BSIT', 'BSOA', 'BSCrim'
+    ];
+
+    return (
+      <View style={[styles.courseGrid, isMobile && styles.courseGridMobile]}>
+        {courses.map((course) => (
+          <TouchableOpacity
+            key={course}
+            style={[
+              styles.courseChip,
+              value === course && styles.courseChipSelected,
+              isMobile && styles.courseChipMobile
+            ]}
+            onPress={() => onSelect(course)}
+          >
+            <Text
+              style={[
+                styles.courseChipText,
+                value === course && styles.courseChipTextSelected,
+                isMobile && styles.courseChipTextMobile
+              ]}
+            >
+              {course}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     );
   };
@@ -1059,7 +1019,7 @@ export default function UserManagement() {
                   <Feather
                     name={isEdit ? "edit-2" : "user-plus"}
                     size={isMobile ? 16 : 20}
-                    color="#0ea5e9"
+                    color={colors.accent.primary}
                   />
                 </View>
                 <View style={styles.modernModalTitleContainer}>
@@ -1075,7 +1035,7 @@ export default function UserManagement() {
                 onPress={handleCloseForm}
                 style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
               >
-                <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+                <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
 
@@ -1086,7 +1046,8 @@ export default function UserManagement() {
               <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
                 <View style={styles.modernFormGroup}>
                   <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Full Name *</Text>
-                  <TextInput
+                  <FormTextInput
+                    inputStyle={styles.modernFormInput}
                     placeholder="Enter full name"
                     value={isEdit ? selectedUser?.name || '' : newUser.name}
                     onChangeText={(text: string) =>
@@ -1102,7 +1063,8 @@ export default function UserManagement() {
                   {isEdit ? (
                     <Text style={styles.emailText}>@{selectedUser?.username}</Text>
                   ) : (
-                    <TextInput
+                    <FormTextInput
+                      inputStyle={styles.modernFormInput}
                       placeholder="Enter username (e.g., john.cajes)"
                       value={newUser.username}
                       onChangeText={(text: string) => setNewUser({ ...newUser, username: text })}
@@ -1117,7 +1079,8 @@ export default function UserManagement() {
                   {isEdit ? (
                     <Text style={styles.emailText}>{selectedUser?.email}</Text>
                   ) : (
-                    <TextInput
+                    <FormTextInput
+                      inputStyle={styles.modernFormInput}
                       placeholder="Enter email address"
                       value={newUser.email}
                       onChangeText={(text: string) => setNewUser({ ...newUser, email: text })}
@@ -1177,7 +1140,8 @@ export default function UserManagement() {
                   <>
                     <View style={styles.modernFormGroup}>
                       <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Student ID *</Text>
-                      <TextInput
+                      <FormTextInput
+                        inputStyle={styles.modernFormInput}
                         placeholder="Enter student ID"
                         value={isEdit ? selectedUser?.studentID || '' : newUser.studentID}
                         onChangeText={(text: string) =>
@@ -1191,14 +1155,14 @@ export default function UserManagement() {
 
                     <View style={styles.modernFormGroup}>
                       <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Course *</Text>
-                      <TextInput
-                        placeholder="Enter course (e.g., BSIT, BSCS)"
+                      <CourseSelector
                         value={isEdit ? selectedUser?.course || '' : newUser.course}
-                        onChangeText={(text: string) =>
+                        onSelect={(course: string) =>
                           isEdit
-                            ? setSelectedUser(prev => prev ? { ...prev, course: text } : null)
-                            : setNewUser({ ...newUser, course: text })
+                            ? setSelectedUser(prev => prev ? { ...prev, course } : null)
+                            : setNewUser({ ...newUser, course })
                         }
+                        isMobile={isMobile}
                       />
                     </View>
 
@@ -1231,7 +1195,8 @@ export default function UserManagement() {
 
                     <View style={styles.modernFormGroup}>
                       <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Block *</Text>
-                      <TextInput
+                      <FormTextInput
+                        inputStyle={styles.modernFormInput}
                         placeholder="Enter block (e.g., 1, 2, 3)"
                         value={isEdit ? selectedUser?.block || '' : newUser.block}
                         onChangeText={(text: string) =>
@@ -1274,7 +1239,8 @@ export default function UserManagement() {
                 {!isEdit && (newUser.role === 'assistant_admin' || newUser.role === 'main_admin') && (
                   <View style={styles.modernFormGroup}>
                     <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Password *</Text>
-                    <TextInput
+                    <FormTextInput
+                      inputStyle={styles.modernFormInput}
                       placeholder="Enter password"
                       value={newUser.password}
                       onChangeText={(text: string) => setNewUser({ ...newUser, password: text })}
@@ -1286,7 +1252,8 @@ export default function UserManagement() {
                 {isEdit && (selectedUser?.role === 'assistant_admin' || selectedUser?.role === 'main_admin') && (
                   <View style={styles.modernFormGroup}>
                     <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Student ID (Optional)</Text>
-                    <TextInput
+                    <FormTextInput
+                      inputStyle={styles.modernFormInput}
                       placeholder="Enter student ID if applicable"
                       value={selectedUser?.studentID || ''}
                       onChangeText={(text: string) =>
@@ -1337,11 +1304,15 @@ export default function UserManagement() {
     );
   };
 
+  const headerGradientColors = isDark
+    ? ['#0f172a', '#1e293b'] as const
+    : ['#1e40af', '#3b82f6'] as const;
+
   return (
     <View style={styles.container}>
       {/* Header with Gradient */}
       <LinearGradient
-        colors={['#14203d', '#06080b']}
+        colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
@@ -1374,7 +1345,7 @@ export default function UserManagement() {
 
         <View style={[styles.dateSection, isMobile && styles.dateSectionMobile]}>
           <View style={[styles.dateContainer, isMobile && styles.dateContainerMobile]}>
-            <Feather name="calendar" size={isMobile ? 10 : 12} color="#94a3b8" />
+            <Feather name="calendar" size={isMobile ? 10 : 12} color={colors.sidebar.text.muted} />
             <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
@@ -1397,9 +1368,9 @@ export default function UserManagement() {
 
       {/* Stats Grid */}
       <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#0ea5e9' }]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
-            <Feather name="users" size={isMobile ? 16 : 20} color="#0ea5e9" />
+        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: colors.accent.primary }]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
+            <Feather name="users" size={isMobile ? 16 : 20} color={colors.accent.primary} />
           </View>
           <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total Users</Text>
@@ -1510,7 +1481,7 @@ export default function UserManagement() {
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size={isMobile ? "small" : "large"} color="#0ea5e9" />
+              <ActivityIndicator size={isMobile ? "small" : "large"} color={colors.accent.primary} />
               <Text style={[styles.loadingText, isMobile && styles.loadingTextMobile]}>Loading users...</Text>
             </View>
           ) : (
@@ -1525,7 +1496,7 @@ export default function UserManagement() {
                   ListEmptyComponent={
                     <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                       <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
-                        <Feather name="users" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                        <Feather name="users" size={isMobile ? 24 : 32} color={colors.sidebar.text.muted} />
                       </View>
                       <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No users found</Text>
                       <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
@@ -1547,18 +1518,19 @@ export default function UserManagement() {
             <Text style={[styles.searchTitle, isMobile && styles.searchTitleMobile]}>Search Users</Text>
 
             <View style={[styles.searchContainer, isMobile && styles.searchContainerMobile]}>
-              <Feather name="search" size={isMobile ? 14 : 16} color="#64748b" />
-              <RNTextInput
+              <Feather name="search" size={isMobile ? 14 : 16} color={colors.sidebar.text.secondary} />
+              <FormTextInput
                 style={[styles.searchInput, isMobile && styles.searchInputMobile]}
+                inputStyle={styles.searchInput} // reuse searchInput style as base
                 placeholder="Search by name, email, username, or student ID..."
                 value={searchQuery}
                 onChangeText={handleSearch}
                 autoCapitalize="none"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.sidebar.text.muted}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={clearSearch} style={styles.searchClearButton}>
-                  <Feather name="x" size={isMobile ? 14 : 16} color="#64748b" />
+                  <Feather name="x" size={isMobile ? 14 : 16} color={colors.sidebar.text.secondary} />
                 </TouchableOpacity>
               )}
             </View>
@@ -1575,7 +1547,7 @@ export default function UserManagement() {
           <View style={styles.searchResultsContainer}>
             {loading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#0ea5e9" />
+                <ActivityIndicator size="small" color={colors.accent.primary} />
               </View>
             ) : (
               <FlatList
@@ -1587,7 +1559,7 @@ export default function UserManagement() {
                   searchQuery ? (
                     <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                       <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
-                        <Feather name="search" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                        <Feather name="search" size={isMobile ? 24 : 32} color={colors.sidebar.text.muted} />
                       </View>
                       <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No matches</Text>
                       <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
@@ -1597,7 +1569,7 @@ export default function UserManagement() {
                   ) : (
                     <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                       <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
-                        <Feather name="search" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                        <Feather name="search" size={isMobile ? 24 : 32} color={colors.sidebar.text.muted} />
                       </View>
                       <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>Start searching</Text>
                       <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
@@ -1627,7 +1599,7 @@ export default function UserManagement() {
             <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
               <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
                 <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
-                  <Feather name="user" size={isMobile ? 16 : 20} color="#0ea5e9" />
+                  <Feather name="user" size={isMobile ? 16 : 20} color={colors.accent.primary} />
                 </View>
                 <View style={styles.modernModalTitleContainer}>
                   <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
@@ -1639,7 +1611,7 @@ export default function UserManagement() {
                 onPress={() => setSelectedUserId(null)}
                 style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
               >
-                <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+                <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
 

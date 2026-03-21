@@ -1,4 +1,3 @@
-// lib/types.ts
 export type Announcement = {
   id: string;
   title: string;
@@ -21,7 +20,7 @@ export interface UserLocation {
 export interface EventLocation {
   latitude: number;
   longitude: number;
-  radius: number; // in meters
+  radius: number; 
   address?: string;
 }
 
@@ -48,7 +47,7 @@ export interface AttendanceRecord {
   };
 }
 
-// Event Types - Make all properties optional except id
+// Event Types 
 export interface EventData {
   id: string;
   title?: string;
@@ -69,13 +68,14 @@ export interface QRCodeData {
   type: 'attendance';
   eventId: string;
   eventTitle: string;
+  generatedAt: string;
   timestamp: string;
   expiresAt: string;
   usesManualExpiration: boolean;
   eventLocation?: EventLocation;
 }
 
-// Validation Result Types - Make event partial
+// Validation Result Types
 export interface ValidationResult {
   valid: boolean;
   error?: 
@@ -88,16 +88,15 @@ export interface ValidationResult {
     | 'LOCATION_INACCURATE'
     | 'VALIDATION_ERROR';
   message?: string;
-  event?: Partial<EventData>; // Use Partial to make all properties optional
+  event?: Partial<EventData>; 
   expirationTime?: Date;
-  distance?: number; // Make this optional
+  distance?: number; 
   allowedRadius?: number;
   accuracy?: number;
   locationVerified?: boolean;
   qrData?: QRCodeData;
 }
 
-// Student Types
 export interface Student {
   id: string;
   studentID: string;

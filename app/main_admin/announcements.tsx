@@ -23,8 +23,9 @@ import {
   View
 } from 'react-native';
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { db } from "../../lib/firebaseConfig";
-import { announcementStyles } from '../../styles/main-admin/announcementStyles';
+import { createAnnouncementStyles } from '../../styles/main-admin/announcementStyles';
 
 const showAlert = (title: string, message?: string) => {
   if (Platform.OS === 'web') {
@@ -49,11 +50,18 @@ interface Announcement {
 
 export default function MainAdminAnnouncements() {
   const { width: screenWidth } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
+  const { user, userData } = useAuth();
+  const router = useRouter();
 
   const isMobile = screenWidth < 640;
   const isTablet = screenWidth >= 640 && screenWidth < 1024;
   const isDesktop = screenWidth >= 1024;
-  const isSmallScreen = screenWidth < 375;
+
+  const styles = useMemo(
+    () => createAnnouncementStyles(colors, isDark, isMobile, isTablet, isDesktop),
+    [colors, isDark, isMobile, isTablet, isDesktop]
+  );
 
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -62,7 +70,7 @@ export default function MainAdminAnnouncements() {
   const [searchResults, setSearchResults] = useState<Announcement[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'week' | 'month' | 'pinned'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'today' | 'week' | 'month' | 'pinned'>('all');
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,8 +80,6 @@ export default function MainAdminAnnouncements() {
 
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<string | null>(null);
   const [priority, setPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
-  const { user, userData } = useAuth();
-  const router = useRouter();
 
   useEffect(() => {
     const q = query(collection(db, "updates"), orderBy("createdAt", "desc"));
@@ -113,10 +119,15 @@ export default function MainAdminAnnouncements() {
     }
   }, [searchQuery, announcements]);
 
-  const filterAnnouncementsByTime = (announcementsList: Announcement[], filter: 'all' | 'week' | 'month' | 'pinned') => {
+  const filterAnnouncementsByTime = (announcementsList: Announcement[], filter: 'all' | 'today' | 'week' | 'month' | 'pinned') => {
     const now = dayjs();
 
     switch (filter) {
+      case 'today':
+        return announcementsList.filter(ann => {
+          if (!ann.createdAt) return false;
+          return dayjs(ann.createdAt.toDate()).isSame(dayjs(), 'day');
+        });
       case 'week':
         return announcementsList.filter(ann => {
           if (!ann.createdAt) return false;
@@ -139,7 +150,7 @@ export default function MainAdminAnnouncements() {
     }
   };
 
-  const handleFilterChange = (filter: 'all' | 'week' | 'month' | 'pinned') => {
+  const handleFilterChange = (filter: 'all' | 'today' | 'week' | 'month' | 'pinned') => {
     setActiveFilter(filter);
     setCurrentPage(1);
   };
@@ -159,7 +170,6 @@ export default function MainAdminAnnouncements() {
     }
 
     try {
-      // Main admin announcements are auto‑approved
       await addDoc(collection(db, "updates"), {
         title: title.trim(),
         message: message.trim(),
@@ -309,7 +319,7 @@ export default function MainAdminAnnouncements() {
   const getPriorityColor = (ann: Announcement) => {
     if (ann.priority === 'urgent' || ann.title.toLowerCase().includes('urgent')) return '#ef4444';
     if (ann.priority === 'important' || ann.title.toLowerCase().includes('important')) return '#f59e0b';
-    return '#0ea5e9';
+    return colors.accent.primary;
   };
 
   const renderPaginatedItem = ({ item, index }: { item: Announcement; index: number }) => {
@@ -332,20 +342,31 @@ export default function MainAdminAnnouncements() {
             {(currentPage - 1) * itemsPerPage + index + 1}
           </Text>
         </View>
+
         <View style={styles.paginatedInfo}>
-          <Text style={[styles.paginatedTitle, isMobile && styles.paginatedTitleMobile]} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <View style={styles.paginatedMeta}>
-            <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
-              {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
+          <View style={[styles.paginatedTitleRow, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }]}>
+            <Text style={[styles.paginatedTitle, isMobile && styles.paginatedTitleMobile]} numberOfLines={1}>
+              {item.title}
             </Text>
-            <View style={styles.paginatedBadgeContainer}>
+
+            <View style={[styles.paginatedBadgeContainer, { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 4 }]}>
+              {isUrgentAnnouncement(item) && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#ef4444' }]}>
+                  <Text style={styles.paginatedBadgeText}>URGENT</Text>
+                </View>
+              )}
+              {isImportantAnnouncement(item) && !isUrgentAnnouncement(item) && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#f59e0b' }]}>
+                  <Text style={styles.paginatedBadgeText}>IMPORTANT</Text>
+                </View>
+              )}
+
               {isNewAnnouncement(item.createdAt) && (
                 <View style={[styles.paginatedBadge, { backgroundColor: '#3b82f6' }]}>
                   <Text style={styles.paginatedBadgeText}>NEW</Text>
                 </View>
               )}
+
               {isPending && (
                 <View style={[styles.paginatedBadge, { backgroundColor: '#f59e0b' }]}>
                   <Text style={styles.paginatedBadgeText}>PENDING</Text>
@@ -363,19 +384,26 @@ export default function MainAdminAnnouncements() {
               )}
             </View>
           </View>
-          {/* Show creator if available */}
+
+          <View style={styles.paginatedMeta}>
+            <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
+              {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
+            </Text>
+          </View>
+
           {item.createdByName && (
             <Text style={[styles.paginatedCreator, isMobile && styles.paginatedCreatorMobile]}>
               by {item.createdByName}
             </Text>
           )}
         </View>
+
         <View style={styles.paginatedActions}>
           <TouchableOpacity
             style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
             onPress={() => handleEditStart(item)}
           >
-            <Feather name="edit-2" size={isMobile ? 12 : 14} color="#3b82f6" />
+            <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
@@ -394,7 +422,7 @@ export default function MainAdminAnnouncements() {
     const isRejected = item.status === 'rejected';
 
     return (
-      <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile, isRejected && { opacity: 0.6 }]}>
+      <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile]}>
         <View style={styles.searchResultHeader}>
           <View style={styles.searchResultTitleContainer}>
             <Text style={[styles.searchResultTitle, isMobile && styles.searchResultTitleMobile]} numberOfLines={1}>
@@ -438,7 +466,7 @@ export default function MainAdminAnnouncements() {
               style={[styles.searchResultEditButton, isMobile && styles.searchResultEditButtonMobile]}
               onPress={() => handleEditStart(item)}
             >
-              <Feather name="edit-2" size={isMobile ? 12 : 14} color="#3b82f6" />
+              <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.searchResultDeleteButton, isMobile && styles.searchResultDeleteButtonMobile]}
@@ -455,7 +483,7 @@ export default function MainAdminAnnouncements() {
 
         <View style={styles.searchResultFooter}>
           <View style={styles.searchResultDate}>
-            <Feather name="clock" size={isMobile ? 8 : 10} color="#64748b" />
+            <Feather name="clock" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
             <Text style={[styles.searchResultDateText, isMobile && styles.searchResultDateTextMobile]}>
               {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
             </Text>
@@ -483,7 +511,7 @@ export default function MainAdminAnnouncements() {
           onPress={handlePrevPage}
           disabled={currentPage === 1}
         >
-          <Feather name="chevron-left" size={isMobile ? 14 : 16} color={currentPage === 1 ? '#cbd5e1' : '#0ea5e9'} />
+          <Feather name="chevron-left" size={isMobile ? 14 : 16} color={currentPage === 1 ? colors.sidebar.text.muted : colors.accent.primary} />
           {!isMobile && <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
             Prev
           </Text>}
@@ -501,19 +529,21 @@ export default function MainAdminAnnouncements() {
           {!isMobile && <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>
             Next
           </Text>}
-          <Feather name="chevron-right" size={isMobile ? 14 : 16} color={currentPage === totalPages ? '#cbd5e1' : '#0ea5e9'} />
+          <Feather name="chevron-right" size={isMobile ? 14 : 16} color={currentPage === totalPages ? colors.sidebar.text.muted : colors.accent.primary} />
         </TouchableOpacity>
       </View>
     );
   };
 
-  const styles = announcementStyles;
+  const headerGradientColors = isDark
+    ? ['#0f172a', '#1e293b'] as const
+    : ['#1e40af', '#3b82f6'] as const;
 
   return (
     <View style={styles.container}>
       {/* Header with Gradient */}
       <LinearGradient
-        colors={['#14203d', '#06080b']}
+        colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
@@ -546,7 +576,7 @@ export default function MainAdminAnnouncements() {
 
         <View style={[styles.dateSection, isMobile && styles.dateSectionMobile]}>
           <View style={[styles.dateContainer, isMobile && styles.dateContainerMobile]}>
-            <Feather name="calendar" size={isMobile ? 10 : 12} color="#94a3b8" />
+            <Feather name="calendar" size={isMobile ? 10 : 12} color={colors.sidebar.text.muted} />
             <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
@@ -569,15 +599,15 @@ export default function MainAdminAnnouncements() {
 
       {/* Stats Grid */}
       <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#0ea5e915' }]}>
-            <Ionicons name="document-text" size={isMobile ? 16 : 20} color="#0ea5e9" />
+        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
+          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
+            <Ionicons name="document-text" size={isMobile ? 16 : 20} color={colors.accent.primary} />
           </View>
           <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
         </View>
 
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#10b98115' }]}>
             <Feather name="sun" size={isMobile ? 16 : 20} color="#10b981" />
           </View>
@@ -585,7 +615,7 @@ export default function MainAdminAnnouncements() {
           <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Today</Text>
         </View>
 
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#000000', borderRightWidth: 4, borderRightColor: '#1266d4' }]}>
+        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
           <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#f59e0b15' }]}>
             <MaterialIcons name="priority-high" size={isMobile ? 16 : 20} color="#ef4444" />
           </View>
@@ -622,6 +652,21 @@ export default function MainAdminAnnouncements() {
                     activeFilter === 'all' && styles.leftFilterButtonTextActive,
                     isMobile && styles.leftFilterButtonTextMobile
                   ]}>All</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.leftFilterButton,
+                    activeFilter === 'today' && styles.leftFilterButtonActive,
+                    isMobile && styles.leftFilterButtonMobile
+                  ]}
+                  onPress={() => handleFilterChange('today')}
+                >
+                  <Text style={[
+                    styles.leftFilterButtonText,
+                    activeFilter === 'today' && styles.leftFilterButtonTextActive,
+                    isMobile && styles.leftFilterButtonTextMobile
+                  ]}>Today</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -666,7 +711,7 @@ export default function MainAdminAnnouncements() {
                     styles.leftFilterButtonText,
                     activeFilter === 'pinned' && styles.leftFilterButtonTextActive,
                     isMobile && styles.leftFilterButtonTextMobile
-                  ]}>Important</Text>
+                  ]}>Priority</Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -674,7 +719,7 @@ export default function MainAdminAnnouncements() {
 
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size={isMobile ? "small" : "large"} color="#0ea5e9" />
+              <ActivityIndicator size={isMobile ? "small" : "large"} color={colors.accent.primary} />
               <Text style={[styles.loadingText, isMobile && styles.loadingTextMobile]}>Loading...</Text>
             </View>
           ) : (
@@ -688,7 +733,7 @@ export default function MainAdminAnnouncements() {
                 ListEmptyComponent={
                   <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                     <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
-                      <FontAwesome6 name="bullhorn" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                      <FontAwesome6 name="bullhorn" size={isMobile ? 24 : 32} color={colors.sidebar.text.muted} />
                     </View>
                     <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No announcements</Text>
                     <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
@@ -704,7 +749,7 @@ export default function MainAdminAnnouncements() {
                   <View style={[styles.selectedDetailHeader, isMobile && styles.selectedDetailHeaderMobile]}>
                     <Text style={[styles.selectedDetailTitle, isMobile && styles.selectedDetailTitleMobile]}>Details</Text>
                     <TouchableOpacity onPress={() => setSelectedAnnouncement(null)}>
-                      <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+                      <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
                     </TouchableOpacity>
                   </View>
 
@@ -753,14 +798,14 @@ export default function MainAdminAnnouncements() {
 
                         <View style={[styles.selectedDetailFooter, isMobile && styles.selectedDetailFooterMobile]}>
                           <View style={[styles.selectedDetailDate, isMobile && styles.selectedDetailDateMobile]}>
-                            <Feather name="calendar" size={isMobile ? 12 : 14} color="#64748b" />
+                            <Feather name="calendar" size={isMobile ? 12 : 14} color={colors.sidebar.text.muted} />
                             <Text style={[styles.selectedDetailDateText, isMobile && styles.selectedDetailDateTextMobile]}>
                               {selected.createdAt ? dayjs(selected.createdAt.toDate()).format('MMM D, YYYY') : ''}
                             </Text>
                           </View>
                           {selected.createdByName && (
                             <View style={[styles.selectedDetailCreator, isMobile && styles.selectedDetailCreatorMobile]}>
-                              <Feather name="user" size={isMobile ? 12 : 14} color="#64748b" />
+                              <Feather name="user" size={isMobile ? 12 : 14} color={colors.sidebar.text.muted} />
                               <Text style={[styles.selectedDetailCreatorText, isMobile && styles.selectedDetailCreatorTextMobile]}>
                                 by {selected.createdByName}
                               </Text>
@@ -772,7 +817,7 @@ export default function MainAdminAnnouncements() {
                               style={[styles.selectedDetailEditButton, isMobile && styles.selectedDetailEditButtonMobile]}
                               onPress={() => handleEditStart(selected)}
                             >
-                              <Feather name="edit-2" size={isMobile ? 14 : 16} color="#3b82f6" />
+                              <Feather name="edit-2" size={isMobile ? 14 : 16} color={colors.accent.primary} />
                               {!isMobile && <Text style={styles.selectedDetailEditText}>Edit</Text>}
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -798,22 +843,22 @@ export default function MainAdminAnnouncements() {
         {/* Right Grid - Search and Results */}
         <View style={[styles.rightGrid, isMobile && styles.rightGridMobile]}>
           <View style={[styles.rightHeader, isMobile && styles.rightHeaderMobile]}>
-            <Text style={[styles.searchTitle, isMobile && styles.searchTitleMobile]}>Search</Text>
+            <Text style={[styles.searchTitle, isMobile && styles.searchTitleMobile]}>Search Announcements</Text>
 
             {/* Search Bar */}
             <View style={[styles.searchContainer, isMobile && styles.searchContainerMobile]}>
-              <Feather name="search" size={isMobile ? 14 : 16} color="#64748b" />
+              <Feather name="search" size={isMobile ? 14 : 16} color={colors.sidebar.text.secondary} />
               <TextInput
                 style={[styles.searchInput, isMobile && styles.searchInputMobile]}
                 placeholder="Type to search..."
                 value={searchQuery}
                 onChangeText={handleSearch}
                 autoCapitalize="none"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.sidebar.text.muted}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={clearSearch} style={styles.searchClearButton}>
-                  <Feather name="x" size={isMobile ? 14 : 16} color="#64748b" />
+                  <Feather name="x" size={isMobile ? 14 : 16} color={colors.sidebar.text.secondary} />
                 </TouchableOpacity>
               )}
             </View>
@@ -831,7 +876,7 @@ export default function MainAdminAnnouncements() {
           <View style={styles.searchResultsContainer}>
             {isLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size={isMobile ? "small" : "small"} color="#0ea5e9" />
+                <ActivityIndicator size={isMobile ? "small" : "small"} color={colors.accent.primary} />
               </View>
             ) : (
               <FlatList
@@ -843,7 +888,7 @@ export default function MainAdminAnnouncements() {
                   searchQuery ? (
                     <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                       <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
-                        <Feather name="search" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                        <Feather name="search" size={isMobile ? 24 : 32} color={colors.sidebar.text.muted} />
                       </View>
                       <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No matches</Text>
                       <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
@@ -853,7 +898,7 @@ export default function MainAdminAnnouncements() {
                   ) : (
                     <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                       <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
-                        <Feather name="search" size={isMobile ? 24 : 32} color="#cbd5e1" />
+                        <Feather name="search" size={isMobile ? 24 : 32} color={colors.sidebar.text.muted} />
                       </View>
                       <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>Start searching</Text>
                       <Text style={[styles.emptyStateText, isMobile && styles.emptyStateTextMobile]}>
@@ -883,7 +928,7 @@ export default function MainAdminAnnouncements() {
                   <FontAwesome6
                     name={editingId ? "pen-to-square" : "bullhorn"}
                     size={isMobile ? 16 : 20}
-                    color="#0ea5e9"
+                    color={colors.accent.primary}
                   />
                 </View>
                 <View style={styles.modernModalTitleContainer}>
@@ -899,7 +944,7 @@ export default function MainAdminAnnouncements() {
                 onPress={resetForm}
                 style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
               >
-                <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+                <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
 
@@ -920,7 +965,7 @@ export default function MainAdminAnnouncements() {
                     >
                       <View style={[
                         styles.priorityIndicator,
-                        { backgroundColor: '#0ea5e9' },
+                        { backgroundColor: colors.accent.primary },
                         isMobile && styles.priorityIndicatorMobile
                       ]} />
                       <Text style={[
@@ -977,7 +1022,7 @@ export default function MainAdminAnnouncements() {
                   <TextInput
                     style={[styles.modernFormInput, isMobile && styles.modernFormInputMobile]}
                     placeholder="Enter title"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={colors.sidebar.text.muted}
                     value={title}
                     onChangeText={setTitle}
                   />
@@ -988,7 +1033,7 @@ export default function MainAdminAnnouncements() {
                   <TextInput
                     style={[styles.modernFormInput, styles.modernTextArea, isMobile && styles.modernFormInputMobile]}
                     placeholder="Write message..."
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor={colors.sidebar.text.muted}
                     value={message}
                     onChangeText={setMessage}
                     multiline

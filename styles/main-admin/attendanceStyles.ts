@@ -1,1175 +1,1210 @@
 import { StyleSheet } from 'react-native';
+import { ThemeColors } from '../../context/ThemeContext';
 
-export const attendanceStyles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f8fafc',
-    },
-    mainScrollView: {
-        flex: 1,
-    },
-    mainScrollContent: {
-        flexGrow: 1,
-    },
-    mainContent: {
-        flex: 1,
-        flexDirection: 'row',
-        padding: 20,
-        gap: 20,
-    },
-    mainContentMobile: {
-        flexDirection: 'column',
-        padding: 15,
-        gap: 15,
-    },
+export const createAttendanceStyles = (
+    colors: ThemeColors,
+    isDark: boolean,
+    isMobile: boolean,
+    isTablet: boolean,
+    isDesktop: boolean
+) => {
+    return StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: colors.background,
+        },
+        mainScrollView: {
+            flex: 1,
+        },
+        mainScrollContent: {
+            flexGrow: 1,
+        },
+        mainContent: {
+            flex: 1,
+            flexDirection: isMobile ? 'column' : 'row',
+            padding: isMobile ? 15 : 20,
+            gap: 20,
+        },
 
-    headerGradient: {
-        paddingTop: 15,
-        paddingBottom: 8,
-        paddingHorizontal: 20,
-    },
-    headerGradientMobile: {
-        paddingTop: 10,
-        paddingBottom: 5,
-        paddingHorizontal: 15,
-    },
-    headerContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    headerContentMobile: {
-        marginBottom: 15,
-    },
-    greetingText: {
-        fontSize: 14,
-        color: '#94a3b8',
-        marginBottom: 4,
-    },
-    greetingTextMobile: {
-        fontSize: 12,
-    },
-    userName: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#ffffff',
-        marginBottom: 2,
-    },
-    userNameMobile: {
-        fontSize: 20,
-    },
-    roleText: {
-        fontSize: 12,
-        color: '#94a3b8',
-    },
-    roleTextMobile: {
-        fontSize: 10,
-    },
-    profileButton: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        borderWidth: 2,
-        borderColor: '#ffffff',
-        overflow: 'hidden',
-    },
-    profileButtonMobile: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-    },
-    profileImage: {
-        width: '100%',
-        height: '100%',
-    },
-    profileFallback: {
-        backgroundColor: '#0ea5e9',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    profileInitials: {
-        color: '#ffffff',
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    profileInitialsMobile: {
-        fontSize: 16,
-    },
-    dateSection: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    dateSectionMobile: {
-        marginTop: -5,
-    },
-    dateContainer: {
-        marginLeft: -10,
-        marginTop: -3,
-        marginBottom: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 6,
-    },
-    dateContainerMobile: {
-        marginLeft: -5,
-        marginTop: -15,
-        paddingHorizontal: 5,
-        paddingVertical: 4,
-    },
-    dateText: {
-        fontSize: 11,
-        color: '#ffffff',
-        fontWeight: '500',
-    },
-    dateTextMobile: {
-        fontSize: 9,
-    },
-    headerActions: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    headerAction: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.18)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerActionMobile: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-    },
+        headerGradient: {
+            paddingTop: isMobile ? 10 : 15,
+            paddingBottom: isMobile ? 5 : 8,
+            paddingHorizontal: isMobile ? 15 : 20,
+        },
+        headerContent: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: isMobile ? 15 : 20,
+        },
+        greetingText: {
+            fontSize: isMobile ? 12 : 14,
+            color: colors.sidebar.text.muted,
+            marginBottom: 4,
+        },
+        userName: {
+            fontSize: isMobile ? 20 : 24,
+            fontWeight: '700',
+            color: '#ffffff',
+            marginBottom: 2,
+        },
+        roleText: {
+            fontSize: isMobile ? 10 : 12,
+            color: colors.sidebar.text.muted,
+        },
+        profileButton: {
+            width: isMobile ? 40 : 50,
+            height: isMobile ? 40 : 50,
+            borderRadius: isMobile ? 20 : 25,
+            borderWidth: 2,
+            borderColor: '#ffffff',
+            overflow: 'hidden',
+        },
+        profileImage: {
+            width: '100%',
+            height: '100%',
+        },
+        profileFallback: {
+            backgroundColor: colors.accent.primary,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        profileInitials: {
+            color: '#ffffff',
+            fontSize: isMobile ? 16 : 18,
+            fontWeight: '600',
+        },
+        dateSection: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+        },
+        dateContainer: {
+            marginLeft: isMobile ? -5 : -10,
+            marginTop: isMobile ? -15 : -20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            paddingHorizontal: isMobile ? 5 : 8,
+            paddingVertical: isMobile ? 4 : 6,
+        },
+        dateText: {
+            fontSize: isMobile ? 9 : 11,
+            color: '#ffffff',
+            fontWeight: '500',
+        },
+        headerActions: {
+            flexDirection: 'row',
+            gap: 12,
+        },
+        headerAction: {
+            width: isMobile ? 36 : 40,
+            height: isMobile ? 36 : 40,
+            borderRadius: isMobile ? 18 : 20,
+            backgroundColor: 'rgba(255, 255, 255, 0.18)',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
 
-    // Stats Grid (Matching announcement.tsx)
-    statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 16,
-        padding: 20,
-        marginTop: -20,
-    },
-    statsGridMobile: {
-        gap: 10,
-        padding: 15,
-        marginTop: -15,
-    },
-    statCard: {
-        flex: 1,
-        minWidth: '22%',
-        backgroundColor: '#ffffff',
-        borderRadius: 20,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
-        elevation: 3,
-        borderLeftWidth: 4,
-    },
-    statCardMobile: {
-        padding: 12,
-        minWidth: '30%',
-    },
-    statIconContainer: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    statIconContainerMobile: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        marginBottom: 8,
-    },
-    statNumber: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: '#0f172a',
-        marginBottom: 4,
-    },
-    statNumberMobile: {
-        fontSize: 22,
-    },
-    statLabel: {
-        fontSize: 12,
-        color: '#64748b',
-        fontWeight: '500',
-    },
-    statLabelMobile: {
-        fontSize: 10,
-    },
+        // Stats Grid
+        statsGrid: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: isMobile ? 10 : 12,
+            padding: isMobile ? 15 : 20,
+            marginTop: isMobile ? -15 : -20,
+        },
+        statCard: {
+            flex: 1,
+            minWidth: isMobile ? '30%' : '18%',
+            backgroundColor: colors.card,
+            borderRadius: 20,
+            padding: isMobile ? 12 : 16,
+            borderWidth: 1,
+            borderColor: colors.border,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: isDark ? 0.3 : 0.05,
+            shadowRadius: 12,
+            elevation: 3,
+            borderLeftWidth: 4,
+            borderLeftColor: colors.accent.primary,
+            borderRightWidth: 4,
+            borderRightColor: isDark ? colors.accent.primary : '#1266d4',
+        },
+        statIconContainer: {
+            width: isMobile ? 36 : 44,
+            height: isMobile ? 36 : 44,
+            borderRadius: 12,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: `${colors.accent.primary}15`,
+            marginBottom: isMobile ? 8 : 12,
+        },
+        statNumber: {
+            fontSize: isMobile ? 22 : 28,
+            fontWeight: '800',
+            color: colors.text,
+            marginBottom: 4,
+        },
+        statLabel: {
+            fontSize: isMobile ? 10 : 12,
+            color: colors.sidebar.text.secondary,
+            fontWeight: '500',
+        },
 
-    // Grid Layouts
-    leftGrid: {
-        flex: 3,
-        backgroundColor: '#ffffff',
-        borderRadius: 24,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-    },
-    leftGridMobile: {
-        flex: undefined,
-        width: '100%',
-        marginBottom: 15,
-    },
-    rightGrid: {
-        flex: 3,
-        backgroundColor: '#ffffff',
-        borderRadius: 24,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-    },
-    rightGridMobile: {
-        flex: undefined,
-        width: '100%',
-    },
+        // Grid Layouts
+        leftGrid: {
+            flex: isMobile ? undefined : 3,
+            width: isMobile ? '100%' : undefined,
+            backgroundColor: colors.card,
+            borderRadius: 24,
+            padding: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: isDark ? 0.3 : 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+            borderWidth: 1,
+            borderColor: colors.border,
+            marginBottom: isMobile ? 15 : 0,
+        },
+        rightGrid: {
+            flex: isMobile ? undefined : 3,
+            width: isMobile ? '100%' : undefined,
+            backgroundColor: colors.card,
+            borderRadius: 24,
+            padding: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: isDark ? 0.3 : 0.05,
+            shadowRadius: 8,
+            elevation: 2,
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
 
-    // Headers
-    leftHeader: {
-        marginBottom: 16,
-        paddingHorizontal: 4,
-    },
-    leftHeaderMobile: {
-        marginBottom: 12,
-    },
-    leftTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#0f172a',
-    },
-    leftTitleMobile: {
-        fontSize: 16,
-    },
-    rightHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    rightHeaderMobile: {
-        marginBottom: 15,
-    },
-    rightTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#0f172a',
-    },
-    rightTitleMobile: {
-        fontSize: 16,
-    },
-    recordCount: {
-        fontSize: 12,
-        color: '#64748b',
-        backgroundColor: '#f1f5f9',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        marginTop: 4,
-    },
-    refreshButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#f1f5f9',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+        // Headers
+        leftHeader: {
+            marginBottom: isMobile ? 12 : 16,
+            paddingHorizontal: 4,
+        },
+        leftTitle: {
+            fontSize: isMobile ? 16 : 18,
+            fontWeight: '700',
+            color: colors.text,
+        },
+        rightHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: isMobile ? 15 : 20,
+        },
+        rightTitle: {
+            fontSize: isMobile ? 16 : 18,
+            fontWeight: '700',
+            color: colors.text,
+        },
+        recordCount: {
+            fontSize: isMobile ? 11 : 12,
+            color: colors.sidebar.text.secondary,
+            backgroundColor: isDark ? colors.border : '#f1f5f9',
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 12,
+            marginTop: 4,
+        },
+        refreshButton: {
+            width: isMobile ? 36 : 40,
+            height: isMobile ? 36 : 40,
+            borderRadius: isMobile ? 18 : 20,
+            backgroundColor: isDark ? colors.border : '#f1f5f9',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
 
-    // Sections
-    section: {
-        marginBottom: 20,
-    },
-    sectionTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#475569',
-        marginBottom: 8,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    sectionTitleMobile: {
-        fontSize: 12,
-        marginBottom: 6,
-    },
+        // Sections
+        section: {
+            marginBottom: 20,
+        },
+        sectionTitle: {
+            fontSize: isMobile ? 12 : 14,
+            fontWeight: '600',
+            color: colors.sidebar.text.secondary,
+            marginBottom: isMobile ? 6 : 8,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
 
-    // Event Selector
-    eventSelector: {
-        backgroundColor: '#f8fafc',
-        borderRadius: 16,
-        padding: 16,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-    },
-    eventSelectorMobile: {
-        padding: 12,
-    },
-    eventSelectorText: {
-        flex: 1,
-        fontSize: 16,
-        color: '#1e293b',
-        fontWeight: '500',
-    },
-    eventSelectorTextMobile: {
-        fontSize: 14,
-    },
-    eventSelectorPlaceholder: {
-        flex: 1,
-        fontSize: 16,
-        color: '#94a3b8',
-    },
-    eventSelectorIcon: {
-        marginLeft: 8,
-    },
+        // Event Selector
+        eventSelector: {
+            backgroundColor: isDark ? colors.card : '#f8fafc',
+            borderRadius: 16,
+            padding: isMobile ? 12 : 16,
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        eventSelectorText: {
+            flex: 1,
+            fontSize: isMobile ? 14 : 16,
+            color: colors.text,
+            fontWeight: '500',
+        },
+        eventSelectorPlaceholder: {
+            flex: 1,
+            fontSize: isMobile ? 14 : 16,
+            color: colors.sidebar.text.muted,
+        },
+        eventSelectorIcon: {
+            marginLeft: 8,
+            color: colors.sidebar.text.secondary,
+        },
 
-    // QR Container
-    qrContainer: {
-        alignItems: 'center',
-        padding: 20,
-        backgroundColor: '#f8fafc',
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        marginTop: 16,
-        marginBottom: 16,
-    },
-    qrContainerMobile: {
-        padding: 16,
-    },
-    eventInfo: {
-        width: '100%',
-        marginBottom: 20,
-        alignItems: 'center',
-    },
-    eventName: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1e293b',
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    eventNameMobile: {
-        fontSize: 18,
-    },
-    eventDetails: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    eventDetailText: {
-        fontSize: 14,
-        color: '#64748b',
-        marginLeft: 6,
-    },
+        // QR Container
+        qrContainer: {
+            alignItems: 'center',
+            padding: isMobile ? 16 : 20,
+            backgroundColor: isDark ? colors.card : '#f8fafc',
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: colors.border,
+            marginTop: 16,
+            marginBottom: 16,
+        },
+        eventInfo: {
+            width: '100%',
+            marginBottom: 20,
+            alignItems: 'center',
+        },
+        eventName: {
+            fontSize: isMobile ? 18 : 20,
+            fontWeight: '700',
+            color: colors.text,
+            marginBottom: 8,
+            textAlign: 'center',
+        },
+        eventDetails: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 4,
+        },
+        eventDetailText: {
+            fontSize: isMobile ? 13 : 14,
+            color: colors.sidebar.text.secondary,
+            marginLeft: 6,
+        },
 
-    // Status Badges
-    statusBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        marginTop: 12,
-    },
-    statusBadgeActive: {
-        backgroundColor: '#dcfce7',
-        borderWidth: 1,
-        borderColor: '#86efac',
-    },
-    statusBadgeExpired: {
-        backgroundColor: '#fee2e2',
-        borderWidth: 1,
-        borderColor: '#fca5a5',
-    },
-    statusBadgeText: {
-        fontSize: 12,
-        fontWeight: '600',
-        marginLeft: 6,
-    },
-    statusBadgeTextActive: {
-        color: '#16a34a',
-    },
-    statusBadgeTextExpired: {
-        color: '#dc2626',
-    },
+        // Status Badges (keep semantic colors)
+        statusBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 20,
+            marginTop: 12,
+        },
+        statusBadgeActive: {
+            backgroundColor: '#dcfce7',
+            borderWidth: 1,
+            borderColor: '#86efac',
+        },
+        statusBadgeExpired: {
+            backgroundColor: '#fee2e2',
+            borderWidth: 1,
+            borderColor: '#fca5a5',
+        },
+        statusBadgeText: {
+            fontSize: isMobile ? 11 : 12,
+            fontWeight: '600',
+            marginLeft: 6,
+        },
+        statusBadgeTextActive: {
+            color: '#16a34a',
+        },
+        statusBadgeTextExpired: {
+            color: '#dc2626',
+        },
 
-    // Location Verification Badge
-    locationVerificationBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#dcfce7',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 12,
-        marginTop: 8,
-    },
-    locationVerificationText: {
-        fontSize: 11,
-        color: '#16a34a',
-        marginLeft: 4,
-        fontWeight: '500',
-    },
+        // Location Verification Badge
+        locationVerificationBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#dcfce7',
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 12,
+            marginTop: 8,
+        },
+        locationVerificationText: {
+            fontSize: isMobile ? 10 : 11,
+            color: '#16a34a',
+            marginLeft: 4,
+            fontWeight: '500',
+        },
 
-    // QR Code
-    qrCodeContainer: {
-        marginVertical: 20,
-        padding: 10,
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    qrInfo: {
-        marginTop: 12,
-        alignItems: 'center',
-    },
-    qrHint: {
-        fontSize: 12,
-        color: '#64748b',
-        textAlign: 'center',
-        marginTop: 4,
-    },
+        // QR Code
+        qrCodeContainer: {
+            marginVertical: 20,
+            padding: 10,
+            backgroundColor: colors.card,
+            borderRadius: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+            elevation: 2,
+        },
+        qrInfo: {
+            marginTop: 12,
+            alignItems: 'center',
+        },
+        qrHint: {
+            fontSize: isMobile ? 11 : 12,
+            color: colors.sidebar.text.muted,
+            textAlign: 'center',
+            marginTop: 4,
+        },
 
-    // Expired State
-    expiredContainer: {
-        alignItems: 'center',
-        padding: 24,
-    },
-    expiredIcon: {
-        marginBottom: 12,
-    },
-    expiredText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#dc2626',
-        textAlign: 'center',
-    },
-    expiredSubtext: {
-        fontSize: 14,
-        color: '#64748b',
-        textAlign: 'center',
-        marginTop: 4,
-    },
+        // Expired State
+        expiredContainer: {
+            alignItems: 'center',
+            padding: 24,
+        },
+        expiredIcon: {
+            marginBottom: 12,
+            color: '#dc2626',
+        },
+        expiredText: {
+            fontSize: isMobile ? 14 : 16,
+            fontWeight: '600',
+            color: '#dc2626',
+            textAlign: 'center',
+        },
+        expiredSubtext: {
+            fontSize: isMobile ? 13 : 14,
+            color: colors.sidebar.text.muted,
+            textAlign: 'center',
+            marginTop: 4,
+        },
 
-    // Action Buttons
-    actionButtons: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    actionButtonsMobile: {
-        flexDirection: 'column',
-        gap: 8,
-    },
-    actionButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 14,
-        borderRadius: 16,
-    },
-    actionButtonMobile: {
-        paddingVertical: 12,
-    },
-    actionButtonPrimary: {
-        backgroundColor: '#0ea5e9',
-    },
-    actionButtonDanger: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 12,
-        borderRadius: 10,
-        backgroundColor: '#ef4444',
-    },
-    actionButtonSecondary: {
-        backgroundColor: '#f1f5f9',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-    },
-    actionButtonText: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    actionButtonTextMobile: {
-        fontSize: 13,
-    },
-    actionButtonTextPrimary: {
-        color: '#ffffff',
-    },
-    actionButtonTextSecondary: {
-        color: '#475569',
-    },
+        // Action Buttons
+        actionButtons: {
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? 8 : 12,
+        },
+        actionButton: {
+            flex: isMobile ? undefined : 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            paddingVertical: isMobile ? 12 : 14,
+            borderRadius: 16,
+        },
+        actionButtonPrimary: {
+            backgroundColor: colors.accent.primary,
+        },
+        actionButtonDanger: {
+            backgroundColor: '#ef4444',
+        },
+        actionButtonSecondary: {
+            backgroundColor: isDark ? colors.border : '#f1f5f9',
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        actionButtonText: {
+            fontSize: isMobile ? 13 : 14,
+            fontWeight: '600',
+        },
+        actionButtonTextPrimary: {
+            color: '#ffffff',
+        },
+        actionButtonTextSecondary: {
+            color: colors.sidebar.text.secondary,
+        },
 
-    // Filters
-    filtersContainer: {
-        marginBottom: 20,
-    },
-    filterLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#64748b',
-        marginBottom: 8,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    filterLabelMobile: {
-        fontSize: 11,
-        marginBottom: 6,
-    },
-    filterRow: {
-        flexDirection: 'row',
-        gap: 8,
-        marginBottom: 16,
-    },
-    filterChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#f1f5f9',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-    },
-    filterChipMobile: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-    },
-    filterChipActive: {
-        backgroundColor: '#0ea5e9',
-        borderColor: '#0ea5e9',
-    },
-    filterChipText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#64748b',
-    },
-    filterChipTextMobile: {
-        fontSize: 11,
-    },
-    filterChipTextActive: {
-        color: '#ffffff',
-    },
+        // Filters
+        filtersContainer: {
+            marginBottom: 20,
+        },
+        filterLabel: {
+            fontSize: isMobile ? 11 : 12,
+            fontWeight: '600',
+            color: colors.sidebar.text.secondary,
+            marginBottom: isMobile ? 6 : 8,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+        },
+        filterRow: {
+            flexDirection: 'row',
+            gap: 8,
+            marginBottom: 16,
+        },
+        filterChip: {
+            paddingHorizontal: isMobile ? 12 : 16,
+            paddingVertical: isMobile ? 6 : 8,
+            borderRadius: 20,
+            backgroundColor: isDark ? colors.border : '#f1f5f9',
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        filterChipActive: {
+            backgroundColor: colors.accent.primary,
+            borderColor: colors.accent.primary,
+        },
+        filterChipText: {
+            fontSize: isMobile ? 11 : 12,
+            fontWeight: '600',
+            color: colors.sidebar.text.secondary,
+        },
+        filterChipTextActive: {
+            color: '#ffffff',
+        },
 
-    // Attendance List
-    attendanceListContainer: {
-        flex: 1,
-        minHeight: 200,
-    },
-    attendanceListContent: {
-        paddingBottom: 8,
-    },
-    blockSection: {
-        marginBottom: 16,
-    },
-    blockHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
-    },
-    blockTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1e293b',
-    },
-    blockCount: {
-        fontSize: 12,
-        color: '#64748b',
-        backgroundColor: '#f1f5f9',
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 10,
-    },
-    attendanceItem: {
-        backgroundColor: '#ffffff',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 8,
-        borderWidth: 1,
-        borderColor: '#f1f5f9',
-    },
-    attendanceItemMobile: {
-        padding: 10,
-    },
-    studentRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 6,
-    },
-    studentInfo: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    studentName: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1e293b',
-        flex: 1,
-    },
-    studentNameMobile: {
-        fontSize: 13,
-    },
-    studentId: {
-        fontSize: 12,
-        color: '#64748b',
-    },
-    studentDetails: {
-        fontSize: 12,
-        color: '#64748b',
-        marginBottom: 4,
-    },
-    timestamp: {
-        fontSize: 11,
-        color: '#94a3b8',
-    },
+        // Attendance List
+        attendanceListContainer: {
+            flex: 1,
+            minHeight: 200,
+        },
+        attendanceListContent: {
+            paddingBottom: 8,
+        },
+        blockSection: {
+            marginBottom: 16,
+        },
+        blockHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 8,
+            paddingBottom: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        blockTitle: {
+            fontSize: isMobile ? 14 : 16,
+            fontWeight: '600',
+            color: colors.text,
+        },
+        blockCount: {
+            fontSize: isMobile ? 11 : 12,
+            color: colors.sidebar.text.secondary,
+            backgroundColor: isDark ? colors.border : '#f1f5f9',
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 10,
+        },
+        attendanceItem: {
+            backgroundColor: colors.card,
+            borderRadius: 12,
+            padding: isMobile ? 10 : 12,
+            marginBottom: 8,
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        studentRow: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 6,
+        },
+        studentInfo: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+        },
+        studentName: {
+            fontSize: isMobile ? 13 : 14,
+            fontWeight: '600',
+            color: colors.text,
+            flex: 1,
+        },
+        studentId: {
+            fontSize: isMobile ? 11 : 12,
+            color: colors.sidebar.text.muted,
+        },
+        studentDetails: {
+            fontSize: isMobile ? 11 : 12,
+            color: colors.sidebar.text.secondary,
+            marginBottom: 4,
+        },
+        timestamp: {
+            fontSize: isMobile ? 10 : 11,
+            color: colors.sidebar.text.muted,
+        },
 
-    // Location Badges
-    locationBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        marginLeft: 8,
-    },
-    locationBadgeValid: {
-        backgroundColor: '#dcfce7',
-    },
-    locationBadgeInvalid: {
-        backgroundColor: '#fee2e2',
-    },
-    locationBadgeText: {
-        fontSize: 10,
-        fontWeight: '600',
-        marginLeft: 4,
-    },
-    locationBadgeTextValid: {
-        color: '#16a34a',
-    },
-    locationBadgeTextInvalid: {
-        color: '#dc2626',
-    },
+        // Location Badges (semantic)
+        locationBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 12,
+            marginLeft: 8,
+        },
+        locationBadgeValid: {
+            backgroundColor: '#dcfce7',
+        },
+        locationBadgeInvalid: {
+            backgroundColor: '#fee2e2',
+        },
+        locationBadgeText: {
+            fontSize: 10,
+            fontWeight: '600',
+            marginLeft: 4,
+        },
+        locationBadgeTextValid: {
+            color: '#16a34a',
+        },
+        locationBadgeTextInvalid: {
+            color: '#dc2626',
+        },
 
-    // Event Item (in modal)
-    eventItem: {
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
-    },
-    eventItemMobile: {
-        padding: 12,
-    },
-    eventItemContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    eventItemName: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1e293b',
-        flex: 1,
-    },
-    eventItemNameMobile: {
-        fontSize: 14,
-    },
-    eventItemBadges: {
-        flexDirection: 'row',
-        gap: 6,
-    },
-    eventItemDate: {
-        fontSize: 13,
-        color: '#64748b',
-        marginBottom: 4,
-    },
-    eventItemFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    eventItemLocation: {
-        fontSize: 12,
-        color: '#64748b',
-        flex: 1,
-    },
-    eventItemExpBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fffbeb',
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 12,
-    },
-    eventItemExpBadgeExpired: {
-        backgroundColor: '#fee2e2',
-    },
-    eventItemExpText: {
-        fontSize: 10,
-        fontWeight: '500',
-        color: '#d97706',
-        marginLeft: 4,
-    },
-    eventItemExpTextExpired: {
-        color: '#dc2626',
-    },
-    eventItemActiveBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#dcfce7',
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 12,
-    },
-    eventItemActiveText: {
-        fontSize: 10,
-        fontWeight: '500',
-        color: '#16a34a',
-        marginLeft: 4,
-    },
-    eventItemLocBadge: {
-        backgroundColor: '#dcfce7',
-        padding: 4,
-        borderRadius: 12,
-        marginLeft: 8,
-    },
+        // Event Item (in modal)
+        eventItem: {
+            padding: isMobile ? 12 : 16,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        eventItemContent: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 4,
+        },
+        eventItemName: {
+            fontSize: isMobile ? 14 : 16,
+            fontWeight: '600',
+            color: colors.text,
+            flex: 1,
+        },
+        eventItemBadges: {
+            flexDirection: 'row',
+            gap: 6,
+        },
+        eventItemDate: {
+            fontSize: isMobile ? 12 : 13,
+            color: colors.sidebar.text.secondary,
+            marginBottom: 4,
+        },
+        eventItemFooter: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+        },
+        eventItemLocation: {
+            fontSize: isMobile ? 11 : 12,
+            color: colors.sidebar.text.secondary,
+            flex: 1,
+        },
+        eventItemExpBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#fffbeb',
+            paddingHorizontal: 6,
+            paddingVertical: 3,
+            borderRadius: 12,
+        },
+        eventItemExpBadgeExpired: {
+            backgroundColor: '#fee2e2',
+        },
+        eventItemExpText: {
+            fontSize: 10,
+            fontWeight: '500',
+            color: '#d97706',
+            marginLeft: 4,
+        },
+        eventItemExpTextExpired: {
+            color: '#dc2626',
+        },
+        eventItemActiveBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#dcfce7',
+            paddingHorizontal: 6,
+            paddingVertical: 3,
+            borderRadius: 12,
+        },
+        eventItemActiveText: {
+            fontSize: 10,
+            fontWeight: '500',
+            color: '#16a34a',
+            marginLeft: 4,
+        },
+        eventItemLocBadge: {
+            backgroundColor: '#dcfce7',
+            padding: 4,
+            borderRadius: 12,
+            marginLeft: 8,
+        },
+        eventItemStatusBadge: {
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            borderRadius: 4,
+            marginRight: 6,
+        },
+        eventItemStatusText: {
+            fontSize: 10,
+            fontWeight: '600',
+            color: '#ffffff',
+        },
 
-    // Empty State
-    emptyState: {
-        alignItems: 'center',
-        paddingVertical: 48,
-    },
-    emptyStateMobile: {
-        paddingVertical: 32,
-    },
-    emptyStateIcon: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#f1f5f9',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    emptyStateIconMobile: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        marginBottom: 12,
-    },
-    emptyStateTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#475569',
-        marginBottom: 8,
-        textAlign: 'center',
-    },
-    emptyStateTitleMobile: {
-        fontSize: 14,
-        marginBottom: 6,
-    },
-    emptyStateText: {
-        fontSize: 14,
-        color: '#94a3b8',
-        textAlign: 'center',
-        maxWidth: 300,
-    },
-    emptyStateTextMobile: {
-        fontSize: 12,
-        maxWidth: 250,
-    },
+        // Empty State
+        emptyState: {
+            alignItems: 'center',
+            paddingVertical: isMobile ? 30 : 48,
+        },
+        emptyStateIcon: {
+            width: isMobile ? 60 : 80,
+            height: isMobile ? 60 : 80,
+            borderRadius: isMobile ? 30 : 40,
+            backgroundColor: colors.border,
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 16,
+        },
+        emptyStateTitle: {
+            fontSize: isMobile ? 14 : 16,
+            fontWeight: '600',
+            color: colors.sidebar.text.secondary,
+            marginBottom: isMobile ? 6 : 8,
+            textAlign: 'center',
+        },
+        emptyStateText: {
+            fontSize: isMobile ? 12 : 14,
+            color: colors.sidebar.text.muted,
+            textAlign: 'center',
+            maxWidth: 300,
+        },
 
-    // Loading
-    loadingContainer: {
-        padding: 24,
-        alignItems: 'center',
-    },
-    loadingText: {
-        fontSize: 14,
-        color: '#64748b',
-        marginTop: 8,
-    },
-    loadingTextMobile: {
-        fontSize: 12,
-    },
+        // Loading
+        loadingContainer: {
+            padding: 24,
+            alignItems: 'center',
+        },
+        loadingText: {
+            fontSize: isMobile ? 12 : 14,
+            color: colors.sidebar.text.secondary,
+            marginTop: 8,
+        },
 
-    // Modern Modal Styles (Matching announcement.tsx)
-    modernModalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modernModalContainer: {
-        width: '90%',
-        maxWidth: 500,
-        maxHeight: '80%',
-        backgroundColor: '#ffffff',
-        borderRadius: 24,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    modernModalContainerMobile: {
-        width: '95%',
-        maxWidth: 400,
-    },
+        modernModalOverlay: {
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        modernModalContainer: {
+            width: '100%',
+            maxWidth: 500,
+            maxHeight: '80%',
+            backgroundColor: colors.card,
+            borderRadius: 24,
+            overflow: 'hidden',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.1,
+            shadowRadius: 20,
+            elevation: 10,
+        },
+        expirationModalContainer: {
+            width: isMobile ? '95%' : '150%',
+            maxWidth: isMobile ? 450 : 800,
+            maxHeight: isMobile ? '90%' : '85%',
+            backgroundColor: colors.card,
+            borderRadius: 24,
+            overflow: 'hidden',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.1,
+            shadowRadius: 20,
+            elevation: 10,
+        },
+        expirationModalContent: {
+            padding: isMobile ? 18 : 24,
+            maxHeight: isMobile ? 450 : 500,
+        },
+        modernModalHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: isMobile ? 15 : 20,
+            paddingVertical: isMobile ? 12 : 16,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        modernModalHeaderLeft: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: isMobile ? 8 : 12,
+        },
+        modernModalIconContainer: {
+            width: isMobile ? 32 : 40,
+            height: isMobile ? 32 : 40,
+            borderRadius: 12,
+            backgroundColor: `${colors.accent.primary}15`,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        modernModalTitleContainer: {
+            gap: 2,
+        },
+        modernModalTitle: {
+            fontSize: isMobile ? 16 : 18,
+            fontWeight: '700',
+            color: colors.text,
+        },
+        modernModalSubtitle: {
+            fontSize: isMobile ? 10 : 12,
+            color: colors.sidebar.text.secondary,
+        },
+        modernModalCloseButton: {
+            width: isMobile ? 32 : 36,
+            height: isMobile ? 32 : 36,
+            borderRadius: isMobile ? 16 : 18,
+            backgroundColor: colors.border,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        modernModalContent: {
+            padding: isMobile ? 15 : 20,
+            maxHeight: isMobile ? 350 : 400,
+        },
 
-    expirationModalContainer: {
-        width: '150%',
-        maxWidth: 800,
-        maxHeight: '85%',
-        backgroundColor: '#ffffff',
-        borderRadius: 24,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    expirationModalContainerMobile: {
-        width: '95%',
-        maxWidth: 450,
-        maxHeight: '90%',
-    },
-    expirationModalContent: {
-        padding: 24,
-        maxHeight: 500,
-    },
-    expirationModalContentMobile: {
-        padding: 18,
-        maxHeight: 450,
-    },
+        // Modern Form Elements
+        modernFormLabel: {
+            fontSize: isMobile ? 13 : 14,
+            fontWeight: '600',
+            color: colors.text,
+            marginBottom: isMobile ? 6 : 8,
+            marginLeft: 4,
+        },
+        modernFormInput: {
+            backgroundColor: isDark ? colors.card : '#f8fafc',
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 16,
+            paddingHorizontal: 16,
+            paddingVertical: isMobile ? 12 : 14,
+            fontSize: isMobile ? 13 : 14,
+            color: colors.text,
+            marginBottom: 12,
+        },
+        modernFormActions: {
+            flexDirection: 'row',
+            gap: isMobile ? 8 : 12,
+            marginTop: isMobile ? 20 : 24,
+        },
+        modernSubmitButton: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            backgroundColor: colors.accent.primary,
+            paddingVertical: isMobile ? 12 : 14,
+            borderRadius: 16,
+        },
+        modernSubmitButtonDisabled: {
+            backgroundColor: colors.sidebar.text.muted,
+        },
+        modernSubmitButtonText: {
+            color: '#ffffff',
+            fontSize: isMobile ? 14 : 16,
+            fontWeight: '600',
+        },
+        modernCancelButton: {
+            flex: 1,
+            backgroundColor: colors.border,
+            paddingVertical: isMobile ? 12 : 14,
+            borderRadius: 16,
+            alignItems: 'center',
+        },
+        modernCancelButtonText: {
+            color: colors.sidebar.text.secondary,
+            fontSize: isMobile ? 14 : 16,
+            fontWeight: '600',
+        },
 
-    modernModalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f1f5f9',
-    },
-    modernModalHeaderMobile: {
-        paddingHorizontal: 15,
-        paddingVertical: 12,
-    },
-    modernModalHeaderLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    modernModalHeaderLeftMobile: {
-        gap: 8,
-    },
-    modernModalIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: '#0ea5e915',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modernModalIconContainerMobile: {
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-    },
-    modernModalTitleContainer: {
-        gap: 2,
-    },
-    modernModalTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#0f172a',
-    },
-    modernModalTitleMobile: {
-        fontSize: 16,
-    },
-    modernModalSubtitle: {
-        fontSize: 12,
-        color: '#64748b',
-    },
-    modernModalSubtitleMobile: {
-        fontSize: 10,
-    },
-    modernModalCloseButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#f1f5f9',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modernModalCloseButtonMobile: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-    },
-    modernModalContent: {
-        padding: 20,
-        maxHeight: 400,
-    },
-    modernModalContentMobile: {
-        padding: 15,
-        maxHeight: 350,
-    },
+        // Expiration Options
+        expirationOptions: {
+            marginBottom: 20,
+        },
+        expirationOption: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: isMobile ? 12 : 16,
+            backgroundColor: isDark ? colors.border : '#f1f5f9',
+            borderRadius: 12,
+            marginBottom: 8,
+        },
+        expirationOptionActive: {
+            backgroundColor: colors.accent.primary,
+            borderColor: colors.accent.primary,
+        },
+        expirationOptionText: {
+            fontSize: isMobile ? 13 : 14,
+            fontWeight: '600',
+            color: colors.text,
+        },
+        expirationOptionTextActive: {
+            color: '#ffffff',
+        },
 
-    // Modern Form Elements
-    modernFormLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1e293b',
-        marginBottom: 8,
-        marginLeft: 4,
-    },
-    modernFormLabelMobile: {
-        fontSize: 13,
-        marginBottom: 6,
-    },
-    modernFormInput: {
-        backgroundColor: '#f8fafc',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 14,
-        color: '#1e293b',
-        marginBottom: 12,
-    },
-    modernFormActions: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: 24,
-    },
-    modernFormActionsMobile: {
-        gap: 8,
-        marginTop: 20,
-    },
-    modernSubmitButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        backgroundColor: '#0ea5e9',
-        paddingVertical: 14,
-        borderRadius: 16,
-    },
-    modernSubmitButtonMobile: {
-        paddingVertical: 12,
-    },
-    modernSubmitButtonDisabled: {
-        backgroundColor: '#cbd5e1',
-    },
-    modernSubmitButtonText: {
-        color: '#ffffff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    modernSubmitButtonTextMobile: {
-        fontSize: 14,
-    },
-    modernCancelButton: {
-        flex: 1,
-        backgroundColor: '#f1f5f9',
-        paddingVertical: 14,
-        borderRadius: 16,
-        alignItems: 'center',
-    },
-    modernCancelButtonMobile: {
-        paddingVertical: 12,
-    },
-    modernCancelButtonText: {
-        color: '#64748b',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    modernCancelButtonTextMobile: {
-        fontSize: 14,
-    },
+        // Expiration Badge
+        expirationBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#fffbeb',
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 6,
+            marginTop: 8,
+        },
+        expirationBadgeText: {
+            fontSize: isMobile ? 10 : 11,
+            color: '#d97706',
+            marginLeft: 4,
+        },
 
-    // Expiration Options
-    expirationOptions: {
-        marginBottom: 20,
-    },
-    expirationOption: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        padding: 16,
-        backgroundColor: '#f1f5f9',
-        borderRadius: 12,
-        marginBottom: 8,
-    },
-    expirationOptionMobile: {
-        padding: 12,
-    },
-    expirationOptionActive: {
-        backgroundColor: '#0ea5e9',
-        borderColor: '#0ea5e9',
-    },
-    expirationOptionText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1e293b',
-    },
-    expirationOptionTextMobile: {
-        fontSize: 13,
-    },
-    expirationOptionTextActive: {
-        color: '#ffffff',
-    },
-    // Expiration Badge
-    expirationBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fffbeb',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 6,
-        marginTop: 8,
-    },
-    expirationBadgeText: {
-        fontSize: 11,
-        color: '#d97706',
-        marginLeft: 4,
-    },
-    paginationContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 16,
-        paddingTop: 16,
-        marginTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: '#f1f5f9',
-    },
-    paginationContainerMobile: {
-        gap: 12,
-        paddingTop: 12,
-    },
-    paginationButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 20,
-        backgroundColor: '#f8fafc',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        gap: 4,
-    },
-    paginationButtonDisabled: {
-        opacity: 0.5,
-        borderColor: '#f1f5f9',
-    },
-    paginationButtonText: {
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#0ea5e9',
-    },
-    paginationButtonTextDisabled: {
-        color: '#cbd5e1',
-    },
-    pageInfo: {
-        alignItems: 'center',
-    },
-    pageInfoText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#0f172a',
-    },
-    eventItemStatusBadge: {
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-        marginRight: 6,
-    },
-    eventItemStatusText: {
-        fontSize: 10,
-        fontWeight: '600',
-        color: '#ffffff',
-    },
-    eventStatusBreakdown: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginTop: 8,
-        gap: 6,
-    },
-    eventStatusBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    eventStatusBadgeText: {
-        fontSize: 11,
-        fontWeight: '600',
-    },
-    modernLocationButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f8fafc',
-        borderRadius: 16,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        gap: 12,
-    },
-    modernLocationButtonText: {
-        flex: 1,
-    },
-    modernLocationButtonTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#1e293b',
-    },
-    modernLocationButtonSubtitle: {
-        fontSize: 12,
-        color: '#64748b',
-        marginTop: 2,
-    },
-});
+        // Pagination
+        paginationContainer: {
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: isMobile ? 12 : 16,
+            paddingTop: 16,
+            marginTop: 8,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+        },
+        paginationButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: isMobile ? 8 : 12,
+            paddingVertical: isMobile ? 6 : 8,
+            borderRadius: 20,
+            backgroundColor: isDark ? colors.card : '#f8fafc',
+            borderWidth: 1,
+            borderColor: colors.border,
+            gap: 4,
+        },
+        paginationButtonDisabled: {
+            opacity: 0.5,
+        },
+        paginationButtonText: {
+            fontSize: isMobile ? 11 : 12,
+            fontWeight: '600',
+            color: colors.accent.primary,
+        },
+        paginationButtonTextDisabled: {
+            color: colors.sidebar.text.muted,
+        },
+        pageInfo: {
+            alignItems: 'center',
+        },
+        pageInfoText: {
+            fontSize: isMobile ? 12 : 14,
+            fontWeight: '600',
+            color: colors.text,
+        },
+
+        // Event Status Breakdown
+        eventStatusBreakdown: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            marginTop: 8,
+            gap: 6,
+        },
+        eventStatusBadge: {
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 12,
+        },
+        eventStatusBadgeText: {
+            fontSize: isMobile ? 10 : 11,
+            fontWeight: '600',
+        },
+
+        // Modern Location Button (for expiration)
+        modernLocationButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: isDark ? colors.card : '#f8fafc',
+            borderRadius: 16,
+            padding: isMobile ? 12 : 16,
+            borderWidth: 1,
+            borderColor: colors.border,
+            gap: 12,
+            marginBottom: 16,
+        },
+        modernLocationButtonText: {
+            flex: 1,
+        },
+        modernLocationButtonTitle: {
+            fontSize: isMobile ? 13 : 14,
+            fontWeight: '600',
+            color: colors.text,
+        },
+        modernLocationButtonSubtitle: {
+            fontSize: isMobile ? 11 : 12,
+            color: colors.sidebar.text.muted,
+            marginTop: 2,
+        },
+
+        // Mode Toggle
+        modeToggleContainer: {
+            flexDirection: 'row',
+            backgroundColor: isDark ? colors.border : '#f1f5f9',
+            borderRadius: 30,
+            padding: 4,
+            marginBottom: 16,
+        },
+        modeButton: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            paddingVertical: isMobile ? 6 : 8,
+            borderRadius: 30,
+        },
+        modeButtonActive: {
+            backgroundColor: colors.accent.primary,
+        },
+        modeButtonText: {
+            fontSize: isMobile ? 12 : 14,
+            fontWeight: '600',
+            color: colors.sidebar.text.secondary,
+        },
+        modeButtonTextActive: {
+            color: '#ffffff',
+        },
+
+        // Receipt Container
+        receiptContainer: {
+            padding: isMobile ? 12 : 16,
+            backgroundColor: isDark ? colors.card : '#f8fafc',
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        receiptHeader: {
+            marginBottom: 16,
+        },
+        receiptTitle: {
+            fontSize: isMobile ? 16 : 18,
+            fontWeight: '700',
+            color: colors.text,
+            marginBottom: 4,
+        },
+        receiptDate: {
+            fontSize: isMobile ? 13 : 14,
+            color: colors.sidebar.text.secondary,
+        },
+        receiptStats: {
+            flexDirection: 'row',
+            justifyContent: 'space-around',
+            marginBottom: 16,
+        },
+        receiptStatItem: {
+            alignItems: 'center',
+        },
+        receiptStatLabel: {
+            fontSize: isMobile ? 11 : 12,
+            color: colors.sidebar.text.secondary,
+            marginBottom: 4,
+        },
+        receiptStatValue: {
+            fontSize: isMobile ? 20 : 24,
+            fontWeight: '700',
+            color: colors.accent.primary,
+        },
+        generateReceiptButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            backgroundColor: colors.accent.primary,
+            paddingVertical: isMobile ? 12 : 14,
+            borderRadius: 12,
+        },
+        generateReceiptText: {
+            color: '#ffffff',
+            fontSize: isMobile ? 14 : 16,
+            fontWeight: '600',
+        },
+
+        // Missing student items
+        missingStudentItem: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        missingListContent: {
+            paddingBottom: 8,
+        },
+        studentBlock: {
+            fontSize: isMobile ? 11 : 12,
+            color: colors.accent.primary,
+            fontWeight: '500',
+            marginRight: 10
+        },
+
+        // No event message
+        noEventMessage: {
+            alignItems: 'center',
+            padding: 24,
+        },
+        noEventText: {
+            fontSize: isMobile ? 13 : 14,
+            color: colors.sidebar.text.muted,
+            textAlign: 'center',
+            marginTop: 8,
+        },
+
+        // Search
+        searchContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: isDark ? colors.card : '#f1f5f9',
+            borderRadius: 12,
+            paddingHorizontal: isMobile ? 8 : 12,
+            marginBottom: 16,
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        searchInput: {
+            flex: 1,
+            paddingVertical: isMobile ? 8 : 12,
+            paddingHorizontal: 8,
+            fontSize: isMobile ? 13 : 14,
+            color: colors.text,
+        },
+        searchClearButton: {
+            padding: 4,
+        },
+
+        // Attendance meta
+        attendanceMeta: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+        },
+        attendanceTimeContainer: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: 6,
+            gap: 6,
+        },
+        attendanceTimeText: {
+            fontSize: isMobile ? 11 : 12,
+            color: colors.sidebar.text.secondary,
+            fontWeight: '500',
+        },
+        paidButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: '#16a34a',
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 8,
+        },
+
+        paidButtonDisabled: {
+            backgroundColor: '#6b7280',
+            opacity: 0.6,
+        },
+        penaltySentBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+        },
+
+        awaitingPenaltyBadge: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            opacity: 0.7,
+        },
+
+        // Additional mobile-specific styles (to support existing isMobile conditionals)
+        headerGradientMobile: { paddingTop: 10, paddingBottom: 5, paddingHorizontal: 15 },
+        headerContentMobile: { marginBottom: 15 },
+        greetingTextMobile: { fontSize: 12 },
+        userNameMobile: { fontSize: 20 },
+        roleTextMobile: { fontSize: 10 },
+        profileButtonMobile: { width: 40, height: 40, borderRadius: 20 },
+        profileInitialsMobile: { fontSize: 16 },
+        dateSectionMobile: { marginTop: -5 },
+        dateContainerMobile: { marginLeft: -5, marginTop: -15, paddingHorizontal: 5, paddingVertical: 4 },
+        dateTextMobile: { fontSize: 9 },
+        headerActionMobile: { width: 36, height: 36, borderRadius: 18 },
+        statsGridMobile: { gap: 10, padding: 15, marginTop: -15 },
+        statCardMobile: { padding: 12, minWidth: '30%' },
+        statIconContainerMobile: { width: 36, height: 36, borderRadius: 10, marginBottom: 8 },
+        statNumberMobile: { fontSize: 22 },
+        statLabelMobile: { fontSize: 10 },
+        mainContentMobile: { flexDirection: 'column', padding: 15, gap: 15 },
+        leftGridMobile: { flex: undefined, width: '100%', marginBottom: 15 },
+        rightGridMobile: { flex: undefined, width: '100%' },
+        leftHeaderMobile: { marginBottom: 12 },
+        leftTitleMobile: { fontSize: 16 },
+        rightHeaderMobile: { marginBottom: 15 },
+        rightTitleMobile: { fontSize: 16 },
+        refreshButtonMobile: { width: 36, height: 36, borderRadius: 18 },
+        sectionTitleMobile: { fontSize: 12, marginBottom: 6 },
+        eventSelectorMobile: { padding: 12 },
+        eventSelectorTextMobile: { fontSize: 14 },
+        qrContainerMobile: { padding: 16 },
+        eventNameMobile: { fontSize: 18 },
+        actionButtonsMobile: { flexDirection: 'column', gap: 8 },
+        actionButtonMobile: { paddingVertical: 12 },
+        actionButtonTextMobile: { fontSize: 13 },
+        filterLabelMobile: { fontSize: 11, marginBottom: 6 },
+        filterChipMobile: { paddingHorizontal: 12, paddingVertical: 6 },
+        filterChipTextMobile: { fontSize: 11 },
+        attendanceItemMobile: { padding: 10 },
+        studentNameMobile: { fontSize: 13 },
+        eventItemMobile: { padding: 12 },
+        eventItemNameMobile: { fontSize: 14 },
+        emptyStateMobile: { paddingVertical: 32 },
+        emptyStateIconMobile: { width: 60, height: 60, borderRadius: 30, marginBottom: 12 },
+        emptyStateTitleMobile: { fontSize: 14, marginBottom: 6 },
+        emptyStateTextMobile: { fontSize: 12, maxWidth: 250 },
+        loadingTextMobile: { fontSize: 12 },
+        modernModalContainerMobile: { width: '95%', maxWidth: 400 },
+        modernModalHeaderMobile: { paddingHorizontal: 15, paddingVertical: 12 },
+        modernModalHeaderLeftMobile: { gap: 8 },
+        modernModalIconContainerMobile: { width: 32, height: 32, borderRadius: 10 },
+        modernModalTitleMobile: { fontSize: 16 },
+        modernModalSubtitleMobile: { fontSize: 10 },
+        modernModalCloseButtonMobile: { width: 32, height: 32, borderRadius: 16 },
+        modernModalContentMobile: { padding: 15, maxHeight: 350 },
+        modernFormLabelMobile: { fontSize: 13, marginBottom: 6 },
+        modernFormInputMobile: { paddingHorizontal: 14, paddingVertical: 12, fontSize: 13 },
+        modernFormActionsMobile: { gap: 8, marginTop: 20 },
+        modernSubmitButtonMobile: { paddingVertical: 12 },
+        modernSubmitButtonTextMobile: { fontSize: 14 },
+        modernCancelButtonMobile: { paddingVertical: 12 },
+        modernCancelButtonTextMobile: { fontSize: 14 },
+        expirationModalContainerMobile: { width: '95%', maxWidth: 450, maxHeight: '90%' },
+        expirationModalContentMobile: { padding: 18, maxHeight: 450 },
+        expirationOptionMobile: { padding: 12 },
+        expirationOptionTextMobile: { fontSize: 13 },
+        paginationContainerMobile: { gap: 12, paddingTop: 12 },
+        paginationButtonMobile: { paddingHorizontal: 8, paddingVertical: 6 },
+        pageInfoTextMobile: { fontSize: 12 },
+        searchContainerMobile: { paddingHorizontal: 8 },
+        searchInputMobile: { paddingVertical: 8, fontSize: 13 },
+    });
+};

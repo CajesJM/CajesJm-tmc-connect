@@ -5,14 +5,84 @@ import {
   MaterialIcons,
   Octicons
 } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { collection, doc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { db } from '../../lib/firebaseConfig';
+import { createProfileStyles } from '../../styles/main-admin/profileStyles';
 
 export default function MainAdminProfile() {
-  const { logout, userData } = useAuth(); 
+  const { logout, userData } = useAuth();
   const router = useRouter();
+  const { colors, isDark } = useTheme();
+  const styles = createProfileStyles(colors, isDark);
+
+  // Local state for profile image (immediate update after upload)
+  const [photoURL, setPhotoURL] = useState<string | null>(userData?.photoURL || null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Stats state
+  const [totalUsers, setTotalUsers] = useState<number>(0);
+  const [activeEvents, setActiveEvents] = useState<number>(0);
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  // Header gradient (matches dashboard)
+  const headerGradientColors = isDark
+    ? (['#0f172a', '#1e293b'] as const)
+    : (['#1e40af', '#3b82f6'] as const);
+
+  // Fetch real statistics from Firestore
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoadingStats(true);
+
+        // 1. Total users
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const usersCount = usersSnapshot.size;
+        setTotalUsers(usersCount);
+
+        // 2. Active events: approved and upcoming
+        const now = new Date();
+        const eventsQuery = query(
+          collection(db, 'events'),
+          where('date', '>=', now), // only future events
+          orderBy('date', 'asc')
+        );
+        const eventsSnapshot = await getDocs(eventsQuery);
+
+        // Count only approved events (status === 'approved' or no status)
+        const activeCount = eventsSnapshot.docs.filter(doc => {
+          const data = doc.data();
+          const status = data.status;
+          return status === 'approved' || status === undefined || status === null || status === '';
+        }).length;
+
+        setActiveEvents(activeCount);
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -37,6 +107,86 @@ export default function MainAdminProfile() {
       .join('')
       .toUpperCase()
       .substring(0, 2);
+  };
+
+  // Image picker (same as dashboard)
+  const handleProfileImagePress = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async (e: any) => {
+          const file = e.target.files[0];
+          if (file) {
+            await uploadProfileImage(file);
+          }
+        };
+        input.click();
+      } else {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (permissionResult.granted === false) {
+          Alert.alert(
+            'Permission Required',
+            'Permission to access camera roll is required!',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.5,
+        });
+
+        if (!result.canceled) {
+          await uploadProfileImage(result.assets[0].uri);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.', [{ text: 'OK' }]);
+    }
+  };
+
+  const uploadProfileImage = async (imageUri: string | File) => {
+    try {
+      setUploadingImage(true);
+
+      let blob: Blob;
+      if (imageUri instanceof File) {
+        blob = imageUri;
+      } else {
+        const response = await fetch(imageUri);
+        blob = await response.blob();
+      }
+
+      const storage = getStorage();
+      const fileName = `profile_${userData?.email}_${Date.now()}.jpg`;
+      const storageRef = ref(storage, `profileImages/${fileName}`);
+
+      await uploadBytes(storageRef, blob);
+      const downloadUrl = await getDownloadURL(storageRef);
+
+      if (userData?.email) {
+        const userRef = doc(db, 'users', userData.email);
+        await updateDoc(userRef, {
+          photoURL: downloadUrl
+        });
+
+        // Update local state immediately
+        setPhotoURL(downloadUrl);
+
+        Alert.alert('Success', 'Profile image updated successfully!', [{ text: 'OK' }]);
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', 'Failed to upload image. Please try again.', [{ text: 'OK' }]);
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const menuItems = [
@@ -92,7 +242,7 @@ export default function MainAdminProfile() {
 
   const renderIcon = (icon: string, iconSet: 'feather' | 'fontawesome6' | 'material' | 'ionicons' | 'octicons', color: string) => {
     const size = 20;
-    
+
     switch (iconSet) {
       case 'feather':
         return <Feather name={icon as any} size={size} color={color} />;
@@ -111,35 +261,58 @@ export default function MainAdminProfile() {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
+      {/* Dashboard‑style gradient header */}
+      <LinearGradient colors={headerGradientColors} style={styles.headerGradient}>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>System Administrator</Text>
-          <Text style={styles.headerSubtitle}>Full System Access & Control</Text>
+          <View>
+            <Text style={styles.greetingText}>My Profile</Text>
+            <Text style={styles.userName}>{getDisplayName()}</Text>
+            <Text style={styles.roleText}>System Administrator</Text>
+          </View>
+          <TouchableOpacity style={styles.profileButton} onPress={handleProfileImagePress} disabled={uploadingImage}>
+            {uploadingImage ? (
+              <View style={[styles.profileImage, styles.profileFallback]}>
+                <ActivityIndicator size="small" color="#ffffff" />
+              </View>
+            ) : photoURL ? (
+              <Image source={{ uri: photoURL }} style={styles.profileImage} />
+            ) : (
+              <View style={[styles.profileImage, styles.profileFallback]}>
+                <Text style={styles.profileInitials}>{getInitials()}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
-      </View>
+
+        <View style={styles.dateSection}>
+          <View style={styles.dateContainer}>
+            <Feather name="calendar" size={12} color={isDark ? colors.sidebar?.text?.secondary : '#ffffff'} />
+            <Text style={styles.dateText}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerAction}
+              onPress={() => console.log('Settings pressed')} // Replace with actual navigation to settings
+            >
+              <Feather name="settings" size={18} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </LinearGradient>
 
       {/* Profile Card */}
       <View style={styles.profileCard}>
         <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{getInitials()}</Text>
-            </View>
-            <View style={styles.statusBadge}>
-              <View style={styles.statusDot} />
-              <Text style={styles.statusText}>Online</Text>
-            </View>
-          </View>
-          
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{getDisplayName()}</Text>
             <Text style={styles.profileRole}>Main System Administrator</Text>
             <Text style={styles.profileEmail}>{userData?.email || 'admin@system.edu'}</Text>
-            
+
             <View style={styles.profileMeta}>
               <View style={styles.metaItem}>
-                <Feather name="award" size={14} color="#0ea5e9" />
+                <Feather name="award" size={14} color={colors.accent.primary} />
                 <Text style={styles.metaText}>Full Access</Text>
               </View>
               <View style={styles.metaItem}>
@@ -150,17 +323,22 @@ export default function MainAdminProfile() {
           </View>
         </View>
 
+        {/* Stats with real data */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>24/7</Text>
             <Text style={styles.statLabel}>Uptime</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>1,254</Text>
+            <Text style={styles.statNumber}>
+              {loadingStats ? <ActivityIndicator size="small" color={colors.accent.primary} /> : totalUsers}
+            </Text>
             <Text style={styles.statLabel}>Users</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>42</Text>
+            <Text style={styles.statNumber}>
+              {loadingStats ? <ActivityIndicator size="small" color={colors.accent.primary} /> : activeEvents}
+            </Text>
             <Text style={styles.statLabel}>Active Events</Text>
           </View>
         </View>
@@ -176,14 +354,14 @@ export default function MainAdminProfile() {
             </View>
             <Text style={styles.quickActionText}>New Event</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.quickAction}>
             <View style={[styles.quickActionIcon, { backgroundColor: 'rgba(139, 92, 246, 0.1)' }]}>
               <Feather name="user-plus" size={20} color="#8b5cf6" />
             </View>
             <Text style={styles.quickActionText}>Add Admin</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.quickAction}>
             <View style={[styles.quickActionIcon, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
               <Feather name="file-text" size={20} color="#10b981" />
@@ -210,7 +388,7 @@ export default function MainAdminProfile() {
                 <Text style={styles.menuTitle}>{item.title}</Text>
                 <Text style={styles.menuDescription}>{item.description}</Text>
               </View>
-              <Feather name="chevron-right" size={20} color="#94a3b8" />
+              <Feather name="chevron-right" size={20} color={colors.sidebar?.text?.muted || '#94a3b8'} />
             </TouchableOpacity>
           ))}
         </View>
@@ -241,7 +419,7 @@ export default function MainAdminProfile() {
 
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Feather name="log-out" size={20} color="#dc2626" />
+        <Feather name="log-out" size={20} color={isDark ? '#f87171' : '#dc2626'} />
         <Text style={styles.logoutText}>Logout System</Text>
       </TouchableOpacity>
 
@@ -252,278 +430,3 @@ export default function MainAdminProfile() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  headerContent: {
-    marginBottom: 16,
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    color: '#cbd5e1',
-    fontSize: 14,
-  },
-  profileCard: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginTop: -40,
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  avatarContainer: {
-    marginRight: 16,
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#0ea5e9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  avatarText: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#16a34a',
-    marginRight: 4,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#16a34a',
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  profileRole: {
-    fontSize: 14,
-    color: '#0ea5e9',
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  profileEmail: {
-    fontSize: 13,
-    color: '#64748b',
-    marginBottom: 12,
-  },
-  profileMeta: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 16,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  statLabel: {
-    fontSize: 10,
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  section: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 12,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  quickAction: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  quickActionText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
-    textAlign: 'center',
-  },
-  menuContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    overflow: 'hidden',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  menuContent: {
-    flex: 1,
-  },
-  menuTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  menuDescription: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  systemInfo: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 16,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#fef2f2',
-    marginHorizontal: 16,
-    marginTop: 24,
-    padding: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#dc2626',
-  },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    marginTop: 16,
-  },
-  footerText: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginBottom: 2,
-  },
-  footerSubtext: {
-    fontSize: 10,
-    color: '#cbd5e1',
-  },
-});

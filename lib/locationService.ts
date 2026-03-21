@@ -24,14 +24,12 @@ export interface LocationResult {
 class LocationService {
   async requestLocationPermission(): Promise<boolean> {
     try {
-      // Check if permission is already granted
       const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
       
       if (existingStatus === 'granted') {
         return true;
       }
 
-      // Request permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
@@ -68,9 +66,8 @@ class LocationService {
     }
   }
 
-  async getCurrentLocation(): Promise<LocationResult> {
+  async getCurrentLocation(accuracy: Location.LocationAccuracy = Location.Accuracy.BestForNavigation): Promise<LocationResult> {
     try {
-      // Check if location services are enabled
       const enabled = await Location.hasServicesEnabledAsync();
       if (!enabled) {
         return {
@@ -80,14 +77,13 @@ class LocationService {
       }
 
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-        // Only use supported options
+        accuracy,
       });
 
       const userLocation: UserLocation = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy || 0,
+        accuracy: location.coords.accuracy || 999,
         timestamp: location.timestamp,
       };
 
@@ -115,13 +111,45 @@ class LocationService {
     }
   }
 
+  async getLocationWithRetry(
+    maxAttempts: number = 3,
+    targetAccuracy: number = 100
+  ): Promise<LocationResult> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`Location attempt ${attempt}/${maxAttempts}`);
+      
+      const result = await this.getCurrentLocation(
+        attempt === 1 ? Location.Accuracy.BestForNavigation : Location.Accuracy.Balanced
+      );
+      
+      if (result.success && result.location) {
+        if (result.location.accuracy <= targetAccuracy) {
+          console.log(`Location acquired with accuracy: ${result.location.accuracy}m`);
+          return result;
+        }
+        
+        // If not accurate enough and not last attempt, wait and retry
+        if (attempt < maxAttempts) {
+          console.log(`Accuracy ${result.location.accuracy}m > ${targetAccuracy}m, retrying...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          // Last attempt - return what we have even if not ideal
+          console.log(`Using location with accuracy: ${result.location.accuracy}m`);
+          return result;
+        }
+      }
+    }
+    
+    return { success: false, error: 'Failed to get location after multiple attempts' };
+  }
+
   calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     if (!lat1 || !lon1 || !lat2 || !lon2) {
       console.warn('Invalid coordinates provided for distance calculation');
-      return 0;
+      return Infinity;
     }
     
-    const R = 6371; // Earth's radius in kilometers
+    const R = 6371;
     const dLat = this.deg2rad(lat2 - lat1);
     const dLon = this.deg2rad(lon2 - lon1);
     const a = 
@@ -130,10 +158,10 @@ class LocationService {
       Math.sin(dLon/2) * Math.sin(dLon/2); 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
     const distance = R * c;
-    return distance * 1000; // Convert to meters
+    return distance * 1000;
   }
 
-  isLocationAccurate(location: UserLocation, requiredAccuracy: number = 50): boolean {
+  isLocationAccurate(location: UserLocation, requiredAccuracy: number = 100): boolean {
     return location.accuracy <= requiredAccuracy;
   }
 

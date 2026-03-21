@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Href, router, Tabs, usePathname } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import LoadingScreen from '../../components/LoadingScreen';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { db } from '../../lib/firebaseConfig';
 
 interface MenuItem {
@@ -46,80 +48,38 @@ export default function MainAdminLayout() {
   const [isLayoutReady, setIsLayoutReady] = useState(false);
   const slideAnim = useRef(new Animated.Value(-300)).current;
   const { userData } = useAuth();
+  const { colors, isDark } = useTheme(); // Use theme context
 
   const sidebarWidth = collapsed ? 80 : 260;
 
   useEffect(() => {
-
     const timer = setTimeout(() => {
       setIsLayoutReady(true);
     }, 300);
-
     return () => clearTimeout(timer);
   }, []);
-  const colors = {
-    sidebar: {
-      background: '#0A0F1E',
-      border: '#1E2A45',
-      text: {
-        primary: '#FFFFFF',
-        secondary: '#8B98B5',
-        muted: '#5A6B8C',
-      },
-      icon: {
-        active: '#FFFFFF',
-        inactive: '#5A6B8C',
-      },
-    },
-    accent: {
-      primary: '#3B82F6',
-      hover: '#2563EB',
-    },
-    header: {
-      background: '#FFFFFF',
-      text: '#0A0F1E',
-      border: '#EFF2F6',
-    }
-  };
 
   // Real-time user stats
   useEffect(() => {
     const usersQuery = query(collection(db, 'users'));
-
     const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
       const now = new Date();
       const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-      let mainAdmins = 0;
-      let assistantAdmins = 0;
-      let students = 0;
-      let newThisWeek = 0;
+      let mainAdmins = 0, assistantAdmins = 0, students = 0, newThisWeek = 0;
 
       snapshot.docs.forEach(doc => {
         const data = doc.data();
         const role = data.role;
-
-        // Count by role
         if (role === 'main_admin') mainAdmins++;
         else if (role === 'assistant_admin') assistantAdmins++;
         else if (role === 'student') students++;
 
-        // Count new users this week
         const createdAt = data.createdAt?.toDate?.() || data.createdAt;
-        if (createdAt && createdAt >= oneWeekAgo) {
-          newThisWeek++;
-        }
+        if (createdAt && createdAt >= oneWeekAgo) newThisWeek++;
       });
 
-      setUserStats({
-        total: snapshot.size,
-        newThisWeek,
-        mainAdmins,
-        assistantAdmins,
-        students
-      });
+      setUserStats({ total: snapshot.size, newThisWeek, mainAdmins, assistantAdmins, students });
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -141,12 +101,10 @@ export default function MainAdminLayout() {
 
   const handleNavigation = (route: Href) => {
     router.push(route);
-    if (!isWeb) {
-      setMobileMenuOpen(false);
-    }
+    if (!isWeb) setMobileMenuOpen(false);
   };
 
-  // Sidebar Component
+  // Sidebar Component with dynamic colors
   const Sidebar = ({ isMobile }: { isMobile?: boolean }) => (
     <View style={[
       styles.sidebarContainer,
@@ -154,56 +112,36 @@ export default function MainAdminLayout() {
       isMobile && { width: 280 }
     ]}>
       <View style={styles.sidebarContent}>
+        {/* Collapse buttons */}
         {isWeb && !isMobile && !collapsed && (
-          <TouchableOpacity
-            onPress={() => setCollapsed(!collapsed)}
-            style={styles.collapseButton}
-          >
-            <Ionicons
-              name="chevron-back"
-              size={18}
-              color={colors.sidebar.text.muted}
-            />
+          <TouchableOpacity onPress={() => setCollapsed(!collapsed)} style={[styles.collapseButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
+            <Ionicons name="chevron-back" size={18} color={colors.sidebar.text.muted} />
           </TouchableOpacity>
         )}
-
         {isWeb && !isMobile && collapsed && (
-          <TouchableOpacity
-            onPress={() => setCollapsed(!collapsed)}
-            style={styles.collapseButtonCentered}
-          >
-            <Ionicons
-              name="chevron-forward"
-              size={18}
-              color={colors.sidebar.text.muted}
-            />
+          <TouchableOpacity onPress={() => setCollapsed(!collapsed)} style={[styles.collapseButtonCentered, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
+            <Ionicons name="chevron-forward" size={18} color={colors.sidebar.text.muted} />
           </TouchableOpacity>
         )}
 
-        <View style={[
-          styles.logoSection,
-          collapsed && styles.logoSectionCollapsed
-        ]}>
+        {/* Logo Section */}
+        <View style={[styles.logoSection, collapsed && styles.logoSectionCollapsed]}>
           <View style={styles.logoWrapper}>
-            <View style={[styles.logoBackground, collapsed && { marginRight: 0 }]}>
+            <View style={[styles.logoBackground, collapsed && { marginRight: 0 }, { backgroundColor: isDark ? 'transparent' : '#F1F5F9' }]}>
               <Image
                 source={require('../../assets/images/Logo/V_1.0.1.png')}
-                style={[
-                  styles.logoImage,
-                  collapsed ? { width: 30, height: 30 } : { width: 40, height: 40 }
-                ]}
+                style={[styles.logoImage, collapsed ? { width: 30, height: 30 } : { width: 40, height: 40 }]}
                 resizeMode="contain"
               />
             </View>
           </View>
-
           {!collapsed && (
             <View style={styles.adminInfo}>
-              <Text style={styles.adminTitle}>Admin Panel</Text>
-              <Text style={styles.adminSubtitle}>TMC Campus Hub</Text>
+              <Text style={[styles.adminTitle, { color: colors.sidebar.text.primary }]}>Admin Panel</Text>
+              <Text style={[styles.adminSubtitle, { color: colors.sidebar.text.secondary }]}>TMC Campus Hub</Text>
               <View style={styles.statusContainer}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusText}>
+                <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
+                <Text style={[styles.statusText, { color: '#10B981' }]}>
                   {userData?.role === 'main_admin' ? 'Main Admin' : 'Assistant Admin'}
                 </Text>
               </View>
@@ -211,34 +149,35 @@ export default function MainAdminLayout() {
           )}
         </View>
 
-        {/* Quick Stats with Real Data */}
+        {/* Quick Stats */}
         {isWeb && !collapsed && (
-          <View style={styles.quickStats}>
+          <View style={[styles.quickStats, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userStats.newThisWeek}</Text>
-              <Text style={styles.statLabel}>New this week</Text>
+              <Text style={[styles.statValue, { color: colors.sidebar.text.primary }]}>{userStats.newThisWeek}</Text>
+              <Text style={[styles.statLabel, { color: colors.sidebar.text.secondary }]}>New this week</Text>
             </View>
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: colors.sidebar.border }]} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{userStats.total}</Text>
-              <Text style={styles.statLabel}>Total users</Text>
+              <Text style={[styles.statValue, { color: colors.sidebar.text.primary }]}>{userStats.total}</Text>
+              <Text style={[styles.statLabel, { color: colors.sidebar.text.secondary }]}>Total users</Text>
             </View>
           </View>
         )}
 
+        {/* Role Breakdown */}
         {isWeb && !collapsed && userStats.total > 0 && (
-          <View style={styles.roleBreakdown}>
+          <View style={[styles.roleBreakdown, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
             <View style={styles.roleItem}>
               <View style={[styles.roleDot, { backgroundColor: '#3B82F6' }]} />
-              <Text style={styles.roleText}>Main Admin: {userStats.mainAdmins}</Text>
+              <Text style={[styles.roleText, { color: colors.sidebar.text.secondary }]}>Main Admin: {userStats.mainAdmins}</Text>
             </View>
             <View style={styles.roleItem}>
               <View style={[styles.roleDot, { backgroundColor: '#10B981' }]} />
-              <Text style={styles.roleText}>Asst. Admin: {userStats.assistantAdmins}</Text>
+              <Text style={[styles.roleText, { color: colors.sidebar.text.secondary }]}>Asst. Admin: {userStats.assistantAdmins}</Text>
             </View>
             <View style={styles.roleItem}>
               <View style={[styles.roleDot, { backgroundColor: '#F59E0B' }]} />
-              <Text style={styles.roleText}>Students: {userStats.students}</Text>
+              <Text style={[styles.roleText, { color: colors.sidebar.text.secondary }]}>Students: {userStats.students}</Text>
             </View>
           </View>
         )}
@@ -247,21 +186,17 @@ export default function MainAdminLayout() {
         <View style={styles.navItems}>
           {menuItems.map((item) => {
             const isActive = isRouteActive(item.route);
-
             return (
               <TouchableOpacity
                 key={item.name}
                 style={[
                   styles.navItem,
                   collapsed && styles.navItemCollapsed,
-                  isActive && styles.activeNavItem
+                  isActive && { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.1)' }
                 ]}
                 onPress={() => handleNavigation(item.route)}
               >
-                <View style={[
-                  styles.navIconWrapper,
-                  collapsed && styles.navIconWrapperCollapsed
-                ]}>
+                <View style={[styles.navIconWrapper, collapsed && styles.navIconWrapperCollapsed]}>
                   <Ionicons
                     name={item.icon}
                     size={collapsed ? 24 : 20}
@@ -271,7 +206,7 @@ export default function MainAdminLayout() {
                 {!collapsed && (
                   <Text style={[
                     styles.navText,
-                    isActive && styles.activeNavText
+                    { color: isActive ? colors.accent.primary : colors.sidebar.text.secondary }
                   ]}>
                     {item.title}
                   </Text>
@@ -282,44 +217,23 @@ export default function MainAdminLayout() {
         </View>
 
         {/* Bottom Section */}
-        <View style={styles.sidebarFooter}>
+        <View style={[styles.sidebarFooter, { borderTopColor: colors.sidebar.border }]}>
           <TouchableOpacity
-            style={[
-              styles.navItem,
-              collapsed && styles.navItemCollapsed
-            ]}
+            style={[styles.navItem, collapsed && styles.navItemCollapsed]}
             onPress={() => router.push('/main_admin/settings' as Href)}
           >
-            <View style={[
-              styles.navIconWrapper,
-              collapsed && styles.navIconWrapperCollapsed
-            ]}>
-              <Ionicons
-                name="settings-outline"
-                size={collapsed ? 24 : 20}
-                color={colors.sidebar.icon.inactive}
-              />
+            <View style={[styles.navIconWrapper, collapsed && styles.navIconWrapperCollapsed]}>
+              <Ionicons name="settings-outline" size={collapsed ? 24 : 20} color={colors.sidebar.icon.inactive} />
             </View>
-            {!collapsed && <Text style={styles.navText}>Settings</Text>}
+            {!collapsed && <Text style={[styles.navText, { color: colors.sidebar.text.secondary }]}>Settings</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.navItem,
-              styles.logoutButton,
-              collapsed && styles.navItemCollapsed
-            ]}
+            style={[styles.navItem, styles.logoutButton, collapsed && styles.navItemCollapsed]}
             onPress={() => router.replace('/super-admin-login' as Href)}
           >
-            <View style={[
-              styles.navIconWrapper,
-              collapsed && styles.navIconWrapperCollapsed
-            ]}>
-              <Ionicons
-                name="log-out-outline"
-                size={collapsed ? 24 : 20}
-                color="#EF4444"
-              />
+            <View style={[styles.navIconWrapper, collapsed && styles.navIconWrapperCollapsed]}>
+              <Ionicons name="log-out-outline" size={collapsed ? 24 : 20} color="#EF4444" />
             </View>
             {!collapsed && <Text style={[styles.navText, styles.logoutText]}>Logout</Text>}
           </TouchableOpacity>
@@ -327,176 +241,71 @@ export default function MainAdminLayout() {
       </View>
     </View>
   );
+
   if (!isLayoutReady) {
-    return (
-      <LoadingScreen
-        message="Loading Dashboard"
-        subMessage="Preparing your admin workspace"
-      />
-    );
+    return <LoadingScreen message="Loading Dashboard" subMessage="Preparing your admin workspace" />;
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={colors.statusBar} />
+      
+      {/* Mobile Header */}
       {!isWeb && (
-        <View style={styles.mobileHeader}>
-          <TouchableOpacity
-            onPress={() => setMobileMenuOpen(!mobileMenuOpen)}
-            style={styles.hamburgerButton}
-          >
-            <Ionicons
-              name={mobileMenuOpen ? "close" : "menu"}
-              size={28}
-              color="#0A0F1E"
-            />
+        <View style={[styles.mobileHeader, { backgroundColor: colors.header.background, borderBottomColor: colors.header.border }]}>
+          <TouchableOpacity onPress={() => setMobileMenuOpen(!mobileMenuOpen)} style={styles.hamburgerButton}>
+            <Ionicons name={mobileMenuOpen ? "close" : "menu"} size={28} color={colors.header.text} />
           </TouchableOpacity>
           <View style={styles.mobileLogoContainer}>
-            <Image
-              source={require('../../assets/images/Logo/V_1.0.1.png')}
-              style={styles.mobileLogo}
-              resizeMode="contain"
-            />
+            <Image source={require('../../assets/images/Logo/V_1.0.1.png')} style={styles.mobileLogo} resizeMode="contain" />
           </View>
           <View style={styles.mobileHeaderRight} />
         </View>
       )}
 
+      {/* Mobile Overlay */}
       {!isWeb && mobileMenuOpen && (
-        <TouchableOpacity
-          style={styles.overlay}
-          activeOpacity={1}
-          onPress={() => setMobileMenuOpen(false)}
-        />
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setMobileMenuOpen(false)} />
       )}
 
+      {/* Mobile Sidebar */}
       {!isWeb && (
-        <Animated.View
-          style={[
-            styles.mobileSidebarContainer,
-            {
-              transform: [{ translateX: slideAnim }],
-            },
-          ]}
-        >
+        <Animated.View style={[styles.mobileSidebarContainer, { transform: [{ translateX: slideAnim }] }]}>
           <Sidebar isMobile={true} />
         </Animated.View>
       )}
 
       {/* Main Layout */}
-      <View style={[
-        styles.mainContent,
-        isWeb && { marginLeft: sidebarWidth },
-      ]}>
-
+      <View style={[styles.mainContent, isWeb && { marginLeft: sidebarWidth }]}>
         {isWeb && <Sidebar />}
-
+        
         <View style={styles.tabsContainer}>
           <Tabs
             initialRouteName='index'
             screenOptions={{
               headerShown: false,
-              headerStyle: {
-                backgroundColor: colors.header.background,
-              },
-              headerTitleStyle: {
-                color: colors.header.text,
-                fontSize: 20,
-                fontWeight: '600',
-              },
+              headerStyle: { backgroundColor: colors.header.background },
+              headerTitleStyle: { color: colors.header.text, fontSize: 20, fontWeight: '600' },
               headerTintColor: colors.header.text,
               headerShadowVisible: false,
               tabBarStyle: !isWeb ? {
-                backgroundColor: '#FFFFFF',
+                backgroundColor: colors.card,
                 borderTopWidth: 1,
-                borderTopColor: '#EFF2F6',
+                borderTopColor: colors.border,
                 paddingBottom: 8,
                 paddingTop: 8,
                 height: 65,
-              } : {
-                display: 'none',
-              },
+              } : { display: 'none' },
               tabBarActiveTintColor: colors.accent.primary,
-              tabBarInactiveTintColor: '#94A3B8',
+              tabBarInactiveTintColor: isDark ? '#94A3B8' : '#64748B',
             }}
           >
-            <Tabs.Screen
-              name="index"
-              options={{
-                title: 'Dashboard',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? "home" : "home-outline"}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="announcements"
-              options={{
-                title: 'Announcements',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? "megaphone" : "megaphone-outline"}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="attendance"
-              options={{
-                title: 'Attendance',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? "calendar" : "calendar-outline"}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="events"
-              options={{
-                title: 'Events',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? "calendar" : "calendar-outline"}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="users"
-              options={{
-                title: 'Users',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? "people" : "people-outline"}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name="profile"
-              options={{
-                title: 'Profile',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? "person" : "person-outline"}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
+            <Tabs.Screen name="index" options={{ title: 'Dashboard', tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} /> }} />
+            <Tabs.Screen name="announcements" options={{ title: 'Announcements', tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "megaphone" : "megaphone-outline"} size={24} color={color} /> }} />
+            <Tabs.Screen name="attendance" options={{ title: 'Attendance', tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "calendar" : "calendar-outline"} size={24} color={color} /> }} />
+            <Tabs.Screen name="events" options={{ title: 'Events', tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "calendar" : "calendar-outline"} size={24} color={color} /> }} />
+            <Tabs.Screen name="users" options={{ title: 'Users', tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "people" : "people-outline"} size={24} color={color} /> }} />
+            <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} /> }} />
           </Tabs>
         </View>
       </View>
@@ -505,261 +314,47 @@ export default function MainAdminLayout() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  mainContent: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  tabsContainer: {
-    flex: 1,
-  },
-  sidebarContainer: {
-    height: '100%',
-    position: 'fixed',
-    left: 0,
-    top: 0,
-    bottom: 0,
-  },
-  sidebarContent: {
-    flex: 1,
-    paddingVertical: 20,
-  },
-  collapseButton: {
-    alignSelf: 'flex-end',
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    marginRight: 16,
-    marginBottom: 16,
-    width: 34,
-    alignItems: 'center',
-  },
-  collapseButtonCentered: {
-    alignSelf: 'center',
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    marginBottom: 16,
-    width: 34,
-    alignItems: 'center',
-  },
-  logoSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 20,
-  },
-  logoSectionCollapsed: {
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  logoWrapper: {
-    marginRight: 12,
-  },
-  logoBackground: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  logoImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  adminInfo: {
-    flex: 1,
-  },
-  adminTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  adminSubtitle: {
-    color: '#8B98B5',
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-    marginRight: 6,
-  },
-  statusText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  quickStats: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 12,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  statLabel: {
-    color: '#8B98B5',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: '#1E2A45',
-    marginHorizontal: 8,
-  },
-  roleBreakdown: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 8,
-    padding: 10,
-    marginHorizontal: 16,
-    marginBottom: 16,
-  },
-  roleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 3,
-  },
-  roleDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  roleText: {
-    color: '#8B98B5',
-    fontSize: 11,
-  },
-  navItems: {
-    flex: 1,
-    paddingHorizontal: 8,
-  },
-  navItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginVertical: 2,
-    borderRadius: 8,
-  },
-  navItemCollapsed: {
-    justifyContent: 'center',
-    paddingHorizontal: 0,
-  },
-  activeNavItem: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-  },
-  navIconWrapper: {
-    width: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navIconWrapperCollapsed: {
-    width: 'auto',
-  },
-  navText: {
-    marginLeft: 12,
-    fontSize: 15,
-    color: '#8B98B5',
-    fontWeight: '500',
-  },
-  activeNavText: {
-    color: '#3B82F6',
-  },
-  sidebarFooter: {
-    paddingHorizontal: 8,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#1E2A45',
-    marginTop: 20,
-    paddingTop: 20,
-  },
-  logoutButton: {
-    marginTop: 5,
-  },
-  logoutText: {
-    color: '#EF4444',
-  },
-  // Mobile
-  mobileHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EFF2F6',
-    zIndex: 1000,
-    elevation: 5,
-  },
-  hamburgerButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  mobileLogoContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  mobileLogo: {
-    width: 40,
-    height: 40,
-  },
-  mobileHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#0A0F1E',
-  },
-  mobileHeaderRight: {
-    width: 40,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 1001,
-  },
-  mobileSidebarContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    bottom: 0,
-    width: 280,
-    zIndex: 1002,
-    elevation: 10,
-  },
+  container: { flex: 1 },
+  mainContent: { flex: 1, flexDirection: 'row' },
+  tabsContainer: { flex: 1 },
+  sidebarContainer: { height: '100%', position: 'fixed', left: 0, top: 0, bottom: 0 },
+  sidebarContent: { flex: 1, paddingVertical: 20 },
+  collapseButton: { alignSelf: 'flex-end', padding: 8, borderRadius: 8, marginRight: 16, marginBottom: 16, width: 34, alignItems: 'center' },
+  collapseButtonCentered: { alignSelf: 'center', padding: 8, borderRadius: 8, marginBottom: 16, width: 34, alignItems: 'center' },
+  logoSection: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 20 },
+  logoSectionCollapsed: { justifyContent: 'center', paddingHorizontal: 8 },
+  logoWrapper: { marginRight: 12 },
+  logoBackground: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  logoImage: { width: 50, height: 50, borderRadius: 25 },
+  adminInfo: { flex: 1 },
+  adminTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  adminSubtitle: { fontSize: 12, marginBottom: 8 },
+  statusContainer: { flexDirection: 'row', alignItems: 'center' },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  statusText: { fontSize: 11, fontWeight: '500' },
+  quickStats: { flexDirection: 'row', borderRadius: 12, padding: 12, marginHorizontal: 16, marginBottom: 12 },
+  statItem: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 18, fontWeight: '700' },
+  statLabel: { fontSize: 11, marginTop: 2 },
+  statDivider: { width: 1, marginHorizontal: 8 },
+  roleBreakdown: { borderRadius: 8, padding: 10, marginHorizontal: 16, marginBottom: 16 },
+  roleItem: { flexDirection: 'row', alignItems: 'center', marginVertical: 3 },
+  roleDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  roleText: { fontSize: 11 },
+  navItems: { flex: 1, paddingHorizontal: 8 },
+  navItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, marginVertical: 2, borderRadius: 8 },
+  navItemCollapsed: { justifyContent: 'center', paddingHorizontal: 0 },
+  navIconWrapper: { width: 32, alignItems: 'center', justifyContent: 'center' },
+  navIconWrapperCollapsed: { width: 'auto' },
+  navText: { marginLeft: 12, fontSize: 15, fontWeight: '500' },
+  sidebarFooter: { paddingHorizontal: 8, paddingBottom: 20, borderTopWidth: 1, marginTop: 20, paddingTop: 20 },
+  logoutButton: { marginTop: 5 },
+  logoutText: { color: '#EF4444' },
+  mobileHeader: { position: 'absolute', top: 0, left: 0, right: 0, height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, zIndex: 1000, elevation: 5 },
+  hamburgerButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
+  mobileLogoContainer: { flex: 1, alignItems: 'center' },
+  mobileLogo: { width: 40, height: 40 },
+  mobileHeaderRight: { width: 40 },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1001 },
+  mobileSidebarContainer: { position: 'absolute', top: 0, left: 0, bottom: 0, width: 280, zIndex: 1002, elevation: 10 },
 });

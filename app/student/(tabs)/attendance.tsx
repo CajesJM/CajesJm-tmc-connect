@@ -54,6 +54,7 @@ export default function StudentAttendance() {
   const [scanAttempts, setScanAttempts] = useState(0);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [permissionType, setPermissionType] = useState<'camera' | 'location' | null>(null);
+  const [locationAttempts, setLocationAttempts] = useState(0);
 
   // Animation values
   const [pulseAnim] = useState(new Animated.Value(1));
@@ -74,7 +75,7 @@ export default function StudentAttendance() {
   // Check permissions on mount and when app returns to foreground
   useEffect(() => {
     checkAllPermissions();
-    
+
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
         checkAllPermissions();
@@ -114,7 +115,7 @@ export default function StudentAttendance() {
       // Check permission status
       const { status } = await Location.getForegroundPermissionsAsync();
       setLocationPermission(status === 'granted');
-      
+
       return { enabled, granted: status === 'granted' };
     } catch (error) {
       console.error('Error checking location permission:', error);
@@ -127,7 +128,7 @@ export default function StudentAttendance() {
   const requestCameraAccess = async (): Promise<boolean> => {
     try {
       const { status } = await Camera.requestCameraPermissionsAsync();
-      
+
       if (status === 'granted') {
         setHasPermission(true);
         return true;
@@ -159,7 +160,7 @@ export default function StudentAttendance() {
 
       // Then request permission
       const { status } = await Location.requestForegroundPermissionsAsync();
-      
+
       if (status === 'granted') {
         setLocationPermission(true);
         return true;
@@ -252,24 +253,51 @@ export default function StudentAttendance() {
     }
   }, []);
 
-  const formatDate = useCallback((dateString: string) => {
-    if (!dateString || !isValidDate(dateString)) return 'Date not available';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
+  const formatDate = useCallback((dateValue: any): string => {
+  if (!dateValue) return 'Date not available';
+  
+  try {
+    let date: Date;
+    
+    // Handle Firestore Timestamp (from admin)
+    if (typeof dateValue === 'object' && dateValue !== null) {
+      if ('seconds' in dateValue && 'nanoseconds' in dateValue) {
+        // Firestore Timestamp object
+        date = new Date(dateValue.seconds * 1000);
+      } else if (dateValue instanceof Date) {
+        date = dateValue;
+      } else {
+        return 'Date not available';
+      }
+    } else if (typeof dateValue === 'string') {
+      date = new Date(dateValue);
+    } else {
       return 'Date not available';
     }
-  }, [isValidDate]);
+    
+    if (isNaN(date.getTime())) {
+      return 'Date not available';
+    }
+    
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Date not available';
+  }
+}, []);
 
-  const validateQRCode = useCallback(async (qrData: QRCodeData, userLocation?: UserLocation): Promise<ValidationResult> => {
+  const validateQRCode = useCallback(async (
+    qrData: QRCodeData,
+    userLocation?: UserLocation
+  ): Promise<ValidationResult> => {
     const now = new Date();
+
     try {
       const eventRef = doc(db, 'events', qrData.eventId);
       const eventDoc = await getDoc(eventRef);
@@ -284,6 +312,7 @@ export default function StudentAttendance() {
 
       const eventData = convertToEventData(eventDoc.data(), eventDoc.id);
 
+      // Check location proximity (required)
       if (eventData.coordinates && userLocation) {
         const eventLocation: EventLocation = eventData.coordinates;
         const locationCheck = locationService.isWithinEventRadius(userLocation, eventLocation);
@@ -298,17 +327,12 @@ export default function StudentAttendance() {
             event: eventData
           };
         }
-        if (!locationService.isLocationAccurate(userLocation)) {
-          return {
-            valid: false,
-            error: 'LOCATION_INACCURATE',
-            message: 'Your location accuracy is too low. Please move to an open area and try again.',
-            accuracy: userLocation.accuracy,
-            event: eventData
-          };
-        }
+
+        // Note: We no longer BLOCK for accuracy, just warn
+        // The proximity check above is the security measure
       }
 
+      // Check QR expiration
       if (eventData.qrExpiration && isValidDate(eventData.qrExpiration)) {
         const manualExpiration = new Date(eventData.qrExpiration);
         if (now > manualExpiration) {
@@ -360,6 +384,7 @@ export default function StudentAttendance() {
         }
       }
 
+      // Check if already attended
       const attendees = eventData.attendees || [];
       const alreadyAttended = attendees.some((attendee: any) =>
         attendee.studentID === currentStudent?.studentID
@@ -388,7 +413,7 @@ export default function StudentAttendance() {
         event: eventData,
         qrData: qrData,
         locationVerified: !!(eventData.coordinates && userLocation),
-        distance: distance
+        distance: distance,
       };
 
     } catch (error) {
@@ -413,6 +438,7 @@ export default function StudentAttendance() {
     if (scanned) return;
     setScanned(true);
     setIsGettingLocation(true);
+    setLocationAttempts(0);
 
     try {
       let qrData: QRCodeData;
@@ -442,10 +468,11 @@ export default function StudentAttendance() {
       }
 
       let userLocation: UserLocation | undefined;
-      
-      // Check location permission first
+      let lowAccuracyWarning = false;
+
+      // Check permissions
       const locationStatus = await checkLocationPermission();
-      
+
       if (!locationStatus.enabled) {
         setShowScanner(false);
         setIsGettingLocation(false);
@@ -463,13 +490,23 @@ export default function StudentAttendance() {
         }
       }
 
+      // Get location with retry (NEW - uses the improved method)
       try {
-        const locationResult = await locationService.getCurrentLocation();
+        const locationResult = await locationService.getLocationWithRetry(3, 100);
+
         if (locationResult.success && locationResult.location) {
           userLocation = locationResult.location;
+          setLocationAttempts(3); // Show completion
+
+          // Flag if accuracy is poor (but don't block)
+          if (userLocation.accuracy > 100) {
+            lowAccuracyWarning = true;
+            console.log(`Low accuracy warning: ${userLocation.accuracy}m`);
+          }
         }
       } catch (locationError) {
         console.warn('Location error:', locationError);
+        // Continue without location if it fails completely
       }
 
       const validation = await validateQRCode(qrData, userLocation);
@@ -483,8 +520,7 @@ export default function StudentAttendance() {
           event: validation.event,
           expirationTime: validation.expirationTime,
           distance: validation.distance,
-          allowedRadius: validation.allowedRadius,
-          accuracy: validation.accuracy
+          allowedRadius: validation.allowedRadius
         });
         setShowResult(true);
         setShowScanner(false);
@@ -492,6 +528,7 @@ export default function StudentAttendance() {
         return;
       }
 
+      // Record attendance
       const attendanceData: AttendanceRecord = {
         studentID: currentStudent.studentID,
         studentName: currentStudent.name,
@@ -501,7 +538,7 @@ export default function StudentAttendance() {
         gender: currentStudent.gender,
         timestamp: new Date().toISOString(),
         scannedAt: new Date().toISOString(),
-        qrGeneratedAt: qrData.timestamp,
+        qrGeneratedAt: qrData.generatedAt || qrData.timestamp || new Date().toISOString(),
         qrExpiredAt: qrData.expiresAt,
         usesManualExpiration: qrData.usesManualExpiration || false,
         location: userLocation ? {
@@ -519,14 +556,21 @@ export default function StudentAttendance() {
         attendees: arrayUnion(attendanceData)
       });
 
+      // Build success message
+      let successMessage = 'Attendance marked successfully!';
+      if (lowAccuracyWarning) {
+        successMessage += '\n(Location accuracy was low but accepted)';
+      }
+
       setScanResult({
         success: true,
-        message: 'Attendance marked successfully!',
+        message: successMessage,
         event: validation.event,
         studentData: attendanceData,
         qrData: qrData,
         locationVerified: validation.locationVerified,
-        distance: validation.distance
+        distance: validation.distance,
+        lowAccuracy: lowAccuracyWarning
       });
       setShowResult(true);
       setShowScanner(false);
@@ -544,7 +588,7 @@ export default function StudentAttendance() {
   const openScanner = useCallback(async () => {
     // Check camera permission first
     const hasCamera = await checkCameraPermission();
-    
+
     if (!hasCamera) {
       const granted = await requestCameraAccess();
       if (!granted) return;
@@ -552,15 +596,15 @@ export default function StudentAttendance() {
 
     // Check location before opening scanner
     const locationStatus = await checkLocationPermission();
-    
+
     if (!locationStatus.enabled || !locationStatus.granted) {
       Alert.alert(
         'Location Required',
         'Location access is needed to verify your attendance at the event venue. Please enable location services.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Enable Location', 
+          {
+            text: 'Enable Location',
             onPress: () => {
               setPermissionType('location');
               setShowPermissionModal(true);
@@ -588,53 +632,53 @@ export default function StudentAttendance() {
   }, [isValidDate]);
 
   const renderPermissionModal = () => (
-  <Modal
-    visible={showPermissionModal}
-    transparent
-    animationType="fade"
-    onRequestClose={() => setShowPermissionModal(false)}
-  >
-    <View style={styles.permissionOverlay}>
-      <View style={styles.permissionModal}>
-        <View style={styles.permissionModalIcon}>
-          <Feather 
-            name={permissionType === 'camera' ? 'camera' : 'map-pin'} 
-            size={48} 
-            color="#ef4444" 
-          />
-        </View>
-        
-        <Text style={styles.permissionModalTitle}>
-          {permissionType === 'camera' ? 'Camera Access Required' : 'Location Access Required'}
-        </Text>
-        
-        <Text style={styles.permissionModalText}>
-          {permissionType === 'camera' 
-            ? 'Camera access is required to scan QR codes for attendance. Please enable it in your device settings.'
-            : 'Location access is required to verify you are at the event venue. Please enable location services in your device settings.'
-          }
-        </Text>
+    <Modal
+      visible={showPermissionModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowPermissionModal(false)}
+    >
+      <View style={styles.permissionOverlay}>
+        <View style={styles.permissionModal}>
+          <View style={styles.permissionModalIcon}>
+            <Feather
+              name={permissionType === 'camera' ? 'camera' : 'map-pin'}
+              size={48}
+              color="#ef4444"
+            />
+          </View>
 
-        <View style={styles.permissionModalButtons}>
-          <TouchableOpacity 
-            style={styles.permissionModalCancel}
-            onPress={() => setShowPermissionModal(false)}
-          >
-            <Text style={styles.permissionModalCancelText}>Not Now</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.permissionModalEnable}
-            onPress={openSettings}
-          >
-            <Feather name="settings" size={18} color="#fff" />
-            <Text style={styles.permissionModalEnableText}>Open Settings</Text>
-          </TouchableOpacity>
+          <Text style={styles.permissionModalTitle}>
+            {permissionType === 'camera' ? 'Camera Access Required' : 'Location Access Required'}
+          </Text>
+
+          <Text style={styles.permissionModalText}>
+            {permissionType === 'camera'
+              ? 'Camera access is required to scan QR codes for attendance. Please enable it in your device settings.'
+              : 'Location access is required to verify you are at the event venue. Please enable location services in your device settings.'
+            }
+          </Text>
+
+          <View style={styles.permissionModalButtons}>
+            <TouchableOpacity
+              style={styles.permissionModalCancel}
+              onPress={() => setShowPermissionModal(false)}
+            >
+              <Text style={styles.permissionModalCancelText}>Not Now</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.permissionModalEnable}
+              onPress={openSettings}
+            >
+              <Feather name="settings" size={18} color="#fff" />
+              <Text style={styles.permissionModalEnableText}>Open Settings</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
   // Loading State
   if (hasPermission === null) {
     return (
@@ -653,13 +697,13 @@ export default function StudentAttendance() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* Permission Modal */}
       {renderPermissionModal()}
 
       {/* Main Content */}
-      <ScrollView 
-        style={styles.scrollView} 
+      <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -686,9 +730,9 @@ export default function StudentAttendance() {
               <Feather name="alert-circle" size={20} color="#f59e0b" />
               <Text style={styles.permissionAlertTitle}>Permissions Required</Text>
             </View>
-            
+
             {!hasPermission && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.permissionAlertItem}
                 onPress={() => {
                   setPermissionType('camera');
@@ -707,7 +751,7 @@ export default function StudentAttendance() {
             )}
 
             {(!locationPermission || !locationEnabled) && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.permissionAlertItem}
                 onPress={() => {
                   setPermissionType('location');
@@ -729,11 +773,11 @@ export default function StudentAttendance() {
 
         {/* Quick Scan Card */}
         <View style={styles.scanCard}>
-          <LinearGradient 
-            colors={hasPermission && locationPermission && locationEnabled 
-              ? ['#0ea5e9', '#0284c7'] 
+          <LinearGradient
+            colors={hasPermission && locationPermission && locationEnabled
+              ? ['#0ea5e9', '#0284c7']
               : ['#9ca3af', '#6b7280']
-            } 
+            }
             style={styles.scanGradient}
           >
             <View style={styles.scanIconContainer}>
@@ -742,8 +786,8 @@ export default function StudentAttendance() {
               </Animated.View>
             </View>
             <Text style={styles.scanCardTitle}>
-              {hasPermission && locationPermission && locationEnabled 
-                ? 'Ready to Scan' 
+              {hasPermission && locationPermission && locationEnabled
+                ? 'Ready to Scan'
                 : 'Setup Required'
               }
             </Text>
@@ -753,11 +797,11 @@ export default function StudentAttendance() {
                 : 'Please enable camera and location permissions to continue'
               }
             </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.scanButton,
                 (!hasPermission || !locationPermission || !locationEnabled) && styles.scanButtonDisabled
-              ]} 
+              ]}
               onPress={openScanner}
               disabled={!hasPermission || !locationPermission || !locationEnabled}
             >
@@ -779,7 +823,7 @@ export default function StudentAttendance() {
               <Feather name="user" size={20} color="#0ea5e9" />
               <Text style={styles.infoTitle}>Student Information</Text>
             </View>
-            
+
             <View style={styles.infoGrid}>
               <View style={styles.infoRow}>
                 <View style={styles.infoItem}>
@@ -822,7 +866,7 @@ export default function StudentAttendance() {
         {/* How It Works */}
         <View style={styles.guideCard}>
           <Text style={styles.guideTitle}>How It Works</Text>
-          
+
           {[
             { icon: 'camera', color: '#0ea5e9', title: 'Open Scanner', desc: 'Tap the button to activate camera' },
             { icon: 'maximize', color: '#8b5cf6', title: 'Scan QR Code', desc: 'Align the code within the frame' },
@@ -866,16 +910,20 @@ export default function StudentAttendance() {
       <Modal visible={showScanner} animationType="slide" onRequestClose={() => setShowScanner(false)}>
         <View style={styles.scannerContainer}>
           <StatusBar barStyle="light-content" backgroundColor="#000" />
-          
+
           {(!cameraReady || isGettingLocation) && (
             <View style={styles.scannerLoading}>
               <ActivityIndicator size="large" color="#0ea5e9" />
               <Text style={styles.scannerLoadingText}>
-                {isGettingLocation ? 'Verifying location...' : 'Starting camera...'}
+                {isGettingLocation
+                  ? locationAttempts > 0
+                    ? `Getting precise location...`
+                    : 'Verifying location...'
+                  : 'Starting camera...'
+                }
               </Text>
             </View>
           )}
-
           <CameraView
             style={styles.camera}
             onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
@@ -891,7 +939,7 @@ export default function StudentAttendance() {
               <View style={styles.cornerBL} />
               <View style={styles.cornerBR} />
             </Animated.View>
-            
+
             <Text style={styles.scannerInstruction}>
               {isGettingLocation ? 'Checking location...' : 'Align QR code within frame'}
             </Text>
@@ -918,7 +966,7 @@ export default function StudentAttendance() {
       {/* Result Modal */}
       <Modal visible={showResult} transparent animationType="none" onRequestClose={resetScanner}>
         <View style={styles.resultOverlay}>
-          <Animated.View 
+          <Animated.View
             style={[
               styles.resultCard,
               { transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }
@@ -931,7 +979,7 @@ export default function StudentAttendance() {
                     <Feather name="check" size={40} color="#fff" />
                   </LinearGradient>
                 </View>
-                
+
                 <Text style={styles.resultTitle}>Attendance Confirmed!</Text>
                 <Text style={styles.resultMessage}>{scanResult.message}</Text>
 

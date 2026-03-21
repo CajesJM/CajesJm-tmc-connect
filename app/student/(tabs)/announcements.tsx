@@ -4,7 +4,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query, Unsubscribe, where } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, Unsubscribe } from 'firebase/firestore';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -90,9 +90,9 @@ export default function StudentAnnouncements() {
   }, []);
 
   const setupAnnouncementsListener = (): Unsubscribe => {
+    // Fetch all announcements (no status filter)
     const q = query(
       collection(db, 'updates'),
-      where('status', '==', 'approved'),
       orderBy('createdAt', 'desc')
     );
 
@@ -100,10 +100,23 @@ export default function StudentAnnouncements() {
       q,
       (snapshot) => {
         if (auth.currentUser) {
-          const list: Announcement[] = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...(doc.data() as Omit<Announcement, 'id'>),
-          }));
+          const list: Announcement[] = snapshot.docs
+            .map((doc) => {
+              const data = doc.data();
+              const hasStatus = 'status' in data;
+              const isApproved = hasStatus && data.status === 'approved';
+              const isAdminEvent = !hasStatus;
+
+              if (isApproved || isAdminEvent) {
+                return {
+                  id: doc.id,
+                  ...(data as Omit<Announcement, 'id'>),
+                };
+              }
+              return null;
+            })
+            .filter((item): item is Announcement => item !== null);
+
           setAnnouncements(list);
           filterAnnouncements(list, timeFilter);
           setLoading(false);

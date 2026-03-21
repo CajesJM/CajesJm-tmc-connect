@@ -444,4 +444,192 @@ emptyStateSubtext: {
   marginTop: 8,
   textAlign: 'center',
 },
+  // Penalty Badge on Profile Card
+  penaltyBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  penaltyBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Menu Badge
+  menuIconContainer: {
+    position: 'relative',
+  },
+  menuBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#EF4444',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+
+  // Modal Subtitle
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+
+  // Penalty Card Styles
+  penaltyCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6',
+  },
+  penaltyCardOverdue: {
+    borderLeftColor: '#DC2626',
+    backgroundColor: '#FEF2F2',
+  },
+  penaltyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  penaltyEventTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    flex: 1,
+    marginRight: 8,
+  },
+  severityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  severityBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  penaltyType: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 12,
+    textTransform: 'capitalize',
+  },
+  penaltySection: {
+    marginBottom: 12,
+  },
+  penaltyLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#9CA3AF',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  penaltyConsequences: {
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  deadlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  deadlineTextOverdue: {
+    color: '#DC2626',
+    fontWeight: '600',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusPending: {
+    backgroundColor: '#FEF3C7',
+  },
+  statusCompleted: {
+    backgroundColor: '#D1FAE5',
+  },
+  statusExcused: {
+    backgroundColor: '#E0E7FF',
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  penaltyActions: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  penaltyActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+    borderWidth: 1,
+  },
+  completeBtn: {
+    borderColor: '#10B981',
+    backgroundColor: '#ECFDF5',
+  },
+  completeBtnText: {
+    color: '#10B981',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  excuseBtn: {
+    borderColor: '#F59E0B',
+    backgroundColor: '#FFFBEB',
+  },
+  excuseBtnText: {
+    color: '#F59E0B',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#10B981',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  penaltyStatusBadge: {
+  paddingHorizontal: 8,
+  paddingVertical: 2,
+  borderRadius: 12,
+  marginLeft: 8,
+},
+penaltyStatusText: {
+  fontSize: 10,
+  fontWeight: '600',
+},
 });

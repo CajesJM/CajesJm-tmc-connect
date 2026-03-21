@@ -4,7 +4,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { collection, doc, getDoc, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -116,18 +116,15 @@ export default function StudentEventsScreen() {
   }, [currentUserId]);
 
   useEffect(() => {
-    setIsLoading(true);
+  setIsLoading(true);
 
-    const q = query(
-      collection(db, 'events'),
-      where('status', '==', 'approved'),
-      orderBy('date', 'desc')
-    );
+  const eventsRef = collection(db, 'events');
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const list: Event[] = snapshot.docs.map((doc) => {
+  const unsubscribe = onSnapshot(
+    eventsRef,
+    (snapshot) => {
+      const list: Event[] = snapshot.docs
+        .map((doc) => {
           const data = doc.data();
           return {
             id: doc.id,
@@ -143,21 +140,29 @@ export default function StudentEventsScreen() {
             verifiedAttendees: data.verifiedAttendees || [],
             coordinates: data.coordinates,
           };
+        })
+        .filter(event => {
+          const doc = snapshot.docs.find(d => d.id === event.id);
+          const data = doc?.data();
+          return data?.status === 'approved' || !data?.hasOwnProperty('status');
         });
+      
+      // Sort by date (most recent first)
+      list.sort((a, b) => b.date.getTime() - a.date.getTime());
+      
+      setEvents(list);
+      setIsLoading(false);
+      setRefreshing(false);
+    },
+    (error) => {
+      console.error('Error fetching events:', error);
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  );
 
-        setEvents(list);
-        setIsLoading(false);
-        setRefreshing(false);
-      },
-      (error) => {
-        console.error('Error fetching events:', error);
-        setIsLoading(false);
-        setRefreshing(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [refreshKey]);
+  return () => unsubscribe();
+}, [refreshKey]);
 
   const getAttendanceStatus = (event: Event): 'attended' | 'missed' | 'not-recorded' => {
     if (!userData?.studentID) return 'not-recorded';

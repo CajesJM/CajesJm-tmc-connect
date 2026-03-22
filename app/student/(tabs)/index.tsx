@@ -6,15 +6,11 @@ import {
     collection,
     doc,
     getDocs,
-    limit,
     onSnapshot,
-    orderBy,
-    query,
-    updateDoc,
-    where
+    updateDoc
 } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -27,14 +23,15 @@ import {
     useWindowDimensions,
     View
 } from 'react-native';
+import { PieChart } from 'react-native-gifted-charts';
 
 import { NotificationModal } from '../../../components/NotificationModal';
 import { useAuth } from '../../../context/AuthContext';
+import { useTheme } from '../../../context/ThemeContext'; // keep import
 import { db } from '../../../lib/firebaseConfig';
-import { studentDashboardStyles as styles } from '../../../styles/student/dashboardStyles';
+import { createStudentDashboardStyles } from '../../../styles/student/dashboardStyles';
 import { Notification, notificationService } from '../../../utils/notifications';
 
-// Types
 interface Event {
     id: string;
     title: string;
@@ -58,10 +55,37 @@ interface Announcement {
 }
 
 export default function StudentDashboard() {
+    const { width } = useWindowDimensions();
+    const { colors, isDark } = useTheme();          // <-- theme
+    const isMobile = width < 768;
+    const isTablet = width >= 768 && width < 1024;
+    const isDesktop = width >= 1024;
+
+    // Dynamic styles based on theme and screen size
+    const styles = useMemo(
+        () => createStudentDashboardStyles(colors, isDark, isMobile, isTablet, isDesktop),
+        [colors, isDark, isMobile, isTablet, isDesktop]
+    );
+
+    // Dynamic header gradient (matches announcement / other screens)
+    const headerGradientColors = isDark
+        ? ['#0f172a', '#1e293b'] as const
+        : ['#1e40af', '#3b82f6'] as const;
+
+    const router = useRouter();
+    const { userData } = useAuth();
+
+    // State declarations (no duplicates)
     const [studentStats, setStudentStats] = useState({
         eventsAttended: 0,
         upcomingEvents: 0,
         totalAnnouncements: 0,
+    });
+
+    const [donutData, setDonutData] = useState({
+        upcomingEvents: 0,
+        pastEvents: 0,
+        announcements: 0,
     });
 
     const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
@@ -76,131 +100,178 @@ export default function StudentDashboard() {
     const [unreadCount, setUnreadCount] = useState(0);
     const [uploadingImage, setUploadingImage] = useState(false);
 
-    const { width } = useWindowDimensions();
-    const router = useRouter();
-    const { userData } = useAuth();
+    // Helper: check if event/announcement should be shown (approved or no status)
+    const isApproved = (data: any): boolean => {
+        const status = data.status;
+        return status === 'approved' || !status;
+    };
 
-    const isMobile = width < 768;
-    const isTablet = width >= 768 && width < 1024;
-
+    // Fetch student stats (attended, upcoming, total announcements)
     const fetchStudentStats = async () => {
-    try {
-        setLoading(true);
-        if (!userData?.email) return;
+        try {
+            setLoading(true);
+            if (!userData?.email) return;
 
-        const now = new Date();
+            const now = new Date();
 
-   
-        const attendedQuery = query(
-            collection(db, 'events'),
-            where('status', '==', 'approved'),
-            where('attendees', 'array-contains', userData.email),
-            where('date', '<', now)
-        );
-        const attendedSnap = await getDocs(attendedQuery);
-        const eventsAttended = attendedSnap.size;
+            const eventsSnapshot = await getDocs(collection(db, 'events'));
+            let attendedCount = 0;
+            let upcomingCount = 0;
 
-        const upcomingQuery = query(
-            collection(db, 'events'),
-            where('status', '==', 'approved'),
-            where('date', '>', now)
-        );
-        const upcomingSnap = await getDocs(upcomingQuery);
-        const upcomingEvents = upcomingSnap.size;
+            eventsSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (!isApproved(data)) return;
 
-      
-        const announcementsQuery = query(
-            collection(db, 'updates'),
-            where('status', '==', 'approved')
-        );
-        const announcementsSnap = await getDocs(announcementsQuery);
-        const totalAnnouncements = announcementsSnap.size;
+                const eventDate = data.date?.toDate?.() || data.date;
+                if (!eventDate) return;
 
-        setStudentStats({
-            eventsAttended,
-            upcomingEvents,
-            totalAnnouncements,
-        });
-    } catch (error) {
-        console.error('Error fetching student stats:', error);
-    } finally {
-        setLoading(false);
-    }
-};
+                if (eventDate < now) {
+                    const attendees = data.attendees || [];
+                    if (attendees.includes(userData.email)) {
+                        attendedCount++;
+                    }
+                } else {
+                    upcomingCount++;
+                }
+            });
 
+            const announcementsSnapshot = await getDocs(collection(db, 'updates'));
+            let totalAnnouncements = 0;
+            announcementsSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (isApproved(data)) totalAnnouncements++;
+            });
+
+            setStudentStats({
+                eventsAttended: attendedCount,
+                upcomingEvents: upcomingCount,
+                totalAnnouncements,
+            });
+        } catch (error) {
+            console.error('Error fetching student stats:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Fetch donut data (counts for chart)
+    const fetchDonutData = async () => {
+        try {
+            const now = new Date();
+            const eventsSnapshot = await getDocs(collection(db, 'events'));
+            let upcomingEventsCount = 0;
+            let pastEventsCount = 0;
+
+            eventsSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (!isApproved(data)) return;
+
+                const eventDate = data.date?.toDate?.() || data.date;
+                if (!eventDate) return;
+
+                if (eventDate > now) {
+                    upcomingEventsCount++;
+                } else {
+                    pastEventsCount++;
+                }
+            });
+
+            const announcementsSnapshot = await getDocs(collection(db, 'updates'));
+            let totalAnnouncements = 0;
+            announcementsSnapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (isApproved(data)) totalAnnouncements++;
+            });
+
+            setDonutData({
+                upcomingEvents: upcomingEventsCount,
+                pastEvents: pastEventsCount,
+                announcements: totalAnnouncements,
+            });
+        } catch (error) {
+            console.error('Error fetching donut data:', error);
+        }
+    };
+
+    // Real‑time listener for upcoming events (for the list)
     const fetchUpcomingEvents = () => {
         setEventsLoading(true);
-
         const now = new Date();
-        
-        const eventsQuery = query(
+
+        const unsubscribe = onSnapshot(
             collection(db, 'events'),
-            where('status', '==', 'approved'),
-            where('date', '>', now), 
-            orderBy('date', 'asc'),
-            limit(5)
+            (snapshot) => {
+                const events: Event[] = [];
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    if (!isApproved(data)) return;
+
+                    const eventDate = data.date?.toDate?.() || data.date;
+                    if (!eventDate) return;
+                    if (eventDate <= now) return;
+
+                    events.push({
+                        id: doc.id,
+                        title: data.title || 'Untitled Event',
+                        description: data.description,
+                        date: eventDate,
+                        time: data.time,
+                        location: data.location,
+                        attendees: data.attendees || [],
+                        createdAt: data.createdAt?.toDate(),
+                    });
+                });
+
+                events.sort((a, b) => a.date.getTime() - b.date.getTime());
+                setUpcomingEvents(events.slice(0, 3));
+                setEventsLoading(false);
+            },
+            (error) => {
+                console.error('Error fetching upcoming events:', error);
+                setEventsLoading(false);
+            }
         );
 
-        return onSnapshot(eventsQuery, (snapshot) => {
-            console.log('Upcoming events snapshot size:', snapshot.size);
-            snapshot.docs.forEach(doc => {
-                console.log('Event:', doc.id, doc.data());
-            });
-
-            const events = snapshot.docs.map(doc => {
-                const data = doc.data();
-                const eventDate = data.date?.toDate();
-                return {
-                    id: doc.id,
-                    title: data.title || 'Untitled Event',
-                    description: data.description,
-                    date: eventDate,
-                    time: data.time,
-                    location: data.location,
-                    attendees: data.attendees || [],
-                    createdAt: data.createdAt?.toDate()
-                };
-            });
-
-            setUpcomingEvents(events);
-            setEventsLoading(false);
-        }, (error) => {
-            console.error('Error fetching upcoming events:', error);
-            setEventsLoading(false);
-        });
+        return unsubscribe;
     };
 
     const fetchRecentAnnouncements = () => {
         setAnnouncementsLoading(true);
-        const announcementsQuery = query(
+        const unsubscribe = onSnapshot(
             collection(db, 'updates'),
-            where('status', '==', 'approved'),
-            orderBy('createdAt', 'desc'),
-            limit(3)
+            (snapshot) => {
+                const announcements: Announcement[] = [];
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    if (!isApproved(data)) return;
+
+                    announcements.push({
+                        id: doc.id,
+                        title: data.title || 'Announcement',
+                        content: data.content || data.message || 'No content',
+                        createdAt: data.createdAt?.toDate() || new Date(),
+                        priority: data.priority || 'medium',
+                        author: data.author || 'Admin',
+                    });
+                });
+
+                announcements.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+                setRecentAnnouncements(announcements.slice(0, 3));
+                setAnnouncementsLoading(false);
+            },
+            (error) => {
+                console.error('Error fetching announcements:', error);
+                setAnnouncementsLoading(false);
+            }
         );
 
-        return onSnapshot(announcementsQuery, (snapshot) => {
-            const announcements = snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    title: data.title || 'Announcement',
-                    content: data.content || data.message || 'No content',
-                    createdAt: data.createdAt?.toDate() || new Date(),
-                    priority: data.priority || 'medium',
-                    author: data.author || 'Admin'
-                };
-            });
-            setRecentAnnouncements(announcements);
-            setAnnouncementsLoading(false);
-        }, (error) => {
-            console.error('Error fetching announcements:', error);
-            setAnnouncementsLoading(false);
-        });
+        return unsubscribe;
     };
 
     useEffect(() => {
         fetchStudentStats();
+        fetchDonutData();
+
         const unsubscribeEvents = fetchUpcomingEvents();
         const unsubscribeAnnouncements = fetchRecentAnnouncements();
 
@@ -227,7 +298,7 @@ export default function StudentDashboard() {
 
     const onRefresh = React.useCallback(() => {
         setRefreshing(true);
-        fetchStudentStats().finally(() => setRefreshing(false));
+        Promise.all([fetchStudentStats(), fetchDonutData()]).finally(() => setRefreshing(false));
     }, []);
 
     const handleNotificationPress = async (notification: Notification) => {
@@ -337,7 +408,7 @@ export default function StudentDashboard() {
     };
 
     const renderStatCard = (title: string, value: number, icon: React.ReactElement, color: string) => (
-        <View style={[styles.statCard, {borderRightWidth: 3, borderRightColor: '#1266d4'}]}>
+        <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
             <View style={styles.statCardHeader}>
                 <View style={[styles.statIconContainer, { backgroundColor: `${color}20` }]}>
                     {icon}
@@ -348,15 +419,99 @@ export default function StudentDashboard() {
         </View>
     );
 
+    const DonutChart = () => {
+        const total = donutData.upcomingEvents + donutData.pastEvents + donutData.announcements;
+        const pieData = [
+            {
+                value: donutData.upcomingEvents,
+                color: '#0ea5e9',
+                text: `${Math.round((donutData.upcomingEvents / total) * 100)}%`,
+                label: 'Upcoming Events',
+                icon: 'time-outline',
+            },
+            {
+                value: donutData.pastEvents,
+                color: '#64748b',
+                text: `${Math.round((donutData.pastEvents / total) * 100)}%`,
+                label: 'Past Events',
+                icon: 'calendar-outline',
+            },
+            {
+                value: donutData.announcements,
+                color: '#8b5cf6',
+                text: `${Math.round((donutData.announcements / total) * 100)}%`,
+                label: 'Announcements',
+                icon: 'megaphone',
+            },
+        ];
+
+        if (total === 0) {
+            return (
+                <View style={styles.donutChartContainer}>
+                    <Text style={styles.donutChartEmptyText}>No data available</Text>
+                </View>
+            );
+        }
+
+        return (
+            <View style={styles.donutChartContainer}>
+                <View style={styles.donutHeader}>
+                    <View style={styles.donutHeaderLeft}>
+                        <Ionicons name="pie-chart" size={18} color="#0ea5e9" />
+                        <Text style={styles.donutTitle}>Content Distribution</Text>
+                    </View>
+                    <Text style={styles.donutTotalBadge}>{total} total</Text>
+                </View>
+
+                <View style={styles.donutChartWrapper}>
+                    <PieChart
+                        data={pieData}
+                        donut
+                        showText
+                        textColor={colors.text}                       
+                        fontWeight="bold"
+                        innerRadius={50}
+                        innerCircleColor={colors.card}               
+                        strokeWidth={2}
+                        focusOnPress={false}
+                        centerLabelComponent={() => (
+                            <View style={styles.donutCenterLabel}>
+                                <Text style={styles.donutCenterValue}>{total}</Text>
+                                <Text style={styles.donutCenterText}>Total Items</Text>
+                            </View>
+                        )}
+                    />
+                </View>
+
+                <View style={styles.progressLegendContainer}>
+                    {pieData.map((item, idx) => (
+                        <View key={idx} style={styles.progressLegendItem}>
+                            <View style={[styles.progressLegendIcon, { backgroundColor: `${item.color}20` }]}>
+                                <Ionicons name={item.icon as any} size={14} color={item.color} />
+                            </View>
+                            <View style={styles.progressLegendInfo}>
+                                <Text style={styles.progressLegendLabel}>{item.label}</Text>
+                                <Text style={styles.progressLegendCount}>{item.value} items</Text>
+                            </View>
+                            <Text style={[styles.progressLegendPercent, { color: item.color }]}>
+                                {item.text}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            </View>
+        );
+    };
+
     const renderOverview = () => (
         <ScrollView
             style={styles.overviewContainer}
             showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#0ea5e9" />}
         >
-            {/* Header */}
+            {/* Header with dynamic gradient */}
             <LinearGradient
-                colors={['#14203d', '#06080b']}
+                colors={headerGradientColors}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.headerGradient}
@@ -440,8 +595,9 @@ export default function StudentDashboard() {
                 )}
             </View>
 
+            <DonutChart />
+
             <View style={styles.twoColumnLayout}>
-    
                 <View style={[styles.column, styles.upcomingColumn]}>
                     <View style={styles.upcomingCard}>
                         <View style={styles.upcomingHeader}>
@@ -497,7 +653,6 @@ export default function StudentDashboard() {
                     </View>
                 </View>
 
-                {/* Recent Announcements */}
                 <View style={[styles.column, styles.upcomingColumn]}>
                     <View style={styles.announcementCard}>
                         <View style={styles.announcementHeader}>
@@ -516,7 +671,7 @@ export default function StudentDashboard() {
                                 {recentAnnouncements.map((announcement) => {
                                     const priorityColor =
                                         announcement.priority === 'high' ? '#ef4444' :
-                                        announcement.priority === 'medium' ? '#f59e0b' : '#10b981';
+                                            announcement.priority === 'medium' ? '#f59e0b' : '#10b981';
                                     return (
                                         <TouchableOpacity
                                             key={announcement.id}

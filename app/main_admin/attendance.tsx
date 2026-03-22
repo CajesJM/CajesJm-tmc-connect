@@ -1,5 +1,7 @@
 import { Feather } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import {
   collection, doc, getDoc, getDocs, onSnapshot,
@@ -9,7 +11,7 @@ import {
   updateDoc,
   where, writeBatch
 } from 'firebase/firestore';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -50,8 +52,6 @@ interface PenaltyStatus {
   cancelledBy?: string;
 }
 
-
-// Stable TextInput component
 const FormTextInput = ({
   style,
   value,
@@ -142,6 +142,8 @@ export default function MainAdminAttendance() {
   );
 
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const qrWrapperRef = useRef<View>(null);
+  const qrCodeRef = useRef<any>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [showEventModal, setShowEventModal] = useState<boolean>(false);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
@@ -157,6 +159,7 @@ export default function MainAdminAttendance() {
   const [isCustomDatePickerVisible, setCustomDatePickerVisible] = useState(false);
   const [customExpirationDate, setCustomExpirationDate] = useState<Date | null>(null);
   const [quickOptions, setQuickOptions] = useState<Array<{ label: string; value: string }>>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -495,17 +498,29 @@ export default function MainAdminAttendance() {
       showAlert('Error', 'Failed to record penalty announcement.');
     }
   };
-
+  const getEventDateISO = (date: any): string => {
+    if (!date) return '';
+    if (typeof date === 'object' && date.toDate) {
+      return date.toDate().toISOString();
+    }
+    if (typeof date === 'string') {
+      const d = new Date(date);
+      return isNaN(d.getTime()) ? '' : d.toISOString();
+    }
+    if (typeof date === 'object' && date.seconds) {
+      return new Date(date.seconds * 1000).toISOString();
+    }
+    return '';
+  };
   const handleSendPenalty = async () => {
+
     if (!selectedEvent || !user) return;
 
-    // Check if penalties were already sent by checking penalties collection
     const penaltiesQuery = query(
       collection(db, 'penalties'),
       where('eventId', '==', selectedEvent.id)
     );
     const existingPenalties = await getDocs(penaltiesQuery);
-
     if (existingPenalties.size > 0) {
       showAlert('Already Sent', 'Penalties have already been sent for this event.');
       return;
@@ -522,20 +537,19 @@ export default function MainAdminAttendance() {
       const studentIds: string[] = [];
       const timestamp = new Date().toISOString();
 
-      // Create penalty records for each missing student
       for (const student of missingAttendees) {
         const penaltyId = `${selectedEvent.id}_${student.id}`;
         const penaltyRef = doc(db, 'penalties', penaltyId);
-
         studentIds.push(student.id);
 
         const penaltyData = {
           eventId: selectedEvent.id,
           eventTitle: selectedEvent.title,
+          eventDate: getEventDateISO(selectedEvent.date), // ✅ Added
           studentId: student.id,
           studentName: student.name,
-          studentID: student.studentID,
-          status: 'pending',
+          studentID: student.studentID,          // ✅ Add back if needed
+          status: 'pending',                     // ✅ Must be 'pending'
           createdAt: timestamp,
           sentBy: user.uid,
           sentAt: timestamp,
@@ -547,11 +561,9 @@ export default function MainAdminAttendance() {
         // Also add to user's penalties array
         const userRef = doc(db, 'users', student.id);
         const userDoc = await getDoc(userRef);
-
         if (userDoc.exists()) {
           const userData = userDoc.data();
           const existingPenalties = userData.penalties || [];
-
           existingPenalties.push({
             id: penaltyId,
             eventId: selectedEvent.id,
@@ -560,7 +572,6 @@ export default function MainAdminAttendance() {
             createdAt: timestamp,
             sentAt: timestamp
           });
-
           batch.update(userRef, { penalties: existingPenalties });
         }
       }
@@ -575,13 +586,9 @@ export default function MainAdminAttendance() {
       });
 
       await batch.commit();
-
-      // IMPORTANT: Update local state immediately
       setSentPenaltyEvents(prev => new Set([...prev, selectedEvent.id]));
-
       setShowPenaltyModal(false);
       showAlert('Success', `Penalties sent to ${studentIds.length} students successfully!`);
-
     } catch (error) {
       console.error('Error sending penalties:', error);
       showAlert('Error', 'Failed to send penalties. Please try again.');
@@ -589,7 +596,6 @@ export default function MainAdminAttendance() {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -861,6 +867,7 @@ export default function MainAdminAttendance() {
       const penaltyData = {
         eventId: selectedEvent.id,
         eventTitle: selectedEvent.title,
+        eventDate: getEventDateISO(selectedEvent.date),
         studentId: student.id,
         studentName: student.name,
         status: 'paid',
@@ -1095,6 +1102,134 @@ export default function MainAdminAttendance() {
     }
   };
 
+  const captureAndSaveQR = async () => {
+    if (!qrCodeRef.current) {
+      showAlert('Error', 'QR code reference not found');
+      return;
+    }
+
+    try {
+      if (Platform.OS === 'web') {
+        // Get the SVG as a data URL
+        qrCodeRef.current.toDataURL(async (dataUrl: string) => {
+          try {
+            // Convert the data URL to a blob
+            const response = await fetch(dataUrl);
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+
+            // Open a new window with the QR image and event details
+            const printWindow = window.open('', '_blank');
+            if (printWindow) {
+              printWindow.document.write(`
+              <html>
+                <head>
+                  <title>QR Code - ${selectedEvent?.title || 'Event'}</title>
+                  <style>
+                    body {
+                      display: flex;
+                      justify-content: center;
+                      align-items: center;
+                      min-height: 100vh;
+                      margin: 0;
+                      font-family: Arial, sans-serif;
+                      background: white;
+                    }
+                    .container {
+                      text-align: center;
+                      padding: 20px;
+                      max-width: 90%;
+                    }
+                    .qr-image {
+                      max-width: 300px;
+                      height: auto;
+                      border: 1px solid #ccc;
+                      padding: 20px;
+                      background: white;
+                      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                    }
+                    .title {
+                      font-size: 24px;
+                      margin-bottom: 20px;
+                    }
+                    .details {
+                      margin-top: 20px;
+                      color: #666;
+                    }
+                    @media print {
+                      .no-print {
+                        display: none;
+                      }
+                    }
+                  </style>
+                </head>
+                <body>
+                  <div class="container">
+                    <div class="title">${selectedEvent?.title || 'Event QR Code'}</div>
+                    <img src="${objectUrl}" class="qr-image" />
+                    <div class="details">
+                      <p>Event: ${selectedEvent?.title}</p>
+                      <p>Date: ${selectedEvent?.date ? formatDate(selectedEvent.date) : 'N/A'}</p>
+                      <p>Location: ${selectedEvent?.location}</p>
+                    </div>
+                    <div class="no-print" style="margin-top: 30px;">
+                      <button onclick="window.print();">Print / Save as PDF</button>
+                      <p style="font-size: 12px;">Use the print dialog to save as PDF or print directly.</p>
+                    </div>
+                  </div>
+                  <script>
+                    // Auto‑print after the image loads
+                    const img = document.querySelector('.qr-image');
+                    if (img.complete) {
+                      setTimeout(() => window.print(), 500);
+                    } else {
+                      img.onload = () => setTimeout(() => window.print(), 500);
+                    }
+                    // Clean up object URL after printing
+                    window.addEventListener('beforeunload', () => URL.revokeObjectURL('${objectUrl}'));
+                  </script>
+                </body>
+              </html>
+            `);
+              printWindow.document.close();
+              showAlert('Print Ready', 'A new window opened. Use the print dialog to save as PDF or print.');
+            } else {
+              showAlert('Popup Blocked', 'Please allow popups to print the QR code.');
+            }
+          } catch (err) {
+            console.error('Error processing QR:', err);
+            showAlert(
+              'Download Failed',
+              'Could not prepare QR code. Please right‑click on the QR code above and select "Save image as..."'
+            );
+          }
+        });
+      } else {
+        // Native: save to gallery (unchanged)
+        if (Platform.OS === 'ios') {
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          if (status !== 'granted') {
+            showAlert('Permission Denied', 'We need permission to save images to your device.');
+            return;
+          }
+        }
+
+        const dataUrl = await qrCodeRef.current.toDataURL();
+        const base64Data = dataUrl.split(',')[1];
+        const fileUri = (FileSystem as any).documentDirectory + `qr_${selectedEvent?.id}_${Date.now()}.png`;
+        await (FileSystem as any).writeAsStringAsync(fileUri, base64Data, {
+          encoding: (FileSystem as any).EncodingType.Base64,
+        });
+        const asset = await MediaLibrary.createAssetAsync(fileUri);
+        await MediaLibrary.createAlbumAsync('Event QR Codes', asset, false);
+        showAlert('Success', 'QR code saved to your gallery!');
+      }
+    } catch (error) {
+      console.error('Error saving QR:', error);
+      showAlert('Error', 'Failed to save QR code. Please try again.');
+    }
+  };
+
   const formatDate = (dateValue: string | { seconds: number; nanoseconds: number } | any) => {
     if (!dateValue) return null;
 
@@ -1114,7 +1249,7 @@ export default function MainAdminAttendance() {
 
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
-        month: 'short',
+        month: 'long',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
@@ -1172,7 +1307,7 @@ export default function MainAdminAttendance() {
       if (isNaN(date.getTime())) return null;
 
       return date.toLocaleDateString('en-US', {
-        month: 'short',
+        month: 'long',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
@@ -1666,58 +1801,8 @@ export default function MainAdminAttendance() {
         </View>
       </LinearGradient>
 
-      {/* Stats Grid */}
-      <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
-            <Feather name="calendar" size={isMobile ? 16 : 20} color={colors.accent.primary} />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{eventStatusStats.total}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total Events</Text>
-          <View style={styles.eventStatusBreakdown}>
-            <View style={[styles.eventStatusBadge, { backgroundColor: '#f59e0b15' }]}>
-              <Text style={[styles.eventStatusBadgeText, { color: '#f59e0b' }]}>P: {eventStatusStats.pending}</Text>
-            </View>
-            <View style={[styles.eventStatusBadge, { backgroundColor: '#10b98115' }]}>
-              <Text style={[styles.eventStatusBadgeText, { color: '#10b981' }]}>A: {eventStatusStats.approved}</Text>
-            </View>
-            <View style={[styles.eventStatusBadge, { backgroundColor: '#ef444415' }]}>
-              <Text style={[styles.eventStatusBadgeText, { color: '#ef4444' }]}>R: {eventStatusStats.rejected}</Text>
-            </View>
-          </View>
-        </View>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#8b5cf615' }]}>
-            <Feather name="user" size={isMobile ? 16 : 20} color="#8b5cf6" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.totalStudents}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total Students</Text>
-        </View>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
-            <Feather name="users" size={isMobile ? 16 : 20} color={colors.accent.primary} />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total Attendees</Text>
-        </View>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#16a34a15' }]}>
-            <Feather name="check-circle" size={isMobile ? 16 : 20} color="#16a34a" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.verified}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Verified Attendees</Text>
-        </View>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#f59e0b15' }]}>
-            <Feather name="grid" size={isMobile ? 16 : 20} color="#f59e0b" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.blocksCount}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Blocks</Text>
-        </View>
-      </View>
-
       {/* Main Content */}
-      <ScrollView style={styles.mainScrollView} contentContainerStyle={styles.mainScrollContent} showsVerticalScrollIndicator={true}>
+      <ScrollView style={styles.mainScrollView} contentContainerStyle={styles.mainScrollContent} showsVerticalScrollIndicator={false}>
         <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
           {/* Left Grid */}
           <View style={[styles.leftGrid, isMobile && styles.leftGridMobile]}>
@@ -1756,24 +1841,55 @@ export default function MainAdminAttendance() {
             {selectedEvent && mode === 'qr' && (
               <>
                 <View style={[styles.qrContainer, isMobile && styles.qrContainerMobile]}>
+                  {/* Event Header */}
                   <View style={styles.eventInfo}>
-                    <Text style={[styles.eventName, isMobile && styles.eventNameMobile]} numberOfLines={1}>{selectedEvent.title}</Text>
-                    {formatDate(selectedEvent.date) && (
-                      <View style={styles.eventDetails}>
-                        <Feather name="calendar" size={12} color={colors.sidebar.text.secondary} />
-                        <Text style={styles.eventDetailText}>{formatDate(selectedEvent.date)}</Text>
-                      </View>
-                    )}
-                    <View style={styles.eventDetails}>
+                    <Text style={[styles.eventName, isMobile && styles.eventNameMobile]} numberOfLines={1}>
+                      {selectedEvent.title}
+                    </Text>
+                    <View style={styles.eventDetailsRow}>
+
+                      <Text style={styles.eventDetailText}>{formatDate(selectedEvent.date)}</Text>
+                      <View style={styles.bullet} />
                       <Feather name="map-pin" size={12} color={colors.sidebar.text.secondary} />
                       <Text style={styles.eventDetailText}>{selectedEvent.location}</Text>
                     </View>
                     {selectedEvent.coordinates && (
                       <View style={styles.locationVerificationBadge}>
                         <Feather name="shield" size={12} color="#16a34a" />
-                        <Text style={styles.locationVerificationText}>Location Verification</Text>
+                        <Text style={styles.locationVerificationText}>Location Verification Enabled</Text>
                       </View>
                     )}
+                  </View>
+
+                  {/* QR Code Frame with ref for capture */}
+                  <View ref={qrWrapperRef} style={styles.qrFrame}>
+                    <View style={styles.qrCodeWrapper}>
+                      {!isCurrentQRExpired ? (
+                        <>
+                          <QRCode
+                            value={qrValue}
+                            getRef={(c) => (qrCodeRef.current = c)}
+                            size={isMobile ? 180 : 220}
+                            color={colors.text}
+                            backgroundColor={colors.card}
+                          />
+                          <View style={styles.qrLabel}>
+                            <Feather name="camera" size={12} color={colors.sidebar.text.muted} />
+                            <Text style={styles.qrLabelText}>Scan to verify attendance</Text>
+                          </View>
+                        </>
+                      ) : (
+                        <View style={styles.expiredOverlay}>
+                          <Feather name="x-circle" size={48} color="#dc2626" />
+                          <Text style={styles.expiredText}>QR Code Expired</Text>
+                          <Text style={styles.expiredSubtext}>Generate a new code to continue</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Status Badge */}
+                  <View style={styles.qrStatus}>
                     <View style={[styles.statusBadge, isCurrentQRExpired ? styles.statusBadgeExpired : styles.statusBadgeActive]}>
                       {isCurrentQRExpired ? (
                         <>
@@ -1784,32 +1900,32 @@ export default function MainAdminAttendance() {
                         <>
                           <Feather name="check-circle" size={12} color="#16a34a" />
                           <Text style={[styles.statusBadgeText, styles.statusBadgeTextActive]}>
-                            {timeLeft ? `Expires in ${timeLeft}` : 'QR Active'}
+                            {timeLeft ? `Valid for ${timeLeft}` : 'Active'}
                           </Text>
                         </>
                       )}
                     </View>
                   </View>
-                  {!isCurrentQRExpired ? (
-                    <>
-                      <View style={styles.qrCodeContainer}>
-                        {qrValue ? (
-                          <QRCode value={qrValue} size={isMobile ? 160 : 200} color={colors.text} backgroundColor={colors.card} />
-                        ) : (
-                          <ActivityIndicator size="large" color={colors.accent.primary} />
-                        )}
-                      </View>
-                      <View style={styles.qrInfo}>
-                        <Text style={styles.qrHint}>Scan this QR code for attendance</Text>
-                        {selectedEvent.coordinates && <Text style={styles.qrHint}>Location verification required</Text>}
-                      </View>
-                    </>
-                  ) : (
-                    <View style={styles.expiredContainer}>
-                      <Feather name="x-circle" size={48} color="#dc2626" style={styles.expiredIcon} />
-                      <Text style={styles.expiredText}>QR Code Expired</Text>
-                      <Text style={styles.expiredSubtext}>Generate a new code to continue</Text>
+
+                  {/* Download Button (only if QR active) */}
+                  {!isCurrentQRExpired && (
+                    <View style={styles.downloadButtonContainer}>
+                      <TouchableOpacity
+                        style={styles.downloadButton}
+                        onPress={captureAndSaveQR}
+                        activeOpacity={0.7}
+                      >
+                        <Feather name="download" size={16} color="#ffffff" />
+                        <Text style={styles.downloadButtonText}>Save QR</Text>
+                      </TouchableOpacity>
                     </View>
+                  )}
+
+                  {/* Expiration hint */}
+                  {selectedEvent.qrExpiration && !isCurrentQRExpired && (
+                    <Text style={styles.expirationHint}>
+                      Expires: {new Date(selectedEvent.qrExpiration).toLocaleString()}
+                    </Text>
                   )}
                 </View>
                 <View style={[styles.actionButtons, isMobile && styles.actionButtonsMobile]}>
@@ -1899,9 +2015,10 @@ export default function MainAdminAttendance() {
                       fetchAttendanceRecords(selectedEvent.id);
                     }
                   }}
-                  onSendPenalty={handleSendPenalty}
+                  onSendPenalty={handleSendPenalty} 
                   eventId={selectedEvent.id}
                   eventTitle={selectedEvent.title}
+                  eventDate={selectedEvent.date}     
                   missingStudents={missingAttendees.map(s => ({
                     id: s.id,
                     name: s.name,
@@ -2301,7 +2418,8 @@ export default function MainAdminAttendance() {
                 <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
-            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
+              showsVerticalScrollIndicator={false}>
               {loading ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={colors.accent.primary} />
@@ -2401,7 +2519,8 @@ export default function MainAdminAttendance() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={[styles.expirationModalContent, isMobile && styles.expirationModalContentMobile]}>
+              <ScrollView style={[styles.expirationModalContent, isMobile && styles.expirationModalContentMobile]}
+                showsVerticalScrollIndicator={false}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Quick Options</Text>
                 <View style={styles.expirationOptions}>
                   {quickOptions.map((option, index) => {

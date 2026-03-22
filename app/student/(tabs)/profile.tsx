@@ -1,8 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,16 +12,30 @@ import {
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View
+  View, useWindowDimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../../../context/AuthContext';
+import { useNotifications } from '../../../context/NotificationContext';
 //import { usePushNotifications } from '../../../hooks/usePushNotifications';
+import { useTheme } from '../../../context/ThemeContext';
 import { auth, db } from '../../../lib/firebaseConfig';
 import type { AttendanceRecord, MissedEvent } from '../../../lib/types';
-import { profileStyles as styles } from '../../../styles/student/profileStyles';
+import { createProfileStyles } from '../../../styles/student/profileStyles';
 
-
+interface Penalty {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  eventDate?: string;
+  studentId: string;
+  studentName: string;
+  status: 'pending' | 'paid' | 'completed';
+  severity?: 'low' | 'medium' | 'high';
+  consequences?: string;
+  deadline?: string;
+  createdAt: string | any;
+}
 
 interface StudentEvent extends MissedEvent {
   scannedAt?: string;
@@ -54,6 +68,10 @@ interface AboutInfo {
 export default function StudentProfile() {
   const { logout, userData } = useAuth();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 640;
+  const isTablet = width >= 640 && width < 1024;
+  const isDesktop = width >= 1024;
   const [missedEvents, setMissedEvents] = useState<MissedEvent[]>([]);
   const [attendedEvents, setAttendedEvents] = useState<MissedEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +84,18 @@ export default function StudentProfile() {
   const [showPenaltiesModal, setShowPenaltiesModal] = useState(false);
   const [penaltyLoading, setPenaltyLoading] = useState(false);
   const [penaltyMap, setPenaltyMap] = useState<Record<string, { status: string; id: string }>>({});
+  const { incrementUnread, clearUnread } = useNotifications();
+  const isFocused = useRef(true);
+  const initialLoadDone = useRef(false);
+  const lastPenaltyTimestamp = useRef<string | null>(null);
   //const { expoPushToken } = usePushNotifications();
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const { theme, setTheme, colors, isDark, toggleTheme } = useTheme();
+  const styles = useMemo(
+    () => createProfileStyles(colors, isDark, isMobile, isTablet, isDesktop),
+    [colors, isDark, isMobile, isTablet, isDesktop]
+  );
+
 
   const [aboutInfo] = useState<AboutInfo>({
     submittedBy: {
@@ -134,7 +163,6 @@ export default function StudentProfile() {
         return;
       }
 
-      // Fetch ALL events (no status filter)
       const eventsRef = collection(db, 'events');
       const querySnapshot = await getDocs(eventsRef);
 
@@ -148,7 +176,7 @@ export default function StudentProfile() {
 
         const hasStatus = 'status' in eventData;
         const isApproved = hasStatus && eventData.status === 'approved';
-        const isAdminEvent = !hasStatus; 
+        const isAdminEvent = !hasStatus;
 
         if (!isApproved && !isAdminEvent) {
           console.log('Skipping event (not approved and not admin):', eventData.title);
@@ -157,14 +185,12 @@ export default function StudentProfile() {
 
         console.log('Event:', eventData.title, 'Date:', eventData.date);
 
-        // Convert date from Firestore Timestamp or string
         const eventDate = typeof eventData.date === 'object' && (eventData.date as any)?.toDate
           ? (eventData.date as any).toDate()
           : new Date((eventData.date as string) || '');
 
         const now = new Date();
 
-        // Only consider past events
         if (eventDate > now) {
           console.log('Event is in future, skipping:', eventData.title);
           continue;
@@ -217,56 +243,75 @@ export default function StudentProfile() {
     }
   };
 
-  const fetchPenalties = useCallback(async () => {
-    if (!auth.currentUser?.uid) return;
-    try {
-      setPenaltyLoading(true);
-      const q = query(
-        collection(db, 'penalties'),
-        where('studentId', '==', auth.currentUser.uid),
-        where('status', 'in', ['pending', 'completed'])
-      );
-      const snapshot = await getDocs(q);
-      console.log('📝 Penalties snapshot size:', snapshot.size);
+  useEffect(() => {
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
 
-      // Build map for badges (includes both pending and completed)
-      const map: Record<string, { status: string; id: string }> = {};
-      const pendingPenalties: any[] = [];
+    const penaltiesQuery = query(
+      collection(db, 'penalties'),
+      where('studentId', '==', userId)
+    );
 
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        console.log('📝 Penalty doc:', doc.id, data);
-        if (data.eventId) {
-          console.log('✅ Mapping eventId:', data.eventId, '→ status:', data.status);
-          map[data.eventId] = { status: data.status, id: doc.id };
-        } else {
-          console.warn('⚠️ Penalty doc missing eventId:', doc.id);
+    const unsubscribe = onSnapshot(
+      penaltiesQuery,
+      (snapshot) => {
+        const allPenalties: any[] = [];
+        const map: Record<string, { status: string; id: string }> = {};
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          allPenalties.push({ id: doc.id, ...data });
+          if (data.eventId) {
+            map[data.eventId] = { status: data.status, id: doc.id };
+          }
+        });
+        allPenalties.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+
+        const pendingPenalties = allPenalties.filter(p => p.status === 'pending');
+        if (pendingPenalties.length > 0) {
+          const newest = pendingPenalties.reduce((a, b) =>
+            (a.createdAt?.toMillis?.() || 0) > (b.createdAt?.toMillis?.() || 0) ? a : b
+          );
+          if (newest && newest.createdAt) {
+            const newestMillis = newest.createdAt.toMillis?.() || newest.createdAt.getTime();
+            const lastMillis = lastPenaltyTimestamp.current ? parseInt(lastPenaltyTimestamp.current) : 0;
+            if (newestMillis > lastMillis && initialLoadDone.current && !isFocused.current) {
+              incrementUnread('profile');
+            }
+            lastPenaltyTimestamp.current = newestMillis.toString();
+          }
         }
 
-        if (data.status === 'pending') {
-          pendingPenalties.push({ id: doc.id, ...data });
+        if (!initialLoadDone.current) {
+          initialLoadDone.current = true;
         }
-      });
 
-      console.log('🗺️ Final penaltyMap:', map);
-      setPenaltyMap(map);
-      setPenalties(pendingPenalties); 
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setPenaltyLoading(false);
-    }
+        setPenalties(allPenalties);
+        setPenaltyMap(map);
+        setPenaltyLoading(false);
+      },
+      (error) => {
+        console.error('Error in penalties listener:', error);
+        setPenaltyLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
+
   useFocusEffect(
     useCallback(() => {
-      fetchPenalties();
-    }, [fetchPenalties])
-  );
+      isFocused.current = true;
+      clearUnread('profile');
 
+      return () => {
+        isFocused.current = false;
+      };
+    }, [clearUnread])
+  );
   useEffect(() => {
     fetchEvents();
     fetchProfileImage();
-    fetchPenalties();
+
   }, []);
 
 
@@ -330,19 +375,15 @@ export default function StudentProfile() {
         return;
       }
 
-      // Convert image to blob
       const response = await fetch(uri);
       const blob = await response.blob();
 
-      // Upload to Firebase Storage
       const storage = getStorage();
       const storageRef = ref(storage, `profile-photos/${user.uid}`);
       await uploadBytes(storageRef, blob);
 
-      // Get download URL
       const downloadURL = await getDownloadURL(storageRef);
 
-      // Update user document in Firestore
       const userRef = doc(db, 'users', user.uid);
       await updateDoc(userRef, {
         profilePhoto: downloadURL
@@ -393,19 +434,40 @@ export default function StudentProfile() {
     return getUsername();
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'Date not available';
+  const formatDate = (dateValue: any) => {
+    if (!dateValue) return 'Date not available';
 
     try {
-      const date = new Date(dateString);
+      let date: Date;
+      if (typeof dateValue === 'object' && dateValue.toDate) {
+        date = dateValue.toDate();
+      } else if (typeof dateValue === 'object' && dateValue.seconds) {
+        date = new Date(dateValue.seconds * 1000);
+      } else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
+      } else {
+        return 'Date not available';
+      }
+
+      if (isNaN(date.getTime())) return 'Date not available';
+
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
-        month: 'short',
+        month: 'long',
         day: 'numeric'
       });
     } catch (error) {
       return 'Date not available';
     }
+  };
+  const getPenaltyDate = (penalty: { eventDate?: any; createdAt?: any }) => {
+    if (penalty.eventDate) {
+      return formatDate(penalty.eventDate);
+    }
+    if (penalty.createdAt) {
+      return formatDate(penalty.createdAt);
+    }
+    return 'Date not available';
   };
 
 
@@ -517,118 +579,127 @@ export default function StudentProfile() {
   );
 
   const renderPenaltiesModal = () => {
-    const pendingCount = penalties.filter(p => p.status === 'pending').length;
-    const paidCount = penalties.filter(p => p.status === 'paid').length;
+  const pendingCount = penalties.filter(p => p.status === 'pending').length;
+  const paidCount = penalties.filter(p => p.status === 'paid').length;
 
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case 'paid': return '#10b981';
-        case 'pending': return '#f59e0b';
-        default: return '#6b7280';
-      }
-    };
+  const severityColors = {
+    low: '#10b981',  
+    medium: '#f59e0b', 
+    high: '#ef4444',  
+  };
 
-    return (
-      <Modal
-        visible={showPenaltiesModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowPenaltiesModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.aboutModal, { maxHeight: '90%' }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>My Penalties</Text>
-                <Text style={styles.modalSubtitle}>
-                  {pendingCount > 0
-                    ? `${pendingCount} pending`
-                    : paidCount > 0
-                      ? 'All penalties paid'
-                      : 'No penalties'}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowPenaltiesModal(false)}>
-                <Icon name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
+  return (
+    <Modal
+      visible={showPenaltiesModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowPenaltiesModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.aboutModal, { maxHeight: '90%' }]}>
+          <View style={styles.modalHeader}>
+            <View>
+              <Text style={styles.modalTitle}>My Penalties</Text>
+              <Text style={styles.modalSubtitle}>
+                {pendingCount > 0
+                  ? `${pendingCount} pending`
+                  : paidCount > 0
+                  ? 'All penalties paid'
+                  : 'No penalties'}
+              </Text>
             </View>
+            <TouchableOpacity onPress={() => setShowPenaltiesModal(false)}>
+              <Icon name="close" size={24} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
 
-            {penaltyLoading ? (
-              <ActivityIndicator size="large" color="#3B82F6" style={{ padding: 40 }} />
-            ) : penalties.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Icon name="check-circle-outline" size={64} color="#10B981" />
-                <Text style={styles.emptyStateTitle}>No Penalties!</Text>
-                <Text style={styles.emptyStateText}>
-                  Great job! You have no pending penalties.
-                </Text>
-              </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {penalties.map((penalty) => {
-                  const isPaid = penalty.status === 'paid';
-                  // Use fallback for missing eventTitle
+          {penaltyLoading ? (
+            <ActivityIndicator size="large" color="#3B82F6" style={{ padding: 40 }} />
+          ) : penalties.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Icon name="check-circle-outline" size={64} color="#10B981" />
+              <Text style={styles.emptyStateTitle}>No Penalties!</Text>
+              <Text style={styles.emptyStateText}>
+                Great job! You have no pending penalties.
+              </Text>
+            </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {penalties
+                .filter(p => p.status === 'pending')
+                .map((penalty) => {
                   const eventTitle = penalty.eventTitle || penalty.eventName || 'Unknown Event';
-                  // Use createdAt if paidAt not available
-                  const date = penalty.paidAt ? new Date(penalty.paidAt) : new Date(penalty.createdAt);
+                  const penaltyDate = getPenaltyDate(penalty);
+                  const severity = penalty.severity || 'medium';
+                  const severityColor = severityColors[severity as keyof typeof severityColors] || '#f59e0b';
 
                   return (
                     <View
                       key={penalty.id}
                       style={[
                         styles.penaltyCard,
-                        isPaid && { borderLeftColor: '#10b981', borderLeftWidth: 4 }
+                        { borderLeftColor: severityColor, borderLeftWidth: 4 },
+                        { backgroundColor: colors.card }, 
                       ]}
                     >
                       <View style={styles.penaltyHeader}>
-                        <Text style={styles.penaltyEventTitle}>
-                          {penalty.eventTitle || penalty.eventName || 'Unknown Event'}
+                        <Text style={[styles.penaltyEventTitle, { color: colors.text }]}>
+                          {eventTitle}
                         </Text>
                         <View style={[
                           styles.statusBadge,
-                          { backgroundColor: getStatusColor(penalty.status) + '20' }
+                          { backgroundColor: severityColor + '20' }
                         ]}>
-                          <Text style={[
-                            styles.statusText,
-                            { color: getStatusColor(penalty.status) }
-                          ]}>
-                            {isPaid ? 'PAID' : 'PENDING'}
+                          <Text style={[styles.statusText, { color: severityColor }]}>
+                            {severity.toUpperCase()}
                           </Text>
                         </View>
                       </View>
 
-                      {/* Show event date if available */}
-                      {penalty.eventDate && (
-                        <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>
-                          Event: {new Date(penalty.eventDate).toLocaleDateString()}
-                        </Text>
-                      )}
+                      <Text style={{ fontSize: 12, color: colors.sidebar.text.secondary, marginTop: 4 }}>
+                        Missed on: {penaltyDate}
+                      </Text>
 
-                      {isPaid && penalty.paidAt && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6 }}>
-                          <Icon name="check-circle" size={16} color="#10b981" />
-                          <Text style={{ fontSize: 13, color: '#10b981', fontWeight: '500' }}>
-                            Paid on {new Date(penalty.paidAt).toLocaleDateString()} at{' '}
-                            {new Date(penalty.paidAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
+                      {/* Show admin consequences if available */}
+                      {penalty.consequences && (
+                        <View style={{
+                          marginTop: 8,
+                          backgroundColor: colors.border,
+                          padding: 10,
+                          borderRadius: 8,
+                        }}>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 4 }}>
+                            Requirements:
+                          </Text>
+                          <Text style={{ fontSize: 12, color: colors.sidebar.text.secondary, lineHeight: 18 }}>
+                            {penalty.consequences}
                           </Text>
                         </View>
                       )}
 
-                      {!isPaid && (
+                      {/* Show deadline if available */}
+                      {penalty.deadline && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6 }}>
+                          <Icon name="clock-outline" size={14} color={severityColor} />
+                          <Text style={{ fontSize: 12, color: severityColor, fontWeight: '500' }}>
+                            Deadline: {formatDate(penalty.deadline)}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* If no consequences provided, show generic message */}
+                      {!penalty.consequences && (
                         <View style={{
                           flexDirection: 'row',
                           alignItems: 'center',
                           marginTop: 8,
                           gap: 6,
-                          backgroundColor: '#f59e0b15',
+                          backgroundColor: severityColor + '15',
                           padding: 8,
                           borderRadius: 6,
                         }}>
-                          <Icon name="clock-alert" size={16} color="#f59e0b" />
-                          <Text style={{ fontSize: 13, color: '#f59e0b', fontWeight: '500' }}>
+                          <Icon name="clock-alert" size={16} color={severityColor} />
+                          <Text style={{ fontSize: 13, color: severityColor, fontWeight: '500' }}>
                             Please contact admin to settle this penalty
                           </Text>
                         </View>
@@ -636,13 +707,75 @@ export default function StudentProfile() {
                     </View>
                   );
                 })}
-              </ScrollView>
-            )}
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+};
+  const renderSettingsModal = () => (
+    <Modal
+      visible={showSettingsModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowSettingsModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.aboutModal, { backgroundColor: colors.card }]}>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Settings</Text>
+            <TouchableOpacity onPress={() => setShowSettingsModal(false)}>
+              <Icon name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.settingsSection}>
+            <Text style={[styles.settingsSectionTitle, { color: colors.text }]}>Theme</Text>
+
+            <TouchableOpacity
+              style={styles.settingsOption}
+              onPress={() => setTheme('light')}
+            >
+              <View style={styles.settingsOptionLeft}>
+                <Icon name="weather-sunny" size={24} color={colors.accent.primary} />
+                <Text style={[styles.settingsOptionText, { color: colors.text }]}>Light</Text>
+              </View>
+              {theme === 'light' && (
+                <Icon name="check-circle" size={20} color={colors.accent.primary} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.settingsOption}
+              onPress={() => setTheme('dark')}
+            >
+              <View style={styles.settingsOptionLeft}>
+                <Icon name="weather-night" size={24} color={colors.accent.primary} />
+                <Text style={[styles.settingsOptionText, { color: colors.text }]}>Dark</Text>
+              </View>
+              {theme === 'dark' && (
+                <Icon name="check-circle" size={20} color={colors.accent.primary} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.settingsOption}
+              onPress={() => setTheme('system')}
+            >
+              <View style={styles.settingsOptionLeft}>
+                <Icon name="cellphone" size={24} color={colors.accent.primary} />
+                <Text style={[styles.settingsOptionText, { color: colors.text }]}>System</Text>
+              </View>
+              {theme === 'system' && (
+                <Icon name="check-circle" size={20} color={colors.accent.primary} />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-    );
-  };
+      </View>
+    </Modal>
+  );
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -657,9 +790,7 @@ export default function StudentProfile() {
             onPress={() => setShowPenaltiesModal(true)}
           >
             <Icon name="alert-circle" size={16} color="#FFFFFF" />
-            <Text style={styles.penaltyBadgeText}>
-              {penalties.filter(p => p.status === 'pending').length} Pending Penalty{penalties.filter(p => p.status === 'pending').length > 1 ? 'ies' : 'y'}
-            </Text>
+            
           </TouchableOpacity>
         )}
 
@@ -873,7 +1004,10 @@ export default function StudentProfile() {
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => setShowSettingsModal(true)}
+          >
             <Icon name="cog" size={20} color="#6B7280" />
             <Text style={styles.menuText}>Settings</Text>
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
@@ -942,10 +1076,9 @@ export default function StudentProfile() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-      {/* Penalties Modal */}
       {renderPenaltiesModal()}
-      {/* About Modal */}
       {renderAboutModal()}
+      {renderSettingsModal()}
 
     </ScrollView>
   );

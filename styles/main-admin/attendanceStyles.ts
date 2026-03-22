@@ -106,53 +106,6 @@ export const createAttendanceStyles = (
             alignItems: 'center',
         },
 
-        // Stats Grid
-        statsGrid: {
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: isMobile ? 10 : 12,
-            padding: isMobile ? 15 : 20,
-            marginTop: isMobile ? -15 : -20,
-        },
-        statCard: {
-            flex: 1,
-            minWidth: isMobile ? '30%' : '18%',
-            backgroundColor: colors.card,
-            borderRadius: 20,
-            padding: isMobile ? 12 : 16,
-            borderWidth: 1,
-            borderColor: colors.border,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: isDark ? 0.3 : 0.05,
-            shadowRadius: 12,
-            elevation: 3,
-            borderLeftWidth: 4,
-            borderLeftColor: colors.accent.primary,
-            borderRightWidth: 4,
-            borderRightColor: isDark ? colors.accent.primary : '#1266d4',
-        },
-        statIconContainer: {
-            width: isMobile ? 36 : 44,
-            height: isMobile ? 36 : 44,
-            borderRadius: 12,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: `${colors.accent.primary}15`,
-            marginBottom: isMobile ? 8 : 12,
-        },
-        statNumber: {
-            fontSize: isMobile ? 22 : 28,
-            fontWeight: '800',
-            color: colors.text,
-            marginBottom: 4,
-        },
-        statLabel: {
-            fontSize: isMobile ? 10 : 12,
-            color: colors.sidebar.text.secondary,
-            fontWeight: '500',
-        },
-
         // Grid Layouts
         leftGrid: {
             flex: isMobile ? undefined : 3,
@@ -286,11 +239,6 @@ export const createAttendanceStyles = (
             marginBottom: 8,
             textAlign: 'center',
         },
-        eventDetails: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: 4,
-        },
         eventDetailText: {
             fontSize: isMobile ? 13 : 14,
             color: colors.sidebar.text.secondary,
@@ -357,26 +305,14 @@ export const createAttendanceStyles = (
             shadowRadius: 4,
             elevation: 2,
         },
-        qrInfo: {
-            marginTop: 12,
-            alignItems: 'center',
-        },
+
         qrHint: {
             fontSize: isMobile ? 11 : 12,
             color: colors.sidebar.text.muted,
             textAlign: 'center',
             marginTop: 4,
         },
-
         // Expired State
-        expiredContainer: {
-            alignItems: 'center',
-            padding: 24,
-        },
-        expiredIcon: {
-            marginBottom: 12,
-            color: '#dc2626',
-        },
         expiredText: {
             fontSize: isMobile ? 14 : 16,
             fontWeight: '600',
@@ -389,7 +325,25 @@ export const createAttendanceStyles = (
             textAlign: 'center',
             marginTop: 4,
         },
-
+        downloadButton: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            backgroundColor: colors.accent.primary,
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+            borderRadius: 30,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 2,
+        },
+        downloadButtonText: {
+            fontSize: 14,
+            fontWeight: '600',
+            color: '#ffffff',
+        },
         // Action Buttons
         actionButtons: {
             flexDirection: isMobile ? 'column' : 'row',
@@ -772,7 +726,7 @@ export const createAttendanceStyles = (
         },
         modernModalContent: {
             padding: isMobile ? 15 : 20,
-            maxHeight: isMobile ? 350 : 400,
+            maxHeight: isMobile ? 350 : 600,
         },
 
         // Modern Form Elements
@@ -1092,6 +1046,90 @@ export const createAttendanceStyles = (
         },
         searchClearButton: {
             padding: 4,
+        },
+
+        qrFrame: {
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginVertical: 12,
+            backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+            borderRadius: 24,
+            padding: 16,
+        },
+        qrCodeWrapper: {
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.card,
+            borderRadius: 16,
+            padding: 12,
+            borderWidth: 1,
+            borderColor: colors.border,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 4,
+            elevation: 1,
+        },
+        qrLabel: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: 12,
+            gap: 6,
+        },
+        qrLabelText: {
+            fontSize: 12,
+            color: colors.sidebar.text.secondary,
+        },
+        expiredOverlay: {
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+        },
+        eventDetailsRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 6,
+            marginTop: 4,
+        },
+        bullet: {
+            width: 4,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: colors.sidebar.text.muted,
+            marginHorizontal: 4,
+        },
+        qrStatus: {
+            alignItems: 'center',
+            marginTop: 0,
+            marginBottom: 8,
+        },
+        downloadButtonContainer: {
+            alignItems: 'center',
+            marginTop: 8,
+            marginBottom: 8,
+        },
+        expirationHint: {
+            fontSize: 12,
+            color: colors.sidebar.text.secondary,
+            textAlign: 'center',
+            marginTop: 4,
+            marginBottom: 8,
+        },
+        instructionBox: {
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 8,
+            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
+            borderRadius: 12,
+            padding: 12,
+            marginTop: 8,
+        },
+        instructionText: {
+            flex: 1,
+            fontSize: 12,
+            lineHeight: 16,
+            color: colors.sidebar.text.secondary,
         },
 
         // Attendance meta

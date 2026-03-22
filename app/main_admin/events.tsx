@@ -947,7 +947,7 @@ export default function MainAdminEvents() {
 
   const renderPaginatedItem = ({ item, index }: { item: Event; index: number }) => {
     const isActive = selectedEvent === item.id;
-    const priorityColor = getPriorityColor(item.date); // ensure this works (see below)
+    const priorityColor = getPriorityColor(item.date); 
 
     return (
       <TouchableOpacity
@@ -1350,7 +1350,8 @@ export default function MainAdminEvents() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ flex: 1 }}
           >
-            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
+            showsVerticalScrollIndicator={false}>
               {/* Campus Image Selection */}
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Campus Image (Optional)</Text>
@@ -1560,31 +1561,6 @@ export default function MainAdminEvents() {
         </View>
       </LinearGradient>
 
-      {/* Stats Grid */}
-      <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
-            <Feather name="calendar" size={isMobile ? 16 : 20} color="#0ea5e9" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
-        </View>
-
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
-            <Feather name="clock" size={isMobile ? 16 : 20} color="#f59e0b" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.upcoming}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Upcoming</Text>
-        </View>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
-            <Feather name="check-circle" size={isMobile ? 16 : 20} color="#64748b" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.past}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Past</Text>
-        </View>
-      </View>
 
       {/* Main Content Grid */}
       <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
@@ -1678,7 +1654,7 @@ export default function MainAdminEvents() {
                   keyExtractor={(item) => item.id}
                   renderItem={renderPaginatedItem}
                   style={styles.paginatedList}
-                  showsVerticalScrollIndicator={true}
+                  showsVerticalScrollIndicator={false}
                   ListEmptyComponent={
                     <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                       <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
@@ -1887,7 +1863,8 @@ export default function MainAdminEvents() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
+            showsVerticalScrollIndicator={false}>
               {/* Location Name */}
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location Name</Text>
@@ -1991,6 +1968,7 @@ export default function MainAdminEvents() {
 
             <FlatList
               data={CAMPUS_LOCATIONS}
+              showsVerticalScrollIndicator={false}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ padding: 16 }}
               renderItem={({ item }) => (
@@ -2006,6 +1984,7 @@ export default function MainAdminEvents() {
                     borderColor: selectedCampusLocation?.id === item.id ? '#0ea5e9' : '#e2e8f0',
                   }}
                   onPress={() => handleSelectCampusImage(item)}
+                  
                 >
                   <Image source={item.image} style={{ width: 50, height: 50, borderRadius: 8, marginRight: 12 }} />
                   <View style={{ flex: 1 }}>
@@ -2055,7 +2034,8 @@ export default function MainAdminEvents() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
+            showsVerticalScrollIndicator={false}>
               <TouchableOpacity
                 style={[styles.modernLocationButton, isMobile && styles.modernFormInputMobile]}
                 onPress={getCurrentLocation}
@@ -2167,7 +2147,8 @@ export default function MainAdminEvents() {
             </View>
 
             {/* Modal Content */}
-            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
+            showsVerticalScrollIndicator={false}>
               {selectedEvent && renderSelectedDetail(
                 events.find(e => e.id === selectedEvent)!,
                 selectedEventUserLocation,

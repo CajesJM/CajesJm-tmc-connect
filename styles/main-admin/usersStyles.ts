@@ -94,49 +94,7 @@ export const createUsersStyles = (
       alignItems: 'center',
       position: 'relative',
     },
-    // Stats Grid
-    statsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: isMobile ? 10 : 16,
-      padding: isMobile ? 15 : 20,
-      marginTop: isMobile ? -15 : -20,
-    },
-    statCard: {
-      flex: 1,
-      minWidth: isMobile ? '30%' : '22%',
-      backgroundColor: colors.card,
-      borderRadius: 20,
-      padding: isMobile ? 12 : 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.3 : 0.05,
-      shadowRadius: 12,
-      elevation: 3,
-      borderLeftWidth: 4,
-      borderLeftColor: colors.accent.primary, // will be overridden per stat
-    },
-    statIconContainer: {
-      width: isMobile ? 36 : 44,
-      height: isMobile ? 36 : 44,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: `${colors.accent.primary}15`,
-    },
-    statNumber: {
-      fontSize: isMobile ? 22 : 28,
-      fontWeight: '800',
-      color: colors.text,
-      marginBottom: 4,
-    },
-    statLabel: {
-      fontSize: isMobile ? 10 : 12,
-      color: colors.sidebar.text.secondary,
-      fontWeight: '500',
-    },
+    
     // Main Content Grid
     mainContent: {
       flex: 1,

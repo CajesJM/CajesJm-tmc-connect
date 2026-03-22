@@ -3,9 +3,9 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,8 +25,10 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CAMPUS_LOCATIONS } from '../../../constants/campusLocations';
 import { useAuth } from '../../../context/AuthContext';
+import { useNotifications } from '../../../context/NotificationContext';
+import { useTheme } from '../../../context/ThemeContext'; // <-- NEW
 import { db } from '../../../lib/firebaseConfig';
-import { studentEventStyles as styles } from '../../../styles/student/eventStyles';
+import { createEventStyles } from '../../../styles/student/eventStyles'; // <-- NEW
 
 dayjs.extend(relativeTime);
 
@@ -54,7 +56,16 @@ export default function StudentEventsScreen() {
   const currentUserId = user?.uid;
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const isSmall = width < 375;
+
+  const { colors, isDark } = useTheme();
+  const isMobile = width < 640;
+  const isTablet = width >= 640 && width < 1024;
+  const isDesktop = width >= 1024;
+
+  const styles = useMemo(
+    () => createEventStyles(colors, isDark, isMobile, isTablet, isDesktop),
+    [colors, isDark, isMobile, isTablet, isDesktop]
+  );
 
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
@@ -64,7 +75,7 @@ export default function StudentEventsScreen() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showMapOptions, setShowMapOptions] = useState(false);
 
-  const [activeFilter, setActiveFilter] = useState<'upcoming' | 'past'>('upcoming');
+  const [activeFilter, setActiveFilter] = useState<'upcoming' | 'past' | 'today'>('upcoming');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -78,11 +89,34 @@ export default function StudentEventsScreen() {
 
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const { incrementUnread, clearUnread } = useNotifications();
+  const isFocused = useRef(true);
+  const initialLoadDone = useRef(false);
+  const lastEventCreatedAt = useRef<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      isFocused.current = true;
+      clearUnread('events');
+
+      return () => {
+        isFocused.current = false;
+      };
+    }, [clearUnread])
+  );
+
+  const todayEventsCount = useMemo(() => {
+    const today = new Date();
+    return events.filter(e => {
+      const d = e.date;
+      return d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate();
+    }).length;
+  }, [events]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-
-
     setRefreshKey(prev => prev + 1);
 
     setTimeout(() => {
@@ -116,53 +150,74 @@ export default function StudentEventsScreen() {
   }, [currentUserId]);
 
   useEffect(() => {
-  setIsLoading(true);
+    setIsLoading(true);
 
-  const eventsRef = collection(db, 'events');
+    const eventsRef = collection(db, 'events');
+    const unsubscribe = onSnapshot(
+      eventsRef,
+      (snapshot) => {
+        const list: Event[] = snapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              title: data.title,
+              description: data.description,
+              date: data.date.toDate(),
+              location: data.location,
+              locationDescription: data.locationDescription,
+              locationImage: data.locationImage,
+              organizer: data.organizer,
+              createdAt: data.createdAt?.toDate() || new Date(),
+              attendees: data.attendees || [],
+              verifiedAttendees: data.verifiedAttendees || [],
+              coordinates: data.coordinates,
+            };
+          })
+          .filter(event => {
+            const docData = snapshot.docs.find(d => d.id === event.id)?.data();
+            return docData?.status === 'approved' || !docData?.hasOwnProperty('status');
+          });
 
-  const unsubscribe = onSnapshot(
-    eventsRef,
-    (snapshot) => {
-      const list: Event[] = snapshot.docs
-        .map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            title: data.title,
-            description: data.description,
-            date: data.date.toDate(),
-            location: data.location,
-            locationDescription: data.locationDescription,
-            locationImage: data.locationImage,
-            organizer: data.organizer,
-            createdAt: data.createdAt?.toDate(),
-            attendees: data.attendees || [],
-            verifiedAttendees: data.verifiedAttendees || [],
-            coordinates: data.coordinates,
-          };
-        })
-        .filter(event => {
-          const doc = snapshot.docs.find(d => d.id === event.id);
-          const data = doc?.data();
-          return data?.status === 'approved' || !data?.hasOwnProperty('status');
-        });
-      
-      // Sort by date (most recent first)
-      list.sort((a, b) => b.date.getTime() - a.date.getTime());
-      
-      setEvents(list);
-      setIsLoading(false);
-      setRefreshing(false);
-    },
-    (error) => {
-      console.error('Error fetching events:', error);
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  );
+        if (list.length > 0) {
+          let newestEvent: Event | null = null;
+          for (const event of list) {
+            if (!newestEvent || event.createdAt > newestEvent.createdAt) {
+              newestEvent = event;
+            }
+          }
 
-  return () => unsubscribe();
-}, [refreshKey]);
+          if (newestEvent && newestEvent.createdAt) {
+            const newestMillis = newestEvent.createdAt.getTime();
+            const lastMillis = lastEventCreatedAt.current ? parseInt(lastEventCreatedAt.current) : 0;
+
+            if (newestMillis > lastMillis && initialLoadDone.current && !isFocused.current) {
+              incrementUnread('events');
+            }
+
+            lastEventCreatedAt.current = newestMillis.toString();
+          }
+        }
+
+        if (!initialLoadDone.current) {
+          initialLoadDone.current = true;
+        }
+
+        list.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+        setEvents(list);
+        setIsLoading(false);
+        setRefreshing(false);
+      },
+      (error) => {
+        console.error('Error fetching events:', error);
+        setIsLoading(false);
+        setRefreshing(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [refreshKey]);
 
   const getAttendanceStatus = (event: Event): 'attended' | 'missed' | 'not-recorded' => {
     if (!userData?.studentID) return 'not-recorded';
@@ -170,17 +225,26 @@ export default function StudentEventsScreen() {
     const now = new Date();
     const isPast = event.date <= now;
 
-    if (!isPast) return 'not-recorded'; // Only show for past events
+    if (!isPast) return 'not-recorded';
 
-    // Check if student attended (QR scan successful - saved by attendance.tsx)
     const hasAttended = event.attendees?.some(
       (attendee: any) => attendee.studentID === userData.studentID
     );
 
     if (hasAttended) return 'attended';
-
-    // Event is past and student didn't attend → MISSED
     return 'missed';
+  };
+
+  const getEmptyTitle = () => {
+    if (activeFilter === 'upcoming') return 'No upcoming events';
+    if (activeFilter === 'past') return 'No past events';
+    return 'No events today';
+  };
+
+  const getEmptyText = () => {
+    if (activeFilter === 'upcoming') return 'Check back later for new events!';
+    if (activeFilter === 'past') return 'No past events to display';
+    return 'No events scheduled for today.';
   };
 
   useEffect(() => {
@@ -189,7 +253,17 @@ export default function StudentEventsScreen() {
 
     if (activeFilter === 'upcoming') {
       filtered = filtered.filter((e) => e.date > now);
-    } else {
+    }
+    else if (activeFilter === 'today') {
+      const today = new Date();
+      filtered = filtered.filter(e => {
+        const d = e.date;
+        return d.getFullYear() === today.getFullYear() &&
+          d.getMonth() === today.getMonth() &&
+          d.getDate() === today.getDate();
+      });
+    }
+    else {
       filtered = filtered.filter((e) => e.date <= now);
     }
 
@@ -214,6 +288,7 @@ export default function StudentEventsScreen() {
       setIsWithinRange(null);
     }
   }, [showDetailModal, selectedEvent]);
+
 
   const stats = useMemo(() => {
     const total = events.length;
@@ -321,6 +396,7 @@ export default function StudentEventsScreen() {
       setCheckingLocation(false);
     }
   };
+
   const openLocationInMaps = async (location: string, coordinates?: { latitude: number; longitude: number }) => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -403,12 +479,9 @@ export default function StudentEventsScreen() {
               {item.title}
             </Text>
             <View style={styles.cardBadges}>
-              {/* Days badge */}
               <View style={[styles.badge, { backgroundColor: days.color }]}>
                 <Text style={styles.badgeText}>{days.text}</Text>
               </View>
-
-              {/* Attendance badge - only for past events */}
               {isPast && attendanceStatus !== 'not-recorded' && (
                 <View style={[
                   styles.attendanceBadge,
@@ -428,14 +501,14 @@ export default function StudentEventsScreen() {
           </View>
 
           <View style={styles.cardInfoRow}>
-            <Feather name="calendar" size={12} color="#64748b" />
+            <Feather name="calendar" size={12} color={colors.sidebar.text.muted} />
             <Text style={styles.cardInfoText}>
               {dayjs(item.date).format('MMM D, YYYY • h:mm A')}
             </Text>
           </View>
 
           <View style={styles.cardInfoRow}>
-            <Feather name="map-pin" size={12} color="#64748b" />
+            <Feather name="map-pin" size={12} color={colors.sidebar.text.muted} />
             <Text style={styles.cardInfoText} numberOfLines={1}>
               {item.location}
             </Text>
@@ -452,7 +525,7 @@ export default function StudentEventsScreen() {
                 setShowMapOptions(true);
               }}
             >
-              <Feather name="map" size={16} color="#0ea5e9" />
+              <Feather name="map" size={16} color={colors.accent.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -463,16 +536,10 @@ export default function StudentEventsScreen() {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <View style={styles.emptyStateIcon}>
-        <Icon name="calendar-remove" size={40} color="#cbd5e1" />
+        <Icon name="calendar-remove" size={40} color={colors.sidebar.text.muted} />
       </View>
-      <Text style={styles.emptyStateTitle}>
-        {activeFilter === 'upcoming' ? 'No upcoming events' : 'No past events'}
-      </Text>
-      <Text style={styles.emptyStateText}>
-        {activeFilter === 'upcoming'
-          ? 'Check back later for new events!'
-          : 'No past events to display'}
-      </Text>
+      <Text style={styles.emptyStateTitle}>{getEmptyTitle()}</Text>
+      <Text style={styles.emptyStateText}>{getEmptyText()}</Text>
     </View>
   );
 
@@ -485,7 +552,7 @@ export default function StudentEventsScreen() {
           onPress={goToPreviousPage}
           disabled={currentPage === 1}
         >
-          <Feather name="chevron-left" size={18} color={currentPage === 1 ? '#cbd5e1' : '#0f172a'} />
+          <Feather name="chevron-left" size={18} color={currentPage === 1 ? colors.sidebar.text.muted : colors.text} />
           <Text style={[styles.paginationText, currentPage === 1 && styles.paginationTextDisabled]}>Prev</Text>
         </TouchableOpacity>
         <Text style={styles.paginationPageInfo}>
@@ -497,7 +564,7 @@ export default function StudentEventsScreen() {
           disabled={currentPage === totalPages}
         >
           <Text style={[styles.paginationText, currentPage === totalPages && styles.paginationTextDisabled]}>Next</Text>
-          <Feather name="chevron-right" size={18} color={currentPage === totalPages ? '#cbd5e1' : '#0f172a'} />
+          <Feather name="chevron-right" size={18} color={currentPage === totalPages ? colors.sidebar.text.muted : colors.text} />
         </TouchableOpacity>
       </View>
     );
@@ -520,7 +587,7 @@ export default function StudentEventsScreen() {
                   <Text style={styles.detailModalTitle}>Event Details</Text>
                 </View>
                 <TouchableOpacity onPress={() => setShowDetailModal(false)} style={styles.detailModalClose}>
-                  <Feather name="x" size={24} color="#64748b" />
+                  <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
                 </TouchableOpacity>
               </View>
 
@@ -537,23 +604,23 @@ export default function StudentEventsScreen() {
 
                 <View style={styles.detailMeta}>
                   <View style={styles.detailMetaItem}>
-                    <Feather name="calendar" size={14} color="#64748b" />
+                    <Feather name="calendar" size={14} color={colors.sidebar.text.muted} />
                     <Text style={styles.detailMetaText}>
                       {dayjs(selectedEvent.date).format('MMM D, YYYY • h:mm A')}
                     </Text>
                   </View>
                   <View style={styles.detailMetaItem}>
-                    <Feather name="map-pin" size={14} color="#64748b" />
+                    <Feather name="map-pin" size={14} color={colors.sidebar.text.muted} />
                     <Text style={styles.detailMetaText}>{selectedEvent.location}</Text>
                   </View>
                   {selectedEvent.locationDescription && (
                     <View style={styles.detailMetaItem}>
-                      <Feather name="info" size={14} color="#64748b" />
+                      <Feather name="info" size={14} color={colors.sidebar.text.muted} />
                       <Text style={styles.detailMetaText}>{selectedEvent.locationDescription}</Text>
                     </View>
                   )}
                   <View style={styles.detailMetaItem}>
-                    <Feather name="user" size={14} color="#64748b" />
+                    <Feather name="user" size={14} color={colors.sidebar.text.muted} />
                     <Text style={styles.detailMetaText}>Organized by {selectedEvent.organizer}</Text>
                   </View>
                 </View>
@@ -605,10 +672,10 @@ export default function StudentEventsScreen() {
                           disabled={checkingLocation}
                         >
                           {checkingLocation ? (
-                            <ActivityIndicator size="small" color="#0ea5e9" />
+                            <ActivityIndicator size="small" color={colors.accent.primary} />
                           ) : (
                             <>
-                              <Feather name="crosshair" size={16} color="#0ea5e9" />
+                              <Feather name="crosshair" size={16} color={colors.accent.primary} />
                               <Text style={styles.detailActionButtonText}>Check my location</Text>
                             </>
                           )}
@@ -663,7 +730,7 @@ export default function StudentEventsScreen() {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Map Options</Text>
             <TouchableOpacity onPress={() => setShowMapOptions(false)} style={styles.modalClose}>
-              <Feather name="x" size={24} color="#64748b" />
+              <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
             </TouchableOpacity>
           </View>
           <View style={styles.modalContent}>
@@ -672,7 +739,7 @@ export default function StudentEventsScreen() {
                 <View style={styles.eventInfo}>
                   <Text style={styles.eventInfoTitle}>{selectedEvent.title}</Text>
                   <Text style={styles.eventInfoLocation}>
-                    <Feather name="map-pin" size={14} color="#0ea5e9" /> {selectedEvent.location}
+                    <Feather name="map-pin" size={14} color={colors.accent.primary} /> {selectedEvent.location}
                   </Text>
                   {selectedEvent.coordinates && (
                     <View style={styles.coordinatesInfo}>
@@ -695,7 +762,7 @@ export default function StudentEventsScreen() {
                   }}
                 >
                   <View style={styles.mapOptionContent}>
-                    <Feather name="map" size={20} color="#0ea5e9" />
+                    <Feather name="map" size={20} color={colors.accent.primary} />
                     <View style={styles.mapOptionText}>
                       <Text style={styles.mapOptionTitle}>Open in Maps</Text>
                       <Text style={styles.mapOptionSubtitle}>Get directions to the event</Text>
@@ -710,10 +777,15 @@ export default function StudentEventsScreen() {
     </Modal>
   );
 
+  // Header gradient colors (same as announcement)
+  const headerGradientColors = isDark
+    ? ['#0f172a', '#1e293b'] as const
+    : ['#1e40af', '#3b82f6'] as const;
+
   if (isLoading && !refreshing) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0ea5e9" />
+        <ActivityIndicator size="large" color={colors.accent.primary} />
         <Text style={styles.loadingText}>Loading events...</Text>
       </View>
     );
@@ -721,8 +793,13 @@ export default function StudentEventsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient colors={['#14203d', '#06080b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+      {/* Header with gradient */}
+      <LinearGradient
+        colors={headerGradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>Welcome,</Text>
@@ -756,28 +833,36 @@ export default function StudentEventsScreen() {
         </View>
       </LinearGradient>
 
+      {/* Stats Section */}
       <View style={styles.statsContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
-          <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
-            <View style={[styles.statIcon, { backgroundColor: '#0ea5e915' }]}>
-              <Feather name="calendar" size={18} color="#0ea5e9" />
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: `${colors.accent.primary}15` }]}>
+              <Feather name="calendar" size={18} color={colors.accent.primary} />
             </View>
             <Text style={styles.statNumber}>{stats.total}</Text>
             <Text style={styles.statLabel}>Total</Text>
           </View>
-          <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+          <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: '#f59e0b15' }]}>
               <Feather name="clock" size={18} color="#f59e0b" />
             </View>
             <Text style={styles.statNumber}>{stats.upcoming}</Text>
             <Text style={styles.statLabel}>Upcoming</Text>
           </View>
-          <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+          <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: '#64748b15' }]}>
               <Feather name="check-circle" size={18} color="#64748b" />
             </View>
             <Text style={styles.statNumber}>{stats.past}</Text>
             <Text style={styles.statLabel}>Past</Text>
+          </View>
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#10b98115' }]}>
+              <Feather name="sun" size={18} color="#10b981" />
+            </View>
+            <Text style={styles.statNumber}>{todayEventsCount}</Text>
+            <Text style={styles.statLabel}>Today</Text>
           </View>
         </ScrollView>
       </View>
@@ -785,17 +870,17 @@ export default function StudentEventsScreen() {
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <View style={styles.searchBar}>
-          <Feather name="search" size={18} color="#64748b" />
+          <Feather name="search" size={18} color={colors.sidebar.text.muted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search events..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.sidebar.text.muted}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClear}>
-              <Feather name="x" size={18} color="#64748b" />
+              <Feather name="x" size={18} color={colors.sidebar.text.muted} />
             </TouchableOpacity>
           )}
         </View>
@@ -820,6 +905,15 @@ export default function StudentEventsScreen() {
               Past
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterChip, activeFilter === 'today' && styles.filterChipActive]}
+            onPress={() => setActiveFilter('today')}
+          >
+            <Text style={[styles.filterChipText, activeFilter === 'today' && styles.filterChipTextActive]}>
+              Today
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -830,7 +924,13 @@ export default function StudentEventsScreen() {
         renderItem={renderEventCard}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => setRefreshing(true)} colors={['#0ea5e9']} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh} 
+            colors={[colors.accent.primary]}
+          />
+        }
         ListEmptyComponent={renderEmptyState}
         ListFooterComponent={renderPagination}
         ListFooterComponentStyle={styles.paginationWrapper}

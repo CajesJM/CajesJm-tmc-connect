@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,10 +11,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { db } from '../lib/firebaseConfig';
 import { createBulkPenalties } from '../lib/penaltyService';
 
@@ -35,6 +36,7 @@ interface PenaltyAnnouncementModalProps {
   onSendPenalty?: () => Promise<void>;
   eventId: string;
   eventTitle: string;
+  eventDate?: any;                       
   missingStudents: Array<{
     id: string;
     name: string;
@@ -52,19 +54,338 @@ const showAlert = (title: string, message: string, onPress?: () => void) => {
   }
 };
 
+const createPenaltyAnnouncementModalStyles = (
+  colors: any,
+  isDark: boolean,
+  isMobile: boolean
+) => {
+  return StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContainer: {
+      backgroundColor: colors.card,
+      borderRadius: 24,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.25,
+      shadowRadius: 24,
+      elevation: 24,
+      overflow: 'hidden',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: isDark ? `${colors.background}80` : '#fef2f2', 
+    },
+    headerTitleContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    headerIconContainer: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: '#ef444420', 
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    modalSubtitle: {
+      fontSize: 14,
+      color: colors.sidebar.text.secondary,
+      marginTop: 2,
+    },
+    closeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    scrollView: {
+      maxHeight: 500,
+    },
+    scrollContent: {
+      padding: 20,
+    },
+    eventCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? colors.border : '#f0f9ff',
+      padding: 16,
+      borderRadius: 16,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: isDark ? colors.border : '#e0f2fe',
+    },
+    eventIconContainer: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: `${colors.accent.primary}20`,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    eventDetails: {
+      flex: 1,
+    },
+    eventLabel: {
+      fontSize: 12,
+      color: colors.accent.primary,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 4,
+    },
+    eventText: {
+      fontSize: 15,
+      color: colors.text,
+      fontWeight: '600',
+      lineHeight: 20,
+    },
+    section: {
+      marginBottom: 20,
+    },
+    sectionLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 10,
+    },
+    severityContainer: {
+      gap: 10,
+    },
+    severityButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      borderRadius: 16,
+      backgroundColor: colors.border,
+      borderWidth: 1,
+      borderColor: colors.border,
+      gap: 12,
+    },
+    severityIndicator: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    severityIndicatorActive: {
+      transform: [{ scale: 1.1 }],
+    },
+    severityTextContainer: {
+      flex: 1,
+    },
+    severityName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    severityLevel: {
+      fontSize: 12,
+      color: colors.sidebar.text.muted,
+      marginTop: 2,
+      textTransform: 'capitalize',
+    },
+    checkIcon: {
+      marginLeft: 'auto',
+    },
+    inputContainer: {
+      position: 'relative',
+    },
+    consequencesInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      padding: 14,
+      fontSize: 14,
+      color: colors.text,
+      minHeight: 120,
+      backgroundColor: isDark ? colors.card : '#f8fafc',
+      lineHeight: 20,
+    },
+    charCount: {
+      position: 'absolute',
+      bottom: 10,
+      right: 10,
+      fontSize: 11,
+      color: colors.sidebar.text.muted,
+    },
+    deadlineButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      backgroundColor: isDark ? colors.card : '#f8fafc',
+      gap: 12,
+    },
+    deadlineIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: `${colors.accent.primary}15`,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    deadlineTextContainer: {
+      flex: 1,
+    },
+    deadlineMain: {
+      fontSize: 15,
+      color: colors.text,
+      fontWeight: '600',
+    },
+    deadlineSub: {
+      fontSize: 12,
+      color: colors.accent.primary,
+      marginTop: 2,
+      fontWeight: '500',
+    },
+    deadlinePlaceholder: {
+      color: colors.sidebar.text.muted,
+      fontWeight: '400',
+    },
+    datePickerWrapper: {
+      marginTop: 8,
+    },
+    webDatePickerContainer: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 2,
+      borderColor: colors.accent.primary,
+      overflow: 'hidden',
+    },
+    webPickerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 14,
+      backgroundColor: `${colors.accent.primary}15`,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    webPickerTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.accent.primary,
+      flex: 1,
+      marginLeft: 10,
+    },
+    confirmDateButton: {
+      backgroundColor: colors.accent.primary,
+      padding: 14,
+      margin: 14,
+      marginTop: 0,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    confirmDateText: {
+      color: '#ffffff',
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    webPickerHint: {
+      fontSize: 12,
+      color: colors.sidebar.text.secondary,
+      padding: 14,
+      paddingTop: 0,
+      backgroundColor: isDark ? colors.card : '#f8fafc',
+      textAlign: 'center',
+    },
+    summaryCard: {
+      backgroundColor: colors.border,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    summaryTitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.sidebar.text.muted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 10,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 6,
+    },
+    summaryText: {
+      fontSize: 14,
+      color: colors.text,
+    },
+    actions: {
+      gap: 10,
+      marginTop: 10,
+    },
+    sendButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#ef4444', 
+      paddingVertical: 16,
+      borderRadius: 16,
+      gap: 10,
+    },
+    sendButtonDisabled: {
+      backgroundColor: colors.sidebar.text.muted,
+    },
+    sendButtonText: {
+      color: '#ffffff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    cancelButton: {
+      alignItems: 'center',
+      paddingVertical: 14,
+      borderRadius: 16,
+    },
+    cancelButtonText: {
+      color: colors.sidebar.text.secondary,
+      fontSize: 15,
+      fontWeight: '500',
+    },
+  });
+};
+
 const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
   visible,
   onClose,
   eventId,
   eventTitle,
+  eventDate,  
   missingStudents = [],
   onPenaltiesSent,
 }) => {
   const { user } = useAuth();
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
 
-  const modalWidth = Math.min(screenWidth * 0.9, 400);
   const isMobile = screenWidth < 640;
+  const modalWidth = Math.min(screenWidth * 0.9, 400);
 
   const [severity, setSeverity] = useState<'low' | 'medium' | 'high'>('medium');
   const [consequences, setConsequences] = useState('');
@@ -83,6 +404,11 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
     medium: 'Moderate',
     high: 'Severe',
   };
+
+  const styles = useMemo(
+    () => createPenaltyAnnouncementModalStyles(colors, isDark, isMobile),
+    [colors, isDark, isMobile]
+  );
 
   const handleSendPenalty = async () => {
     if (!consequences.trim()) {
@@ -127,7 +453,7 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
         {
           id: eventId,
           title: eventTitle || 'Unknown Event',
-          date: new Date(),
+          date: eventDate || new Date(),
         },
         {
           type: 'absence',
@@ -141,17 +467,14 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
       const successCount = results.filter(r => r.success).length;
       const failedCount = results.length - successCount;
 
-      // Get successful student IDs for the callback
       const successfulStudentIds = results
         .filter(r => r.success)
         .map(r => r.studentId);
 
-      // Call the callback to notify parent component
       if (onPenaltiesSent && successfulStudentIds.length > 0) {
         onPenaltiesSent(successfulStudentIds);
       }
 
-      // Show success alert
       const alertMessage = failedCount > 0
         ? `✅ ${successCount} of ${missingStudents.length} students notified\n\n⚠️ ${failedCount} failed to receive notification\n\nSeverity: ${severityLabels[severity]} (${severity})\nDeadline: ${formatDeadline(deadline)}`
         : `✅ Successfully notified ${successCount} students\n\nSeverity: ${severityLabels[severity]} (${severity})\nDeadline: ${formatDeadline(deadline)}`;
@@ -190,7 +513,6 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
     });
   };
 
-  // Calculate days/hours remaining
   const getTimeRemaining = (date: Date | null) => {
     if (!date) return null;
     const now = new Date();
@@ -207,7 +529,7 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
     <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={[styles.modalContainer, { width: modalWidth, maxHeight: '85%' }]}>
-          {/* Header - Matching NotificationModal style */}
+          {/* Header */}
           <View style={styles.modalHeader}>
             <View style={styles.headerTitleContainer}>
               <View style={styles.headerIconContainer}>
@@ -221,7 +543,7 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
               </View>
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={onClose} disabled={sending}>
-              <Feather name="x" size={20} color="#64748b" />
+              <Feather name="x" size={20} color={colors.sidebar.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -230,10 +552,9 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
           >
-
             <View style={styles.eventCard}>
               <View style={styles.eventIconContainer}>
-                <Feather name="calendar" size={20} color="#0ea5e9" />
+                <Feather name="calendar" size={20} color={colors.accent.primary} />
               </View>
               <View style={styles.eventDetails}>
                 <Text style={styles.eventLabel}>Event</Text>
@@ -243,10 +564,9 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
               </View>
             </View>
 
-
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>
-                <Feather name="activity" size={14} color="#64748b" /> Severity Level
+                <Feather name="activity" size={14} color={colors.sidebar.text.secondary} /> Severity Level
               </Text>
               <View style={styles.severityContainer}>
                 {(['low', 'medium', 'high'] as const).map((level) => (
@@ -304,10 +624,9 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
               </View>
             </View>
 
-
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>
-                <Feather name="file-text" size={14} color="#64748b" /> Consequences / Requirements
+                <Feather name="file-text" size={14} color={colors.sidebar.text.secondary} /> Consequences / Requirements
               </Text>
               <View style={styles.inputContainer}>
                 <TextInput
@@ -316,8 +635,8 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
                   value={consequences}
                   onChangeText={setConsequences}
                   placeholder="Submit a 500-word reflection paper explaining the importance of attendance. Attend the mandatory make-up session scheduled for Friday 3:00 PM at the Library Hall."
-                  placeholderTextColor="#94a3b8"
-                  style={[styles.consequencesInput, { fontStyle: 'italic' }]}
+                  placeholderTextColor={colors.sidebar.text.muted}
+                  style={styles.consequencesInput}
                   textAlignVertical="top"
                   maxLength={500}
                 />
@@ -325,10 +644,9 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
               </View>
             </View>
 
-            {/* Deadline Selection - Enhanced */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>
-                <Feather name="clock" size={14} color="#64748b" /> Compliance Deadline
+                <Feather name="clock" size={14} color={colors.sidebar.text.secondary} /> Compliance Deadline
               </Text>
 
               {!showDatePicker ? (
@@ -336,14 +654,14 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
                   onPress={() => setShowDatePicker(true)}
                   style={[
                     styles.deadlineButton,
-                    deadline && { borderColor: '#0ea5e9', borderWidth: 2 },
+                    deadline && { borderColor: colors.accent.primary, borderWidth: 2 },
                   ]}
                 >
                   <View style={styles.deadlineIconContainer}>
                     <Feather
                       name={deadline ? "check-circle" : "calendar"}
                       size={20}
-                      color={deadline ? '#0ea5e9' : '#64748b'}
+                      color={deadline ? colors.accent.primary : colors.sidebar.text.secondary}
                     />
                   </View>
                   <View style={styles.deadlineTextContainer}>
@@ -361,17 +679,17 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
                       </Text>
                     )}
                   </View>
-                  <Feather name="chevron-right" size={20} color="#94a3b8" />
+                  <Feather name="chevron-right" size={20} color={colors.sidebar.text.muted} />
                 </TouchableOpacity>
               ) : (
                 <View style={styles.datePickerWrapper}>
                   {Platform.OS === 'web' ? (
                     <View style={styles.webDatePickerContainer}>
                       <View style={styles.webPickerHeader}>
-                        <Feather name="calendar" size={18} color="#0ea5e9" />
+                        <Feather name="calendar" size={18} color={colors.accent.primary} />
                         <Text style={styles.webPickerTitle}>Select Date & Time</Text>
                         <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                          <Feather name="x" size={20} color="#64748b" />
+                          <Feather name="x" size={20} color={colors.sidebar.text.secondary} />
                         </TouchableOpacity>
                       </View>
                       <input
@@ -393,9 +711,9 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
                           padding: '14px',
                           fontSize: '16px',
                           borderRadius: '10px',
-                          border: '2px solid #e2e8f0',
-                          backgroundColor: '#f8fafc',
-                          color: '#1e293b',
+                          border: `2px solid ${colors.border}`,
+                          backgroundColor: colors.card,
+                          color: colors.text,
                           fontFamily: 'inherit',
                           outline: 'none',
                           cursor: 'pointer',
@@ -428,7 +746,6 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
                         onCancel={() => setShowDatePicker(false)}
                         minimumDate={new Date()}
                         date={deadline || new Date()}
-                        // Add display mode to prevent auto-close on day select
                         display="default"
                       />
                     )
@@ -437,12 +754,11 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
               )}
             </View>
 
-            {/* Summary Card */}
             {(consequences || deadline) && (
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryTitle}>Penalty Summary</Text>
                 <View style={styles.summaryRow}>
-                  <Feather name="users" size={14} color="#64748b" />
+                  <Feather name="users" size={14} color={colors.sidebar.text.secondary} />
                   <Text style={styles.summaryText}>
                     {missingStudents.length} recipient{missingStudents.length !== 1 ? 's' : ''}
                   </Text>
@@ -455,7 +771,7 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
                 </View>
                 {deadline && (
                   <View style={styles.summaryRow}>
-                    <Feather name="clock" size={14} color="#0ea5e9" />
+                    <Feather name="clock" size={14} color={colors.accent.primary} />
                     <Text style={styles.summaryText}>
                       Due {formatDeadline(deadline)}
                     </Text>
@@ -464,7 +780,6 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
               </View>
             )}
 
-            {/* Action Buttons */}
             <View style={styles.actions}>
               <TouchableOpacity
                 onPress={handleSendPenalty}
@@ -503,316 +818,5 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    elevation: 24,
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#fee2e2',
-    backgroundColor: '#fef2f2',
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#ef444420',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 2,
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollView: {
-    maxHeight: 500,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  eventCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0f9ff',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e0f2fe',
-  },
-  eventIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: '#0ea5e920',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  eventDetails: {
-    flex: 1,
-  },
-  eventLabel: {
-    fontSize: 12,
-    color: '#0ea5e9',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  eventText: {
-    fontSize: 15,
-    color: '#1e293b',
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 10,
-  },
-  severityContainer: {
-    gap: 10,
-  },
-  severityButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 12,
-  },
-  severityIndicator: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  severityIndicatorActive: {
-    transform: [{ scale: 1.1 }],
-  },
-  severityTextContainer: {
-    flex: 1,
-  },
-  severityName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  severityLevel: {
-    fontSize: 12,
-    color: '#94a3b8',
-    marginTop: 2,
-    textTransform: 'capitalize',
-  },
-  checkIcon: {
-    marginLeft: 'auto',
-  },
-  inputContainer: {
-    position: 'relative',
-  },
-  consequencesInput: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 16,
-    padding: 14,
-    fontSize: 14,
-    color: '#1e293b',
-    minHeight: 120,
-    backgroundColor: '#f8fafc',
-    lineHeight: 20,
-  },
-  charCount: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    fontSize: 11,
-    color: '#94a3b8',
-  },
-  deadlineButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 16,
-    backgroundColor: '#f8fafc',
-    gap: 12,
-  },
-  deadlineIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#f0f9ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deadlineTextContainer: {
-    flex: 1,
-  },
-  deadlineMain: {
-    fontSize: 15,
-    color: '#1e293b',
-    fontWeight: '600',
-  },
-  deadlineSub: {
-    fontSize: 12,
-    color: '#0ea5e9',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  deadlinePlaceholder: {
-    color: '#94a3b8',
-    fontWeight: '400',
-  },
-  datePickerWrapper: {
-    marginTop: 8,
-  },
-  webDatePickerContainer: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#0ea5e9',
-    overflow: 'hidden',
-  },
-  webPickerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    backgroundColor: '#f0f9ff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0f2fe',
-  },
-  webPickerTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#0ea5e9',
-    flex: 1,
-    marginLeft: 10,
-  },
-  confirmDateButton: {
-    backgroundColor: '#0ea5e9',
-    padding: 14,
-    margin: 14,
-    marginTop: 0,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  confirmDateText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  webPickerHint: {
-    fontSize: 12,
-    color: '#64748b',
-    padding: 14,
-    paddingTop: 0,
-    backgroundColor: '#f8fafc',
-    textAlign: 'center',
-  },
-  summaryCard: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  summaryTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748b',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 10,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-  summaryText: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  actions: {
-    gap: 10,
-    marginTop: 10,
-  },
-  sendButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ef4444',
-    paddingVertical: 16,
-    borderRadius: 16,
-    gap: 10,
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#cbd5e1',
-  },
-  sendButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 16,
-  },
-  cancelButtonText: {
-    color: '#64748b',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-});
 
 export default PenaltyAnnouncementModal;

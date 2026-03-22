@@ -2,10 +2,10 @@ import { Feather } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, onSnapshot, orderBy, query, Unsubscribe } from 'firebase/firestore';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -21,8 +21,10 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../../../context/AuthContext';
+import { useNotifications } from '../../../context/NotificationContext';
+import { useTheme } from '../../../context/ThemeContext';
 import { auth, db } from '../../../lib/firebaseConfig';
-import { studentAnnouncementStyles } from '../../../styles/student/announcementStyle';
+import { createStudentAnnouncementStyles } from '../../../styles/student/announcementStyle';
 
 dayjs.extend(relativeTime);
 
@@ -40,7 +42,16 @@ type TimeFilter = 'all' | 'today' | 'week' | 'month';
 
 export default function StudentAnnouncements() {
   const { width: screenWidth } = useWindowDimensions();
-  const isMobile = screenWidth < 640;
+  const { colors, isDark } = useTheme();          
+  const isMobile = screenWidth < 640;               
+  const isTablet = screenWidth >= 640 && screenWidth < 1024;
+  const isDesktop = screenWidth >= 1024;        
+
+  const styles = useMemo(
+    () => createStudentAnnouncementStyles(colors, isDark, isMobile, isTablet, isDesktop),
+    [colors, isDark, isMobile, isTablet, isDesktop]
+  );
+
   const { userData } = useAuth();
   const router = useRouter();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -54,9 +65,23 @@ export default function StudentAnnouncements() {
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const { incrementUnread, clearUnread } = useNotifications();
   const itemsPerPage = 5;
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const styles = studentAnnouncementStyles;
+  const isFocused = useRef(true);
+  const initialLoadDone = useRef(false);
+  const lastFirstTimestamp = useRef<string | null>(null);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      isFocused.current = true;
+      clearUnread('announcements');
+      return () => {
+        isFocused.current = false;
+      };
+    }, [clearUnread])
+  );
 
   useEffect(() => {
     let unsubscribeAnnouncements: Unsubscribe | null = null;
@@ -66,6 +91,7 @@ export default function StudentAnnouncements() {
       const authenticated = !!user;
       setIsUserAuthenticated(authenticated);
 
+  
       if (unsubscribeAnnouncements) {
         unsubscribeAnnouncements();
         unsubscribeAnnouncements = null;
@@ -87,14 +113,10 @@ export default function StudentAnnouncements() {
       if (unsubscribeAuth) unsubscribeAuth();
       if (unsubscribeAnnouncements) unsubscribeAnnouncements();
     };
-  }, []);
+  }, [refreshKey]);
 
   const setupAnnouncementsListener = (): Unsubscribe => {
-    // Fetch all announcements (no status filter)
-    const q = query(
-      collection(db, 'updates'),
-      orderBy('createdAt', 'desc')
-    );
+    const q = query(collection(db, 'updates'), orderBy('createdAt', 'desc'));
 
     return onSnapshot(
       q,
@@ -116,6 +138,23 @@ export default function StudentAnnouncements() {
               return null;
             })
             .filter((item): item is Announcement => item !== null);
+
+          if (list.length > 0) {
+            const newest = list[0].createdAt;
+            if (newest) {
+              const newestMillis = newest.toDate().getTime();
+              const lastMillis = lastFirstTimestamp.current ? parseInt(lastFirstTimestamp.current) : 0;
+
+              if (newestMillis > lastMillis && initialLoadDone.current && !isFocused.current) {
+                incrementUnread('announcements');
+              }
+              lastFirstTimestamp.current = newestMillis.toString();
+            }
+          }
+
+          if (!initialLoadDone.current) {
+            initialLoadDone.current = true;
+          }
 
           setAnnouncements(list);
           filterAnnouncements(list, timeFilter);
@@ -143,7 +182,7 @@ export default function StudentAnnouncements() {
 
   useEffect(() => {
     filterAnnouncements(announcements, timeFilter);
-    setCurrentPage(1); // reset pagination on filter change
+    setCurrentPage(1);
   }, [timeFilter, announcements]);
 
   useEffect(() => {
@@ -195,7 +234,7 @@ export default function StudentAnnouncements() {
   const getPriorityColor = (priority?: string, title?: string) => {
     if (priority === 'urgent' || title?.toLowerCase().includes('urgent')) return '#ef4444';
     if (priority === 'important' || title?.toLowerCase().includes('important')) return '#f59e0b';
-    return '#0ea5e9';
+    return colors.accent.primary;
   };
 
   const getPriorityLabel = (priority?: string, title?: string) => {
@@ -221,10 +260,18 @@ export default function StudentAnnouncements() {
   const handleRefresh = () => {
     if (!isUserAuthenticated) return;
     setRefreshing(true);
-    setRefreshing(false);
-  };
+    setRefreshKey(prev => prev + 1);
 
-  // Pagination
+    setTimeout(() => {
+      setRefreshing(prev => {
+        if (prev) {
+          console.log('Refresh timeout – forcing refresh end');
+          return false;
+        }
+        return prev;
+      });
+    }, 5000);
+  };
   const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
   const paginatedAnnouncements = filteredAnnouncements.slice(
     (currentPage - 1) * itemsPerPage,
@@ -254,10 +301,8 @@ export default function StudentAnnouncements() {
           onPress={goToPreviousPage}
           disabled={currentPage === 1}
         >
-          <Feather name="chevron-left" size={18} color={currentPage === 1 ? '#cbd5e1' : '#0f172a'} />
-          <Text style={[styles.paginationText, currentPage === 1 && styles.paginationTextDisabled]}>
-            Prev
-          </Text>
+          <Feather name="chevron-left" size={18} color={currentPage === 1 ? colors.sidebar.text.muted : colors.text} />
+          <Text style={[styles.paginationText, currentPage === 1 && styles.paginationTextDisabled]}>Prev</Text>
         </TouchableOpacity>
 
         <Text style={styles.paginationPageInfo}>
@@ -269,10 +314,8 @@ export default function StudentAnnouncements() {
           onPress={goToNextPage}
           disabled={currentPage === totalPages}
         >
-          <Text style={[styles.paginationText, currentPage === totalPages && styles.paginationTextDisabled]}>
-            Next
-          </Text>
-          <Feather name="chevron-right" size={18} color={currentPage === totalPages ? '#cbd5e1' : '#0f172a'} />
+          <Text style={[styles.paginationText, currentPage === totalPages && styles.paginationTextDisabled]}>Next</Text>
+          <Feather name="chevron-right" size={18} color={currentPage === totalPages ? colors.sidebar.text.muted : colors.text} />
         </TouchableOpacity>
       </View>
     );
@@ -288,7 +331,7 @@ export default function StudentAnnouncements() {
         onPress={() => openDetailModal(item)}
         activeOpacity={0.7}
       >
-
+        <View style={[styles.cardPriorityBar, { backgroundColor: priorityColor }]} />
         <View style={styles.cardContent}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle} numberOfLines={1}>
@@ -314,7 +357,6 @@ export default function StudentAnnouncements() {
     );
   };
 
-  // Detail Modal
   const renderDetailModal = () => (
     <Modal
       visible={showDetailModal}
@@ -345,7 +387,7 @@ export default function StudentAnnouncements() {
                   onPress={() => setShowDetailModal(false)}
                   style={styles.detailModalClose}
                 >
-                  <Feather name="x" size={24} color="#64748b" />
+                  <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
                 </TouchableOpacity>
               </View>
 
@@ -377,7 +419,7 @@ export default function StudentAnnouncements() {
 
                 <View style={styles.detailMeta}>
                   <View style={styles.detailMetaItem}>
-                    <Feather name="clock" size={14} color="#64748b" />
+                    <Feather name="clock" size={14} color={colors.sidebar.text.muted} />
                     <Text style={styles.detailMetaText}>
                       {selectedAnnouncement.createdAt
                         ? dayjs(selectedAnnouncement.createdAt.toDate()).format('MMM D, YYYY • h:mm A')
@@ -386,7 +428,7 @@ export default function StudentAnnouncements() {
                   </View>
                   {selectedAnnouncement.createdByName && (
                     <View style={styles.detailMetaItem}>
-                      <Feather name="user" size={14} color="#64748b" />
+                      <Feather name="user" size={14} color={colors.sidebar.text.muted} />
                       <Text style={styles.detailMetaText}>
                         by {selectedAnnouncement.createdByName}
                       </Text>
@@ -405,10 +447,19 @@ export default function StudentAnnouncements() {
     </Modal>
   );
 
+  const headerGradientColors = isDark
+    ? ['#0f172a', '#1e293b'] as const
+    : ['#1e40af', '#3b82f6'] as const;
+
   if (loading && isUserAuthenticated) {
     return (
       <View style={styles.container}>
-        <LinearGradient colors={['#14203d', '#0f172a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <LinearGradient
+          colors={headerGradientColors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.greeting}>Welcome back,</Text>
@@ -445,7 +496,7 @@ export default function StudentAnnouncements() {
           </View>
         </LinearGradient>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0ea5e9" />
+          <ActivityIndicator size="large" color={colors.accent.primary} />
           <Text style={styles.loadingText}>Loading announcements...</Text>
         </View>
       </View>
@@ -454,8 +505,13 @@ export default function StudentAnnouncements() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient colors={['#14203d', '#06080b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+      {/* Header with dynamic gradient */}
+      <LinearGradient
+        colors={headerGradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>Welcome back,</Text>
@@ -497,28 +553,28 @@ export default function StudentAnnouncements() {
           {/* Stats */}
           <View style={styles.statsContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
-              <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
-                <View style={[styles.statIcon, { backgroundColor: '#0ea5e915' }]}>
-                  <Icon name="file-document" size={18} color="#0ea5e9" />
+              <View style={styles.statCard}>
+                <View style={[styles.statIcon, { backgroundColor: `${colors.accent.primary}15` }]}>
+                  <Icon name="file-document" size={18} color={colors.accent.primary} />
                 </View>
                 <Text style={styles.statNumber}>{stats.total}</Text>
                 <Text style={styles.statLabel}>Total</Text>
               </View>
-              <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+              <View style={styles.statCard}>
                 <View style={[styles.statIcon, { backgroundColor: '#10b98115' }]}>
                   <Feather name="sun" size={18} color="#10b981" />
                 </View>
                 <Text style={styles.statNumber}>{stats.today}</Text>
                 <Text style={styles.statLabel}>Today</Text>
               </View>
-              <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+              <View style={styles.statCard}>
                 <View style={[styles.statIcon, { backgroundColor: '#f59e0b15' }]}>
                   <Icon name="flag" size={18} color="#f59e0b" />
                 </View>
                 <Text style={styles.statNumber}>{stats.important}</Text>
                 <Text style={styles.statLabel}>Important</Text>
               </View>
-              <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+              <View style={styles.statCard}>
                 <View style={[styles.statIcon, { backgroundColor: '#ef444415' }]}>
                   <Icon name="alert-circle" size={18} color="#ef4444" />
                 </View>
@@ -531,17 +587,17 @@ export default function StudentAnnouncements() {
           {/* Search Bar */}
           <View style={styles.searchSection}>
             <View style={styles.searchBar}>
-              <Feather name="search" size={18} color="#64748b" />
+              <Feather name="search" size={18} color={colors.sidebar.text.muted} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search announcements..."
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.sidebar.text.muted}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClear}>
-                  <Feather name="x" size={18} color="#64748b" />
+                  <Feather name="x" size={18} color={colors.sidebar.text.muted} />
                 </TouchableOpacity>
               )}
             </View>
@@ -585,12 +641,16 @@ export default function StudentAnnouncements() {
               contentContainerStyle={styles.listContainer}
               showsVerticalScrollIndicator={false}
               refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#0ea5e9']} />
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[colors.accent.primary]}
+                />
               }
               ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <View style={styles.emptyStateIcon}>
-                    <Icon name="bullhorn-outline" size={40} color="#cbd5e1" />
+                    <Icon name="bullhorn-outline" size={40} color={colors.sidebar.text.muted} />
                   </View>
                   <Text style={styles.emptyStateTitle}>No announcements</Text>
                   <Text style={styles.emptyStateText}>
@@ -610,7 +670,7 @@ export default function StudentAnnouncements() {
       ) : (
         <View style={styles.emptyState}>
           <View style={styles.emptyStateIcon}>
-            <Icon name="account-off" size={40} color="#cbd5e1" />
+            <Icon name="account-off" size={40} color={colors.sidebar.text.muted} />
           </View>
           <Text style={styles.emptyStateTitle}>Please log in</Text>
           <Text style={styles.emptyStateText}>Sign in to see the latest campus updates</Text>

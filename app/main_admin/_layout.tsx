@@ -2,8 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { Href, router, Tabs, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { collection, onSnapshot, query } from 'firebase/firestore';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Image,
+  PanResponder,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 import LoadingScreen from '../../components/LoadingScreen';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -46,20 +55,60 @@ export default function MainAdminLayout() {
     students: 0
   });
   const [isLayoutReady, setIsLayoutReady] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-300)).current;
+  
+  // Animated values
+  const sidebarAnim = useRef(new Animated.Value(260)).current;   // full width
+  const contentOpacity = useRef(new Animated.Value(1)).current;  // for text fading
+  const mobileSlideAnim = useRef(new Animated.Value(-300)).current;
+  const mobileOverlayAnim = useRef(new Animated.Value(0)).current;
+  
   const { userData } = useAuth();
-  const { colors, isDark } = useTheme(); // Use theme context
+  const { colors, isDark } = useTheme();
 
-  const sidebarWidth = collapsed ? 80 : 260;
+  const fullWidth = 260;
+  const collapsedWidth = 80;
+  const sidebarWidth = collapsed ? collapsedWidth : fullWidth;
 
+  // Animate sidebar width and content opacity when collapse state changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLayoutReady(true);
-    }, 300);
+    Animated.parallel([
+      Animated.timing(sidebarAnim, {
+        toValue: collapsed ? collapsedWidth : fullWidth,
+        duration: 300,
+        useNativeDriver: false, // width must use native driver false
+      }),
+      Animated.timing(contentOpacity, {
+        toValue: collapsed ? 0 : 1,
+        duration: 200,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, [collapsed]);
+
+  // Mobile menu animations with spring
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(mobileSlideAnim, {
+        toValue: mobileMenuOpen ? 0 : -300,
+        useNativeDriver: true,
+        speed: 12,
+        bounciness: 8,
+      }),
+      Animated.timing(mobileOverlayAnim, {
+        toValue: mobileMenuOpen ? 1 : 0,
+        duration: 300,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, [mobileMenuOpen]);
+
+  // Entrance animation for nav items (sequential fade-in)
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLayoutReady(true), 300);
     return () => clearTimeout(timer);
   }, []);
 
-  // Real-time user stats
+  // Real-time user stats (unchanged)
   useEffect(() => {
     const usersQuery = query(collection(db, 'users'));
     const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
@@ -83,14 +132,6 @@ export default function MainAdminLayout() {
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: mobileMenuOpen ? 0 : -300,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [mobileMenuOpen]);
-
   const isRouteActive = (route: Href) => {
     const routeString = route.toString();
     if (routeString === '/main_admin') {
@@ -104,147 +145,260 @@ export default function MainAdminLayout() {
     if (!isWeb) setMobileMenuOpen(false);
   };
 
-  // Sidebar Component with dynamic colors
-  const Sidebar = ({ isMobile }: { isMobile?: boolean }) => (
-    <View style={[
-      styles.sidebarContainer,
-      { backgroundColor: colors.sidebar.background, width: sidebarWidth },
-      isMobile && { width: 280 }
-    ]}>
-      <View style={styles.sidebarContent}>
-        {/* Collapse buttons */}
-        {isWeb && !isMobile && !collapsed && (
-          <TouchableOpacity onPress={() => setCollapsed(!collapsed)} style={[styles.collapseButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-            <Ionicons name="chevron-back" size={18} color={colors.sidebar.text.muted} />
-          </TouchableOpacity>
-        )}
-        {isWeb && !isMobile && collapsed && (
-          <TouchableOpacity onPress={() => setCollapsed(!collapsed)} style={[styles.collapseButtonCentered, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-            <Ionicons name="chevron-forward" size={18} color={colors.sidebar.text.muted} />
-          </TouchableOpacity>
-        )}
+  // Swipe to close on mobile
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return mobileMenuOpen && gestureState.dx > 20;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx > 0) {
+          mobileSlideAnim.setValue(-300 + gestureState.dx);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > 100) {
+          setMobileMenuOpen(false);
+        } else {
+          Animated.spring(mobileSlideAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
-        {/* Logo Section */}
-        <View style={[styles.logoSection, collapsed && styles.logoSectionCollapsed]}>
-          <View style={styles.logoWrapper}>
-            <View style={[styles.logoBackground, collapsed && { marginRight: 0 }, { backgroundColor: isDark ? 'transparent' : '#F1F5F9' }]}>
-              <Image
-                source={require('../../assets/images/Logo/V_1.0.1.png')}
-                style={[styles.logoImage, collapsed ? { width: 30, height: 30 } : { width: 40, height: 40 }]}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-          {!collapsed && (
-            <View style={styles.adminInfo}>
-              <Text style={[styles.adminTitle, { color: colors.sidebar.text.primary }]}>Admin Panel</Text>
-              <Text style={[styles.adminSubtitle, { color: colors.sidebar.text.secondary }]}>TMC Campus Hub</Text>
-              <View style={styles.statusContainer}>
-                <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
-                <Text style={[styles.statusText, { color: '#10B981' }]}>
-                  {userData?.role === 'main_admin' ? 'Main Admin' : 'Assistant Admin'}
-                </Text>
+  // Sidebar component with premium animations
+  const Sidebar = ({ isMobile }: { isMobile?: boolean }) => {
+    const animatedWidth = isMobile ? 280 : sidebarAnim;
+    
+    return (
+      <Animated.View 
+        style={[
+          styles.sidebarContainer,
+          { 
+            backgroundColor: colors.sidebar.background,
+            width: animatedWidth,
+            // Glassmorphism effect on web – use type assertion for web‑only styles
+            ...(isWeb && !isMobile && {
+              backgroundColor: isDark 
+                ? 'rgba(15, 25, 35, 0.85)' 
+                : 'rgba(255, 255, 255, 0.85)',
+              backdropFilter: 'blur(20px)',
+            } as any),
+          },
+          isMobile && { width: 280 }
+        ]}
+      >
+        <View style={styles.sidebarContent}>
+          {/* Collapse button with rotation animation */}
+          {isWeb && !isMobile && (
+            <TouchableOpacity 
+              onPress={() => setCollapsed(!collapsed)} 
+              style={[styles.collapseButton, collapsed && styles.collapseButtonCollapsed]}
+              activeOpacity={0.8}
+            >
+              <Animated.View style={{
+                transform: [{
+                  rotate: sidebarAnim.interpolate({
+                    inputRange: [collapsedWidth, fullWidth],
+                    outputRange: ['180deg', '0deg'],
+                  })
+                }]
+              }}>
+                <Ionicons 
+                  name="chevron-back" 
+                  size={18} 
+                  color={colors.sidebar.text.muted} 
+                />
+              </Animated.View>
+            </TouchableOpacity>
+          )}
+
+          {/* Logo Section */}
+          <Animated.View style={[
+            styles.logoSection,
+            collapsed && styles.logoSectionCollapsed,
+            { opacity: contentOpacity }
+          ]}>
+            <View style={styles.logoWrapper}>
+              <View style={[styles.logoBackground, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#F1F5F9' }]}>
+                <Image
+                  source={require('../../assets/images/Logo/V_1.0.1.png')}
+                  style={[styles.logoImage, collapsed ? { width: 30, height: 30 } : { width: 40, height: 40 }]}
+                  resizeMode="contain"
+                />
               </View>
             </View>
-          )}
-        </View>
-
-        {/* Quick Stats */}
-        {isWeb && !collapsed && (
-          <View style={[styles.quickStats, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: colors.sidebar.text.primary }]}>{userStats.newThisWeek}</Text>
-              <Text style={[styles.statLabel, { color: colors.sidebar.text.secondary }]}>New this week</Text>
-            </View>
-            <View style={[styles.statDivider, { backgroundColor: colors.sidebar.border }]} />
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: colors.sidebar.text.primary }]}>{userStats.total}</Text>
-              <Text style={[styles.statLabel, { color: colors.sidebar.text.secondary }]}>Total users</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Role Breakdown */}
-        {isWeb && !collapsed && userStats.total > 0 && (
-          <View style={[styles.roleBreakdown, { backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }]}>
-            <View style={styles.roleItem}>
-              <View style={[styles.roleDot, { backgroundColor: '#3B82F6' }]} />
-              <Text style={[styles.roleText, { color: colors.sidebar.text.secondary }]}>Main Admin: {userStats.mainAdmins}</Text>
-            </View>
-            <View style={styles.roleItem}>
-              <View style={[styles.roleDot, { backgroundColor: '#10B981' }]} />
-              <Text style={[styles.roleText, { color: colors.sidebar.text.secondary }]}>Asst. Admin: {userStats.assistantAdmins}</Text>
-            </View>
-            <View style={styles.roleItem}>
-              <View style={[styles.roleDot, { backgroundColor: '#F59E0B' }]} />
-              <Text style={[styles.roleText, { color: colors.sidebar.text.secondary }]}>Students: {userStats.students}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Navigation Items */}
-        <View style={styles.navItems}>
-          {menuItems.map((item) => {
-            const isActive = isRouteActive(item.route);
-            return (
-              <TouchableOpacity
-                key={item.name}
-                style={[
-                  styles.navItem,
-                  collapsed && styles.navItemCollapsed,
-                  isActive && { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.1)' }
-                ]}
-                onPress={() => handleNavigation(item.route)}
-              >
-                <View style={[styles.navIconWrapper, collapsed && styles.navIconWrapperCollapsed]}>
-                  <Ionicons
-                    name={item.icon}
-                    size={collapsed ? 24 : 20}
-                    color={isActive ? colors.accent.primary : colors.sidebar.icon.inactive}
-                  />
-                </View>
-                {!collapsed && (
-                  <Text style={[
-                    styles.navText,
-                    { color: isActive ? colors.accent.primary : colors.sidebar.text.secondary }
-                  ]}>
-                    {item.title}
+            {!collapsed && (
+              <View style={styles.adminInfo}>
+                <Text style={[styles.adminTitle, { color: colors.sidebar.text.primary }]}>Admin Panel</Text>
+                <Text style={[styles.adminSubtitle, { color: colors.sidebar.text.secondary }]}>TMC Campus Hub</Text>
+                <View style={styles.statusContainer}>
+                  <View style={[styles.statusDot, { backgroundColor: '#10B981' }]} />
+                  <Text style={[styles.statusText, { color: '#10B981' }]}>
+                    {userData?.role === 'main_admin' ? 'Main Admin' : 'Assistant Admin'}
                   </Text>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+                </View>
+              </View>
+            )}
+          </Animated.View>
 
-        {/* Bottom Section */}
-        <View style={[styles.sidebarFooter, { borderTopColor: colors.sidebar.border }]}>
-          <TouchableOpacity
-            style={[styles.navItem, collapsed && styles.navItemCollapsed]}
-            onPress={() => router.push('/main_admin/settings' as Href)}
-          >
-            <View style={[styles.navIconWrapper, collapsed && styles.navIconWrapperCollapsed]}>
-              <Ionicons name="settings-outline" size={collapsed ? 24 : 20} color={colors.sidebar.icon.inactive} />
-            </View>
-            {!collapsed && <Text style={[styles.navText, { color: colors.sidebar.text.secondary }]}>Settings</Text>}
-          </TouchableOpacity>
+          {/* Quick Stats with animation */}
+          {isWeb && !collapsed && (
+            <Animated.View 
+              style={[
+                styles.quickStats, 
+                { 
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                  opacity: contentOpacity,
+                  transform: [{
+                    scale: contentOpacity.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.8, 1],
+                    })
+                  }]
+                }
+              ]}
+            >
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.sidebar.text.primary }]}>{userStats.newThisWeek}</Text>
+                <Text style={[styles.statLabel, { color: colors.sidebar.text.secondary }]}>New this week</Text>
+              </View>
+              <View style={[styles.statDivider, { backgroundColor: colors.sidebar.border }]} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.sidebar.text.primary }]}>{userStats.total}</Text>
+                <Text style={[styles.statLabel, { color: colors.sidebar.text.secondary }]}>Total users</Text>
+              </View>
+            </Animated.View>
+          )}
 
-          <TouchableOpacity
-            style={[styles.navItem, styles.logoutButton, collapsed && styles.navItemCollapsed]}
-            onPress={() => router.replace('/super-admin-login' as Href)}
-          >
-            <View style={[styles.navIconWrapper, collapsed && styles.navIconWrapperCollapsed]}>
-              <Ionicons name="log-out-outline" size={collapsed ? 24 : 20} color="#EF4444" />
-            </View>
-            {!collapsed && <Text style={[styles.navText, styles.logoutText]}>Logout</Text>}
-          </TouchableOpacity>
+          {/* Role Breakdown with animation */}
+          {isWeb && !collapsed && userStats.total > 0 && (
+            <Animated.View style={[
+              styles.roleBreakdown,
+              { 
+                backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                opacity: contentOpacity,
+              }
+            ]}>
+              <View style={styles.roleItem}>
+                <View style={[styles.roleDot, { backgroundColor: '#3B82F6' }]} />
+                <Text style={[styles.roleText, { color: colors.sidebar.text.secondary }]}>Main Admin: {userStats.mainAdmins}</Text>
+              </View>
+              <View style={styles.roleItem}>
+                <View style={[styles.roleDot, { backgroundColor: '#10B981' }]} />
+                <Text style={[styles.roleText, { color: colors.sidebar.text.secondary }]}>Asst. Admin: {userStats.assistantAdmins}</Text>
+              </View>
+              <View style={styles.roleItem}>
+                <View style={[styles.roleDot, { backgroundColor: '#F59E0B' }]} />
+                <Text style={[styles.roleText, { color: colors.sidebar.text.secondary }]}>Students: {userStats.students}</Text>
+              </View>
+            </Animated.View>
+          )}
+
+          {/* Navigation Items with hover & active effects */}
+          <View style={styles.navItems}>
+            {menuItems.map((item, index) => {
+              const isActive = isRouteActive(item.route);
+              return (
+                <TouchableOpacity
+                  key={item.name}
+                  style={[
+                    styles.navItem,
+                    collapsed && styles.navItemCollapsed,
+                    isActive && [styles.activeNavItem, { 
+                      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)',
+                      borderLeftColor: colors.accent.primary,
+                    }]
+                  ]}
+                  onPress={() => handleNavigation(item.route)}
+                  activeOpacity={0.7}
+                  {...(isWeb ? {
+                    onMouseEnter: (e: any) => {
+                      e.currentTarget.style.transform = 'scale(1.02)';
+                      e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)';
+                    },
+                    onMouseLeave: (e: any) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.backgroundColor = isActive 
+                        ? (isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.1)')
+                        : 'transparent';
+                    }
+                  } : {})}
+                >
+                  <Animated.View style={[
+                    styles.navIconWrapper,
+                    collapsed && styles.navIconWrapperCollapsed,
+                    {
+                      transform: [{
+                        scale: isActive ? 1.1 : 1
+                      }]
+                    }
+                  ]}>
+                    <Ionicons
+                      name={item.icon}
+                      size={collapsed ? 24 : 20}
+                      color={isActive ? colors.accent.primary : colors.sidebar.icon.inactive}
+                    />
+                  </Animated.View>
+                  {!collapsed && (
+                    <Animated.Text style={[
+                      styles.navText,
+                      { color: isActive ? colors.accent.primary : colors.sidebar.text.secondary },
+                      { opacity: contentOpacity }
+                    ]}>
+                      {item.title}
+                    </Animated.Text>
+                  )}
+                  {isActive && !collapsed && (
+                    <View style={[styles.activeIndicator, { backgroundColor: colors.accent.primary }]} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Bottom Section */}
+          <Animated.View style={[
+            styles.sidebarFooter, 
+            { borderTopColor: colors.sidebar.border, opacity: contentOpacity }
+          ]}>
+            <TouchableOpacity
+              style={[styles.navItem, collapsed && styles.navItemCollapsed]}
+              onPress={() => router.push('/main_admin/settings' as Href)}
+            >
+              <View style={[styles.navIconWrapper, collapsed && styles.navIconWrapperCollapsed]}>
+                <Ionicons name="settings-outline" size={collapsed ? 24 : 20} color={colors.sidebar.icon.inactive} />
+              </View>
+              {!collapsed && <Text style={[styles.navText, { color: colors.sidebar.text.secondary }]}>Settings</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.navItem, styles.logoutButton, collapsed && styles.navItemCollapsed]}
+              onPress={() => router.replace('/super-admin-login' as Href)}
+            >
+              <View style={[styles.navIconWrapper, collapsed && styles.navIconWrapperCollapsed]}>
+                <Ionicons name="log-out-outline" size={collapsed ? 24 : 20} color="#EF4444" />
+              </View>
+              {!collapsed && <Text style={[styles.navText, styles.logoutText]}>Logout</Text>}
+            </TouchableOpacity>
+          </Animated.View>
         </View>
-      </View>
-    </View>
-  );
+      </Animated.View>
+    );
+  };
 
   if (!isLayoutReady) {
     return <LoadingScreen message="Loading Dashboard" subMessage="Preparing your admin workspace" />;
   }
+
+  // Animated margin for main content on web
+  const mainMarginLeft = sidebarAnim.interpolate({
+    inputRange: [collapsedWidth, fullWidth],
+    outputRange: [collapsedWidth, fullWidth],
+  });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -263,20 +417,34 @@ export default function MainAdminLayout() {
         </View>
       )}
 
-      {/* Mobile Overlay */}
+      {/* Mobile Overlay with fade */}
       {!isWeb && mobileMenuOpen && (
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setMobileMenuOpen(false)} />
+        <Animated.View 
+          style={[styles.overlay, { opacity: mobileOverlayAnim }]}
+          {...panResponder.panHandlers}
+        >
+          <TouchableOpacity 
+            style={styles.overlayTouch}
+            activeOpacity={1} 
+            onPress={() => setMobileMenuOpen(false)} 
+          />
+        </Animated.View>
       )}
 
       {/* Mobile Sidebar */}
       {!isWeb && (
-        <Animated.View style={[styles.mobileSidebarContainer, { transform: [{ translateX: slideAnim }] }]}>
+        <Animated.View 
+          style={[
+            styles.mobileSidebarContainer, 
+            { transform: [{ translateX: mobileSlideAnim }] }
+          ]}
+        >
           <Sidebar isMobile={true} />
         </Animated.View>
       )}
 
-      {/* Main Layout */}
-      <View style={[styles.mainContent, isWeb && { marginLeft: sidebarWidth }]}>
+      {/* Main Layout with animated margin */}
+      <Animated.View style={[styles.mainContent, isWeb && { marginLeft: mainMarginLeft }]}>
         {isWeb && <Sidebar />}
         
         <View style={styles.tabsContainer}>
@@ -308,7 +476,7 @@ export default function MainAdminLayout() {
             <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} /> }} />
           </Tabs>
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -317,10 +485,34 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   mainContent: { flex: 1, flexDirection: 'row' },
   tabsContainer: { flex: 1 },
-  sidebarContainer: { height: '100%', position: 'fixed', left: 0, top: 0, bottom: 0 },
+  sidebarContainer: { 
+    height: '100%', 
+    position: 'fixed', 
+    left: 0, 
+    top: 0, 
+    bottom: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 10,
+  },
   sidebarContent: { flex: 1, paddingVertical: 20 },
-  collapseButton: { alignSelf: 'flex-end', padding: 8, borderRadius: 8, marginRight: 16, marginBottom: 16, width: 34, alignItems: 'center' },
-  collapseButtonCentered: { alignSelf: 'center', padding: 8, borderRadius: 8, marginBottom: 16, width: 34, alignItems: 'center' },
+  collapseButton: { 
+    alignSelf: 'flex-end', 
+    padding: 8, 
+    borderRadius: 8, 
+    marginRight: 16, 
+    marginBottom: 16, 
+    width: 34, 
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.03)',
+  },
+  collapseButtonCollapsed: {
+    alignSelf: 'center',
+    marginRight: 0,
+  },
   logoSection: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 20 },
   logoSectionCollapsed: { justifyContent: 'center', paddingHorizontal: 8 },
   logoWrapper: { marginRight: 12 },
@@ -342,19 +534,75 @@ const styles = StyleSheet.create({
   roleDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   roleText: { fontSize: 11 },
   navItems: { flex: 1, paddingHorizontal: 8 },
-  navItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, marginVertical: 2, borderRadius: 8 },
+  navItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: 12, 
+    paddingHorizontal: 16, 
+    marginVertical: 2, 
+    borderRadius: 12,
+    position: 'relative',
+  },
   navItemCollapsed: { justifyContent: 'center', paddingHorizontal: 0 },
+  activeNavItem: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#3B82F6',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    right: 0,
+    top: '25%',
+    width: 3,
+    height: '50%',
+    borderRadius: 2,
+  },
   navIconWrapper: { width: 32, alignItems: 'center', justifyContent: 'center' },
   navIconWrapperCollapsed: { width: 'auto' },
   navText: { marginLeft: 12, fontSize: 15, fontWeight: '500' },
   sidebarFooter: { paddingHorizontal: 8, paddingBottom: 20, borderTopWidth: 1, marginTop: 20, paddingTop: 20 },
   logoutButton: { marginTop: 5 },
   logoutText: { color: '#EF4444' },
-  mobileHeader: { position: 'absolute', top: 0, left: 0, right: 0, height: 60, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, zIndex: 1000, elevation: 5 },
+  mobileHeader: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    height: 60, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 16, 
+    zIndex: 1000, 
+    elevation: 5,
+    borderBottomWidth: 1,
+  },
   hamburgerButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
   mobileLogoContainer: { flex: 1, alignItems: 'center' },
   mobileLogo: { width: 40, height: 40 },
   mobileHeaderRight: { width: 40 },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1001 },
-  mobileSidebarContainer: { position: 'absolute', top: 0, left: 0, bottom: 0, width: 280, zIndex: 1002, elevation: 10 },
+  overlay: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    bottom: 0, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    zIndex: 1001 
+  },
+  overlayTouch: {
+    flex: 1,
+  },
+  mobileSidebarContainer: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    bottom: 0, 
+    width: 280, 
+    zIndex: 1002, 
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
 });

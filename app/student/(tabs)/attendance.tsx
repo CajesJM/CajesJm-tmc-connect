@@ -17,13 +17,15 @@ import {
   StatusBar,
   Text,
   TouchableOpacity,
-  View
+  useWindowDimensions,
+  View,
 } from 'react-native';
+import { useTheme } from '../../../context/ThemeContext';
 import { ErrorService } from '../../../lib/errorService';
 import { auth, db } from '../../../lib/firebaseConfig';
 import { locationService } from '../../../lib/locationService';
 import type { AttendanceRecord, EventData, EventLocation, QRCodeData, UserLocation, ValidationResult } from '../../../lib/types';
-import { attendanceStyles as styles } from '../../../styles/student/attendanceStyles';
+import { createAttendanceStyles } from '../../../styles/student/attendanceStyles';
 
 const convertToEventData = (docData: DocumentData, id: string): EventData => ({
   id,
@@ -41,6 +43,11 @@ const convertToEventData = (docData: DocumentData, id: string): EventData => ({
 });
 
 export default function StudentAttendance() {
+  const { width } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
+  const isMobile = width < 640;
+  const isTablet = width >= 640 && width < 1024;
+  const isDesktop = width >= 1024;
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
   const [locationEnabled, setLocationEnabled] = useState<boolean>(true);
@@ -55,6 +62,14 @@ export default function StudentAttendance() {
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [permissionType, setPermissionType] = useState<'camera' | 'location' | null>(null);
   const [locationAttempts, setLocationAttempts] = useState(0);
+
+  const styles = useMemo(
+    () => createAttendanceStyles(colors, isDark, isMobile, isTablet, isDesktop),
+    [colors, isDark, isMobile, isTablet, isDesktop]
+  );
+  const headerGradientColors = isDark
+    ? ['#0f172a', '#1e293b'] as const
+    : ['#1e40af', '#3b82f6'] as const;
 
   // Animation values
   const [pulseAnim] = useState(new Animated.Value(1));
@@ -254,43 +269,43 @@ export default function StudentAttendance() {
   }, []);
 
   const formatDate = useCallback((dateValue: any): string => {
-  if (!dateValue) return 'Date not available';
-  
-  try {
-    let date: Date;
-    
-    // Handle Firestore Timestamp (from admin)
-    if (typeof dateValue === 'object' && dateValue !== null) {
-      if ('seconds' in dateValue && 'nanoseconds' in dateValue) {
-        // Firestore Timestamp object
-        date = new Date(dateValue.seconds * 1000);
-      } else if (dateValue instanceof Date) {
-        date = dateValue;
+    if (!dateValue) return 'Date not available';
+
+    try {
+      let date: Date;
+
+      // Handle Firestore Timestamp (from admin)
+      if (typeof dateValue === 'object' && dateValue !== null) {
+        if ('seconds' in dateValue && 'nanoseconds' in dateValue) {
+          // Firestore Timestamp object
+          date = new Date(dateValue.seconds * 1000);
+        } else if (dateValue instanceof Date) {
+          date = dateValue;
+        } else {
+          return 'Date not available';
+        }
+      } else if (typeof dateValue === 'string') {
+        date = new Date(dateValue);
       } else {
         return 'Date not available';
       }
-    } else if (typeof dateValue === 'string') {
-      date = new Date(dateValue);
-    } else {
+
+      if (isNaN(date.getTime())) {
+        return 'Date not available';
+      }
+
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
       return 'Date not available';
     }
-    
-    if (isNaN(date.getTime())) {
-      return 'Date not available';
-    }
-    
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return 'Date not available';
-  }
-}, []);
+  }, []);
 
   const validateQRCode = useCallback(async (
     qrData: QRCodeData,
@@ -684,9 +699,9 @@ export default function StudentAttendance() {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" />
-        <LinearGradient colors={['#14203d', '#06080b']} style={styles.loadingContainer}>
+        <LinearGradient colors={headerGradientColors} style={styles.header}>
           <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color="#0ea5e9" />
+            <ActivityIndicator size="large" color={colors.accent.primary} />
             <Text style={styles.loadingText}>Initializing Scanner...</Text>
           </View>
         </LinearGradient>
@@ -708,10 +723,10 @@ export default function StudentAttendance() {
         contentContainerStyle={styles.scrollContent}
       >
         {/* Header */}
-        <LinearGradient colors={['#14203d', '#06080b']} style={styles.header}>
+        <LinearGradient colors={headerGradientColors} style={styles.header}>
           <View style={styles.headerTop}>
             <View style={styles.headerIcon}>
-              <Feather name="check-square" size={28} color="#0ea5e9" />
+              <Feather name="check-square" size={28} color={colors.accent.primary} />
             </View>
             <View>
               <Text style={styles.greeting}>Attendance</Text>
@@ -775,7 +790,7 @@ export default function StudentAttendance() {
         <View style={styles.scanCard}>
           <LinearGradient
             colors={hasPermission && locationPermission && locationEnabled
-              ? ['#0ea5e9', '#0284c7']
+              ? [colors.accent.primary, '#0284c7']
               : ['#9ca3af', '#6b7280']
             }
             style={styles.scanGradient}
@@ -805,7 +820,7 @@ export default function StudentAttendance() {
               onPress={openScanner}
               disabled={!hasPermission || !locationPermission || !locationEnabled}
             >
-              <Feather name="camera" size={20} color={hasPermission && locationPermission && locationEnabled ? "#0ea5e9" : "#9ca3af"} />
+              <Feather name="camera" size={20} color={hasPermission && locationPermission && locationEnabled ? colors.accent.primary : "#9ca3af"} />
               <Text style={[
                 styles.scanButtonText,
                 (!hasPermission || !locationPermission || !locationEnabled) && styles.scanButtonTextDisabled
@@ -820,7 +835,7 @@ export default function StudentAttendance() {
         {formattedStudentInfo && (
           <View style={styles.infoCard}>
             <View style={styles.infoHeader}>
-              <Feather name="user" size={20} color="#0ea5e9" />
+              <Feather name="user" size={20} color={colors.accent.primary} />
               <Text style={styles.infoTitle}>Student Information</Text>
             </View>
 
@@ -913,7 +928,7 @@ export default function StudentAttendance() {
 
           {(!cameraReady || isGettingLocation) && (
             <View style={styles.scannerLoading}>
-              <ActivityIndicator size="large" color="#0ea5e9" />
+              <ActivityIndicator size="large" color={colors.accent.primary} />
               <Text style={styles.scannerLoadingText}>
                 {isGettingLocation
                   ? locationAttempts > 0

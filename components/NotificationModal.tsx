@@ -1,9 +1,23 @@
 import { Feather, FontAwesome6 } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Modal, ScrollView, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View
+  Animated,
+  Dimensions,
+  Modal,
+  PanResponder,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
+import { Snackbar } from 'react-native-paper';
 import { useTheme } from '../context/ThemeContext';
+
+const { height: screenHeight } = Dimensions.get('window');
 
 interface PendingApproval {
   id: string;
@@ -25,6 +39,8 @@ interface NotificationModalProps {
   onApprove?: (approval: PendingApproval) => void;
   onReject?: (approval: PendingApproval) => void;
   approvalCount?: number;
+  loading?: boolean;
+  onRefresh?: () => Promise<void>;
 }
 
 export const NotificationModal: React.FC<NotificationModalProps> = ({
@@ -37,22 +53,114 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   onApprove,
   onReject,
   approvalCount = 0,
+  loading = false,
+  onRefresh, 
 }) => {
   const { width } = useWindowDimensions();
-  const { colors, isDark } = useTheme(); 
+  const { colors, isDark } = useTheme();
   const [activeTab, setActiveTab] = useState<'notifications' | 'approvals'>(
     approvalCount > 0 ? 'approvals' : 'notifications'
   );
+  const [refreshing, setRefreshing] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+
+  const slideAnim = useRef(new Animated.Value(screenHeight)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const tabTranslateX = useRef(new Animated.Value(activeTab === 'approvals' ? 0 : 1)).current;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 10,
+      onPanResponderMove: (_, gesture) => {
+        if (gesture.dy > 0) {
+          slideAnim.setValue(gesture.dy);
+          overlayOpacity.setValue(1 - gesture.dy / screenHeight);
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > screenHeight * 0.3) {
+          onClose();
+        } else {
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            tension: 65,
+            friction: 11,
+            useNativeDriver: true,
+          }).start();
+          Animated.timing(overlayOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(overlayOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 65,
+          friction: 11,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(overlayOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: screenHeight,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => onClose());
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    Animated.spring(tabTranslateX, {
+      toValue: activeTab === 'approvals' ? 0 : 1,
+      tension: 65,
+      friction: 11,
+      useNativeDriver: true,
+    }).start();
+  }, [activeTab]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
   const modalWidth = Math.min(width * 0.9, 400);
 
-  React.useEffect(() => {
-    if (visible && approvalCount > 0) {
-      setActiveTab('approvals');
-    }
-  }, [visible, approvalCount]);
+  const withHaptic = (callback: () => void) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    callback();
+  };
 
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      setRefreshing(true);
+      await onRefresh();
+      setRefreshing(false);
+    }
+  };
+
+  const handleMarkAllRead = () => {
+    withHaptic(() => {
+      onMarkAllRead();
+      setSnackbarVisible(true);
+      setTimeout(() => setSnackbarVisible(false), 2000);
+    });
+  };
 
   const getNotificationStyles = () => ({
     overlay: isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
@@ -74,64 +182,100 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
 
   const dynamic = getNotificationStyles();
 
-  const renderTabs = () => (
-    <View style={[styles.tabContainer, { backgroundColor: dynamic.tabBg, borderBottomColor: dynamic.tabBorder }]}>
-      <TouchableOpacity
-        style={[
-          styles.tab, 
-          { backgroundColor: activeTab === 'approvals' ? dynamic.activeTabBg : dynamic.inactiveTabBg }
-        ]}
-        onPress={() => setActiveTab('approvals')}
-      >
-        <View style={styles.tabContent}>
-          <FontAwesome6
-            name="clipboard-check"
-            size={14}
-            color={activeTab === 'approvals' ? '#ffffff' : dynamic.textSecondary}
-          />
-          <Text style={[
-            styles.tabText, 
-            { color: activeTab === 'approvals' ? '#ffffff' : dynamic.textSecondary }
-          ]}>
-            Approvals
-          </Text>
-          {approvalCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: dynamic.approvalBadgeBg }]}>
-              <Text style={styles.badgeText}>{approvalCount}</Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[
-          styles.tab, 
-          { backgroundColor: activeTab === 'notifications' ? dynamic.activeTabBg : dynamic.inactiveTabBg }
-        ]}
-        onPress={() => setActiveTab('notifications')}
-      >
-        <View style={styles.tabContent}>
-          <Feather
-            name="bell"
-            size={14}
-            color={activeTab === 'notifications' ? '#ffffff' : dynamic.textSecondary}
-          />
-          <Text style={[
-            styles.tabText, 
-            { color: activeTab === 'notifications' ? '#ffffff' : dynamic.textSecondary }
-          ]}>
-            Notifications
-          </Text>
-          {unreadCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: dynamic.badgeBg }]}>
-              <Text style={styles.badgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
+  const SkeletonItem = () => (
+    <View style={[styles.skeletonItem, { backgroundColor: dynamic.iconBg }]}>
+      <View style={[styles.skeletonIcon, { backgroundColor: dynamic.textMuted }]} />
+      <View style={styles.skeletonContent}>
+        <View style={[styles.skeletonLine, { width: '70%', backgroundColor: dynamic.textMuted }]} />
+        <View style={[styles.skeletonLine, { width: '90%', marginTop: 8, backgroundColor: dynamic.textMuted }]} />
+        <View style={[styles.skeletonLine, { width: '40%', marginTop: 8, backgroundColor: dynamic.textMuted }]} />
+      </View>
     </View>
   );
 
+  const renderTabs = () => (
+  <View style={[styles.tabContainer, { backgroundColor: dynamic.tabBg, borderBottomColor: dynamic.tabBorder }]}>
+    <TouchableOpacity
+      style={[
+        styles.tab,
+        { backgroundColor: activeTab === 'approvals' ? dynamic.activeTabBg : dynamic.inactiveTabBg }
+      ]}
+      onPress={() => setActiveTab('approvals')}
+      activeOpacity={0.7}
+    >
+      <View style={styles.tabContent}>
+        <FontAwesome6
+          name="clipboard-check"
+          size={14}
+          color={activeTab === 'approvals' ? '#ffffff' : dynamic.textPrimary}
+        />
+        <Text
+          style={[
+            styles.tabText,
+            { color: activeTab === 'approvals' ? '#ffffff' : dynamic.textPrimary },
+          ]}
+        >
+          Approvals
+        </Text>
+        {approvalCount > 0 && (
+          <View style={[styles.badge, { backgroundColor: dynamic.approvalBadgeBg }]}>
+            <Text style={styles.badgeText}>{approvalCount}</Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+
+    <TouchableOpacity
+      style={[
+        styles.tab,
+        { backgroundColor: activeTab === 'notifications' ? dynamic.activeTabBg : dynamic.inactiveTabBg }
+      ]}
+      onPress={() => setActiveTab('notifications')}
+      activeOpacity={0.7}
+    >
+      <View style={styles.tabContent}>
+        <Feather
+          name="bell"
+          size={14}
+          color={activeTab === 'notifications' ? '#ffffff' : dynamic.textPrimary}
+        />
+        <Text
+          style={[
+            styles.tabText,
+            { color: activeTab === 'notifications' ? '#ffffff' : dynamic.textPrimary },
+          ]}
+        >
+          Notifications
+        </Text>
+        {unreadCount > 0 && (
+          <View style={[styles.badge, { backgroundColor: dynamic.badgeBg }]}>
+            <Text style={styles.badgeText}>{unreadCount}</Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+
+    {/* Animated indicator */}
+    <Animated.View
+      style={[
+        styles.tabIndicator,
+        {
+          transform: [
+            {
+              translateX: tabTranslateX.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, modalWidth / 2 - 20],
+              }),
+            },
+          ],
+          backgroundColor: dynamic.activeTabBg,
+        },
+      ]}
+    />
+  </View>
+);
+
+  // --- Approval list 
   const renderApprovalsList = () => (
     <ScrollView style={styles.notificationsList} showsVerticalScrollIndicator={false}>
       {pendingApprovals.length === 0 ? (
@@ -149,52 +293,52 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
           <View
             key={approval.id}
             style={[
-              styles.notificationItem, 
+              styles.notificationItem,
               styles.approvalItem,
-              { 
+              {
                 backgroundColor: dynamic.modalBg,
                 borderColor: colors.border,
                 shadowColor: isDark ? '#000' : '#000',
                 shadowOpacity: isDark ? 0.3 : 0.1,
-              }
+              },
             ]}
           >
-            <View style={[
-              styles.notificationIcon,
-              { 
-                backgroundColor: approval.type === 'announcement' 
-                  ? (isDark ? '#f59e0b20' : '#fef3c7') 
-                  : (isDark ? '#0ea5e920' : '#dbeafe')
-              }
-            ]}>
-              <FontAwesome6
-                name={approval.type === 'announcement' ? 'bullhorn' : 'calendar'}
-                size={18}
-                color={approval.type === 'announcement' ? '#f59e0b' : '#0ea5e9'}
-              />
-            </View>
 
             <View style={styles.approvalContent}>
               <View style={styles.notificationHeader}>
                 <Text style={[styles.notificationTitle, { color: dynamic.textPrimary }]} numberOfLines={1}>
                   {approval.title}
                 </Text>
-                <View style={[
-                  styles.typeBadge,
-                  { 
-                    backgroundColor: approval.type === 'announcement' 
-                      ? (isDark ? '#f59e0b30' : '#fef3c7') 
-                      : (isDark ? '#0ea5e930' : '#dbeafe')
-                  }
-                ]}>
-                  <Text style={[
-                    styles.typeBadgeText,
-                    { 
-                      color: approval.type === 'announcement' 
-                        ? (isDark ? '#fbbf24' : '#d97706') 
-                        : (isDark ? '#38bdf8' : '#0369a1')
-                    }
-                  ]}>
+                <View
+                  style={[
+                    styles.typeBadge,
+                    {
+                      backgroundColor:
+                        approval.type === 'announcement'
+                          ? isDark
+                            ? '#f59e0b30'
+                            : '#fef3c7'
+                          : isDark
+                          ? '#0ea5e930'
+                          : '#dbeafe',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.typeBadgeText,
+                      {
+                        color:
+                          approval.type === 'announcement'
+                            ? isDark
+                              ? '#fbbf24'
+                              : '#d97706'
+                            : isDark
+                            ? '#38bdf8'
+                            : '#0369a1',
+                      },
+                    ]}
+                  >
                     {approval.type === 'announcement' ? 'Announcement' : 'Event'}
                   </Text>
                 </View>
@@ -210,8 +354,12 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
 
               <View style={[styles.approvalActions, { borderTopColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.rejectButton, { backgroundColor: isDark ? '#ef444420' : '#fef2f2' }]}
-                  onPress={() => onReject?.(approval)}   
+                  style={[
+                    styles.actionButton,
+                    styles.rejectButton,
+                    { backgroundColor: isDark ? '#ef444420' : '#fef2f2' },
+                  ]}
+                  onPress={() => withHaptic(() => onReject?.(approval))}
                 >
                   <Feather name="x" size={14} color="#dc2626" />
                   <Text style={styles.rejectButtonText}>Reject</Text>
@@ -219,7 +367,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
 
                 <TouchableOpacity
                   style={[styles.actionButton, styles.approveButton, { backgroundColor: '#0ea5e9' }]}
-                  onPress={() => onApprove?.(approval)}
+                  onPress={() => withHaptic(() => onApprove?.(approval))}
                 >
                   <Feather name="check" size={14} color="#ffffff" />
                   <Text style={styles.approveButtonText}>Approve</Text>
@@ -232,42 +380,61 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     </ScrollView>
   );
 
-  const renderNotificationsList = () => (
-    <ScrollView style={styles.notificationsList} showsVerticalScrollIndicator={false}>
-      {notifications.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <View style={[styles.emptyIconContainer, { backgroundColor: dynamic.iconBg }]}>
-            <Feather name="bell-off" size={32} color={dynamic.textMuted} />
+
+  const renderNotificationsList = () => {
+    if (loading) {
+      return (
+        <ScrollView style={styles.notificationsList} showsVerticalScrollIndicator={false}>
+          {[1, 2, 3].map((i) => (
+            <SkeletonItem key={i} />
+          ))}
+        </ScrollView>
+      );
+    }
+
+    if (notifications.length === 0) {
+      return (
+        <ScrollView style={styles.notificationsList}>
+          <View style={styles.emptyContainer}>
+            <View style={[styles.emptyIconContainer, { backgroundColor: dynamic.iconBg }]}>
+              <Feather name="bell-off" size={32} color={dynamic.textMuted} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: dynamic.textPrimary }]}>All quiet here</Text>
+            <Text style={[styles.emptySubtitle, { color: dynamic.textSecondary }]}>
+              You'll see notifications when something new arrives.
+            </Text>
           </View>
-          <Text style={[styles.emptyTitle, { color: dynamic.textPrimary }]}>No notifications</Text>
-          <Text style={[styles.emptySubtitle, { color: dynamic.textSecondary }]}>
-            You're all caught up! Check back later for updates.
-          </Text>
-        </View>
-      ) : (
-        notifications.map((notification) => (
+        </ScrollView>
+      );
+    }
+
+    return (
+      <ScrollView
+        style={styles.notificationsList}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.accent.primary]}
+            tintColor={colors.accent.primary}
+          />
+        }
+      >
+        {notifications.map((notification) => (
           <TouchableOpacity
             key={notification.id}
             style={[
               styles.notificationItem,
-              { 
+              {
                 backgroundColor: notification.read ? dynamic.modalBg : dynamic.unreadBg,
                 borderColor: notification.read ? colors.border : dynamic.unreadBorder,
-              }
+              },
             ]}
-            onPress={() => onNotificationPress(notification)}
+            onPress={() => withHaptic(() => onNotificationPress(notification))}
             activeOpacity={0.7}
           >
-            <View style={[
-              styles.notificationIcon,
-              { backgroundColor: getNotificationColor(notification.type) + (isDark ? '30' : '15') }
-            ]}>
-              <Feather
-                name={getNotificationIcon(notification.type)}
-                size={18}
-                color={getNotificationColor(notification.type)}
-              />
-            </View>
+          
             <View style={styles.notificationContent}>
               <View style={styles.notificationHeader}>
                 <Text style={[styles.notificationTitle, { color: dynamic.textPrimary }]} numberOfLines={1}>
@@ -283,28 +450,29 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
               </Text>
             </View>
           </TouchableOpacity>
-        ))
-      )}
-    </ScrollView>
-  );
+        ))}
+      </ScrollView>
+    );
+  };
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <View style={[styles.modalOverlay, { backgroundColor: dynamic.overlay }]}>
-        <View style={[
-          styles.modalContainer, 
-          { 
-            width: modalWidth, 
-            backgroundColor: dynamic.modalBg,
-            shadowColor: isDark ? '#000' : '#000',
-            shadowOpacity: isDark ? 0.5 : 0.25,
-          }
-        ]}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <Animated.View
+        style={[styles.modalOverlay, { backgroundColor: dynamic.overlay, opacity: overlayOpacity }]}
+        {...panResponder.panHandlers}
+      >
+        <Animated.View
+          style={[
+            styles.modalContainer,
+            {
+              width: modalWidth,
+              backgroundColor: dynamic.modalBg,
+              transform: [{ translateY: slideAnim }],
+              shadowColor: isDark ? '#000' : '#000',
+              shadowOpacity: isDark ? 0.5 : 0.25,
+            },
+          ]}
+        >
           {/* Modal Header */}
           <View style={[styles.modalHeader, { borderBottomColor: dynamic.headerBorder, backgroundColor: dynamic.modalBg }]}>
             <View style={styles.headerTitleContainer}>
@@ -316,26 +484,23 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                 </View>
               )}
             </View>
-            <TouchableOpacity 
-              style={[styles.closeButton, { backgroundColor: dynamic.iconBg }]} 
-              onPress={onClose}
+            <TouchableOpacity
+              style={[styles.closeButton, { backgroundColor: dynamic.iconBg }]}
+              onPress={() => withHaptic(onClose)}
             >
               <Feather name="x" size={20} color={dynamic.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          {/* Tabs */}
+          {/* Tabs (only show if approvals exist) */}
           {(approvalCount > 0 || pendingApprovals.length > 0) && renderTabs()}
 
-          {/* Mark All Read Button (only for notifications tab) */}
+          {/* Mark All Read Button */}
           {activeTab === 'notifications' && unreadCount > 0 && (
             <View style={[styles.markAllContainer, { borderBottomColor: dynamic.headerBorder, backgroundColor: dynamic.tabBg }]}>
               <TouchableOpacity
-                style={[
-                  styles.markAllButton, 
-                  { backgroundColor: dynamic.modalBg, borderColor: colors.border }
-                ]}
-                onPress={onMarkAllRead}
+                style={[styles.markAllButton, { backgroundColor: dynamic.modalBg, borderColor: colors.border }]}
+                onPress={handleMarkAllRead}
               >
                 <Feather name="check-circle" size={16} color={colors.accent.primary} />
                 <Text style={[styles.markAllText, { color: colors.accent.primary }]}>Mark all as read</Text>
@@ -343,31 +508,71 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
             </View>
           )}
 
-          {/* Content based on active tab */}
-          {activeTab === 'approvals' ? renderApprovalsList() : renderNotificationsList()}
-        </View>
-      </View>
+          {/* Cross‑fade content container */}
+          <Animated.View
+            style={[
+              styles.contentContainer,
+              {
+                opacity: tabTranslateX.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 0],
+                }),
+                transform: [
+                  {
+                    scale: tabTranslateX.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 0.95],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            {activeTab === 'approvals' ? renderApprovalsList() : renderNotificationsList()}
+          </Animated.View>
+        </Animated.View>
+      </Animated.View>
+
+      {/* Snackbar for confirmation */}
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={2000}
+        style={{ backgroundColor: isDark ? '#1e293b' : '#fff', position: 'absolute', bottom: 20, left: 20, right: 20 }}
+      >
+        <Text style={{ color: dynamic.textPrimary }}>All notifications marked as read</Text>
+      </Snackbar>
     </Modal>
   );
 };
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
-    case 'event': return 'calendar';
-    case 'announcement': return 'bell';
-    case 'attendance': return 'check-square';
-    case 'user': return 'user-plus';
-    default: return 'bell';
+    case 'event':
+      return 'calendar';
+    case 'announcement':
+      return 'bell';
+    case 'attendance':
+      return 'check-square';
+    case 'user':
+      return 'user-plus';
+    default:
+      return 'bell';
   }
 };
 
 const getNotificationColor = (type: string) => {
   switch (type) {
-    case 'event': return '#0ea5e9';
-    case 'announcement': return '#f59e0b';
-    case 'attendance': return '#10b981';
-    case 'user': return '#8b5cf6';
-    default: return '#64748b';
+    case 'event':
+      return '#0ea5e9';
+    case 'announcement':
+      return '#f59e0b';
+    case 'attendance':
+      return '#10b981';
+    case 'user':
+      return '#8b5cf6';
+    default:
+      return '#64748b';
   }
 };
 
@@ -391,7 +596,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    borderRadius: 24,
+    borderRadius: 28,
     maxHeight: '85%',
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 24,
@@ -411,8 +616,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
+    letterSpacing: -0.3,
   },
   unreadBadge: {
     borderRadius: 12,
@@ -438,12 +644,17 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 8,
     borderBottomWidth: 1,
+    position: 'relative',
   },
   tab: {
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 12,
+    alignItems: 'center',
+  },
+  activeTab: {
+    backgroundColor: 'transparent',
   },
   tabContent: {
     flexDirection: 'row',
@@ -454,6 +665,14 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    height: 3,
+    width: '50%', 
+    borderRadius: 3,
+    marginBottom: -1,
   },
   badge: {
     borderRadius: 10,
@@ -488,15 +707,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  contentContainer: {
+    flex: 1,
+  },
   notificationsList: {
     padding: 16,
     maxHeight: 500,
   },
   notificationItem: {
     flexDirection: 'row',
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 8,
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 12,
     borderWidth: 1,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
@@ -613,6 +835,28 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 18,
+  },
+
+  skeletonItem: {
+    flexDirection: 'row',
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 12,
+    backgroundColor: '#f1f5f9',
+  },
+  skeletonIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    marginRight: 12,
+  },
+  skeletonContent: {
+    flex: 1,
+  },
+  skeletonLine: {
+    height: 14,
+    borderRadius: 4,
+    backgroundColor: '#e2e8f0',
   },
 });
 

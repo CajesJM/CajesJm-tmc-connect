@@ -1,4 +1,4 @@
-import { Feather, FontAwesome6, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Feather, FontAwesome6 } from '@expo/vector-icons';
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -597,32 +597,7 @@ export default function MainAdminAnnouncements() {
         </View>
       </LinearGradient>
 
-      {/* Stats Grid */}
-      <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
-            <Ionicons name="document-text" size={isMobile ? 16 : 20} color={colors.accent.primary} />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total</Text>
-        </View>
-
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#10b98115' }]}>
-            <Feather name="sun" size={isMobile ? 16 : 20} color="#10b981" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.today}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Today</Text>
-        </View>
-
-        <View style={[styles.statCard, isMobile && styles.statCardMobile]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#f59e0b15' }]}>
-            <MaterialIcons name="priority-high" size={isMobile ? 16 : 20} color="#ef4444" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.urgent}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Urgent</Text>
-        </View>
-      </View>
+      
 
       {/* Main Content Grid */}
       <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>

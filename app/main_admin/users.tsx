@@ -629,56 +629,141 @@ export default function UserManagement() {
   }, [users]);
 
   const renderPaginatedItem = ({ item, index }: { item: User; index: number }) => {
-    const isActive = selectedUserId === item.id;
-    const roleColor = getRoleColor(item.role);
-    const isCurrentUser = item.email === userData?.email;
+  const isActive = selectedUserId === item.id;
+  const roleColor = getRoleColor(item.role);
+  const isCurrentUser = item.email === userData?.email;
 
-    return (
-      <TouchableOpacity
-        style={[
-          styles.paginatedItem,
-          isActive && styles.paginatedItemActive,
-          isMobile && styles.paginatedItemMobile,
-          !item.active && { opacity: 0.6 }
-        ]}
-        onPress={() => setSelectedUserId(item.id)}
-      >
-        <View style={[styles.paginatedNumber, { backgroundColor: `${roleColor}15` }]}>
-          <Text style={[styles.paginatedNumberText, { color: roleColor }]}>
-            {(currentPage - 1) * itemsPerPage + index + 1}
+  return (
+    <TouchableOpacity
+      style={[
+        styles.paginatedItem,
+        isActive && styles.paginatedItemActive,
+        isMobile && styles.paginatedItemMobile,
+        !item.active && { opacity: 0.6 }
+      ]}
+      onPress={() => setSelectedUserId(item.id)}
+    >
+      <View style={[styles.paginatedNumber, { backgroundColor: `${roleColor}15` }]}>
+        <Text style={[styles.paginatedNumberText, { color: roleColor }]}>
+          {(currentPage - 1) * itemsPerPage + index + 1}
+        </Text>
+      </View>
+      <View style={styles.paginatedInfo}>
+        {/* Row 1: Name + Inactive Badge (badge on the right) */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={[styles.paginatedName, isMobile && styles.paginatedNameMobile]} numberOfLines={1}>
+            {item.name}
+          </Text>
+          {!item.active && (
+            <View style={styles.inactiveBadge}>
+              <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Row 2: Email + Role Badge (badge on the right) */}
+        <View style={[styles.paginatedMeta, { justifyContent: 'space-between' }]}>
+          <Text style={[styles.paginatedEmail, isMobile && styles.paginatedEmailMobile]}>
+            {item.email}
+          </Text>
+          <View style={[styles.paginatedBadge, { backgroundColor: getRoleBgColor(item.role) }]}>
+            <Text style={[styles.paginatedBadgeText, { color: roleColor }]}>
+              {item.role.replace('_', ' ').toUpperCase()}
+            </Text>
+          </View>
+        </View>
+
+        {/* Row 3: Username */}
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Feather name="at-sign" size={8} color={colors.accent.primary} />
+          <Text style={[styles.paginatedUsername, { marginLeft: 4 }]} numberOfLines={1}>
+            {item.username}
           </Text>
         </View>
-        <View style={styles.paginatedInfo}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={[styles.paginatedName, isMobile && styles.paginatedNameMobile]} numberOfLines={1}>
-              {item.name}
-            </Text>
+      </View>
+      <View style={styles.paginatedActions}>
+        {/* action buttons unchanged */}
+        <TouchableOpacity
+          style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
+          onPress={() => {
+            setSelectedUser(item);
+            setShowEditModal(true);
+          }}
+        >
+          <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
+        </TouchableOpacity>
+        {!isCurrentUser && (
+          <>
+            <TouchableOpacity
+              style={[
+                styles.paginatedStatusButton,
+                { backgroundColor: item.active ? '#fff7ed' : '#e6f7e6' },
+                isMobile && styles.paginatedStatusButtonMobile
+              ]}
+              onPress={() => handleToggleActive(item)}
+            >
+              <Feather
+                name={item.active ? "user-x" : "user-check"}
+                size={isMobile ? 12 : 14}
+                color={item.active ? "#ef4444" : "#10b981"}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
+              onPress={() => handleDeleteUser(item.id, item.name)}
+            >
+              <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+  const renderSearchResultItem = ({ item }: { item: User }) => {
+  const roleColor = getRoleColor(item.role);
+  const isCurrentUser = item.email === userData?.email;
+
+  return (
+    <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile]}>
+      <View style={styles.searchResultHeader}>
+        {/* Title row: name on left, badges on right */}
+        <View style={[styles.searchResultTitleContainer, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+          <Text style={[styles.searchResultTitle, isMobile && styles.searchResultTitleMobile]} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <View style={styles.searchResultBadges}>
             {!item.active && (
-              <View style={styles.inactiveBadge}>
-                <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
+              <View style={[styles.searchResultBadge, { backgroundColor: colors.sidebar.text.muted }]}>
+                <Text style={styles.searchResultBadgeText}>INACTIVE</Text>
               </View>
             )}
-          </View>
-          <View style={styles.paginatedMeta}>
-            <Text style={[styles.paginatedEmail, isMobile && styles.paginatedEmailMobile]}>
-              {item.email}
-            </Text>
-            <View style={[styles.paginatedBadge, { backgroundColor: getRoleBgColor(item.role) }]}>
-              <Text style={[styles.paginatedBadgeText, { color: roleColor }]}>
+            <View style={[styles.searchResultBadge, { backgroundColor: getRoleBgColor(item.role) }]}>
+              <Text style={[styles.searchResultBadgeText, { color: roleColor }]}>
                 {item.role.replace('_', ' ').toUpperCase()}
               </Text>
             </View>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Feather name="at-sign" size={8} color={colors.accent.primary} />
-            <Text style={[styles.paginatedUsername, { marginLeft: 4 }]} numberOfLines={1}>
-              {item.username}
+        </View>
+
+        {/* Email and matched student ID indicator (unchanged) */}
+        <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile]}>
+          {item.email}
+        </Text>
+        {searchQuery && item.studentID && item.studentID.toLowerCase().includes(searchQuery.toLowerCase()) && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <Feather name="hash" size={10} color="#10b981" />
+            <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile, { color: '#10b981', fontWeight: '600', marginLeft: 4 }]}>
+              ID: {item.studentID} (matched)
             </Text>
           </View>
-        </View>
-        <View style={styles.paginatedActions}>
+        )}
+
+        {/* Action buttons (unchanged) */}
+        <View style={styles.searchResultActions}>
           <TouchableOpacity
-            style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
+            style={[styles.searchResultEditButton, isMobile && styles.searchResultEditButtonMobile]}
             onPress={() => {
               setSelectedUser(item);
               setShowEditModal(true);
@@ -690,9 +775,9 @@ export default function UserManagement() {
             <>
               <TouchableOpacity
                 style={[
-                  styles.paginatedStatusButton,
+                  styles.searchResultStatusButton,
                   { backgroundColor: item.active ? '#fff7ed' : '#e6f7e6' },
-                  isMobile && styles.paginatedStatusButtonMobile
+                  isMobile && styles.searchResultStatusButtonMobile
                 ]}
                 onPress={() => handleToggleActive(item)}
               >
@@ -703,7 +788,7 @@ export default function UserManagement() {
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
+                style={[styles.searchResultDeleteButton, isMobile && styles.searchResultDeleteButtonMobile]}
                 onPress={() => handleDeleteUser(item.id, item.name)}
               >
                 <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
@@ -711,103 +796,30 @@ export default function UserManagement() {
             </>
           )}
         </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderSearchResultItem = ({ item }: { item: User }) => {
-    const roleColor = getRoleColor(item.role);
-    const isCurrentUser = item.email === userData?.email;
-
-    return (
-      <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile]}>
-        <View style={styles.searchResultHeader}>
-          <View style={styles.searchResultTitleContainer}>
-            <Text style={[styles.searchResultTitle, isMobile && styles.searchResultTitleMobile]} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <View style={styles.searchResultBadges}>
-              {!item.active && (
-                <View style={[styles.searchResultBadge, { backgroundColor: colors.sidebar.text.muted }]}>
-                  <Text style={styles.searchResultBadgeText}>INACTIVE</Text>
-                </View>
-              )}
-              <View style={[styles.searchResultBadge, { backgroundColor: getRoleBgColor(item.role) }]}>
-                <Text style={[styles.searchResultBadgeText, { color: roleColor }]}>
-                  {item.role.replace('_', ' ').toUpperCase()}
-                </Text>
-              </View>
-            </View>
-            {searchQuery && item.studentID && item.studentID.toLowerCase().includes(searchQuery.toLowerCase()) && (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Feather name="hash" size={10} color="#10b981" />
-                <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile, { color: '#10b981', fontWeight: '600', marginLeft: 4 }]}>
-                  ID: {item.studentID} (matched)
-                </Text>
-              </View>
-            )}
-          </View>
-          <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile]}>
-            {item.email}
-          </Text>
-          <View style={styles.searchResultActions}>
-            <TouchableOpacity
-              style={[styles.searchResultEditButton, isMobile && styles.searchResultEditButtonMobile]}
-              onPress={() => {
-                setSelectedUser(item);
-                setShowEditModal(true);
-              }}
-            >
-              <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
-            </TouchableOpacity>
-            {!isCurrentUser && (
-              <>
-                <TouchableOpacity
-                  style={[
-                    styles.searchResultStatusButton,
-                    { backgroundColor: item.active ? '#fff7ed' : '#e6f7e6' },
-                    isMobile && styles.searchResultStatusButtonMobile
-                  ]}
-                  onPress={() => handleToggleActive(item)}
-                >
-                  <Feather
-                    name={item.active ? "user-x" : "user-check"}
-                    size={isMobile ? 12 : 14}
-                    color={item.active ? "#ef4444" : "#10b981"}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.searchResultDeleteButton, isMobile && styles.searchResultDeleteButtonMobile]}
-                  onPress={() => handleDeleteUser(item.id, item.name)}
-                >
-                  <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.searchResultFooter}>
-          <View style={styles.searchResultRole}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Feather name="at-sign" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
-              <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile, { marginLeft: 4 }]}>
-                {item.username}
-              </Text>
-            </View>
-          </View>
-          {item.studentID && (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Feather name="hash" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
-              <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile, { marginLeft: 4 }]}>
-                {item.studentID}
-              </Text>
-            </View>
-          )}
-        </View>
       </View>
-    );
-  };
+
+      {/* Footer (username and student ID) unchanged */}
+      <View style={styles.searchResultFooter}>
+        <View style={styles.searchResultRole}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Feather name="at-sign" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
+            <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile, { marginLeft: 4 }]}>
+              {item.username}
+            </Text>
+          </View>
+        </View>
+        {item.studentID && (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Feather name="hash" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
+            <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile, { marginLeft: 4 }]}>
+              {item.studentID}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
 
   const renderSelectedDetail = (selected: User) => {
     const roleColor = getRoleColor(selected.role);
@@ -1043,7 +1055,8 @@ export default function UserManagement() {
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
               style={{ flex: 1 }}
             >
-              <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+              <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
+              showsVerticalScrollIndicator={false}>
                 <View style={styles.modernFormGroup}>
                   <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Full Name *</Text>
                   <FormTextInput
@@ -1366,41 +1379,6 @@ export default function UserManagement() {
         </View>
       </LinearGradient>
 
-      {/* Stats Grid */}
-      <View style={[styles.statsGrid, isMobile && styles.statsGridMobile]}>
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: colors.accent.primary }]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile]}>
-            <Feather name="users" size={isMobile ? 16 : 20} color={colors.accent.primary} />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.total}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Total Users</Text>
-        </View>
-
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#1d4ed8' }]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#dbeafe' }]}>
-            <Feather name="shield" size={isMobile ? 16 : 20} color="#1d4ed8" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.mainAdmins}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Main Admins</Text>
-        </View>
-
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#7c3aed' }]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#ede9fe' }]}>
-            <Feather name="user-check" size={isMobile ? 16 : 20} color="#7c3aed" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.assistantAdmins}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Assistant Admins</Text>
-        </View>
-
-        <View style={[styles.statCard, isMobile && styles.statCardMobile, { borderLeftColor: '#15803d' }]}>
-          <View style={[styles.statIconContainer, isMobile && styles.statIconContainerMobile, { backgroundColor: '#dcfce7' }]}>
-            <Feather name="book" size={isMobile ? 16 : 20} color="#15803d" />
-          </View>
-          <Text style={[styles.statNumber, isMobile && styles.statNumberMobile]}>{stats.students}</Text>
-          <Text style={[styles.statLabel, isMobile && styles.statLabelMobile]}>Students</Text>
-        </View>
-      </View>
-
       {/* Main Content Grid */}
       <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
         {/* Left Grid - Paginated Users */}
@@ -1492,7 +1470,7 @@ export default function UserManagement() {
                   keyExtractor={(item) => item.id}
                   renderItem={renderPaginatedItem}
                   style={styles.paginatedList}
-                  showsVerticalScrollIndicator={true}
+                  showsVerticalScrollIndicator={false}
                   ListEmptyComponent={
                     <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
                       <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
@@ -1615,7 +1593,8 @@ export default function UserManagement() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
+            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
+            showsVerticalScrollIndicator={false}>
               {selectedUserId && renderSelectedDetail(
                 users.find(u => u.id === selectedUserId)!
               )}

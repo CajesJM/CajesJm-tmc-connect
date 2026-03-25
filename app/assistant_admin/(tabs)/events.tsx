@@ -1,4 +1,4 @@
-import { Feather, FontAwesome6, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Feather, FontAwesome6 } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -38,8 +38,9 @@ import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { CAMPUS_LOCATIONS, CampusLocation } from '../../../constants/campusLocations';
 import { useAuth } from '../../../context/AuthContext';
+import { useTheme } from '../../../context/ThemeContext';
 import { db } from '../../../lib/firebaseConfig';
-import { assistantEventsStyles as styles } from '../../../styles/assistant-admin/eventStyles';
+import { createAssistantEventsStyles } from '../../../styles/assistant-admin/eventStyles';
 
 dayjs.extend(relativeTime);
 
@@ -59,23 +60,25 @@ interface Event {
     longitude: number;
     radius: number;
   };
-  // Approval fields
   status?: 'pending' | 'approved' | 'rejected';
   createdBy?: string;
   createdByName?: string;
 }
 
-interface CoordinatesState {
-  latitude: string;
-  longitude: string;
-  radius: string;
-}
-
 export default function AssistantAdminEvents() {
+  const { width } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
+  const isMobile = width < 640;
+  const isTablet = width >= 640 && width < 1024;
+  const isDesktop = width >= 1024;
+
+  const styles = useMemo(
+    () => createAssistantEventsStyles(colors, isDark, isMobile, isTablet, isDesktop),
+    [colors, isDark, isMobile, isTablet, isDesktop]
+  );
+
   const { user, userData } = useAuth();
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const isSmall = width < 375;
 
   // Data state
   const [events, setEvents] = useState<Event[]>([]);
@@ -95,6 +98,8 @@ export default function AssistantAdminEvents() {
   const [locationDescription, setLocationDescription] = useState('');
   const [selectedCampusId, setSelectedCampusId] = useState<string | null>(null);
   const [coordinates, setCoordinates] = useState<Event['coordinates']>();
+  const [descriptionLength, setDescriptionLength] = useState(0);
+  const [showCharWarning, setShowCharWarning] = useState(false);
 
   // Date picker
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
@@ -110,8 +115,7 @@ export default function AssistantAdminEvents() {
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [selectedCampusLocation, setSelectedCampusLocation] = useState<CampusLocation | null>(null);
 
-  // Filter & search
-  const [activeFilter, setActiveFilter] = useState<'all' | 'upcoming' | 'past'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'upcoming' | 'past' | 'today'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Pagination
@@ -123,6 +127,7 @@ export default function AssistantAdminEvents() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [distance, setDistance] = useState<number | null>(null);
   const [isWithinRange, setIsWithinRange] = useState<boolean | null>(null);
+
   // --- Firestore listener ---
   useEffect(() => {
     const q = query(collection(db, 'events'), orderBy('date', 'desc'));
@@ -161,10 +166,13 @@ export default function AssistantAdminEvents() {
     return () => unsubscribe();
   }, []);
 
-  // Filtering and search
   useEffect(() => {
     let filtered = [...events];
     const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
 
     switch (activeFilter) {
       case 'upcoming':
@@ -172,6 +180,13 @@ export default function AssistantAdminEvents() {
         break;
       case 'past':
         filtered = filtered.filter((e) => e.date <= now);
+        break;
+      case 'today':
+        filtered = filtered.filter((e) => {
+          const eventDate = new Date(e.date);
+          eventDate.setHours(0, 0, 0, 0);
+          return eventDate >= today && eventDate < tomorrow;
+        });
         break;
     }
 
@@ -191,7 +206,6 @@ export default function AssistantAdminEvents() {
 
   useEffect(() => {
     if (showDetailModal) {
-      // Reset location check when opening a new event detail
       setDistance(null);
       setUserLocation(null);
       setIsWithinRange(null);
@@ -263,7 +277,7 @@ export default function AssistantAdminEvents() {
     }
   };
 
-  const openLocationInMaps = async (location: string, coordinates?: { latitude: number, longitude: number }) => {
+  const openLocationInMaps = async (location: string, coordinates?: { latitude: number; longitude: number }) => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       let origin = '';
@@ -303,6 +317,7 @@ export default function AssistantAdminEvents() {
       Alert.alert('Error', 'Could not open maps application');
     }
   };
+
   // Pagination
   const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
   const paginatedEvents = filteredEvents.slice(
@@ -342,7 +357,6 @@ export default function AssistantAdminEvents() {
     hideDatePicker();
   };
 
-  // Web date input
   const handleWebDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (!value) return;
@@ -361,10 +375,11 @@ export default function AssistantAdminEvents() {
   const handleSelectCampusImage = (loc: CampusLocation) => {
     setSelectedCampusLocation(loc);
     setSelectedCampusId(loc.id);
-    setLocation(loc.name); // Always update location to campus name
+    setLocation(loc.name);
     setShowImagePicker(false);
     setTimeout(() => setShowLocationPicker(true), 100);
   };
+
   const getCurrentLocation = async () => {
     try {
       setLocationLoading(true);
@@ -474,7 +489,7 @@ export default function AssistantAdminEvents() {
         locationDescription: locationDescription.trim() || '',
         locationImage: selectedCampusId || '',
         coordinates: coordinates || null,
-        status: 'pending', // requires re‑approval after edit
+        status: 'pending',
         updatedAt: serverTimestamp(),
       });
       resetForm();
@@ -569,22 +584,31 @@ export default function AssistantAdminEvents() {
   };
 
   // --- Render card ---
-  const renderEventCard = ({ item }: { item: Event }) => {
+  const renderEventCard = ({ item, index }: { item: Event; index: number }) => {
     const status = getStatusBadge(item.status);
     const days = getDaysUntilEvent(item.date);
     const imageSource = getLocationImage(item);
+    const globalNumber = (currentPage - 1) * itemsPerPage + index + 1;
 
     return (
       <TouchableOpacity
-        style={[styles.card, item.status === 'pending' && styles.cardPending]}
+        style={styles.card}
         onPress={() => {
           setSelectedEvent(item);
           setShowDetailModal(true);
         }}
         activeOpacity={0.7}
       >
+
         <View style={styles.cardLeft}>
-          <Image source={imageSource} style={styles.cardImage} />
+          <View style={styles.cardImageContainer}>
+            <Image source={imageSource} style={styles.cardImage} />
+            <View style={styles.cardNumberContainer}>
+              <View style={styles.cardNumberBadge}>
+                <Text style={styles.cardNumberText}>{globalNumber}</Text>
+              </View>
+            </View>
+          </View>
         </View>
         <View style={styles.cardContent}>
           <View style={styles.cardHeaderRow}>
@@ -602,14 +626,14 @@ export default function AssistantAdminEvents() {
           </View>
 
           <View style={styles.cardInfoRow}>
-            <Feather name="calendar" size={12} color="#64748b" />
+            <Feather name="calendar" size={12} color={colors.sidebar.text.muted} />
             <Text style={styles.cardInfoText}>
               {dayjs(item.date).format('MMM D, YYYY • h:mm A')}
             </Text>
           </View>
 
           <View style={styles.cardInfoRow}>
-            <Feather name="map-pin" size={12} color="#64748b" />
+            <Feather name="map-pin" size={12} color={colors.sidebar.text.muted} />
             <Text style={styles.cardInfoText} numberOfLines={1}>
               {item.location}
             </Text>
@@ -619,18 +643,18 @@ export default function AssistantAdminEvents() {
             <Text style={styles.cardDescription} numberOfLines={2}>
               {item.description}
             </Text>
-            <View style={styles.cardActions}>
+            <View style={styles.cardActionsRow}>
               <TouchableOpacity
-                style={styles.cardActionButton}
+                style={styles.cardActionButtonSmall}
                 onPress={() => handleEditStart(item)}
               >
-                <Feather name="edit-2" size={14} color="#3b82f6" />
+                <Feather name="edit-2" size={14} color={colors.accent.primary} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.cardActionButton, styles.cardActionDanger]}
+                style={[styles.cardActionButtonSmall, styles.cardActionButtonDangerSmall]}
                 onPress={() => handleDeleteEvent(item.id, item.title)}
               >
-                <Feather name="trash-2" size={14} color="#ef4444" />
+                <Feather name="trash-2" size={14} color={colors.error || '#ef4444'} />
               </TouchableOpacity>
             </View>
           </View>
@@ -642,7 +666,7 @@ export default function AssistantAdminEvents() {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <View style={styles.emptyStateIcon}>
-        <FontAwesome6 name="calendar" size={40} color="#cbd5e1" />
+        <FontAwesome6 name="calendar" size={40} color={colors.sidebar.text.muted} />
       </View>
       <Text style={styles.emptyStateTitle}>No events found</Text>
       <Text style={styles.emptyStateText}>
@@ -660,7 +684,7 @@ export default function AssistantAdminEvents() {
           onPress={goToPreviousPage}
           disabled={currentPage === 1}
         >
-          <Feather name="chevron-left" size={18} color={currentPage === 1 ? '#cbd5e1' : '#0f172a'} />
+          <Feather name="chevron-left" size={18} color={currentPage === 1 ? colors.sidebar.text.muted : colors.text} />
           <Text style={[styles.paginationText, currentPage === 1 && styles.paginationTextDisabled]}>Prev</Text>
         </TouchableOpacity>
         <Text style={styles.paginationPageInfo}>
@@ -672,23 +696,35 @@ export default function AssistantAdminEvents() {
           disabled={currentPage === totalPages}
         >
           <Text style={[styles.paginationText, currentPage === totalPages && styles.paginationTextDisabled]}>Next</Text>
-          <Feather name="chevron-right" size={18} color={currentPage === totalPages ? '#cbd5e1' : '#0f172a'} />
+          <Feather name="chevron-right" size={18} color={currentPage === totalPages ? colors.sidebar.text.muted : colors.text} />
         </TouchableOpacity>
       </View>
     );
   };
 
+  const headerGradientColors = isDark
+    ? ['#0f172a', '#1e293b'] as const
+    : ['#1e40af', '#3b82f6'] as const;
+
   return (
     <View style={styles.container}>
       {/* Header */}
-      <LinearGradient colors={['#14203d', '#06080b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+      <LinearGradient
+        colors={headerGradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>Welcome back,</Text>
             <Text style={styles.userName}>{userData?.name || 'Assistant'}</Text>
             <Text style={styles.role}>Assistant Admin</Text>
           </View>
-          <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/assistant_admin/profile')}>
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={() => router.push('/assistant_admin/profile')}
+          >
             {userData?.photoURL ? (
               <Image source={{ uri: userData.photoURL }} style={styles.profileImage} />
             ) : (
@@ -704,7 +740,7 @@ export default function AssistantAdminEvents() {
           <View style={styles.dateContainer}>
             <Feather name="calendar" size={12} color="#94a3b8" />
             <Text style={styles.dateText}>
-             {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </Text>
           </View>
           <TouchableOpacity style={styles.addButton} onPress={() => setShowCreateForm(true)}>
@@ -715,23 +751,30 @@ export default function AssistantAdminEvents() {
       </LinearGradient>
 
       {/* Stats Row */}
+      {/*
       <View style={styles.statsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
-          <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
-            <View style={[styles.statIcon, { backgroundColor: '#0ea5e915' }]}>
-              <Ionicons name="calendar" size={18} color="#0ea5e9" />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.statsScroll}
+        >
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: `${colors.accent.primary}15` }]}>
+              <Ionicons name="calendar" size={18} color={colors.accent.primary} />
             </View>
             <Text style={styles.statNumber}>{stats.total}</Text>
             <Text style={styles.statLabel}>Total</Text>
           </View>
-          <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+
+          <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: '#f59e0b15' }]}>
               <Feather name="clock" size={18} color="#f59e0b" />
             </View>
             <Text style={styles.statNumber}>{stats.upcoming}</Text>
             <Text style={styles.statLabel}>Upcoming</Text>
           </View>
-          <View style={[styles.statCard, { borderRightWidth: 3, borderRightColor: '#1266d4' }]}>
+
+          <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: '#f59e0b15' }]}>
               <MaterialIcons name="pending" size={18} color="#f59e0b" />
             </View>
@@ -740,21 +783,21 @@ export default function AssistantAdminEvents() {
           </View>
         </ScrollView>
       </View>
-
+    */}
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <View style={styles.searchBar}>
-          <Feather name="search" size={18} color="#64748b" />
+          <Feather name="search" size={18} color={colors.sidebar.text.muted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search events..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.sidebar.text.muted}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClear}>
-              <Feather name="x" size={18} color="#64748b" />
+              <Feather name="x" size={18} color={colors.sidebar.text.muted} />
             </TouchableOpacity>
           )}
         </View>
@@ -762,19 +805,37 @@ export default function AssistantAdminEvents() {
 
       {/* Filter Chips */}
       <View style={styles.filterSection}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-          {(['all', 'upcoming', 'past'] as const).map((filter) => (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScroll}
+        >
+          {(['all', 'upcoming', 'past', 'today'] as const).map((filter) => (
             <TouchableOpacity
               key={filter}
-              style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
+              style={[
+                styles.filterChip,
+                activeFilter === filter && styles.filterChipActive
+              ]}
               onPress={() => setActiveFilter(filter)}
             >
-              <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              <Text style={[
+                styles.filterChipText,
+                activeFilter === filter && styles.filterChipTextActive
+              ]}>
+                {filter === 'today' ? 'Today' : filter.charAt(0).toUpperCase() + filter.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
+      </View>
+      {/* Results info */}
+      <View style={styles.resultsInfo}>
+        <Text style={styles.resultsText}>
+          {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
+          {activeFilter !== 'all' && ` from ${activeFilter}`}
+          {searchQuery ? ` matching "${searchQuery}"` : ''}
+        </Text>
       </View>
 
       <FlatList
@@ -790,7 +851,7 @@ export default function AssistantAdminEvents() {
               setRefreshing(true);
               setTimeout(() => setRefreshing(false), 2000);
             }}
-            colors={['#0ea5e9']}
+            colors={[colors.accent.primary]}
           />
         }
         ListEmptyComponent={renderEmptyState}
@@ -805,7 +866,7 @@ export default function AssistantAdminEvents() {
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
                 <View style={styles.modalIconContainer}>
-                  <FontAwesome6 name={editingId ? 'pen-to-square' : 'calendar'} size={20} color="#0ea5e9" />
+                  <FontAwesome6 name={editingId ? 'pen-to-square' : 'calendar'} size={20} color={colors.accent.primary} />
                 </View>
                 <View>
                   <Text style={styles.modalTitle}>{editingId ? 'Edit Event' : 'New Event'}</Text>
@@ -815,7 +876,7 @@ export default function AssistantAdminEvents() {
                 </View>
               </View>
               <TouchableOpacity onPress={resetForm} style={styles.modalClose}>
-                <Feather name="x" size={24} color="#64748b" />
+                <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
 
@@ -847,6 +908,7 @@ export default function AssistantAdminEvents() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Enter event title"
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={title}
                   onChangeText={setTitle}
                 />
@@ -856,13 +918,46 @@ export default function AssistantAdminEvents() {
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Description *</Text>
                 <TextInput
-                  style={[styles.formInput, styles.formTextArea]}
+                  style={[
+                    styles.formInput,
+                    styles.formTextArea,
+                    showCharWarning && styles.inputWarning
+                  ]}
                   placeholder="Describe the event..."
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={description}
-                  onChangeText={setDescription}
+                  onChangeText={(text) => {
+                    if (text.length <= 500) {
+                      setDescription(text);
+                      setDescriptionLength(text.length);
+                      setShowCharWarning(text.length >= 450);
+                    }
+                  }}
                   multiline
                   numberOfLines={4}
+                  maxLength={500}
                 />
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: 4
+                }}>
+                  <Text style={{
+                    fontSize: 11,
+                    color: descriptionLength >= 450 ? '#f59e0b' : colors.sidebar.text.muted,
+                  }}>
+                    {descriptionLength >= 450 && descriptionLength < 500 ? '⚠️ Approaching limit' : ''}
+                    {descriptionLength === 500 ? '⚠️ Maximum characters reached' : ''}
+                  </Text>
+                  <Text style={{
+                    fontSize: 12,
+                    color: descriptionLength >= 450 ? '#ef4444' : colors.sidebar.text.muted,
+                    fontWeight: descriptionLength >= 450 ? 'bold' : 'normal'
+                  }}>
+                    {descriptionLength}/500 characters
+                  </Text>
+                </View>
               </View>
 
               {/* Date & Time */}
@@ -879,9 +974,9 @@ export default function AssistantAdminEvents() {
                       padding: '12px',
                       fontSize: '16px',
                       borderRadius: '12px',
-                      border: '1px solid #e2e8f0',
-                      backgroundColor: '#f8fafc',
-                      color: '#1e293b',
+                      border: `1px solid ${colors.border}`,
+                      backgroundColor: colors.border,
+                      color: colors.text,
                       fontFamily: 'inherit',
                       outline: 'none',
                     }}
@@ -889,7 +984,7 @@ export default function AssistantAdminEvents() {
                 ) : (
                   <>
                     <TouchableOpacity style={styles.datePickerButton} onPress={showDatePicker}>
-                      <Feather name="calendar" size={18} color="#0ea5e9" />
+                      <Feather name="calendar" size={18} color={colors.accent.primary} />
                       <Text style={styles.datePickerText}>{dayjs(date).format('MMM D, YYYY • h:mm A')}</Text>
                     </TouchableOpacity>
                     <DateTimePickerModal
@@ -908,7 +1003,7 @@ export default function AssistantAdminEvents() {
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Location *</Text>
                 <TouchableOpacity style={styles.locationPickerButton} onPress={() => setShowLocationPicker(true)}>
-                  <Feather name="map-pin" size={18} color="#0ea5e9" />
+                  <Feather name="map-pin" size={18} color={colors.accent.primary} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.locationPickerTitle}>
                       {location || 'Set location'}
@@ -966,7 +1061,7 @@ export default function AssistantAdminEvents() {
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
                 <View style={styles.modalIconContainer}>
-                  <Feather name="map-pin" size={20} color="#0ea5e9" />
+                  <Feather name="map-pin" size={20} color={colors.accent.primary} />
                 </View>
                 <View>
                   <Text style={styles.modalTitle}>Location Details</Text>
@@ -974,7 +1069,7 @@ export default function AssistantAdminEvents() {
                 </View>
               </View>
               <TouchableOpacity onPress={() => setShowLocationPicker(false)} style={styles.modalClose}>
-                <Feather name="x" size={24} color="#64748b" />
+                <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
             <View style={styles.modalContent}>
@@ -983,6 +1078,7 @@ export default function AssistantAdminEvents() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="e.g., Main Hall, Library, etc."
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={location}
                   onChangeText={setLocation}
                 />
@@ -992,6 +1088,7 @@ export default function AssistantAdminEvents() {
                 <TextInput
                   style={[styles.formInput, styles.formTextArea]}
                   placeholder="Describe the venue..."
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={locationDescription}
                   onChangeText={setLocationDescription}
                   multiline
@@ -1034,7 +1131,7 @@ export default function AssistantAdminEvents() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Choose Campus Location</Text>
               <TouchableOpacity onPress={() => setShowImagePicker(false)} style={styles.modalClose}>
-                <Feather name="x" size={24} color="#64748b" />
+                <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -1050,7 +1147,7 @@ export default function AssistantAdminEvents() {
                     <Text style={styles.locationOptionName}>{item.name}</Text>
                     {item.description && <Text style={styles.locationOptionDescription}>{item.description}</Text>}
                   </View>
-                  {selectedCampusId === item.id && <Icon name="check-circle" size={24} color="#0ea5e9" />}
+                  {selectedCampusId === item.id && <Icon name="check-circle" size={24} color={colors.accent.primary} />}
                 </TouchableOpacity>
               )}
               contentContainerStyle={{ padding: 20 }}
@@ -1074,30 +1171,30 @@ export default function AssistantAdminEvents() {
                 </View>
               </View>
               <TouchableOpacity onPress={() => setShowCoordinatesModal(false)} style={styles.modalClose}>
-                <Feather name="x" size={24} color="#64748b" />
+                <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalContent}>
               <TouchableOpacity style={styles.coordinatesAction} onPress={getCurrentLocation} disabled={locationLoading}>
-                <Feather name="crosshair" size={18} color="#0ea5e9" />
-                <Text style={{ flex: 1 }}>{locationLoading ? 'Getting location...' : 'Use current location'}</Text>
-                {locationLoading && <ActivityIndicator size="small" color="#0ea5e9" />}
+                <Feather name="crosshair" size={18} color={colors.accent.primary} />
+                <Text style={{ flex: 1, color: colors.text }}>{locationLoading ? 'Getting location...' : 'Use current location'}</Text>
+                {locationLoading && <ActivityIndicator size="small" color={colors.accent.primary} />}
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.coordinatesAction} onPress={openWebMap}>
                 <Feather name="globe" size={18} color="#10b981" />
-                <Text style={{ flex: 1 }}>Open Google Maps</Text>
+                <Text style={{ flex: 1, color: colors.text }}>Open Google Maps</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.coordinatesAction} onPress={() => setShowManualCoordinates(true)}>
-                <Feather name="type" size={18} color="#64748b" />
-                <Text style={{ flex: 1 }}>Enter coordinates manually</Text>
+                <Feather name="type" size={18} color={colors.sidebar.text.muted} />
+                <Text style={{ flex: 1, color: colors.text }}>Enter coordinates manually</Text>
               </TouchableOpacity>
 
               {(coordLat || coordLng) && (
                 <View style={styles.coordinatesDisplay}>
-                  <Text>Lat: {coordLat || '—'}</Text>
-                  <Text>Lng: {coordLng || '—'}</Text>
+                  <Text style={{ color: colors.text }}>Lat: {coordLat || '—'}</Text>
+                  <Text style={{ color: colors.text }}>Lng: {coordLng || '—'}</Text>
                 </View>
               )}
 
@@ -1105,7 +1202,8 @@ export default function AssistantAdminEvents() {
                 <Text style={styles.formLabel}>Radius (meters)</Text>
                 <TextInput
                   style={styles.formInput}
-                  placeholder="100"
+                  placeholder="250"
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={coordRadius}
                   onChangeText={setCoordRadius}
                   keyboardType="numeric"
@@ -1132,7 +1230,7 @@ export default function AssistantAdminEvents() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Enter Coordinates</Text>
               <TouchableOpacity onPress={() => setShowManualCoordinates(false)} style={styles.modalClose}>
-                <Feather name="x" size={24} color="#64748b" />
+                <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
             <View style={styles.modalContent}>
@@ -1141,6 +1239,7 @@ export default function AssistantAdminEvents() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="14.599512"
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={coordLat}
                   onChangeText={setCoordLat}
                   keyboardType="numeric"
@@ -1151,6 +1250,7 @@ export default function AssistantAdminEvents() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="120.984219"
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={coordLng}
                   onChangeText={setCoordLng}
                   keyboardType="numeric"
@@ -1193,7 +1293,7 @@ export default function AssistantAdminEvents() {
                     <Text style={styles.detailModalTitle}>Event Details</Text>
                   </View>
                   <TouchableOpacity onPress={() => setShowDetailModal(false)} style={styles.detailModalClose}>
-                    <Feather name="x" size={24} color="#64748b" />
+                    <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
                   </TouchableOpacity>
                 </View>
 
@@ -1213,24 +1313,24 @@ export default function AssistantAdminEvents() {
 
                   <View style={styles.detailMeta}>
                     <View style={styles.detailMetaItem}>
-                      <Feather name="calendar" size={14} color="#64748b" />
+                      <Feather name="calendar" size={14} color={colors.sidebar.text.muted} />
                       <Text style={styles.detailMetaText}>
                         {dayjs(selectedEvent.date).format('MMM D, YYYY • h:mm A')}
                       </Text>
                     </View>
                     <View style={styles.detailMetaItem}>
-                      <Feather name="map-pin" size={14} color="#64748b" />
+                      <Feather name="map-pin" size={14} color={colors.sidebar.text.muted} />
                       <Text style={styles.detailMetaText}>{selectedEvent.location}</Text>
                     </View>
                     {selectedEvent.locationDescription && (
                       <View style={styles.detailMetaItem}>
-                        <Feather name="info" size={14} color="#64748b" />
+                        <Feather name="info" size={14} color={colors.sidebar.text.muted} />
                         <Text style={styles.detailMetaText}>{selectedEvent.locationDescription}</Text>
                       </View>
                     )}
                     {selectedEvent.createdByName && (
                       <View style={styles.detailMetaItem}>
-                        <Feather name="user" size={14} color="#64748b" />
+                        <Feather name="user" size={14} color={colors.sidebar.text.muted} />
                         <Text style={styles.detailMetaText}>Created by {selectedEvent.createdByName}</Text>
                       </View>
                     )}
@@ -1255,7 +1355,6 @@ export default function AssistantAdminEvents() {
                           )}
                         </View>
 
-                        {/* Distance indicator (same as before) */}
                         {distance !== null && (
                           <View style={{ marginBottom: 12 }}>
                             <View style={styles.rangeTrack}>
@@ -1277,7 +1376,6 @@ export default function AssistantAdminEvents() {
                           </View>
                         )}
 
-                        {/* Buttons row */}
                         <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
                           <TouchableOpacity
                             style={[styles.detailActionButton, { flex: 1 }]}
@@ -1285,10 +1383,10 @@ export default function AssistantAdminEvents() {
                             disabled={checkingLocation}
                           >
                             {checkingLocation ? (
-                              <ActivityIndicator size="small" color="#0ea5e9" />
+                              <ActivityIndicator size="small" color={colors.accent.primary} />
                             ) : (
                               <>
-                                <Feather name="crosshair" size={16} color="#0ea5e9" />
+                                <Feather name="crosshair" size={16} color={colors.accent.primary} />
                                 <Text style={styles.detailActionButtonText}>Check my location</Text>
                               </>
                             )}
@@ -1303,7 +1401,6 @@ export default function AssistantAdminEvents() {
                           </TouchableOpacity>
                         </View>
 
-                        {/* Coordinates display */}
                         <View style={styles.detailMetaItem}>
                           <Feather name="map-pin" size={14} color="#f59e0b" />
                           <Text style={styles.detailMetaText}>
@@ -1321,7 +1418,6 @@ export default function AssistantAdminEvents() {
                     </>
                   )}
 
-
                   <View style={styles.detailActions}>
                     <TouchableOpacity
                       style={styles.detailEditButton}
@@ -1330,14 +1426,14 @@ export default function AssistantAdminEvents() {
                         handleEditStart(selectedEvent);
                       }}
                     >
-                      <Feather name="edit-2" size={18} color="#3b82f6" />
+                      <Feather name="edit-2" size={18} color={colors.accent.primary} />
                       <Text style={styles.detailEditButtonText}>Edit Event</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.detailDeleteButton}
                       onPress={() => handleDeleteEvent(selectedEvent.id, selectedEvent.title)}
                     >
-                      <Feather name="trash-2" size={18} color="#ef4444" />
+                      <Feather name="trash-2" size={18} color={colors.error || '#ef4444'} />
                       <Text style={styles.detailDeleteButtonText}>Delete Event</Text>
                     </TouchableOpacity>
                   </View>

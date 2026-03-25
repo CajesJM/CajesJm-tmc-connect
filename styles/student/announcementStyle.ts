@@ -195,8 +195,14 @@ export const createStudentAnnouncementStyles = (
       shadowRadius: 8,
       elevation: 2,
     },
-    cardPriorityBar: {
-      width: 4,
+    cardAbsoluteBar: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: isMobile ? 30 : 60,
+      borderTopLeftRadius: 16,
+      borderBottomLeftRadius: 16,
     },
     cardContent: {
       flex: 1,
@@ -440,6 +446,23 @@ export const createStudentAnnouncementStyles = (
       fontSize: isMobile ? 14 : 16,
       color: colors.text,
       lineHeight: 24,
+    },
+    cardNumberContainer: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    cardNumberBadge: {
+      width: isMobile ? 24 : 28,
+      height: isMobile ? 24 : 28,
+      borderRadius: isMobile ? 12 : 14,
+    
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    cardNumberText: {
+      fontSize: isMobile ? 10 : 12,
+      fontWeight: '600',
+      color: colors.text,
     },
   });
 };

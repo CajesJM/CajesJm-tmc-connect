@@ -1,5 +1,8 @@
-import { StyleSheet } from 'react-native';
+
+import { Dimensions, StyleSheet } from 'react-native';
 import { ThemeColors } from '../../context/ThemeContext';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const createStudentDashboardStyles = (
   colors: ThemeColors,
@@ -8,9 +11,10 @@ export const createStudentDashboardStyles = (
   isTablet: boolean,
   isDesktop: boolean
 ) => {
-  const { background, card, text, border, accent, sidebar } = colors;
+  const { background, card, text, textSecondary, textMuted, border, accent, sidebar } = colors;
 
   return StyleSheet.create({
+    // Container styles
     container: {
       flex: 1,
       backgroundColor: background,
@@ -21,47 +25,97 @@ export const createStudentDashboardStyles = (
     overviewContainer: {
       flex: 1,
     },
+
+    // Enhanced Header with Gradient
     headerGradient: {
-      paddingHorizontal: isMobile ? 16 : 24,
-      paddingTop: isMobile ? 50 : 60,
-      paddingBottom: isMobile ? 5 : 8,
-      borderBottomLeftRadius: isMobile ? 20 : 24,
-      borderBottomRightRadius: isMobile ? 20 : 24,
+      paddingHorizontal: isMobile ? 20 : 28,
+      paddingTop: isMobile ? 60 : 70,
+      paddingBottom: isMobile ? 24 : 32,
+      borderBottomLeftRadius: isMobile ? 24 : 32,
+      borderBottomRightRadius: isMobile ? 24 : 32,
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    headerBackgroundShapes: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      opacity: 0.1,
+    },
+    shape1: {
+      position: 'absolute',
+      width: 200,
+      height: 200,
+      borderRadius: 100,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      top: -50,
+      right: -50,
+    },
+    shape2: {
+      position: 'absolute',
+      width: 150,
+      height: 150,
+      borderRadius: 75,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      bottom: -30,
+      left: -30,
     },
     headerContent: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
+      alignItems: 'flex-start',
+      zIndex: 1,
     },
     greetingText: {
-      fontSize: isMobile ? 12 : 13,
-      color: sidebar.text.muted,
-      fontFamily: 'Inter-Regular',
+      fontSize: isMobile ? 14 : 16,
+      color: 'rgba(255,255,255,0.8)',
+      fontWeight: '500',
+      letterSpacing: 0.5,
     },
     userName: {
-      fontSize: isMobile ? 18 : 20,
+      fontSize: isMobile ? 24 : 32,
       fontWeight: 'bold',
       color: '#ffffff',
-      marginTop: 2,
+      marginTop: 4,
+      letterSpacing: -0.5,
+    },
+    roleBadge: {
+      marginTop: 8,
+      alignSelf: 'flex-start',
+    },
+    roleGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
     },
     roleText: {
       fontSize: isMobile ? 12 : 13,
-      color: accent.primary,
-      marginTop: 4,
+      color: '#ffffff',
+      fontWeight: '600',
     },
     profileButton: {
-      width: isMobile ? 48 : 56,
-      height: isMobile ? 48 : 56,
-      borderRadius: isMobile ? 24 : 28,
-      backgroundColor: '#ffffff20',
+      width: isMobile ? 56 : 64,
+      height: isMobile ? 56 : 64,
+      borderRadius: isMobile ? 28 : 32,
+      backgroundColor: 'rgba(255,255,255,0.2)',
       justifyContent: 'center',
       alignItems: 'center',
       overflow: 'hidden',
+      borderWidth: 3,
+      borderColor: 'rgba(255,255,255,0.3)',
+      position: 'relative',
     },
     profileImage: {
-      width: isMobile ? 48 : 56,
-      height: isMobile ? 48 : 56,
-      borderRadius: isMobile ? 24 : 28,
+      width: isMobile ? 56 : 64,
+      height: isMobile ? 56 : 64,
+      borderRadius: isMobile ? 28 : 32,
     },
     profileFallback: {
       backgroundColor: accent.primary,
@@ -69,226 +123,499 @@ export const createStudentDashboardStyles = (
       alignItems: 'center',
     },
     profileInitials: {
-      fontSize: isMobile ? 20 : 24,
-      fontWeight: '600',
+      fontSize: isMobile ? 24 : 28,
+      fontWeight: '700',
       color: '#ffffff',
+    },
+    editIconContainer: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      backgroundColor: accent.primary,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#ffffff',
     },
     dateSection: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginTop: isMobile ? 12 : 16,
+      marginTop: isMobile ? 20 : 24,
+      zIndex: 1,
     },
     dateContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: 8,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
     },
     dateText: {
-      fontSize: isMobile ? 10 : 12,
-      color: sidebar.text.muted,
+      fontSize: isMobile ? 12 : 14,
+      color: 'rgba(255,255,255,0.9)',
+      fontWeight: '500',
     },
     headerActions: {
       flexDirection: 'row',
       gap: 12,
     },
     headerAction: {
-      width: isMobile ? 32 : 36,
-      height: isMobile ? 32 : 36,
-      borderRadius: isMobile ? 16 : 18,
-      backgroundColor: '#ffffff20',
+      width: isMobile ? 40 : 44,
+      height: isMobile ? 40 : 44,
+      borderRadius: isMobile ? 20 : 22,
+      backgroundColor: 'rgba(255,255,255,0.2)',
       justifyContent: 'center',
       alignItems: 'center',
       position: 'relative',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.3)',
     },
     notificationBadge: {
       position: 'absolute',
-      top: -4,
-      right: -4,
+      top: -6,
+      right: -6,
       backgroundColor: '#ef4444',
-      borderRadius: 10,
-      minWidth: 18,
-      height: 18,
+      borderRadius: 12,
+      minWidth: 22,
+      height: 22,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 4,
+      paddingHorizontal: 6,
+      borderWidth: 2,
+      borderColor: isDark ? '#1e293b' : '#ffffff',
+      shadowColor: '#ef4444',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.4,
+      shadowRadius: 4,
+      elevation: 4,
     },
     notificationBadgeText: {
       color: '#ffffff',
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: 'bold',
     },
+
+    // Enhanced Stats Grid
     statsGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      paddingHorizontal: isMobile ? 12 : 16,
-      marginTop: 0,
+      paddingHorizontal: isMobile ? 16 : 24,
+      marginTop: isMobile ? 16 : 20,
       gap: 12,
       justifyContent: 'space-between',
     },
     statCard: {
       backgroundColor: card,
       borderRadius: 20,
-      padding: isMobile ? 12 : 16,
-      width: '30%',
-      minWidth: 90,
+      padding: isMobile ? 16 : 20,
+      width: isMobile ? '30%' : '31%',
+      minWidth: 100,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.05,
-      shadowRadius: 8,
-      elevation: 2,
-      borderLeftWidth: 4,
-      marginTop: 12,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.4 : 0.08,
+      shadowRadius: 12,
+      elevation: 4,
+      borderLeftWidth: 0,
+      borderTopWidth: 4,
+      marginTop: 0,
     },
     statCardHeader: {
       marginBottom: 12,
     },
     statIconContainer: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 44,
+      height: 44,
+      borderRadius: 14,
       justifyContent: 'center',
       alignItems: 'center',
     },
     statNumber: {
-      fontSize: isMobile ? 20 : 24,
+      fontSize: isMobile ? 28 : 32,
       fontWeight: 'bold',
-      color: text,
+      letterSpacing: -1,
     },
     statLabel: {
       fontSize: isMobile ? 11 : 13,
-      color: sidebar.text.secondary,
+      color: textSecondary,
+      marginTop: 4,
+      fontWeight: '500',
+    },
+
+    // Interactive Donut Chart Styles
+    donutChartContainer: {
+      marginHorizontal: isMobile ? 16 : 24,
+      marginVertical: isMobile ? 16 : 20,
+      borderRadius: 24,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: isDark ? 0.4 : 0.1,
+      shadowRadius: 24,
+      elevation: 8,
+    },
+    donutGradient: {
+      padding: isMobile ? 20 : 24,
+    },
+    donutHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 20,
+    },
+    donutHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    donutIconContainer: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    donutTitle: {
+      fontSize: isMobile ? 17 : 19,
+      fontWeight: 'bold',
+      color: text,
+    },
+    donutSubtitle: {
+      fontSize: isMobile ? 12 : 13,
+      color: textMuted,
+      marginTop: 2,
+    },
+    donutTotalBadge: {
+      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 16,
+      alignItems: 'center',
+    },
+    donutTotalBadgeText: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: accent.primary,
+    },
+    donutTotalBadgeLabel: {
+      fontSize: 11,
+      color: textMuted,
+      marginTop: 2,
+    },
+    donutChartWrapper: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginVertical: 20,
+    },
+    donutCenterLabel: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    donutCenterValue: {
+      fontSize: 32,
+      fontWeight: 'bold',
+      color: text,
+    },
+    donutCenterText: {
+      fontSize: 13,
+      color: textSecondary,
       marginTop: 4,
     },
-    twoColumnLayout: {
+
+    // Interactive Legend
+    interactiveLegendContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      paddingHorizontal: isMobile ? 16 : 24,
-      marginTop: 24,
-      gap: 16,
-      paddingBottom: 30,
+      gap: 10,
+      marginTop: 8,
+    },
+    interactiveLegendItem: {
+      flex: 1,
+      minWidth: isMobile ? '45%' : '30%',
+      borderRadius: 16,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    interactiveLegendItemSelected: {
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      elevation: 6,
+      transform: [{ scale: 1.02 }],
+    },
+    interactiveLegendItemHovered: {
+      opacity: 0.9,
+    },
+    legendGradient: {
+      padding: 14,
+      minHeight: 90,
+    },
+    legendContent: {
+      flex: 1,
+    },
+    legendIconRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    legendPercent: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: '#ffffff',
+    },
+    legendLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#ffffff',
+      marginBottom: 4,
+    },
+    legendCount: {
+      fontSize: 12,
+      color: 'rgba(255,255,255,0.8)',
+    },
+    selectedIndicator: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+    },
+
+    // Selected Details Panel
+    selectedDetailsContainer: {
+      marginTop: 16,
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    selectedDetailsGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      gap: 12,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.1)',
+    },
+    selectedDetailsText: {
+      flex: 1,
+    },
+    selectedDetailsTitle: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 2,
+    },
+    selectedDetailsDescription: {
+      fontSize: 13,
+      color: textSecondary,
+    },
+    exploreButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+    },
+    exploreButtonText: {
+      color: '#ffffff',
+      fontSize: 13,
+      fontWeight: '600',
+    },
+
+    // Empty State
+    donutChartEmptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 40,
+    },
+    donutChartEmptyText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: text,
+      marginTop: 16,
+    },
+    donutChartEmptySubtext: {
+      fontSize: 14,
+      color: textMuted,
+      marginTop: 8,
+    },
+
+    // Two Column Layout
+    twoColumnLayout: {
+      flexDirection: isDesktop ? 'row' : 'column',
+      paddingHorizontal: isMobile ? 12 : 16,
+      marginTop: isMobile ? 12 : 16,
+      gap: 12,
+      paddingBottom: 24,
+      marginBottom:100,
     },
     column: {
       flex: 1,
-      minWidth: isMobile ? 280 : 300,
+      minWidth: isMobile ? '100%' : 260,
+      
     },
     upcomingColumn: {
       flex: 1,
     },
+
+    // Card Styles with Gradients
     upcomingCard: {
-      backgroundColor: card,
-      borderRadius: 24,
-      padding: isMobile ? 12 : 16,
-      marginBottom: 16,
+      borderRadius: 16,
+      overflow: 'hidden',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.05,
+      shadowOpacity: isDark ? 0.2 : 0.05,
       shadowRadius: 8,
-      elevation: 2,
+      elevation: 3,
+      marginBottom: 12,
     },
+    announcementCard: {
+      borderRadius: 16,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.2 : 0.05,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    cardGradient: {
+      padding: isMobile ? 12 : 16,
+      flex: 1,
+    },
+    // Section Headers
     upcomingHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 16,
+      marginBottom: 12,                     
+    },
+    sectionTitleContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,                               
+    },
+    sectionIcon: {
+      width: 32,                             
+      height: 32,                           
+      borderRadius: 8,                       
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     upcomingTitle: {
-      fontSize: isMobile ? 15 : 16,
-      fontWeight: '600',
+      fontSize: isMobile ? 14 : 16,        
+      fontWeight: 'bold',
       color: text,
     },
-    viewAllText: {
-      fontSize: isMobile ? 12 : 13,
-      color: accent.primary,
-      fontWeight: '500',
+    viewAllButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 20,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
     },
+    viewAllText: {
+      fontSize: isMobile ? 13 : 14,
+      color: accent.primary,
+      fontWeight: '600',
+    },
+
+    // List Styles
     upcomingList: {
       gap: 12,
     },
     upcomingItem: {
       flexDirection: 'row',
       alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+      borderRadius: 12,                      // ✅ smaller radius
+      padding: 8,                            // ✅ smaller padding
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
     },
-    eventDate: {
-      width: 48,
-      height: 48,
-      borderRadius: 12,
-      backgroundColor: border,
+    registeredItem: {
+      backgroundColor: isDark ? 'rgba(16,185,129,0.1)' : 'rgba(16,185,129,0.05)',
+      borderColor: 'rgba(16,185,129,0.2)',
+    },
+    eventDateGradient: {
+      width: 40,
+      height: 40,
+      borderRadius: 10,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: 12,
+      marginRight: 10,
     },
     eventDay: {
       fontSize: 16,
       fontWeight: 'bold',
-      color: text,
+      color: '#ffffff',
     },
     eventMonth: {
-      fontSize: 10,
-      color: sidebar.text.secondary,
+      fontSize: 9,
+      color: 'rgba(255,255,255,0.9)',
+      fontWeight: '600',
+      textTransform: 'uppercase',
     },
     eventInfo: {
       flex: 1,
     },
     eventName: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '600',
       color: text,
+      marginBottom: 2,
+    },
+    eventMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
     },
     eventTime: {
       fontSize: 12,
-      color: sidebar.text.secondary,
-      marginTop: 2,
+      color: textSecondary,
     },
-    loadingContainer: {
+    eventMetaDivider: {
+      fontSize: 12,
+      color: textMuted,
+    },
+    registeredBadge: {
+      flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 24,
+      gap: 4,
+      marginTop: 6,
     },
-    loadingText: {
-      fontSize: 13,
-      color: sidebar.text.muted,
-      marginTop: 8,
-    },
-    emptyContainer: {
-      alignItems: 'center',
-      paddingVertical: 24,
-    },
-    emptyText: {
-      fontSize: 14,
-      color: sidebar.text.muted,
-      marginTop: 8,
-    },
-    createButton: {
-      marginTop: 12,
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      backgroundColor: accent.primary,
-      borderRadius: 20,
-    },
-    createButtonText: {
-      fontSize: 13,
-      color: '#ffffff',
+    registeredBadgeText: {
+      fontSize: 11,
+      color: '#10b981',
       fontWeight: '600',
     },
-    announcementCard: {
-      backgroundColor: card,
-      borderRadius: 24,
-      padding: isMobile ? 12 : 16,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.3 : 0.05,
-      shadowRadius: 8,
-      elevation: 2,
+    chevronContainer: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
+
+    // Announcement Styles
     announcementHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 16,
+      marginBottom: 20,
     },
     announcementTitle: {
-      fontSize: isMobile ? 15 : 16,
-      fontWeight: '600',
+      fontSize: isMobile ? 14 : 16,         
+      fontWeight: 'bold',
       color: text,
     },
     announcementList: {
@@ -297,123 +624,104 @@ export const createStudentDashboardStyles = (
     announcementItem: {
       flexDirection: 'row',
       alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+      borderRadius: 12,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
     },
     announcementBadge: {
       width: 32,
       height: 32,
-      borderRadius: 16,
+      borderRadius: 8,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: 12,
+      marginRight: 10,
+      borderWidth: 1.5,
     },
     announcementContent: {
       flex: 1,
     },
     announcementText: {
-      fontSize: 14,
-      fontWeight: '500',
-      color: text,
-    },
-    announcementTime: {
-      fontSize: 11,
-      color: sidebar.text.muted,
-      marginTop: 2,
-    },
-    registeredBadge: {
-      fontSize: 11,
-      color: '#10b981',
+      fontSize: 13,
       fontWeight: '600',
-      marginTop: 2,
+      color: text,
+      marginBottom: 4,
     },
-    donutChartContainer: {
-      backgroundColor: card,
-      borderRadius: 20,
-      marginHorizontal: isMobile ? 16 : 24,
-      marginVertical: 12,
-      padding: isMobile ? 12 : 16,
-      shadowColor: '#000',
-      shadowOpacity: isDark ? 0.3 : 0.05,
-      shadowRadius: 8,
-      elevation: 2,
-    },
-    donutHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16,
-    },
-    donutHeaderLeft: {
+    announcementMetaRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+      flexWrap: 'wrap',
     },
-    donutTitle: {
-      fontSize: isMobile ? 15 : 16,
-      fontWeight: '600',
-      color: text,
-    },
-    donutTotalBadge: {
-      backgroundColor: `${accent.primary}15`,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 20,
+    announcementTime: {
       fontSize: 12,
-      fontWeight: '600',
-      color: accent.primary,
+      color: textMuted,
     },
-    donutChartWrapper: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginVertical: 16,
+    announcementMetaDivider: {
+      fontSize: 12,
+      color: textMuted,
     },
-    donutCenterLabel: {
-      alignItems: 'center',
+    announcementAuthor: {
+      fontSize: 12,
+      color: textSecondary,
+      fontWeight: '500',
     },
-    donutCenterValue: {
-      fontSize: 24,
+    priorityBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 12,
+    },
+    priorityText: {
+      fontSize: 10,
       fontWeight: 'bold',
-      color: text,
+      textTransform: 'uppercase',
     },
-    donutCenterText: {
-      fontSize: 12,
-      color: sidebar.text.secondary,
+
+    // Loading & Empty States
+    loadingContainer: {
+      alignItems: 'center',
+      paddingVertical: 40,
     },
-    progressLegendContainer: {
-      marginTop: 16,
-      gap: 12,
+    loadingText: {
+      fontSize: 14,
+      color: textMuted,
+      marginTop: 12,
     },
-    progressLegendItem: {
+    emptyContainer: {
+      alignItems: 'center',
+      paddingVertical: 40,
+    },
+    emptyIconContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    emptyText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: textSecondary,
+      marginBottom: 16,
+    },
+    createButton: {
+      borderRadius: 24,
+      overflow: 'hidden',
+    },
+    createButtonGradient: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
+      gap: 8,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
     },
-    progressLegendIcon: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    progressLegendInfo: {
-      flex: 1,
-    },
-    progressLegendLabel: {
+    createButtonText: {
       fontSize: 14,
-      fontWeight: '500',
-      color: text,
-    },
-    progressLegendCount: {
-      fontSize: 12,
-      color: sidebar.text.secondary,
-    },
-    progressLegendPercent: {
-      fontSize: 14,
+      color: '#ffffff',
       fontWeight: '600',
-    },
-    donutChartEmptyText: {
-      textAlign: 'center',
-      color: sidebar.text.muted,
-      padding: 24,
     },
   });
 };

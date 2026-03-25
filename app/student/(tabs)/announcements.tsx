@@ -38,14 +38,14 @@ interface Announcement {
   createdByName?: string;
 }
 
-type TimeFilter = 'all' | 'today' | 'week' | 'month';
+type TimeFilter = 'all' | 'today' | 'week' | 'month' | 'priority';
 
 export default function StudentAnnouncements() {
   const { width: screenWidth } = useWindowDimensions();
-  const { colors, isDark } = useTheme();          
-  const isMobile = screenWidth < 640;               
+  const { colors, isDark } = useTheme();
+  const isMobile = screenWidth < 640;
   const isTablet = screenWidth >= 640 && screenWidth < 1024;
-  const isDesktop = screenWidth >= 1024;        
+  const isDesktop = screenWidth >= 1024;
 
   const styles = useMemo(
     () => createStudentAnnouncementStyles(colors, isDark, isMobile, isTablet, isDesktop),
@@ -66,7 +66,7 @@ export default function StudentAnnouncements() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const { incrementUnread, clearUnread } = useNotifications();
-  const itemsPerPage = 5;
+  const itemsPerPage = 8;
   const [refreshKey, setRefreshKey] = useState(0);
 
   const isFocused = useRef(true);
@@ -76,9 +76,15 @@ export default function StudentAnnouncements() {
   useFocusEffect(
     React.useCallback(() => {
       isFocused.current = true;
-      clearUnread('announcements');
+      const timeoutId = setTimeout(() => {
+        if (isFocused.current) {
+          clearUnread('announcements');
+        }
+      }, 100); 
+
       return () => {
         isFocused.current = false;
+        clearTimeout(timeoutId);
       };
     }, [clearUnread])
   );
@@ -91,7 +97,7 @@ export default function StudentAnnouncements() {
       const authenticated = !!user;
       setIsUserAuthenticated(authenticated);
 
-  
+
       if (unsubscribeAnnouncements) {
         unsubscribeAnnouncements();
         unsubscribeAnnouncements = null;
@@ -220,12 +226,17 @@ export default function StudentAnnouncements() {
           (ann) => ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'month'))
         );
         break;
+      case 'priority':
+
+        filtered = announcementsList.filter(
+          (ann) => ann.priority === 'important' || ann.priority === 'urgent'
+        );
+        break;
       default:
         filtered = announcementsList;
     }
     setFilteredAnnouncements(filtered);
   };
-
   const isNewAnnouncement = (createdAt: any) => {
     if (!createdAt) return false;
     return dayjs(createdAt.toDate()).isAfter(dayjs().subtract(1, 'day'));
@@ -321,7 +332,8 @@ export default function StudentAnnouncements() {
     );
   };
 
-  const renderAnnouncementCard = ({ item }: { item: Announcement }) => {
+  const renderAnnouncementCard = (item: Announcement, index: number) => {
+    const globalNumber = (currentPage - 1) * itemsPerPage + index + 1;
     const priorityColor = getPriorityColor(item.priority, item.title);
     const isNew = isNewAnnouncement(item.createdAt);
 
@@ -331,7 +343,22 @@ export default function StudentAnnouncements() {
         onPress={() => openDetailModal(item)}
         activeOpacity={0.7}
       >
-        <View style={[styles.cardPriorityBar, { backgroundColor: priorityColor }]} />
+        {/* Gradient bar remains absolute */}
+        <LinearGradient
+          colors={[priorityColor, 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.cardAbsoluteBar}
+        />
+
+        {/* Number badge */}
+        <View style={styles.cardNumberContainer}>
+          <View style={styles.cardNumberBadge}>
+            <Text style={styles.cardNumberText}>{globalNumber}</Text>
+          </View>
+        </View>
+
+        {/* Content */}
         <View style={styles.cardContent}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle} numberOfLines={1}>
@@ -548,9 +575,11 @@ export default function StudentAnnouncements() {
         </View>
       </LinearGradient>
 
+
       {isUserAuthenticated ? (
         <>
           {/* Stats */}
+          {/*
           <View style={styles.statsContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
               <View style={styles.statCard}>
@@ -582,8 +611,8 @@ export default function StudentAnnouncements() {
                 <Text style={styles.statLabel}>Urgent</Text>
               </View>
             </ScrollView>
-          </View>
-
+          </View>  
+        */}
           {/* Search Bar */}
           <View style={styles.searchSection}>
             <View style={styles.searchBar}>
@@ -606,7 +635,7 @@ export default function StudentAnnouncements() {
           {/* Filter Chips */}
           <View style={styles.filterSection}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-              {(['all', 'today', 'week', 'month'] as const).map((filter) => (
+              {(['all', 'today', 'week', 'month', 'priority'] as const).map((filter) => (
                 <TouchableOpacity
                   key={filter}
                   style={[styles.filterChip, timeFilter === filter && styles.filterChipActive]}
@@ -637,7 +666,7 @@ export default function StudentAnnouncements() {
             <FlatList
               data={paginatedAnnouncements}
               keyExtractor={(item) => item.id}
-              renderItem={renderAnnouncementCard}
+              renderItem={({ item, index }) => renderAnnouncementCard(item, index)}
               contentContainerStyle={styles.listContainer}
               showsVerticalScrollIndicator={false}
               refreshControl={

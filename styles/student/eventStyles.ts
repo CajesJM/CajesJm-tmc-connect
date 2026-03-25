@@ -195,6 +195,14 @@ export const createEventStyles = (
       gap: isMobile ? 8 : 12,
       paddingBottom: 20,
     },
+    resultsInfo: {
+      paddingHorizontal: isMobile ? 16 : 24,
+      marginBottom: 8,
+    },
+    resultsText: {
+      fontSize: isMobile ? 11 : 13,
+      color: colors.sidebar.text.secondary,
+    },
 
     // Event Card
     card: {
@@ -656,15 +664,39 @@ export const createEventStyles = (
       gap: 4,
     },
     attendedBadge: {
-      backgroundColor: '#10b981', // keep fixed
+      backgroundColor: '#10b981',
     },
     missedBadge: {
-      backgroundColor: '#ef4444', // keep fixed
+      backgroundColor: '#ef4444',
     },
     attendanceBadgeText: {
       color: '#fff',
       fontSize: 9,
       fontWeight: '700',
+    },
+    cardImageContainer: {
+      position: 'relative',
+    },
+    cardNumberContainer: {
+      position: 'absolute',
+      top: isMobile ? 6 : 8,
+      left: isMobile ? 6 : 8,
+      zIndex: 10,
+    },
+    cardNumberBadge: {
+      width: isMobile ? 24 : 28,
+      height: isMobile ? 24 : 28,
+      borderRadius: isMobile ? 12 : 14,
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    cardNumberText: {
+      fontSize: isMobile ? 10 : 12,
+      fontWeight: 'bold',
+      color: '#fff',
     },
   });
 };

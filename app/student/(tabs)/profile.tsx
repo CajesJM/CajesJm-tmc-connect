@@ -6,18 +6,22 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   Image,
   Modal,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
-  View, useWindowDimensions,
+  View,
+  useWindowDimensions
 } from 'react-native';
+import { PieChart } from 'react-native-gifted-charts';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../../../context/AuthContext';
 import { useNotifications } from '../../../context/NotificationContext';
-//import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { useTheme } from '../../../context/ThemeContext';
 import { auth, db } from '../../../lib/firebaseConfig';
 import type { AttendanceRecord, MissedEvent } from '../../../lib/types';
@@ -40,7 +44,6 @@ interface Penalty {
 interface StudentEvent extends MissedEvent {
   scannedAt?: string;
 }
-
 
 interface TeamMember {
   id: string;
@@ -65,6 +68,158 @@ interface AboutInfo {
   description?: string;
 }
 
+// Monthly attendance data interface
+interface MonthlyAttendanceData {
+  month: string;
+  attended: number;
+  missed: number;
+  total: number;
+}
+
+// Separate component for animated bar chart to fix hook rules
+const BarChartSection = ({ monthlyAttendanceData, maxValue, colors, isDark, chartAnim }: any) => {
+  return (
+    <Animated.View style={[
+      {
+        backgroundColor: colors.card,
+        borderRadius: 20,
+        padding: 20,
+        opacity: chartAnim,
+        transform: [{ translateY: chartAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) }],
+      }
+    ]}>
+      <Text style={[{ color: colors.text, fontSize: 18, fontWeight: '600', marginBottom: 4, textAlign: 'center' }]}>
+        Monthly Attendance Trends
+      </Text>
+      <Text style={[{ color: colors.sidebar.text.secondary, fontSize: 12, textAlign: 'center', marginBottom: 16 }]}>
+        Events Attended vs Missed
+      </Text>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 10 }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 200, marginVertical: 10 }}>
+          {monthlyAttendanceData.map((data: any, index: number) => (
+            <BarChartItem
+              key={index}
+              data={data}
+              index={index}
+              maxValue={maxValue}
+              colors={colors}
+              isDark={isDark}
+            />
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Legend */}
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 24, marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: '#10B981' }} />
+          <Text style={{ color: colors.text, fontSize: 12, fontWeight: '500' }}>Attended</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: '#EF4444' }} />
+          <Text style={{ color: colors.text, fontSize: 12, fontWeight: '500' }}>Missed</Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+};
+
+// Individual bar chart item with its own animation
+const BarChartItem = ({ data, index, maxValue, colors, isDark }: any) => {
+  const maxHeight = 140;
+  const attendedHeight = (data.attended / maxValue) * maxHeight;
+  const missedHeight = (data.missed / maxValue) * maxHeight;
+  const barAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(barAnim, {
+      toValue: 1,
+      duration: 800,
+      delay: index * 100,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  return (
+    <View style={{ alignItems: 'center', width: 70, marginHorizontal: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: maxHeight, marginBottom: 8 }}>
+        {/* Attended Bar with Animation */}
+        <Animated.View style={{
+          width: 28,
+          backgroundColor: '#10B981',
+          borderRadius: 6,
+          height: Math.max(attendedHeight, 4),
+          opacity: barAnim,
+          transform: [{ scaleY: barAnim }],
+        }}>
+          {data.attended > 0 && (
+            <Text style={{
+              position: 'absolute',
+              top: -18,
+              left: 0,
+              right: 0,
+              textAlign: 'center',
+              fontSize: 11,
+              fontWeight: 'bold',
+              color: '#10B981',
+            }}>
+              {data.attended}
+            </Text>
+          )}
+        </Animated.View>
+
+        {/* Missed Bar with Animation */}
+        <Animated.View style={{
+          width: 28,
+          backgroundColor: '#EF4444',
+          borderRadius: 6,
+          height: Math.max(missedHeight, 4),
+          opacity: barAnim,
+          transform: [{ scaleY: barAnim }],
+        }}>
+          {data.missed > 0 && (
+            <Text style={{
+              position: 'absolute',
+              top: -18,
+              left: 0,
+              right: 0,
+              textAlign: 'center',
+              fontSize: 11,
+              fontWeight: 'bold',
+              color: '#EF4444',
+            }}>
+              {data.missed}
+            </Text>
+          )}
+        </Animated.View>
+      </View>
+
+      <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text }}>
+        {data.month}
+      </Text>
+      {data.total > 0 && (
+        <View style={{
+          marginTop: 4,
+          backgroundColor: isDark ? '#334155' : '#e2e8f0',
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+          borderRadius: 10,
+        }}>
+          <Text style={{ fontSize: 9, color: colors.sidebar.text.secondary }}>
+            {data.total}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
 export default function StudentProfile() {
   const { logout, userData } = useAuth();
   const router = useRouter();
@@ -88,14 +243,22 @@ export default function StudentProfile() {
   const isFocused = useRef(true);
   const initialLoadDone = useRef(false);
   const lastPenaltyTimestamp = useRef<string | null>(null);
-  //const { expoPushToken } = usePushNotifications();
+  const [showCourseModal, setShowCourseModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const { theme, setTheme, colors, isDark, toggleTheme } = useTheme();
+
+  // New state for charts
+  const [showAttendanceReportModal, setShowAttendanceReportModal] = useState(false);
+  const [monthlyAttendanceData, setMonthlyAttendanceData] = useState<MonthlyAttendanceData[]>([]);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [attendedCount, setAttendedCount] = useState(0);
+  const [missedCount, setMissedCount] = useState(0);
+
   const styles = useMemo(
     () => createProfileStyles(colors, isDark, isMobile, isTablet, isDesktop),
     [colors, isDark, isMobile, isTablet, isDesktop]
   );
-
 
   const [aboutInfo] = useState<AboutInfo>({
     submittedBy: {
@@ -134,21 +297,469 @@ export default function StudentProfile() {
           profilePhoto: require('../../../assets/images/Profile/jim.jpg'),
           role: '',
           email: 'ayubankarljames@gmail.com'
-
         },
       ],
       organization: 'TMC Connect Developers'
     },
     submittedTo: {
-      name: 'Jay Ian Camelotes',
+      name: 'Cristine Joy Yap',
       profilePhoto: '',
-      department: 'Bachelor of Information Technology',
+      department: 'Bachelor of Science Information Technology',
       institution: ''
     },
     version: '1.0.1',
     description: 'TMC Connect - A comprehensive solution for managing campus events, attendance tracking, and student engagement.'
   });
 
+  const renderHelpModal = () => {
+    const faqs = [
+      {
+        id: '1',
+        question: 'How do I scan my attendance?',
+        answer: 'Go to the Events section, find the current event, and tap the "Scan QR Code" button. Point your camera at the QR code displayed at the event venue to mark your attendance.',
+        icon: 'qrcode-scan'
+      },
+      {
+        id: '2',
+        question: 'What happens if I miss an event?',
+        answer: 'When you miss an event, it will appear in your "Missed" tab. The admin may issue penalties for unexcused absences. You can view your penalties in the "My Penalties" section.',
+        icon: 'calendar-remove'
+      },
+      {
+        id: '3',
+        question: 'How do I view my attendance history?',
+        answer: 'Go to your Profile and check the "Attended" tab to see all events you\'ve successfully attended. You can also generate an Attendance Report for detailed monthly statistics.',
+        icon: 'chart-line'
+      },
+      {
+        id: '4',
+        question: 'Can I change my profile picture?',
+        answer: 'Yes! Tap on your profile picture in the Profile section, then choose to either take a new photo or select one from your gallery.',
+        icon: 'camera'
+      },
+      {
+        id: '5',
+        question: 'How do I receive notifications?',
+        answer: 'Make sure you have notifications enabled in your device settings. You\'ll receive alerts for new events, announcements, attendance reminders, and penalty updates.',
+        icon: 'bell'
+      },
+      {
+        id: '6',
+        question: 'What are the penalties for missed events?',
+        answer: 'Penalties vary depending on the event importance and frequency of absences. Check your "My Penalties" section for specific details about any pending penalties.',
+        icon: 'alert-circle'
+      },
+      {
+        id: '7',
+        question: 'How do I update my course information?',
+        answer: 'Course information can only be updated by administrators. Contact your department or admin if you need to make changes to your course details.',
+        icon: 'school'
+      },
+      {
+        id: '8',
+        question: 'Is my data secure?',
+        answer: 'Yes, we take data security seriously. All your personal information and attendance records are securely stored and only accessible to authorized personnel.',
+        icon: 'shield-account'
+      }
+    ];
+
+    const supportChannels = [
+      {
+        id: '1',
+        title: 'Email Support',
+        description: 'Get help via email',
+        contact: 'support@tmcconnect.com',
+        icon: 'email',
+        color: '#3B82F6'
+      },
+      {
+        id: '2',
+        title: 'Live Chat',
+        description: 'Chat with our support team',
+        contact: 'Available 9 AM - 5 PM',
+        icon: 'chat',
+        color: '#10B981'
+      },
+      {
+        id: '3',
+        title: 'Help Center',
+        description: 'Browse our knowledge base',
+        contact: 'Documentation & Guides',
+        icon: 'help-circle',
+        color: '#F59E0B'
+      },
+      {
+        id: '4',
+        title: 'Report an Issue',
+        description: 'Submit a bug report',
+        contact: 'We\'ll respond within 24h',
+        icon: 'bug',
+        color: '#EF4444'
+      }
+    ];
+
+    return (
+      <Modal
+        visible={showHelpModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowHelpModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.aboutModal, { maxHeight: '90%', padding: 0 }]}>
+            <View style={[styles.modalHeader, { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12 }]}>
+              <View>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Help & Support</Text>
+                <Text style={[styles.modalSubtitle, { color: colors.sidebar.text.secondary }]}>
+                  How can we help you today?
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowHelpModal(false)}>
+                <Icon name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ paddingHorizontal: 20, paddingBottom: 20 }}
+            >
+              {/* Quick Search/Support Banner */}
+              <View style={[styles.supportBanner, {
+                backgroundColor: isDark ? '#1e293b' : '#f0f9ff',
+                borderRadius: 16,
+                padding: 20,
+                marginBottom: 24,
+                marginTop: 8,
+                alignItems: 'center'
+              }]}>
+                <Icon name="headset" size={48} color={colors.accent.primary} />
+                <Text style={[styles.supportBannerTitle, { color: colors.text, fontSize: 18, fontWeight: 'bold', marginTop: 12 }]}>
+                  Need Immediate Help?
+                </Text>
+                <Text style={[styles.supportBannerText, { color: colors.sidebar.text.secondary, textAlign: 'center', marginTop: 8 }]}>
+                  Our support team is ready to assist you with any questions or concerns.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.contactSupportButton, {
+                    backgroundColor: colors.accent.primary,
+                    marginTop: 16,
+                    paddingHorizontal: 24,
+                    paddingVertical: 12,
+                    borderRadius: 25,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8
+                  }]}
+                  onPress={() => {
+                    Alert.alert(
+                      'Contact Support',
+                      'Choose your preferred contact method:',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Email', onPress: () => Alert.alert('Email Support', 'Send an email to support@tmcconnect.com') },
+                        { text: 'Chat', onPress: () => Alert.alert('Live Chat', 'Our live chat support is currently offline. Please try again during business hours.') }
+                      ]
+                    );
+                  }}
+                >
+                  <Icon name="headset" size={20} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '600' }}>Contact Support</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Support Channels */}
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18, fontWeight: '600', marginBottom: 12 }]}>
+                Support Channels
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 24 }}>
+                {supportChannels.map((channel) => (
+                  <TouchableOpacity
+                    key={channel.id}
+                    style={[styles.supportCard, {
+                      width: '48%',
+                      backgroundColor: colors.card,
+                      borderRadius: 12,
+                      padding: 16,
+                      marginBottom: 12,
+                      borderWidth: 1,
+                      borderColor: colors.border
+                    }]}
+                    onPress={() => {
+                      Alert.alert(
+                        channel.title,
+                        channel.contact,
+                        [
+                          { text: 'OK' },
+                          ...(channel.id === '1' ? [{ text: 'Send Email', onPress: () => Alert.alert('Email', `Opening email app to ${channel.contact}`) }] : [])
+                        ]
+                      );
+                    }}
+                  >
+                    <View style={[styles.supportIconContainer, {
+                      backgroundColor: `${channel.color}20`,
+                      width: 40,
+                      height: 40,
+                      borderRadius: 12,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginBottom: 12
+                    }]}>
+                      <Icon name={channel.icon} size={24} color={channel.color} />
+                    </View>
+                    <Text style={[styles.supportTitle, { color: colors.text, fontSize: 14, fontWeight: '600', marginBottom: 4 }]}>
+                      {channel.title}
+                    </Text>
+                    <Text style={[styles.supportDescription, { color: colors.sidebar.text.secondary, fontSize: 12 }]}>
+                      {channel.contact}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* FAQ Section */}
+              <Text style={[styles.sectionTitle, { color: colors.text, fontSize: 18, fontWeight: '600', marginBottom: 12 }]}>
+                Frequently Asked Questions
+              </Text>
+              <View style={{ marginBottom: 24 }}>
+                {faqs.map((faq, index) => {
+                  const [expanded, setExpanded] = useState(false);
+                  return (
+                    <View
+                      key={faq.id}
+                      style={[styles.faqItem, {
+                        backgroundColor: colors.card,
+                        borderRadius: 12,
+                        marginBottom: 8,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        overflow: 'hidden'
+                      }]}
+                    >
+                      <TouchableOpacity
+                        style={[styles.faqQuestion, {
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: 16
+                        }]}
+                        onPress={() => setExpanded(!expanded)}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+                          <View style={[styles.faqIconContainer, {
+                            backgroundColor: `${colors.accent.primary}20`,
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            justifyContent: 'center',
+                            alignItems: 'center'
+                          }]}>
+                            <Icon name={faq.icon} size={16} color={colors.accent.primary} />
+                          </View>
+                          <Text style={[styles.faqQuestionText, {
+                            color: colors.text,
+                            fontSize: 14,
+                            fontWeight: '600',
+                            flex: 1
+                          }]}>
+                            {faq.question}
+                          </Text>
+                        </View>
+                        <Icon
+                          name={expanded ? 'chevron-up' : 'chevron-down'}
+                          size={20}
+                          color={colors.sidebar.text.secondary}
+                        />
+                      </TouchableOpacity>
+
+                      {expanded && (
+                        <View style={[styles.faqAnswer, {
+                          paddingHorizontal: 16,
+                          paddingBottom: 16,
+                          paddingTop: 0,
+                          borderTopWidth: 1,
+                          borderTopColor: colors.border
+                        }]}>
+                          <Text style={[styles.faqAnswerText, {
+                            color: colors.sidebar.text.secondary,
+                            fontSize: 13,
+                            lineHeight: 20
+                          }]}>
+                            {faq.answer}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* Report a Problem Section */}
+              <View style={[styles.reportProblemCard, {
+                backgroundColor: isDark ? '#1e293b' : '#fef2f2',
+                borderRadius: 16,
+                padding: 20,
+                marginBottom: 24,
+                borderWidth: 1,
+                borderColor: isDark ? '#ef444430' : '#ef444420'
+              }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12 }}>
+                  <Icon name="bug" size={24} color="#EF4444" />
+                  <Text style={[styles.reportTitle, { color: colors.text, fontSize: 16, fontWeight: '600' }]}>
+                    Found a Bug?
+                  </Text>
+                </View>
+                <Text style={[styles.reportDescription, { color: colors.sidebar.text.secondary, fontSize: 13, lineHeight: 18, marginBottom: 16 }]}>
+                  Help us improve TMC Connect by reporting any issues you encounter. Our team will investigate and fix it as soon as possible.
+                </Text>
+                <TouchableOpacity
+                  style={[styles.reportButton, {
+                    backgroundColor: '#EF4444',
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 25,
+                    alignSelf: 'flex-start',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8
+                  }]}
+                  onPress={() => {
+                    Alert.alert(
+                      'Report an Issue',
+                      'Please describe the issue you\'re experiencing:',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Submit',
+                          onPress: () => Alert.alert('Thank You!', 'Your report has been submitted. We\'ll look into it promptly.')
+                        }
+                      ]
+                    );
+                  }}
+                >
+                  <Icon name="email" size={18} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>Report Issue</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Version Info */}
+              <View style={[styles.versionInfo, {
+                alignItems: 'center',
+                paddingVertical: 20,
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+                marginTop: 8
+              }]}>
+                <Text style={[styles.versionText, { color: colors.sidebar.text.muted, fontSize: 12 }]}>
+                  TMC Connect v1.0.1
+                </Text>
+                <Text style={[styles.copyrightText, { color: colors.sidebar.text.muted, fontSize: 11, marginTop: 4 }]}>
+                  © 2024 TMC Connect. All rights reserved.
+                </Text>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+
+  const calculateMonthlyAttendance = useCallback(async () => {
+    try {
+      setChartLoading(true);
+      const studentID = (userData as any)?.studentID;
+
+      console.log('Calculating monthly attendance for student:', studentID);
+
+      if (!studentID) {
+        console.log('No student ID found');
+        setChartLoading(false);
+        return;
+      }
+
+      const eventsRef = collection(db, 'events');
+      const querySnapshot = await getDocs(eventsRef);
+
+      // Get last 6 months
+      const now = new Date();
+      const months: { name: string; startDate: Date; endDate: Date; fullName: string }[] = [];
+
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthName = date.toLocaleString('default', { month: 'short' });
+        const fullMonthName = date.toLocaleString('default', { month: 'long' });
+        const startDate = new Date(date.getFullYear(), date.getMonth(), 1);
+        const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+        months.push({ name: monthName, startDate, endDate, fullName: fullMonthName });
+      }
+
+      const monthlyData: MonthlyAttendanceData[] = months.map(month => ({
+        month: month.name,
+        attended: 0,
+        missed: 0,
+        total: 0
+      }));
+
+      let totalAttended = 0;
+      let totalMissed = 0;
+
+      console.log('Total events to process:', querySnapshot.docs.length);
+
+      // Process each event
+      querySnapshot.docs.forEach(docSnapshot => {
+        const eventData = docSnapshot.data();
+
+        // Check if event is approved
+        const hasStatus = 'status' in eventData;
+        const isApproved = hasStatus && eventData.status === 'approved';
+        const isAdminEvent = !hasStatus;
+
+        if (!isApproved && !isAdminEvent) return;
+
+        // Get event date
+        let eventDate: Date;
+        if (typeof eventData.date === 'object' && (eventData.date as any)?.toDate) {
+          eventDate = (eventData.date as any).toDate();
+        } else if (typeof eventData.date === 'string') {
+          eventDate = new Date(eventData.date);
+        } else {
+          return;
+        }
+
+        if (eventDate > now) return;
+
+        const attendees = eventData.attendees || [];
+        const studentAttendance = attendees.find((attendee: AttendanceRecord) =>
+          attendee.studentID === studentID.toString()
+        );
+        const eventMonthIndex = months.findIndex(month =>
+          eventDate >= month.startDate && eventDate <= month.endDate
+        );
+
+        if (eventMonthIndex !== -1) {
+          if (studentAttendance) {
+            monthlyData[eventMonthIndex].attended++;
+            totalAttended++;
+          } else {
+            monthlyData[eventMonthIndex].missed++;
+            totalMissed++;
+          }
+          monthlyData[eventMonthIndex].total++;
+        }
+      });
+
+      console.log('Monthly attendance data calculated:', monthlyData);
+      console.log('Totals - Attended:', totalAttended, 'Missed:', totalMissed);
+
+      setMonthlyAttendanceData(monthlyData);
+      setAttendedCount(totalAttended);
+      setMissedCount(totalMissed);
+    } catch (error) {
+      console.error('Error calculating monthly attendance:', error);
+    } finally {
+      setChartLoading(false);
+    }
+  }, [userData]);
 
   const fetchEvents = async () => {
     try {
@@ -236,12 +847,42 @@ export default function StudentProfile() {
 
       setMissedEvents(missed);
       setAttendedEvents(attended);
+
+      // Calculate chart data after fetching events
+      await calculateMonthlyAttendance();
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  const renderCourseModal = () => (
+    <Modal
+      visible={showCourseModal}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowCourseModal(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.aboutModal, { backgroundColor: colors.card }]}>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>My Course</Text>
+            <TouchableOpacity onPress={() => setShowCourseModal(false)}>
+              <Icon name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.courseDisplayContainer}>
+            <Icon name="school" size={48} color={colors.accent.primary} />
+            <Text style={[styles.courseDisplayText, { color: colors.text }]}>
+              {userCourse}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
   useEffect(() => {
     const userId = auth.currentUser?.uid;
@@ -308,12 +949,16 @@ export default function StudentProfile() {
       };
     }, [clearUnread])
   );
+
   useEffect(() => {
-    fetchEvents();
-    fetchProfileImage();
+    const loadData = async () => {
+      await fetchEvents();
+      await calculateMonthlyAttendance();
+      fetchProfileImage();
+    };
 
+    loadData();
   }, []);
-
 
   const fetchProfileImage = async () => {
     try {
@@ -420,10 +1065,26 @@ export default function StudentProfile() {
   };
 
   const handleLogout = () => {
-    logout();
-    router.replace('/login');
-  };
+    const confirmLogout = () => {
+      logout();
+      router.replace('/login');
+    };
 
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to logout?')) {
+        confirmLogout();
+      }
+    } else {
+      Alert.alert(
+        'Logout',
+        'Are you sure you want to logout?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Logout', style: 'destructive', onPress: confirmLogout }
+        ]
+      );
+    }
+  };
   const getUsername = () => {
     if (!userData?.email) return 'Student';
     return userData.email.split('@')[0];
@@ -460,6 +1121,7 @@ export default function StudentProfile() {
       return 'Date not available';
     }
   };
+
   const getPenaltyDate = (penalty: { eventDate?: any; createdAt?: any }) => {
     if (penalty.eventDate) {
       return formatDate(penalty.eventDate);
@@ -469,7 +1131,6 @@ export default function StudentProfile() {
     }
     return 'Date not available';
   };
-
 
   const userCourse = (userData as any)?.course || 'Course not set';
   const userYearLevel = (userData as any)?.yearLevel || 'N/A';
@@ -493,7 +1154,6 @@ export default function StudentProfile() {
           </View>
 
           <ScrollView style={styles.aboutContent} showsVerticalScrollIndicator={false}>
-
             {aboutInfo.description && (
               <View style={styles.aboutSection}>
                 <Text style={styles.aboutDescription}>
@@ -502,9 +1162,7 @@ export default function StudentProfile() {
               </View>
             )}
 
-
             <View style={styles.aboutSection}>
-
               {aboutInfo.submittedBy.organization && (
                 <Text style={styles.organizationName}>
                   {aboutInfo.submittedBy.organization}
@@ -514,7 +1172,6 @@ export default function StudentProfile() {
               <View style={styles.membersList}>
                 {aboutInfo.submittedBy.members.map((member) => (
                   <View key={member.id} style={styles.memberItem}>
-
                     {member.profilePhoto ? (
                       <Image
                         source={member.profilePhoto}
@@ -541,7 +1198,6 @@ export default function StudentProfile() {
               </View>
             </View>
 
-
             <View style={styles.aboutSection}>
               <Text style={styles.sectionLabel}>Submitted To</Text>
               <View style={styles.submittedToCard}>
@@ -564,7 +1220,6 @@ export default function StudentProfile() {
               </View>
             </View>
 
-
             {aboutInfo.version && (
               <View style={styles.versionSection}>
                 <Text style={styles.versionText}>
@@ -579,141 +1234,139 @@ export default function StudentProfile() {
   );
 
   const renderPenaltiesModal = () => {
-  const pendingCount = penalties.filter(p => p.status === 'pending').length;
-  const paidCount = penalties.filter(p => p.status === 'paid').length;
+    const pendingCount = penalties.filter(p => p.status === 'pending').length;
+    const paidCount = penalties.filter(p => p.status === 'paid').length;
 
-  const severityColors = {
-    low: '#10b981',  
-    medium: '#f59e0b', 
-    high: '#ef4444',  
+    const severityColors = {
+      low: '#10b981',
+      medium: '#f59e0b',
+      high: '#ef4444',
+    };
+
+    return (
+      <Modal
+        visible={showPenaltiesModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPenaltiesModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.aboutModal, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>My Penalties</Text>
+                <Text style={styles.modalSubtitle}>
+                  {pendingCount > 0
+                    ? `${pendingCount} pending`
+                    : paidCount > 0
+                      ? 'All penalties paid'
+                      : 'No penalties'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowPenaltiesModal(false)}>
+                <Icon name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {penaltyLoading ? (
+              <ActivityIndicator size="large" color="#3B82F6" style={{ padding: 40 }} />
+            ) : penalties.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Icon name="check-circle-outline" size={64} color="#10B981" />
+                <Text style={styles.emptyStateTitle}>No Penalties!</Text>
+                <Text style={styles.emptyStateText}>
+                  Great job! You have no pending penalties.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {penalties
+                  .filter(p => p.status === 'pending')
+                  .map((penalty) => {
+                    const eventTitle = penalty.eventTitle || penalty.eventName || 'Unknown Event';
+                    const penaltyDate = getPenaltyDate(penalty);
+                    const severity = penalty.severity || 'medium';
+                    const severityColor = severityColors[severity as keyof typeof severityColors] || '#f59e0b';
+
+                    return (
+                      <View
+                        key={penalty.id}
+                        style={[
+                          styles.penaltyCard,
+                          { borderLeftColor: severityColor, borderLeftWidth: 4 },
+                          { backgroundColor: colors.card },
+                        ]}
+                      >
+                        <View style={styles.penaltyHeader}>
+                          <Text style={[styles.penaltyEventTitle, { color: colors.text }]}>
+                            {eventTitle}
+                          </Text>
+                          <View style={[
+                            styles.statusBadge,
+                            { backgroundColor: severityColor + '20' }
+                          ]}>
+                            <Text style={[styles.statusText, { color: severityColor }]}>
+                              {severity.toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={{ fontSize: 12, color: colors.sidebar.text.secondary, marginTop: 4 }}>
+                          Missed on: {penaltyDate}
+                        </Text>
+
+                        {penalty.consequences && (
+                          <View style={{
+                            marginTop: 8,
+                            backgroundColor: colors.border,
+                            padding: 10,
+                            borderRadius: 8,
+                          }}>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 4 }}>
+                              Requirements:
+                            </Text>
+                            <Text style={{ fontSize: 12, color: colors.sidebar.text.secondary, lineHeight: 18 }}>
+                              {penalty.consequences}
+                            </Text>
+                          </View>
+                        )}
+
+                        {penalty.deadline && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6 }}>
+                            <Icon name="clock-outline" size={14} color={severityColor} />
+                            <Text style={{ fontSize: 12, color: severityColor, fontWeight: '500' }}>
+                              Deadline: {formatDate(penalty.deadline)}
+                            </Text>
+                          </View>
+                        )}
+
+                        {!penalty.consequences && (
+                          <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            marginTop: 8,
+                            gap: 6,
+                            backgroundColor: severityColor + '15',
+                            padding: 8,
+                            borderRadius: 6,
+                          }}>
+                            <Icon name="clock-alert" size={16} color={severityColor} />
+                            <Text style={{ fontSize: 13, color: severityColor, fontWeight: '500' }}>
+                              Please contact admin to settle this penalty
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+    );
   };
 
-  return (
-    <Modal
-      visible={showPenaltiesModal}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => setShowPenaltiesModal(false)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.aboutModal, { maxHeight: '90%' }]}>
-          <View style={styles.modalHeader}>
-            <View>
-              <Text style={styles.modalTitle}>My Penalties</Text>
-              <Text style={styles.modalSubtitle}>
-                {pendingCount > 0
-                  ? `${pendingCount} pending`
-                  : paidCount > 0
-                  ? 'All penalties paid'
-                  : 'No penalties'}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => setShowPenaltiesModal(false)}>
-              <Icon name="close" size={24} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
-
-          {penaltyLoading ? (
-            <ActivityIndicator size="large" color="#3B82F6" style={{ padding: 40 }} />
-          ) : penalties.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Icon name="check-circle-outline" size={64} color="#10B981" />
-              <Text style={styles.emptyStateTitle}>No Penalties!</Text>
-              <Text style={styles.emptyStateText}>
-                Great job! You have no pending penalties.
-              </Text>
-            </View>
-          ) : (
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {penalties
-                .filter(p => p.status === 'pending')
-                .map((penalty) => {
-                  const eventTitle = penalty.eventTitle || penalty.eventName || 'Unknown Event';
-                  const penaltyDate = getPenaltyDate(penalty);
-                  const severity = penalty.severity || 'medium';
-                  const severityColor = severityColors[severity as keyof typeof severityColors] || '#f59e0b';
-
-                  return (
-                    <View
-                      key={penalty.id}
-                      style={[
-                        styles.penaltyCard,
-                        { borderLeftColor: severityColor, borderLeftWidth: 4 },
-                        { backgroundColor: colors.card }, 
-                      ]}
-                    >
-                      <View style={styles.penaltyHeader}>
-                        <Text style={[styles.penaltyEventTitle, { color: colors.text }]}>
-                          {eventTitle}
-                        </Text>
-                        <View style={[
-                          styles.statusBadge,
-                          { backgroundColor: severityColor + '20' }
-                        ]}>
-                          <Text style={[styles.statusText, { color: severityColor }]}>
-                            {severity.toUpperCase()}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Text style={{ fontSize: 12, color: colors.sidebar.text.secondary, marginTop: 4 }}>
-                        Missed on: {penaltyDate}
-                      </Text>
-
-                      {/* Show admin consequences if available */}
-                      {penalty.consequences && (
-                        <View style={{
-                          marginTop: 8,
-                          backgroundColor: colors.border,
-                          padding: 10,
-                          borderRadius: 8,
-                        }}>
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 4 }}>
-                            Requirements:
-                          </Text>
-                          <Text style={{ fontSize: 12, color: colors.sidebar.text.secondary, lineHeight: 18 }}>
-                            {penalty.consequences}
-                          </Text>
-                        </View>
-                      )}
-
-                      {/* Show deadline if available */}
-                      {penalty.deadline && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6 }}>
-                          <Icon name="clock-outline" size={14} color={severityColor} />
-                          <Text style={{ fontSize: 12, color: severityColor, fontWeight: '500' }}>
-                            Deadline: {formatDate(penalty.deadline)}
-                          </Text>
-                        </View>
-                      )}
-
-                      {/* If no consequences provided, show generic message */}
-                      {!penalty.consequences && (
-                        <View style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          marginTop: 8,
-                          gap: 6,
-                          backgroundColor: severityColor + '15',
-                          padding: 8,
-                          borderRadius: 6,
-                        }}>
-                          <Icon name="clock-alert" size={16} color={severityColor} />
-                          <Text style={{ fontSize: 13, color: severityColor, fontWeight: '500' }}>
-                            Please contact admin to settle this penalty
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-            </ScrollView>
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-};
   const renderSettingsModal = () => (
     <Modal
       visible={showSettingsModal}
@@ -777,11 +1430,336 @@ export default function StudentProfile() {
     </Modal>
   );
 
+  // Attendance Report Modal with Enhanced Interactive Charts
+  const renderAttendanceReportModal = () => {
+    const totalEvents = attendedCount + missedCount;
+    const attendedPercentage = totalEvents > 0 ? Math.round((attendedCount / totalEvents) * 100) : 0;
+    const missedPercentage = totalEvents > 0 ? Math.round((missedCount / totalEvents) * 100) : 0;
+
+    // Animation values for stats
+    const statAnim1 = useRef(new Animated.Value(0)).current;
+    const statAnim2 = useRef(new Animated.Value(0)).current;
+    const chartAnim = useRef(new Animated.Value(0)).current;
+    const [selectedSlice, setSelectedSlice] = useState<number | null>(null);
+
+    // Animate stats on mount
+    useEffect(() => {
+      if (showAttendanceReportModal) {
+        Animated.stagger(200, [
+          Animated.timing(statAnim1, {
+            toValue: 1,
+            duration: 600,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(statAnim2, {
+            toValue: 1,
+            duration: 600,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(chartAnim, {
+            toValue: 1,
+            duration: 800,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }, [showAttendanceReportModal]);
+
+    const pieData = [
+      {
+        value: attendedCount,
+        color: '#10B981',
+        gradientColor: '#059669',
+        text: `${attendedPercentage}%`,
+        label: 'Attended',
+        icon: 'check-circle',
+        description: 'Events you successfully attended',
+      },
+      {
+        value: missedCount,
+        color: '#EF4444',
+        gradientColor: '#dc2626',
+        text: `${missedPercentage}%`,
+        label: 'Missed',
+        icon: 'calendar-remove',
+        description: 'Events you missed',
+      },
+    ];
+
+    const maxValue = Math.max(
+      ...monthlyAttendanceData.flatMap(d => [d.attended, d.missed]),
+      1
+    );
+
+    return (
+      <Modal
+        visible={showAttendanceReportModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAttendanceReportModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.aboutModal, { maxHeight: '90%', padding: 0 }]}>
+            <View style={[styles.modalHeader, { paddingHorizontal: 20, paddingTop: 20 }]}>
+              <View>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Attendance Report</Text>
+                <Text style={[styles.modalSubtitle, { color: colors.sidebar.text.secondary }]}>
+                  Last 6 months overview
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowAttendanceReportModal(false)}>
+                <Icon name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
+              {chartLoading ? (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color={colors.accent.primary} />
+                  <Text style={{ marginTop: 12, color: colors.sidebar.text.secondary }}>Loading attendance data...</Text>
+                </View>
+              ) : (
+                <>
+                  {/* Animated Summary Stats */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, marginBottom: 24, gap: 12 }}>
+                    <Animated.View style={[
+                      styles.summaryCard,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: '#10B981',
+                        borderWidth: 1,
+                        borderRadius: 16,
+                        padding: 16,
+                        flex: 1,
+                        alignItems: 'center',
+                        opacity: statAnim1,
+                        transform: [{ translateY: statAnim1.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+                      }
+                    ]}>
+                      <Animated.View style={{ transform: [{ scale: statAnim1.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }] }}>
+                        <Icon name="check-circle" size={28} color="#10B981" />
+                      </Animated.View>
+                      <Text style={[styles.summaryNumber, { color: '#10B981', fontSize: 32, fontWeight: 'bold', marginTop: 8 }]}>
+                        {attendedCount}
+                      </Text>
+                      <Text style={[styles.summaryLabel, { color: colors.sidebar.text.secondary, fontSize: 12 }]}>Events Attended</Text>
+                    </Animated.View>
+
+                    <Animated.View style={[
+                      styles.summaryCard,
+                      {
+                        backgroundColor: colors.card,
+                        borderColor: '#EF4444',
+                        borderWidth: 1,
+                        borderRadius: 16,
+                        padding: 16,
+                        flex: 1,
+                        alignItems: 'center',
+                        opacity: statAnim2,
+                        transform: [{ translateY: statAnim2.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+                      }
+                    ]}>
+                      <Animated.View style={{ transform: [{ scale: statAnim2.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }] }}>
+                        <Icon name="calendar-remove" size={28} color="#EF4444" />
+                      </Animated.View>
+                      <Text style={[styles.summaryNumber, { color: '#EF4444', fontSize: 32, fontWeight: 'bold', marginTop: 8 }]}>
+                        {missedCount}
+                      </Text>
+                      <Text style={[styles.summaryLabel, { color: colors.sidebar.text.secondary, fontSize: 12 }]}>Events Missed</Text>
+                    </Animated.View>
+                  </View>
+
+                  {/* Interactive Donut Chart */}
+                  <Animated.View style={[
+                    styles.chartContainer,
+                    {
+                      backgroundColor: colors.card,
+                      borderRadius: 20,
+                      padding: 20,
+                      marginBottom: 20,
+                      opacity: chartAnim,
+                      transform: [{ scale: chartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
+                    }
+                  ]}>
+                    <Text style={[styles.chartTitle, { color: colors.text, fontSize: 18, fontWeight: '600', marginBottom: 8, textAlign: 'center' }]}>
+                      Overall Attendance Distribution
+                    </Text>
+                    <Text style={[styles.chartSubtitle, { color: colors.sidebar.text.secondary, fontSize: 12, textAlign: 'center', marginBottom: 16 }]}>
+                      Tap segments for details
+                    </Text>
+
+                    <View style={{ alignItems: 'center', justifyContent: 'center', height: 220 }}>
+                      <PieChart
+                        data={pieData.map((item, index) => ({
+                          ...item,
+                          onPress: () => setSelectedSlice(selectedSlice === index ? null : index),
+                          strokeWidth: selectedSlice === index ? 4 : 2,
+                          strokeColor: selectedSlice === index ? '#ffffff' : 'transparent',
+                        }))}
+                        donut
+                        showText
+                        textColor={isDark ? '#ffffff' : '#1e293b'}
+                        fontWeight="bold"
+                        innerRadius={60}
+                        innerCircleColor={isDark ? '#1e293b' : '#ffffff'}
+                        radius={isMobile ? 90 : 110}
+                        focusOnPress
+                        centerLabelComponent={() => (
+                          <View style={{ alignItems: 'center' }}>
+                            {selectedSlice !== null ? (
+                              <>
+                                <Text style={{ fontSize: 28, fontWeight: 'bold', color: pieData[selectedSlice].color }}>
+                                  {pieData[selectedSlice].value}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: colors.sidebar.text.secondary }}>
+                                  {pieData[selectedSlice].label}
+                                </Text>
+                              </>
+                            ) : (
+                              <>
+                                <Text style={[styles.centerLabelValue, { color: colors.text, fontSize: 28, fontWeight: 'bold' }]}>
+                                  {totalEvents}
+                                </Text>
+                                <Text style={[styles.centerLabelText, { color: colors.sidebar.text.secondary, fontSize: 11 }]}>
+                                  Total Events
+                                </Text>
+                              </>
+                            )}
+                          </View>
+                        )}
+                      />
+                    </View>
+
+                    {/* Interactive Legend */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 16 }}>
+                      {pieData.map((item, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          onPress={() => setSelectedSlice(selectedSlice === index ? null : index)}
+                          style={[
+                            styles.pieLegendItem,
+                            selectedSlice === index && {
+                              backgroundColor: isDark ? `${item.color}30` : `${item.color}15`,
+                              borderColor: item.color,
+                            }
+                          ]}
+                        >
+                          <View style={[styles.pieLegendDot, { backgroundColor: item.color }]} />
+                          <View>
+                            <Text style={[styles.pieLegendText, { color: colors.text, fontWeight: '600' }]}>
+                              {item.label}
+                            </Text>
+                            <Text style={[styles.pieLegendSubtext, { color: colors.sidebar.text.secondary }]}>
+                              {item.value} ({item.text})
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    {/* Selected Slice Details */}
+                    {selectedSlice !== null && (
+                      <Animated.View
+                        style={[
+                          styles.sliceDetailsContainer,
+                          {
+                            backgroundColor: isDark ? `${pieData[selectedSlice].color}20` : `${pieData[selectedSlice].color}10`,
+                            opacity: chartAnim,
+                            transform: [{ translateY: chartAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+                          }
+                        ]}
+                      >
+                        <Icon name={pieData[selectedSlice].icon as any} size={20} color={pieData[selectedSlice].color} />
+                        <Text style={[styles.sliceDetailsText, { color: pieData[selectedSlice].color }]}>
+                          {pieData[selectedSlice].description}
+                        </Text>
+                      </Animated.View>
+                    )}
+                  </Animated.View>
+
+                  {/* Animated Bar Chart - Using the component */}
+                  {monthlyAttendanceData.length > 0 && (
+                    <BarChartSection
+                      monthlyAttendanceData={monthlyAttendanceData}
+                      maxValue={maxValue}
+                      colors={colors}
+                      isDark={isDark}
+                      chartAnim={chartAnim}
+                    />
+                  )}
+
+                  {/* Performance Insight Card */}
+                  {totalEvents > 0 && (
+                    <Animated.View style={[
+                      styles.chartContainer,
+                      {
+                        backgroundColor: colors.card,
+                        borderRadius: 20,
+                        padding: 20,
+                        marginTop: 20,
+                        marginBottom: 20,
+                        opacity: chartAnim,
+                        transform: [{ translateY: chartAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }],
+                      }
+                    ]}>
+                      <Text style={[styles.chartTitle, { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 12, textAlign: 'center' }]}>
+                        Performance Insight
+                      </Text>
+
+                      {/* Progress Bar */}
+                      <View style={{ width: '100%', backgroundColor: isDark ? '#334155' : '#e2e8f0', borderRadius: 10, height: 12, overflow: 'hidden', marginBottom: 12 }}>
+                        <Animated.View style={{
+                          width: `${attendedPercentage}%`,
+                          backgroundColor: attendedPercentage >= 80 ? '#10B981' : attendedPercentage >= 60 ? '#F59E0B' : '#EF4444',
+                          height: '100%',
+                          borderRadius: 10,
+                          opacity: chartAnim,
+                          transform: [{ scaleX: chartAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }) }],
+                        }} />
+                      </View>
+
+                      {/* Rating Scale */}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <Text style={{ fontSize: 10, color: colors.sidebar.text.secondary }}>0%</Text>
+                        <Text style={{ fontSize: 10, color: colors.sidebar.text.secondary }}>50%</Text>
+                        <Text style={{ fontSize: 10, color: colors.sidebar.text.secondary }}>100%</Text>
+                      </View>
+
+                      {/* Status Badge */}
+                      <View style={{
+                        backgroundColor: attendedPercentage >= 80 ? '#10B98120' : attendedPercentage >= 60 ? '#F59E0B20' : '#EF444420',
+                        padding: 12,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                      }}>
+                        <Text style={{
+                          fontSize: 14,
+                          fontWeight: '600',
+                          color: attendedPercentage >= 80 ? '#10B981' : attendedPercentage >= 60 ? '#F59E0B' : '#EF4444',
+                        }}>
+                          {attendedPercentage >= 80 ? '🎉 Excellent' : attendedPercentage >= 60 ? '👍 Good' : '⚠️ Needs Improvement'}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: colors.sidebar.text.secondary, marginTop: 4, textAlign: 'center' }}>
+                          {attendedPercentage >= 80 ? 'Keep up the great work!' :
+                            attendedPercentage >= 60 ? 'You\'re doing well, aim higher!' :
+                              'Attend more events to improve your record'}
+                        </Text>
+                      </View>
+                    </Animated.View>
+                  )}
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-
-
-
       <View style={styles.profileCard}>
         {/* Penalty Badge - Shows if has penalties */}
         {penalties.filter(p => p.status === 'pending').length > 0 && (
@@ -790,7 +1768,6 @@ export default function StudentProfile() {
             onPress={() => setShowPenaltiesModal(true)}
           >
             <Icon name="alert-circle" size={16} color="#FFFFFF" />
-            
           </TouchableOpacity>
         )}
 
@@ -864,7 +1841,6 @@ export default function StudentProfile() {
         {loading ? (
           <ActivityIndicator size="small" color="#3B82F6" style={styles.loading} />
         ) : activeTab === 'attended' ? (
-
           attendedEvents.length === 0 ? (
             <View style={styles.emptyState}>
               <Icon name="calendar-clock" size={48} color="#9CA3AF" />
@@ -912,7 +1888,6 @@ export default function StudentProfile() {
             <View style={styles.eventsList}>
               {missedEvents.slice(0, 5).map((event) => {
                 const penalty = penaltyMap[event.id];
-                console.log(`🔍 Event ID: ${event.id}, Penalty:`, penalty);
                 const isPending = penalty?.status === 'pending';
                 const isCompleted = penalty?.status === 'paid' || penalty?.status === 'completed';
 
@@ -958,19 +1933,24 @@ export default function StudentProfile() {
             </View>
           )
         )}
-
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.menu}>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => setShowCourseModal(true)}
+          >
             <Icon name="book-open-variant" size={20} color="#3B82F6" />
             <Text style={styles.menuText}>My Courses</Text>
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => setShowAttendanceReportModal(true)}
+          >
             <Icon name="chart-bar" size={20} color="#8B5CF6" />
             <Text style={styles.menuText}>Attendance Report</Text>
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
@@ -994,7 +1974,6 @@ export default function StudentProfile() {
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
 
-
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => setShowAboutModal(true)}
@@ -1013,7 +1992,10 @@ export default function StudentProfile() {
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => setShowHelpModal(true)}
+          >
             <Icon name="help-circle" size={20} color="#F59E0B" />
             <Text style={styles.menuText}>Help & Support</Text>
             <Icon name="chevron-right" size={20} color="#9CA3AF" />
@@ -1076,11 +2058,13 @@ export default function StudentProfile() {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
+
       {renderPenaltiesModal()}
       {renderAboutModal()}
       {renderSettingsModal()}
-
+      {renderCourseModal()}
+      {renderHelpModal()}
+      {renderAttendanceReportModal()}
     </ScrollView>
   );
 }
-

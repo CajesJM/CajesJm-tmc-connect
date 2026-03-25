@@ -75,7 +75,7 @@ export default function StudentEventsScreen() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showMapOptions, setShowMapOptions] = useState(false);
 
-  const [activeFilter, setActiveFilter] = useState<'upcoming' | 'past' | 'today'>('upcoming');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'upcoming' | 'past' | 'today'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -253,8 +253,9 @@ export default function StudentEventsScreen() {
 
     if (activeFilter === 'upcoming') {
       filtered = filtered.filter((e) => e.date > now);
-    }
-    else if (activeFilter === 'today') {
+    } else if (activeFilter === 'past') {
+      filtered = filtered.filter((e) => e.date <= now);
+    } else if (activeFilter === 'today') {
       const today = new Date();
       filtered = filtered.filter(e => {
         const d = e.date;
@@ -263,9 +264,7 @@ export default function StudentEventsScreen() {
           d.getDate() === today.getDate();
       });
     }
-    else {
-      filtered = filtered.filter((e) => e.date <= now);
-    }
+
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -455,11 +454,14 @@ export default function StudentEventsScreen() {
     return CAMPUS_LOCATIONS[0].image;
   };
 
-  const renderEventCard = ({ item }: { item: Event }) => {
+  const renderEventCard = ({ item, index }: { item: Event; index: number }) => {
     const days = getDaysUntilEvent(item.date);
     const imageSource = getLocationImage(item);
     const isPast = item.date <= new Date();
     const attendanceStatus = getAttendanceStatus(item);
+
+    // Global number across all pages
+    const globalNumber = (currentPage - 1) * itemsPerPage + index + 1;
 
     return (
       <TouchableOpacity
@@ -471,7 +473,14 @@ export default function StudentEventsScreen() {
         activeOpacity={0.7}
       >
         <View style={styles.cardLeft}>
-          <Image source={imageSource} style={styles.cardImage} />
+          <View style={styles.cardImageContainer}>
+            <Image source={imageSource} style={styles.cardImage} />
+            <View style={styles.cardNumberContainer}>
+              <View style={styles.cardNumberBadge}>
+                <Text style={styles.cardNumberText}>{globalNumber}</Text>
+              </View>
+            </View>
+          </View>
         </View>
         <View style={styles.cardContent}>
           <View style={styles.cardHeaderRow}>
@@ -834,6 +843,7 @@ export default function StudentEventsScreen() {
       </LinearGradient>
 
       {/* Stats Section */}
+      {/*
       <View style={styles.statsContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
           <View style={styles.statCard}>
@@ -866,7 +876,7 @@ export default function StudentEventsScreen() {
           </View>
         </ScrollView>
       </View>
-
+        */}
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <View style={styles.searchBar}>
@@ -889,6 +899,14 @@ export default function StudentEventsScreen() {
       {/* Filter Chips */}
       <View style={styles.filterSection}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          <TouchableOpacity
+            style={[styles.filterChip, activeFilter === 'all' && styles.filterChipActive]}
+            onPress={() => setActiveFilter('all')}
+          >
+            <Text style={[styles.filterChipText, activeFilter === 'all' && styles.filterChipTextActive]}>
+              All
+            </Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.filterChip, activeFilter === 'upcoming' && styles.filterChipActive]}
             onPress={() => setActiveFilter('upcoming')}
@@ -916,6 +934,14 @@ export default function StudentEventsScreen() {
           </TouchableOpacity>
         </ScrollView>
       </View>
+      {/* Results info */}
+      <View style={styles.resultsInfo}>
+        <Text style={styles.resultsText}>
+          {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
+          {activeFilter !== 'all' && ` from ${activeFilter}`}
+          {searchQuery ? ` matching "${searchQuery}"` : ''}
+        </Text>
+      </View>
 
       {/* Events List */}
       <FlatList
@@ -927,7 +953,7 @@ export default function StudentEventsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh} 
+            onRefresh={onRefresh}
             colors={[colors.accent.primary]}
           />
         }

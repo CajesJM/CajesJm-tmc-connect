@@ -1,5 +1,4 @@
-// app/assistant_admin/(tabs)/announcements.tsx
-import { Feather, FontAwesome6, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Feather, FontAwesome6 } from '@expo/vector-icons';
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,8 +21,9 @@ import {
   View
 } from 'react-native';
 import { useAuth } from "../../../context/AuthContext";
+import { useTheme } from "../../../context/ThemeContext";
 import { db } from "../../../lib/firebaseConfig";
-import { assistantAnnouncementStyles } from '../../../styles/assistant-admin/announcementStyles';
+import { createAssistantAnnouncementStyles } from '../../../styles/assistant-admin/announcementStyles';
 
 dayjs.extend(relativeTime);
 
@@ -33,13 +33,23 @@ interface Announcement {
   message: string;
   createdAt?: any;
   priority?: 'normal' | 'important' | 'urgent';
-  status?: 'pending' | 'approved' | 'rejected';          // new
-  createdBy?: string;                                     // email of creator
-  createdByName?: string;                                 // name of creator
+  status?: 'pending' | 'approved' | 'rejected';
+  createdBy?: string;
+  createdByName?: string;
 }
 
 export default function AssistantAdminAnnouncements() {
   const { width: screenWidth } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
+
+  const isMobile = screenWidth < 640;
+  const isTablet = screenWidth >= 640 && screenWidth < 1024;
+  const isDesktop = screenWidth >= 1024;
+
+  const styles = useMemo(
+    () => createAssistantAnnouncementStyles(colors, isDark, isMobile, isTablet, isDesktop),
+    [colors, isDark, isMobile, isTablet, isDesktop]
+  );
 
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
@@ -47,7 +57,7 @@ export default function AssistantAdminAnnouncements() {
   const [filteredAnnouncements, setFilteredAnnouncements] = useState<Announcement[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'week' | 'month' | 'urgent'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'today' | 'week' | 'month' | 'priority'>('all');
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,13 +65,11 @@ export default function AssistantAdminAnnouncements() {
   const [priority, setPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
 
   const { userData } = useAuth();
   const router = useRouter();
-  const styles = assistantAnnouncementStyles;
 
   useEffect(() => {
     const q = query(collection(db, "updates"), orderBy("createdAt", "desc"));
@@ -87,6 +95,11 @@ export default function AssistantAdminAnnouncements() {
 
     const now = dayjs();
     switch (activeFilter) {
+      case 'today':
+        filtered = filtered.filter(ann =>
+          ann.createdAt && dayjs(ann.createdAt.toDate()).isSame(now, 'day')
+        );
+        break;
       case 'week':
         filtered = filtered.filter(ann =>
           ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'week'))
@@ -97,9 +110,9 @@ export default function AssistantAdminAnnouncements() {
           ann.createdAt && dayjs(ann.createdAt.toDate()).isAfter(now.subtract(1, 'month'))
         );
         break;
-      case 'urgent':
+      case 'priority':
         filtered = filtered.filter(ann =>
-          ann.priority === 'urgent' || ann.title.toLowerCase().includes('urgent')
+          ann.priority === 'important' || ann.priority === 'urgent'
         );
         break;
     }
@@ -132,7 +145,7 @@ export default function AssistantAdminAnnouncements() {
         title: title.trim(),
         message: message.trim(),
         priority: priority,
-        status: 'pending',                           // requires approval
+        status: 'pending',
         createdBy: userData?.email || 'unknown',
         createdByName: userData?.name || 'Assistant Admin',
         createdAt: serverTimestamp(),
@@ -154,7 +167,7 @@ export default function AssistantAdminAnnouncements() {
         title: title.trim(),
         message: message.trim(),
         priority: priority,
-        status: 'pending',                           // requires re‑approval
+        status: 'pending',
         updatedAt: serverTimestamp(),
       });
       resetForm();
@@ -233,7 +246,7 @@ export default function AssistantAdminAnnouncements() {
   const getPriorityColor = (title: string, priority?: string) => {
     if (priority === 'urgent' || title.toLowerCase().includes('urgent')) return '#ef4444';
     if (priority === 'important' || title.toLowerCase().includes('important')) return '#f59e0b';
-    return '#0ea5e9';
+    return colors.accent.primary;
   };
 
   const getPriorityLabel = (title: string, priority?: string) => {
@@ -253,13 +266,12 @@ export default function AssistantAdminAnnouncements() {
       if (!ann.createdAt) return false;
       return dayjs(ann.createdAt.toDate()).isSame(dayjs(), 'day');
     }).length;
-    const urgent = announcements.filter(ann =>
-      ann.priority === 'urgent' || ann.title.toLowerCase().includes('urgent')
+    const priority = announcements.filter(ann =>
+      ann.priority === 'important' || ann.priority === 'urgent'
     ).length;
-    return { total, today, urgent };
+    return { total, today, priority };
   }, [announcements]);
 
-  // Pagination calculations
   const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
   const paginatedAnnouncements = filteredAnnouncements.slice(
     (currentPage - 1) * itemsPerPage,
@@ -284,7 +296,7 @@ export default function AssistantAdminAnnouncements() {
           onPress={goToPreviousPage}
           disabled={currentPage === 1}
         >
-          <Feather name="chevron-left" size={18} color={currentPage === 1 ? "#cbd5e1" : "#0f172a"} />
+          <Feather name="chevron-left" size={18} color={currentPage === 1 ? colors.sidebar.text.muted : colors.text} />
           <Text style={[styles.paginationText, currentPage === 1 && styles.paginationTextDisabled]}>
             Prev
           </Text>
@@ -302,18 +314,19 @@ export default function AssistantAdminAnnouncements() {
           <Text style={[styles.paginationText, currentPage === totalPages && styles.paginationTextDisabled]}>
             Next
           </Text>
-          <Feather name="chevron-right" size={18} color={currentPage === totalPages ? "#cbd5e1" : "#0f172a"} />
+          <Feather name="chevron-right" size={18} color={currentPage === totalPages ? colors.sidebar.text.muted : colors.text} />
         </TouchableOpacity>
       </View>
     );
   };
 
-  const renderAnnouncementCard = ({ item }: { item: Announcement }) => {
+  const renderAnnouncementCard = (item: Announcement, index: number) => {
+    const globalNumber = (currentPage - 1) * itemsPerPage + index + 1;
     const priorityColor = getPriorityColor(item.title, item.priority);
     const isNew = isNewAnnouncement(item.createdAt);
     const isPending = item.status === 'pending';
     const isRejected = item.status === 'rejected';
-    const isApproved = item.status === 'approved';
+    const isApproved = item.status === 'approved' || !item.status;
 
     return (
       <TouchableOpacity
@@ -321,14 +334,25 @@ export default function AssistantAdminAnnouncements() {
         onPress={() => openDetailModal(item)}
         activeOpacity={0.7}
       >
-       
+        <LinearGradient
+          colors={[priorityColor, 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.cardAbsoluteBar}
+        />
+
+        {/* Number badge */}
+        <View style={styles.cardNumberContainer}>
+          <View style={styles.cardNumberBadge}>
+            <Text style={styles.cardNumberText}>{globalNumber}</Text>
+          </View>
+        </View>
 
         <View style={styles.cardContent}>
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle} numberOfLines={1}>
               {item.title}
             </Text>
-
             <View style={styles.cardHeaderRight}>
               {isNew && (
                 <View style={[styles.badge, { backgroundColor: '#3b82f6' }]}>
@@ -345,34 +369,31 @@ export default function AssistantAdminAnnouncements() {
                   <Text style={styles.badgeText}>REJECTED</Text>
                 </View>
               )}
-              {isApproved && (
+              {isApproved && !isPending && !isRejected && (
                 <View style={[styles.badge, { backgroundColor: '#10b981' }]}>
                   <Text style={styles.badgeText}>APPROVED</Text>
                 </View>
               )}
               <View style={[styles.priorityDotSmall, { backgroundColor: priorityColor }]} />
-
               <Text style={styles.cardTime}>
                 {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
               </Text>
-
               <View style={styles.cardActionsRow}>
                 <TouchableOpacity
                   style={styles.cardActionButtonSmall}
                   onPress={() => handleEditStart(item)}
                 >
-                  <Feather name="edit-2" size={14} color="#3b82f6" />
+                  <Feather name="edit-2" size={14} color={colors.accent.primary} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.cardActionButtonSmall, styles.cardActionButtonDangerSmall]}
                   onPress={() => handleDelete(item.id, item.title)}
                 >
-                  <Feather name="trash-2" size={14} color="#ef4444" />
+                  <Feather name="trash-2" size={14} color={colors.error || '#ef4444'} />
                 </TouchableOpacity>
               </View>
             </View>
           </View>
-
           <Text style={styles.cardMessage} numberOfLines={1}>
             {item.message}
           </Text>
@@ -380,11 +401,10 @@ export default function AssistantAdminAnnouncements() {
       </TouchableOpacity>
     );
   };
-
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <View style={styles.emptyStateIcon}>
-        <FontAwesome6 name="bullhorn" size={40} color="#cbd5e1" />
+        <FontAwesome6 name="bullhorn" size={40} color={colors.sidebar.text.muted} />
       </View>
       <Text style={styles.emptyStateTitle}>No announcements</Text>
       <Text style={styles.emptyStateText}>
@@ -393,11 +413,16 @@ export default function AssistantAdminAnnouncements() {
     </View>
   );
 
+  // Header gradient colors based on theme
+  const headerGradientColors = isDark
+    ? ['#0f172a', '#1e293b'] as const
+    : ['#1e40af', '#3b82f6'] as const;
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={['#14203d', '#06080b']}
+        colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
@@ -428,8 +453,7 @@ export default function AssistantAdminAnnouncements() {
           <View style={styles.dateContainer}>
             <Feather name="calendar" size={12} color="#94a3b8" />
             <Text style={styles.dateText}>
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-              })}
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </Text>
           </View>
           <TouchableOpacity
@@ -443,21 +467,21 @@ export default function AssistantAdminAnnouncements() {
       </LinearGradient>
 
       {/* Stats Row */}
-      <View style={styles.statsContainer}>
+      {/*<View style={styles.statsContainer}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.statsScroll}
         >
-          <View style={[styles.statCard, {borderRightWidth: 3, borderRightColor: '#1266d4'}]}>
-            <View style={[styles.statIcon, { backgroundColor: '#0ea5e915' }]}>
-              <Ionicons name="document-text" size={18} color="#0ea5e9" />
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: `${colors.accent.primary}15` }]}>
+              <Ionicons name="document-text" size={18} color={colors.accent.primary} />
             </View>
             <Text style={styles.statNumber}>{stats.total}</Text>
             <Text style={styles.statLabel}>Total</Text>
           </View>
 
-          <View style={[styles.statCard, {borderRightWidth: 3, borderRightColor: '#1266d4'}]}>
+          <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: '#10b98115' }]}>
               <Feather name="sun" size={18} color="#10b981" />
             </View>
@@ -465,30 +489,30 @@ export default function AssistantAdminAnnouncements() {
             <Text style={styles.statLabel}>Today</Text>
           </View>
 
-          <View style={[styles.statCard, {borderRightWidth: 3, borderRightColor: '#1266d4'}]}>
+          <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: '#ef444415' }]}>
               <MaterialIcons name="priority-high" size={18} color="#ef4444" />
             </View>
-            <Text style={styles.statNumber}>{stats.urgent}</Text>
-            <Text style={styles.statLabel}>Urgent</Text>
+            <Text style={styles.statNumber}>{stats.priority}</Text>
+            <Text style={styles.statLabel}>Priority</Text>
           </View>
         </ScrollView>
-      </View>
+      </View> */}
 
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <View style={styles.searchBar}>
-          <Feather name="search" size={18} color="#64748b" />
+          <Feather name="search" size={18} color={colors.sidebar.text.muted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search announcements..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.sidebar.text.muted}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClear}>
-              <Feather name="x" size={18} color="#64748b" />
+              <Feather name="x" size={18} color={colors.sidebar.text.muted} />
             </TouchableOpacity>
           )}
         </View>
@@ -501,7 +525,7 @@ export default function AssistantAdminAnnouncements() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterScroll}
         >
-          {(['all', 'week', 'month', 'urgent'] as const).map((filter) => (
+          {(['all', 'today', 'week', 'month', 'priority'] as const).map((filter) => (
             <TouchableOpacity
               key={filter}
               style={[
@@ -520,16 +544,24 @@ export default function AssistantAdminAnnouncements() {
           ))}
         </ScrollView>
       </View>
+      {/* Results info */}
+      <View style={styles.resultsInfo}>
+        <Text style={styles.resultsText}>
+          {filteredAnnouncements.length} announcement{filteredAnnouncements.length !== 1 ? 's' : ''}
+          {activeFilter !== 'all' && ` from ${activeFilter}`}
+          {searchQuery ? ` matching "${searchQuery}"` : ''}
+        </Text>
+      </View>
 
       {/* Announcements List with Pagination */}
       <FlatList
         data={paginatedAnnouncements}
         keyExtractor={(item) => item.id}
-        renderItem={renderAnnouncementCard}
+        renderItem={({ item, index }) => renderAnnouncementCard(item, index)}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0ea5e9']} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.accent.primary]} />
         }
         ListEmptyComponent={renderEmptyState}
         ListFooterComponent={renderPagination}
@@ -554,7 +586,7 @@ export default function AssistantAdminAnnouncements() {
                   <FontAwesome6
                     name={editingId ? "pen-to-square" : "bullhorn"}
                     size={20}
-                    color="#0ea5e9"
+                    color={colors.accent.primary}
                   />
                 </View>
                 <View>
@@ -567,7 +599,7 @@ export default function AssistantAdminAnnouncements() {
                 </View>
               </View>
               <TouchableOpacity onPress={resetForm} style={styles.modalClose}>
-                <Feather name="x" size={24} color="#64748b" />
+                <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
 
@@ -580,11 +612,11 @@ export default function AssistantAdminAnnouncements() {
                     style={[
                       styles.priorityButton,
                       priority === 'normal' && styles.priorityButtonActive,
-                      priority === 'normal' && { borderColor: '#0ea5e9', backgroundColor: '#0ea5e915' }
+                      priority === 'normal' && { borderColor: colors.accent.primary, backgroundColor: `${colors.accent.primary}15` }
                     ]}
                     onPress={() => setPriority('normal')}
                   >
-                    <View style={[styles.priorityDot, { backgroundColor: '#0ea5e9' }]} />
+                    <View style={[styles.priorityDot, { backgroundColor: colors.accent.primary }]} />
                     <Text style={[
                       styles.priorityButtonText,
                       priority === 'normal' && styles.priorityButtonTextActive
@@ -629,7 +661,7 @@ export default function AssistantAdminAnnouncements() {
                 <TextInput
                   style={styles.formInput}
                   placeholder="Enter announcement title"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={title}
                   onChangeText={setTitle}
                   maxLength={100}
@@ -642,7 +674,7 @@ export default function AssistantAdminAnnouncements() {
                 <TextInput
                   style={[styles.formInput, styles.formTextArea]}
                   placeholder="Write your announcement message..."
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={message}
                   onChangeText={setMessage}
                   multiline
@@ -710,7 +742,7 @@ export default function AssistantAdminAnnouncements() {
                     onPress={() => setShowDetailModal(false)}
                     style={styles.detailModalClose}
                   >
-                    <Feather name="x" size={24} color="#64748b" />
+                    <Feather name="x" size={24} color={colors.sidebar.text.secondary} />
                   </TouchableOpacity>
                 </View>
 
@@ -731,7 +763,7 @@ export default function AssistantAdminAnnouncements() {
                         <Text style={styles.detailBadgeText}>REJECTED</Text>
                       </View>
                     )}
-                    {selectedAnnouncement.status === 'approved' && (
+                    {(selectedAnnouncement.status === 'approved' || !selectedAnnouncement.status) && (
                       <View style={[styles.detailBadge, { backgroundColor: '#10b981' }]}>
                         <Text style={styles.detailBadgeText}>APPROVED</Text>
                       </View>
@@ -750,7 +782,7 @@ export default function AssistantAdminAnnouncements() {
 
                   <View style={styles.detailMeta}>
                     <View style={styles.detailMetaItem}>
-                      <Feather name="clock" size={14} color="#64748b" />
+                      <Feather name="clock" size={14} color={colors.sidebar.text.muted} />
                       <Text style={styles.detailMetaText}>
                         {selectedAnnouncement.createdAt
                           ? dayjs(selectedAnnouncement.createdAt.toDate()).format('MMM D, YYYY • h:mm A')
@@ -759,7 +791,7 @@ export default function AssistantAdminAnnouncements() {
                     </View>
                     {selectedAnnouncement.createdByName && (
                       <View style={styles.detailMetaItem}>
-                        <Feather name="user" size={14} color="#64748b" />
+                        <Feather name="user" size={14} color={colors.sidebar.text.muted} />
                         <Text style={styles.detailMetaText}>
                           Created by {selectedAnnouncement.createdByName}
                         </Text>
@@ -781,7 +813,7 @@ export default function AssistantAdminAnnouncements() {
                         handleEditStart(selectedAnnouncement);
                       }}
                     >
-                      <Feather name="edit-2" size={18} color="#3b82f6" />
+                      <Feather name="edit-2" size={18} color={colors.accent.primary} />
                       <Text style={styles.detailEditButtonText}>Edit Announcement</Text>
                     </TouchableOpacity>
 
@@ -792,7 +824,7 @@ export default function AssistantAdminAnnouncements() {
                         selectedAnnouncement.title
                       )}
                     >
-                      <Feather name="trash-2" size={18} color="#ef4444" />
+                      <Feather name="trash-2" size={18} color={colors.error || '#ef4444'} />
                       <Text style={styles.detailDeleteButtonText}>Delete Announcement</Text>
                     </TouchableOpacity>
                   </View>

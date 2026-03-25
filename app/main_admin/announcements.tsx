@@ -76,7 +76,7 @@ export default function MainAdminAnnouncements() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const [itemsPerPage] = useState(isMobile ? 5 : 5);
+  const [itemsPerPage] = useState(isMobile ? 10 : 10);
 
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<string | null>(null);
   const [priority, setPriority] = useState<'normal' | 'important' | 'urgent'>('normal');
@@ -597,7 +597,7 @@ export default function MainAdminAnnouncements() {
         </View>
       </LinearGradient>
 
-      
+
 
       {/* Main Content Grid */}
       <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
@@ -690,6 +690,14 @@ export default function MainAdminAnnouncements() {
                 </TouchableOpacity>
               </ScrollView>
             </View>
+          </View>
+          {/* Results info */}
+          <View style={styles.resultsInfo}>
+            <Text style={styles.resultsText}>
+              {filterAnnouncementsByTime(announcements, activeFilter).length} announcement{filterAnnouncementsByTime(announcements, activeFilter).length !== 1 ? 's' : ''}
+              {activeFilter !== 'all' && ` from ${activeFilter}`}
+              
+            </Text>
           </View>
 
           {isLoading ? (

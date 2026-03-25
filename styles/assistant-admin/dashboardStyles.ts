@@ -1,131 +1,153 @@
-import { StyleSheet } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native';
 
-export const assistantDashboardStyles = StyleSheet.create({
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
-  contentArea: {
+  scrollView: {
     flex: 1,
   },
-  overviewContainer: {
-    flex: 1,
+  headerContainer: {
+    marginBottom: 20,
   },
   headerGradient: {
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 5,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
-  greetingText: {
-    fontSize: 13,
-    color: '#94a3b8',
-    fontFamily: 'Inter-Regular',
+  headerLeft: {
+    flex: 1,
+  },
+  greetingContainer: {
+    gap: 4,
+  },
+  greetingLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
   },
   userName: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginTop: 2,
+  },
+  roleBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    marginTop: 8,
   },
   roleText: {
-    fontSize: 13,
-    color: '#0ea5e9',
-    marginTop: 4,
-  },
-  profileButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#ffffff20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  profileImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-  },
-  profileFallback: {
-    backgroundColor: '#0ea5e9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileInitials: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  dateSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dateText: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#ffffff',
+    fontWeight: '600',
   },
-  headerActions: {
+  headerRight: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 12,
   },
-  headerAction: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#ffffff20',
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  iconButtonInner: {
     position: 'relative',
   },
   notificationBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -8,
+    right: -8,
     backgroundColor: '#ef4444',
     borderRadius: 10,
-    minWidth: 18,
-    height: 18,
+    minWidth: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: '#3b82f6',
   },
   notificationBadgeText: {
     color: '#ffffff',
     fontSize: 10,
     fontWeight: 'bold',
   },
+  profileButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  profileFallback: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileInitials: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    gap: 8,
+  },
+  dateText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+  },
+  statsContainer: {
+    paddingHorizontal: 16,
+    marginTop: -10,
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 12,
-    marginTop: -20,
     gap: 12,
-    justifyContent: 'space-between',
   },
   statCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
     width: '47%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
     shadowRadius: 8,
-    elevation: 2,
+  },
+  statCardGradient: {
+    padding: 16,
   },
   statCardHeader: {
     flexDirection: 'row',
@@ -134,66 +156,84 @@ export const assistantDashboardStyles = StyleSheet.create({
     marginBottom: 12,
   },
   statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  statNumber: {
-    fontSize: 24,
+  trendBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  trendText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  counterText: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#0f172a',
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 4,
+    fontSize: 14,
+    color: '#ffffff',
+    opacity: 0.9,
+    fontWeight: '500',
   },
   statSubtext: {
-    fontSize: 11,
-    color: '#94a3b8',
-    marginTop: 4,
+    fontSize: 12,
+    color: '#ffffff',
+    opacity: 0.6,
+    marginTop: 2,
   },
-  chartsContainer: {
+  chartContainer: {
     marginTop: 24,
     paddingHorizontal: 16,
+  },
+  chartGradient: {
+    borderRadius: 24,
+    padding: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
   },
   chartHeader: {
     marginBottom: 16,
   },
-  chartsTitle: {
+  chartTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontWeight: '700',
   },
-  chartsSubtitle: {
+  chartSubtitle: {
     fontSize: 13,
-    color: '#64748b',
-    marginTop: 2,
+    marginTop: 4,
   },
-  chartLegend: {
+  legendContainer: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
-    gap: 16,
-    marginTop: 12,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    gap: 12,
+    marginBottom: 16,
   },
   legendButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: 'rgba(100,116,139,0.1)',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    gap: 8,
   },
-  legendButtonActiveBlue: {
-    backgroundColor: '#0ea5e920',
-  },
-  legendButtonActiveGreen: {
-    backgroundColor: '#10b98120',
+  legendButtonActive: {
+    backgroundColor: 'rgba(59,130,246,0.1)',
+    borderWidth: 1,
   },
   legendDot: {
     width: 10,
@@ -202,87 +242,110 @@ export const assistantDashboardStyles = StyleSheet.create({
   },
   legendText: {
     fontSize: 13,
-    color: '#334155',
     fontWeight: '500',
   },
-  legendTextActive: {
-    fontWeight: '600',
-  },
   legendValue: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   legendValueText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   chartWrapper: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
     position: 'relative',
-  },
-  chartBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 24,
-  },
-  chartScrollContent: {
-    paddingRight: 16,
   },
   chart: {
     borderRadius: 16,
     marginVertical: 8,
   },
-  axisLabelContainer: {
+  tooltip: {
+    position: 'absolute',
+    zIndex: 100,
+    elevation: 10,
+  },
+  tooltipGradient: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  tooltipMonth: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  tooltipValue: {
+    color: '#ffffff',
+    fontSize: 11,
+    opacity: 0.9,
+  },
+  tooltipArrow: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#2563eb',
+    alignSelf: 'center',
+  },
+  chartFooter: {
     alignItems: 'center',
     marginTop: 8,
   },
   axisLabel: {
     fontSize: 12,
-    color: '#64748b',
+    fontWeight: '500',
   },
   quickActionsSection: {
     marginTop: 24,
     paddingHorizontal: 16,
   },
-  quickActionsTitle: {
+  sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 12,
+    fontWeight: '700',
+    marginBottom: 16,
   },
   quickActionsGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 12,
-    justifyContent: 'space-between',
   },
   quickActionCard: {
-    width: '30%',
+    flex: 1,
     aspectRatio: 1,
     borderRadius: 20,
     overflow: 'hidden',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   quickActionGradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 12,
+    padding: 16,
+  },
+  quickActionIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   quickActionText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#ffffff',
-    marginTop: 8,
+    fontWeight: '600',
     textAlign: 'center',
   },
   twoColumnLayout: {
@@ -291,52 +354,48 @@ export const assistantDashboardStyles = StyleSheet.create({
     paddingHorizontal: 16,
     marginTop: 24,
     gap: 16,
-    paddingBottom: 30,
   },
   column: {
     flex: 1,
-    minWidth: 280,
-  },
-  activityColumn: {
-    flex: 1.2,
-  },
-  upcomingColumn: {
-    flex: 1,
+    minWidth: 300,
+    marginBottom:100,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 18,
+  announcementHeader: {
+    marginTop: 24,
+  },
+  viewAllText: {
+    fontSize: 13,
+    color: '#3b82f6',
     fontWeight: '600',
-    color: '#0f172a',
   },
-  activityList: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
+  card: {
+    borderRadius: 20,
     padding: 16,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 2,
   },
   activityItem: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 12,
+  },
+  activityItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: 'rgba(148,163,184,0.2)',
   },
-  lastActivityItem: {
-    borderBottomWidth: 0,
-  },
-  activityIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  activityIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -353,206 +412,147 @@ export const assistantDashboardStyles = StyleSheet.create({
   activityTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
   },
   activityTime: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#64748b',
   },
   activityDescription: {
     fontSize: 13,
-    color: '#475569',
   },
-  emptyActivity: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyActivityText: {
-    fontSize: 14,
-    color: '#94a3b8',
-    marginTop: 8,
+  activityIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: 8,
   },
   paginationContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 16,
-    gap: 12,
+    gap: 16,
   },
   paginationButton: {
-    flexDirection: 'row',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(59,130,246,0.1)',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: '#f1f5f9',
   },
   paginationButtonDisabled: {
     opacity: 0.5,
   },
-  paginationButtonText: {
-    fontSize: 13,
-    color: '#0ea5e9',
-    marginHorizontal: 4,
-  },
-  paginationButtonTextDisabled: {
-    color: '#cbd5e1',
-  },
-  pageInfo: {
-    paddingHorizontal: 12,
-  },
-  pageInfoText: {
-    fontSize: 13,
+  paginationText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#334155',
+    color: '#64748b',
   },
-  upcomingCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  upcomingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  emptyState: {
     alignItems: 'center',
-    marginBottom: 16,
+    paddingVertical: 40,
   },
-  upcomingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
+  emptyStateText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748b',
   },
-  viewAllText: {
-    fontSize: 13,
-    color: '#0ea5e9',
-    fontWeight: '500',
+  loader: {
+    paddingVertical: 40,
   },
-  upcomingList: {
-    gap: 12,
-  },
-  upcomingItem: {
+  eventItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 12,
   },
-  eventDate: {
-    width: 48,
-    height: 48,
+  eventItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148,163,184,0.2)',
+  },
+  eventDateBox: {
+    width: 50,
+    height: 50,
     borderRadius: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: 'rgba(59,130,246,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   eventDay: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: '#3b82f6',
   },
   eventMonth: {
     fontSize: 10,
-    color: '#64748b',
+    color: '#3b82f6',
+    fontWeight: '600',
   },
   eventInfo: {
     flex: 1,
   },
-  eventName: {
+  eventTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
   },
-  eventTime: {
+  eventMeta: {
     fontSize: 12,
     color: '#64748b',
     marginTop: 2,
   },
   eventAttendees: {
     fontSize: 11,
-    color: '#0ea5e9',
+    color: '#3b82f6',
     marginTop: 2,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: '#94a3b8',
-    marginTop: 8,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#94a3b8',
-    marginTop: 8,
-  },
-  createButton: {
-    marginTop: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#0ea5e9',
-    borderRadius: 20,
-  },
-  createButtonText: {
-    fontSize: 13,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
-  announcementCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  announcementHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  announcementTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  announcementList: {
-    gap: 12,
+    fontWeight: '500',
   },
   announcementItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 12,
   },
-  announcementBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  announcementItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148,163,184,0.2)',
+  },
+  priorityBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  announcementContent: {
+  announcementInfo: {
     flex: 1,
   },
-  announcementText: {
+  announcementTitle: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#0f172a',
+    fontWeight: '600',
   },
-  announcementTime: {
+  announcementMeta: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: '#64748b',
     marginTop: 2,
   },
+  shimmerContainer: {
+    overflow: 'hidden',
+  },
+  shimmerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.3,
+  },
+  bottomPadding: {
+    height: 40,
+  },
+  emptyChartPlaceholder: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 40,
+}
 });

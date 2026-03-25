@@ -142,7 +142,6 @@ function TabsContent() {
   [colors.card, colors.accent.primary, isDark]
 );
 
-  // QR button gradient colors (active / inactive)
   const qrGradientColors = useMemo(
     () => [colors.accent.primary, '#0284c7'] as const,
     [colors.accent.primary]
@@ -151,6 +150,7 @@ function TabsContent() {
   return (
     <View style={{ flex: 1 }}>
       <Tabs
+      initialRouteName="index" 
         screenOptions={{
           tabBarActiveTintColor: colors.accent.primary,
           tabBarInactiveTintColor: colors.sidebar.text.secondary,
@@ -184,10 +184,10 @@ function TabsContent() {
         <Tabs.Screen
           name="announcements"
           options={{
-            title: 'News',
+            title: 'Announcements',
             tabBarIcon: ({ focused }) => (
               <TabIconWithBadge
-                name="notifications"
+                name="megaphone"
                 focused={focused}
                 badgeCount={unreadCounts.announcements}
                 colors={colors}

@@ -5,6 +5,7 @@ import { ActivityIndicator, useColorScheme, View } from 'react-native';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface ThemeColors {
+  // Existing structure
   sidebar: {
     background: string;
     border: string;
@@ -32,6 +33,14 @@ export interface ThemeColors {
   card: string;
   border: string;
   statusBar: 'light' | 'dark';
+
+  // New properties needed by admin profile style
+  textSecondary: string;
+  textMuted: string;
+  error: string;
+  success?: string;
+  warning?: string;
+  primary?: string; // optional, but we can map from accent.primary
 }
 
 interface ThemeContextType {
@@ -70,6 +79,13 @@ const lightColors: ThemeColors = {
   card: '#FFFFFF',
   border: '#E2E8F0',
   statusBar: 'dark',
+  // New properties
+  textSecondary: '#64748B',
+  textMuted: '#94A3B8',
+  error: '#EF4444',
+  success: '#10B981',
+  warning: '#F59E0B',
+  primary: '#3B82F6',
 };
 
 const darkColors: ThemeColors = {
@@ -100,6 +116,13 @@ const darkColors: ThemeColors = {
   card: '#1E293B',
   border: '#334155',
   statusBar: 'light',
+  // New properties
+  textSecondary: '#8B98B5',
+  textMuted: '#5A6B8C',
+  error: '#EF4444',
+  success: '#10B981',
+  warning: '#F59E0B',
+  primary: '#3B82F6',
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -111,7 +134,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeMode>('system');
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load saved theme on mount
   useEffect(() => {
     loadSavedTheme();
   }, []);
@@ -156,12 +178,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const colors = isDark ? darkColors : lightColors;
 
   if (!isLoaded) {
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <ActivityIndicator />
-    </View>
-  );
-}
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
   return (
     <ThemeContext.Provider value={{ theme, setTheme, colors, isDark, toggleTheme }}>
       {children}

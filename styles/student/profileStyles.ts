@@ -632,5 +632,208 @@ export const createProfileStyles = (
       marginTop: 16,
       marginBottom: 8,
     },
+    courseDisplayContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 40,
+    },
+    courseDisplayText: {
+      fontSize: 42,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      backgroundColor: 'transparent',
+    },
+
+
+
+    summaryCard: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    summaryNumber: {
+      fontSize: 24,
+      fontWeight: 'bold',
+    },
+    summaryLabel: {
+      fontSize: 12,
+      marginTop: 4,
+    },
+    chartContainer: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    chartTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 12,
+    },
+    chartSubtitle: {
+      fontSize: 12,
+      marginBottom: 16,
+    },
+    centerLabelValue: {
+      fontSize: 24,
+      fontWeight: 'bold',
+    },
+    centerLabelText: {
+      fontSize: 12,
+    },
+
+    // Add these styles to your createProfileStyles function
+    supportBanner: {
+      borderRadius: 16,
+      padding: 20,
+      alignItems: 'center',
+    },
+    supportBannerTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    supportBannerText: {
+      fontSize: 13,
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+    contactSupportButton: {
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 25,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    supportCard: {
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+    },
+    supportIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    supportTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 4,
+    },
+    supportDescription: {
+      fontSize: 12,
+    },
+    faqItem: {
+      borderRadius: 12,
+      marginBottom: 8,
+      borderWidth: 1,
+      overflow: 'hidden',
+    },
+    faqQuestion: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+    },
+    faqIconContainer: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    faqQuestionText: {
+      fontSize: 14,
+      fontWeight: '600',
+      flex: 1,
+    },
+    faqAnswer: {
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      paddingTop: 0,
+    },
+    faqAnswerText: {
+      fontSize: 13,
+      lineHeight: 20,
+    },
+    reportProblemCard: {
+      borderRadius: 16,
+      padding: 20,
+      borderWidth: 1,
+    },
+    reportTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    reportDescription: {
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    reportButton: {
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 25,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      alignSelf: 'flex-start',
+    },
+    versionInfo: {
+      alignItems: 'center',
+      paddingVertical: 20,
+    },
+
+    copyrightText: {
+      fontSize: 11,
+      marginTop: 4,
+    },
+ 
+    pieLegendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: 'transparent',
+      backgroundColor: 'rgba(0,0,0,0.03)',
+    },
+    pieLegendDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+    },
+    pieLegendText: {
+      fontSize: isMobile ? 13 : 14,
+    },
+    pieLegendSubtext: {
+      fontSize: isMobile ? 11 : 12,
+      marginTop: 2,
+    },
+    sliceDetailsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 16,
+      padding: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: 'rgba(0,0,0,0.1)',
+    },
+    sliceDetailsText: {
+      fontSize: 13,
+      fontWeight: '500',
+    },
   });
 };

@@ -789,6 +789,15 @@ export const createAnnouncementStyles = (
             marginLeft: 4,
             fontStyle: 'italic',
         },
+        resultsInfo: {
+            paddingHorizontal: isMobile ? 12 : 16,
+            marginTop: 8,
+            marginBottom: 12,
+        },
+        resultsText: {
+            fontSize: isMobile ? 11 : 13,
+            color: colors.sidebar.text.secondary,
+        },
 
         // Additional mobile-specific styles
         headerGradientMobile: { paddingTop: 10, paddingBottom: 5, paddingHorizontal: 15 },

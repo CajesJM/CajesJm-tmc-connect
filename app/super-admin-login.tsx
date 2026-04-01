@@ -1,12 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { getAuth, sendPasswordResetEmail } from 'firebase/auth'; // <-- NEW
+import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Image,
   KeyboardAvoidingView,
@@ -33,7 +32,7 @@ const modalStyles = StyleSheet.create({
     alignItems: 'center',
   },
   container: {
-    width: '80%',
+    width: '20%',
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
@@ -122,12 +121,15 @@ export default function SuperAdminLogin() {
   const [loadingMessage, setLoadingMessage] = useState<string>("");
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
-
-  // NEW: Forgot password modal state
   const [forgotModalVisible, setForgotModalVisible] = useState(false);
   const [forgotUsername, setForgotUsername] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+
+  // Lockout state
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [remainingLockoutSeconds, setRemainingLockoutSeconds] = useState(0);
 
   const usernameAnim = useRef(new Animated.Value(username ? 1 : 0)).current;
   const passwordAnim = useRef(new Animated.Value(password ? 1 : 0)).current;
@@ -135,6 +137,42 @@ export default function SuperAdminLogin() {
   const slideAnim = useRef(new Animated.Value(24)).current;
 
   const animationDuration = 180;
+
+  const saveLockoutState = (attempts: number, lockoutTime: number | null) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('superAdminLoginAttempts', JSON.stringify({
+        failedAttempts: attempts,
+        lockoutUntil: lockoutTime,
+      }));
+    }
+  };
+
+  const restoreLockoutState = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('superAdminLoginAttempts');
+      if (stored) {
+        try {
+          const { failedAttempts: storedAttempts, lockoutUntil: storedLockout } = JSON.parse(stored);
+          if (storedLockout && storedLockout > Date.now()) {
+            setFailedAttempts(storedAttempts);
+            setLockoutUntil(storedLockout);
+          } else {
+            // Lockout has expired, clear it
+            localStorage.removeItem('superAdminLoginAttempts');
+            setFailedAttempts(0);
+            setLockoutUntil(null);
+          }
+        } catch (e) {
+          console.error('Failed to restore lockout state:', e);
+          localStorage.removeItem('superAdminLoginAttempts');
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    restoreLockoutState();
+  }, []);
 
   const animateLabel = (animValue: Animated.Value, toValue: number) => {
     Animated.timing(animValue, {
@@ -159,6 +197,39 @@ export default function SuperAdminLogin() {
     ]).start();
   }, []);
 
+  // Countdown effect for lockout
+  useEffect(() => {
+    let interval: number;
+    if (lockoutUntil && lockoutUntil > Date.now()) {
+      const updateRemaining = () => {
+        const remaining = Math.max(0, Math.ceil((lockoutUntil - Date.now()) / 1000));
+        setRemainingLockoutSeconds(remaining);
+        if (remaining === 0) {
+          setLockoutUntil(null);
+          setFailedAttempts(0);
+          setRemainingLockoutSeconds(0);
+          localStorage.removeItem('superAdminLoginAttempts');
+          setError(null);
+        }
+      };
+      updateRemaining();
+      interval = setInterval(updateRemaining, 1000);
+      return () => clearInterval(interval);
+    } else if (lockoutUntil && lockoutUntil <= Date.now()) {
+      setLockoutUntil(null);
+      setFailedAttempts(0);
+      setRemainingLockoutSeconds(0);
+      localStorage.removeItem('superAdminLoginAttempts');
+      setError(null);
+    }
+  }, [lockoutUntil]);
+
+  useEffect(() => {
+    if (lockoutUntil && lockoutUntil > Date.now() && remainingLockoutSeconds > 0) {
+      setError(`Too many failed attempts. Please wait ${remainingLockoutSeconds} second${remainingLockoutSeconds !== 1 ? 's' : ''} before trying again.`);
+    }
+  }, [remainingLockoutSeconds, lockoutUntil]);
+
   const forceLabelsUp = () => {
     if (username) animateLabel(usernameAnim, 1);
     if (password) animateLabel(passwordAnim, 1);
@@ -169,6 +240,17 @@ export default function SuperAdminLogin() {
     if (busy || authLoading) return;
     setError(null);
 
+    // Check lockout
+    if (lockoutUntil && lockoutUntil > Date.now()) {
+      return;
+    } else if (lockoutUntil && lockoutUntil <= Date.now()) {
+      // Reset lockout if expired
+      setLockoutUntil(null);
+      setFailedAttempts(0);
+      setRemainingLockoutSeconds(0);
+      localStorage.removeItem('superAdminLoginAttempts');
+    }
+
     if (!username || !password) {
       setError("Please enter username and password");
       return;
@@ -178,57 +260,57 @@ export default function SuperAdminLogin() {
     setLoadingMessage("Verifying credentials");
 
     try {
-      setLoadingMessage("Checking user account");
+      // 1. Check username in Firestore
       const usersCollection = collection(db, 'users');
       const q = query(usersCollection, where('username', '==', username));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        setError("Invalid username or password");
-        Alert.alert("Login Failed", "Invalid username or password");
-        setBusy(false);
-        return;
+        throw new Error("Invalid username or password");
       }
 
       const userDoc = querySnapshot.docs[0];
       const userData = userDoc.data();
 
-      setLoadingMessage("Verifying admin privileges");
       if (userData.role !== 'main_admin') {
-        setError("Access denied. This portal is for administrators only.");
-        Alert.alert("Access Denied", "This portal is for Main Administrators only");
-        setBusy(false);
-        return;
+        throw new Error("Access denied. This portal is for administrators only.");
       }
 
-      setLoadingMessage("Authenticating");
-      const loggedInUser = await login(userData.email, password);
+      // 2. Attempt Firebase login
+      await login(userData.email, password);
 
+      // 3. Success: reset attempts & lockout, navigate
+      setFailedAttempts(0);
+      setLockoutUntil(null);
+      setRemainingLockoutSeconds(0);
+      setError(null);
+      localStorage.removeItem('superAdminLoginAttempts');
       setLoadingMessage("Access granted! Loading dashboard");
-
-      setTimeout(() => {
-        router.replace('/main_admin');
-      }, 1500);
+      router.replace('/main_admin');
 
     } catch (err: any) {
       console.log("Login error:", err.message);
-      let errorMessage = "Invalid username or password";
-      setError(errorMessage);
-      Alert.alert("Login Failed", errorMessage);
-    } finally {
-      if (!busy) {
-        setTimeout(() => {
-          setBusy(false);
-          setLoadingMessage("");
-        }, 1000);
+      // Increment failed attempts
+      const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+
+      if (newAttempts >= 3) {
+        // Lockout for 60 seconds
+        const lockoutTime = Date.now() + 60 * 1000;
+        setLockoutUntil(lockoutTime);
+        setRemainingLockoutSeconds(60);
+        saveLockoutState(newAttempts, lockoutTime);
+      } else {
+        setError(`Invalid username or password. ${3 - newAttempts} attempt(s) remaining.`);
       }
+      setBusy(false);
     }
   };
+
   const isValidEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/;
     return emailRegex.test(email);
   };
-
 
   const handleForgotPassword = async () => {
     if (!forgotUsername.trim()) {
@@ -240,7 +322,6 @@ export default function SuperAdminLogin() {
     setForgotMessage(null);
 
     try {
-      // Find user by username
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('username', '==', forgotUsername.trim()));
       const querySnapshot = await getDocs(q);
@@ -254,7 +335,6 @@ export default function SuperAdminLogin() {
       const userDoc = querySnapshot.docs[0];
       const userData = userDoc.data();
 
-      // Ensure it's a main_admin
       if (userData.role !== 'main_admin') {
         setForgotMessage("This account does not have admin privileges.");
         setForgotLoading(false);
@@ -274,15 +354,12 @@ export default function SuperAdminLogin() {
         return;
       }
 
-      // Send password reset email
       const auth = getAuth();
       await sendPasswordResetEmail(auth, email);
 
-      // Success: show message in modal, keep open for 2 seconds, then close
       setForgotMessage("✓ Password reset email sent! Check your inbox.");
       setForgotLoading(false);
 
-      // Auto‑close modal after 2 seconds
       setTimeout(() => {
         setForgotModalVisible(false);
         setForgotUsername("");
@@ -305,6 +382,7 @@ export default function SuperAdminLogin() {
   };
 
   const isLoading = busy || authLoading;
+  const isLockedOut = lockoutUntil && lockoutUntil > Date.now();
 
   const usernameLabelStyle = {
     transform: [
@@ -341,7 +419,7 @@ export default function SuperAdminLogin() {
         />
       </Modal>
 
-      {/* NEW: Forgot Password Modal */}
+      {/* Forgot Password Modal */}
       <Modal
         transparent
         visible={forgotModalVisible}
@@ -409,14 +487,13 @@ export default function SuperAdminLogin() {
       >
         <View style={styles.container}>
 
-          {/* ── LEFT COLUMN ── */}
+          {/* LEFT COLUMN */}
           <LinearGradient
             colors={['#0a2b4a', '#1e4a76', '#3182ce']}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={[styles.leftColumn, { flex: 1.15 }]}
           >
-            {/* Decorative circles */}
             <View style={{
               position: 'absolute', top: -80, right: -80,
               width: 360, height: 360, borderRadius: 180,
@@ -428,7 +505,6 @@ export default function SuperAdminLogin() {
               backgroundColor: 'rgba(14,165,233,0.04)',
             }} />
 
-            {/* Logo */}
             <View style={styles.logoContainer}>
               <Image
                 source={require('../assets/images/Logo/TMC_Connect.png')}
@@ -441,13 +517,11 @@ export default function SuperAdminLogin() {
               </View>
             </View>
 
-            {/* Tag */}
             <View style={styles.headlineTag}>
               <View style={styles.headlineTagDot} />
               <Text style={styles.headlineTagText}>Main Administrator</Text>
             </View>
 
-            {/* Headline */}
             <Text style={styles.welcomeTitle}>
               Manage your{'\n'}
               <Text style={styles.welcomeTitleAccent}>organization</Text>
@@ -457,7 +531,6 @@ export default function SuperAdminLogin() {
               Access the full administrative suite — oversee users, events, announcements, attendance, and system-wide approvals.
             </Text>
 
-            {/* Features Grid */}
             <View style={styles.featuresGrid}>
               {features.map((item, idx) => (
                 <View key={idx} style={styles.featureItem}>
@@ -470,7 +543,6 @@ export default function SuperAdminLogin() {
             </View>
           </LinearGradient>
 
-          {/* ── RIGHT COLUMN ── */}
           <Animated.View
             style={[
               styles.rightColumn,
@@ -482,7 +554,6 @@ export default function SuperAdminLogin() {
           >
             <View style={styles.card}>
 
-              {/* Card Header */}
               <View style={styles.cardHeader}>
                 <View style={styles.cardBadge}>
                   <View style={styles.cardBadgeIcon}>
@@ -520,7 +591,7 @@ export default function SuperAdminLogin() {
                       onChangeText={setUsername}
                       style={[styles.input, styles.inputWithIcon]}
                       autoCapitalize="none"
-                      editable={!isLoading}
+                      editable={!isLoading && !isLockedOut}
                       onFocus={() => {
                         setUsernameFocused(true);
                         animateLabel(usernameAnim, 1);
@@ -534,7 +605,6 @@ export default function SuperAdminLogin() {
                 </View>
               </View>
 
-              {/* Password */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Password</Text>
                 <View style={[
@@ -558,7 +628,7 @@ export default function SuperAdminLogin() {
                       onChangeText={setPassword}
                       style={[styles.input, styles.inputWithIcon]}
                       secureTextEntry={!showPassword}
-                      editable={!isLoading}
+                      editable={!isLoading && !isLockedOut}
                       onFocus={() => {
                         setPasswordFocused(true);
                         animateLabel(passwordAnim, 1);
@@ -572,7 +642,7 @@ export default function SuperAdminLogin() {
                   <TouchableOpacity
                     onPress={() => setShowPassword(!showPassword)}
                     style={styles.eyeIcon}
-                    disabled={isLoading}
+                    disabled={isLoading || !!isLockedOut}
                   >
                     <Ionicons
                       name={showPassword ? "eye-off-outline" : "eye-outline"}
@@ -583,12 +653,11 @@ export default function SuperAdminLogin() {
                 </View>
               </View>
 
-              {/* Options Row */}
               <View style={styles.optionsRow}>
                 <TouchableOpacity
                   style={styles.checkboxContainer}
                   onPress={() => setKeepLoggedIn(!keepLoggedIn)}
-                  disabled={isLoading}
+                  disabled={isLoading || !!isLockedOut}
                 >
                   <View style={[styles.checkbox, keepLoggedIn && styles.checkboxChecked]}>
                     {keepLoggedIn && <Ionicons name="checkmark" size={12} color="#fff" />}
@@ -596,41 +665,36 @@ export default function SuperAdminLogin() {
                   <Text style={styles.checkboxLabel}>Keep me logged in</Text>
                 </TouchableOpacity>
 
-                {/* UPDATED: Forgot password button now opens modal */}
                 <TouchableOpacity
                   onPress={() => setForgotModalVisible(true)}
-                  disabled={isLoading}
+                  disabled={isLoading || !!isLockedOut}
                 >
                   <Text style={styles.forgotText}>Forgot password?</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Error */}
               {error && <Text style={styles.error}>{error}</Text>}
 
-              {/* Login Button */}
               <TouchableOpacity
-                style={[styles.button, isLoading && styles.disabled]}
+                style={[styles.button, (isLoading || !!isLockedOut) && styles.disabled]}
                 onPress={handleLogin}
-                disabled={isLoading}
+                disabled={isLoading || !!isLockedOut}
                 activeOpacity={0.8}
               >
                 <Ionicons name="log-in-outline" size={18} color="#ffffff" />
                 <Text style={styles.buttonText}>Sign In to Dashboard</Text>
               </TouchableOpacity>
 
-              {/* Back link */}
               <View style={styles.footerLinks}>
                 <TouchableOpacity
                   onPress={() => router.push('/login')}
                   style={styles.backLink}
-                  disabled={isLoading}
+                  disabled={isLoading || !!isLockedOut}
                 >
                   <Text style={styles.backLinkText}>← Back to User Login</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Security note */}
               <View style={styles.securityNote}>
                 <Ionicons name="lock-closed" size={11} color="#94a3b8" />
                 <Text style={styles.securityNoteText}>

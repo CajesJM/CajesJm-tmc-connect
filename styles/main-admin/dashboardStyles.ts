@@ -2,7 +2,12 @@ import { Dimensions, StyleSheet } from 'react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
 
+const isWide = screenWidth >= 1200;
+const isTablet = screenWidth >= 768 && screenWidth < 1200;
+const isMobile = screenWidth < 768;
+
 export const createDashboardStyles = (colors: any, isDark: boolean) => StyleSheet.create({
+  // ─── Layout ───────────────────────────────────────────────────────────────
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -14,83 +19,68 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
     flex: 1,
     backgroundColor: colors.background,
   },
+
+  // ─── Header ───────────────────────────────────────────────────────────────
   headerGradient: {
-    paddingTop: 15,
-    paddingBottom: 8,
-    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  userDistributionColumn: {
-    flex: 2.2,
-    minWidth: 320,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statCardGrid: {
-    flex: 0.8,
-    minWidth: 180,
-    margin: 0,
-  },
-  statsGridContainer: {
-    flex: 1,
-    borderRadius: 24,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.2 : 0.05,
-    shadowRadius: 8,
-    elevation: 4,
-    minWidth: 280,
-  },
-  statsColumn: {
-    flex: 1,
-    minWidth: 280,
+    marginBottom: 16,
   },
   greetingText: {
-    fontSize: 14,
-    color: colors.sidebar.text.muted,
-    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+    opacity: 0.75,
+    marginBottom: 2,
   },
   userName: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
     color: '#ffffff',
     marginBottom: 2,
+    letterSpacing: -0.8,
   },
   roleText: {
     fontSize: 12,
-    color: colors.sidebar.text.muted,
+    fontWeight: '500',
+    opacity: 0.6,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
   profileButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: '#ffffff',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2.5,
+    borderColor: 'rgba(255,255,255,0.7)',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
   },
   profileImage: {
     width: '100%',
     height: '100%',
   },
   profileFallback: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   profileInitials: {
     color: '#ffffff',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   dateSection: {
     flexDirection: 'row',
@@ -98,112 +88,520 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
     alignItems: 'center',
   },
   dateContainer: {
-    marginLeft: -10,
-    marginTop: -20,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
+    gap: 6,
+    paddingHorizontal: 10,
     paddingVertical: 6,
+    borderRadius: 20,
   },
   dateText: {
-    fontSize: 11,
-    color: isDark ? colors.sidebar.text.secondary : '#ffffff',
+    fontSize: 12,
     fontWeight: '500',
+    color: '#ffffff',
+    letterSpacing: 0.2,
+    marginLeft: -8,
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   headerAction: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   notificationBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 6,
+    right: 6,
     backgroundColor: '#ef4444',
     borderRadius: 10,
     minWidth: 16,
     height: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#ffffff',
   },
   notificationBadgeText: {
     color: '#ffffff',
     fontSize: 9,
-    fontWeight: '700',
+    fontWeight: '800',
     paddingHorizontal: 3,
+  },
+
+  // ─── 3-Column Charts Grid ─────────────────────────────────────────────────
+  chartsGrid: {
+    flexDirection: isMobile ? 'column' : 'row',
+    gap: 14,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 12,
+    alignItems: 'stretch',
+  },
+  chartColumn: {
+    flex: 1,
+    minWidth: 0,
+  },
+  lineChartColumn: {
+    flex: isMobile ? 1 : isTablet ? 2.5 : 2.8,
+    minWidth: isMobile ? undefined : 300,
+  },
+  donutChartColumn: {
+    flex: isMobile ? 1 : isTablet ? 1.4 : 1.5,
+    minWidth: isMobile ? undefined : 260,
+  },
+  statsChartColumn: {
+    flex: isMobile ? 1 : isTablet ? 1.4 : 1.5,
+    minWidth: isMobile ? undefined : 240,
+  },
+
+  // ─── Two-Column Layout ────────────────────────────────────────────────────
+  twoColumnLayout: {
+    flexDirection: isMobile ? 'column' : 'row',
+    gap: 14,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    alignItems: 'stretch',
+  },
+  column: {
+    flex: 1,
+    minWidth: 0,
+  },
+  monthlyActivityColumn: {
+    flex: isMobile ? 1 : 2,
+    minWidth: isMobile ? undefined : 280,
+  },
+  statsColumn: {
+    flex: isMobile ? 1 : 1.5,
+    minWidth: isMobile ? undefined : 240,
+  },
+  activityColumn: {
+    flex: isMobile ? 1 : 2,      // was 1.6 → 2
+    minWidth: 0,
+  },
+  upcomingColumn: {
+    flex: isMobile ? 1 : 1.5,    // was 1 → 1.5
+    minWidth: isMobile ? undefined : 240,
+  },
+  userDistributionColumn: {
+    flex: isMobile ? 1 : 1.8,
+    minWidth: isMobile ? undefined : 280,
+  },
+
+  // ─── Section Scaffold ─────────────────────────────────────────────────────
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+    paddingHorizontal: 2,
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.text,
+    letterSpacing: -0.3,
+  },
+
+  // ─── Card Base ────────────────────────────────────────────────────────────
+  cardBase: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(51,65,85,0.6)' : 'rgba(226,232,240,0.9)',
+    shadowColor: isDark ? '#000' : '#64748b',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.28 : 0.07,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+
+  // ─── Analytics Line Chart ─────────────────────────────────────────────────
+  chartsContainer: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(51,65,85,0.6)' : 'rgba(226,232,240,0.9)',
+    shadowColor: isDark ? '#000' : '#0ea5e9',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 18,
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  chartsTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginBottom: 3,
+  },
+  chartsSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    opacity: 0.7,
+  },
+  chartLegend: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    gap: 7,
+  },
+  legendButton: {
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  legendDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+  legendText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+  legendValue: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 7,
+  },
+  legendValueText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  chartWrapper: {
+    position: 'relative',
+    borderRadius: 14,
+    overflow: 'visible',
+    marginVertical: 6,
+  },
+  chartBackground: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: 14,
+  },
+  chartScrollContent: {
+    paddingRight: 16,
+    paddingLeft: 4,
+  },
+  chart: {
+    borderRadius: 14,
+    marginVertical: 6,
+  },
+  axisLabelContainer: {
+    alignItems: 'center',
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  axisLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    opacity: 0.55,
+  },
+  dataPointsOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-end',
+    pointerEvents: 'none',
+  },
+  dataPointTooltip: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  // ─── Chart Summary Cards ──────────────────────────────────────────────────
+  chartSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: isDark ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.9)',
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  summaryItemBlue: {
+    backgroundColor: isDark ? 'rgba(14,165,233,0.12)' : '#f0f9ff',
+    borderColor: isDark ? 'rgba(14,165,233,0.3)' : 'rgba(14,165,233,0.18)',
+  },
+  summaryItemGreen: {
+    backgroundColor: isDark ? 'rgba(16,185,129,0.12)' : '#f0fdf4',
+    borderColor: isDark ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.18)',
+  },
+  summaryItemPurple: {
+    backgroundColor: isDark ? 'rgba(139,92,246,0.12)' : '#faf5ff',
+    borderColor: isDark ? 'rgba(139,92,246,0.3)' : 'rgba(139,92,246,0.18)',
+  },
+  summaryIconContainer: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+
+  // ─── Donut Chart ──────────────────────────────────────────────────────────
+  donutChartContainer: {
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: isDark ? 0.28 : 0.07,
+    shadowRadius: 20,
+    elevation: 5,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  donutHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  donutHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  donutTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  donutTotalBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    fontSize: 12,
+    fontWeight: '700',
+    overflow: 'hidden',
+  },
+  donutChartWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 8,
+    height: 190,
+    position: 'relative',
+  },
+  donutCenterLabel: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  donutCenterValue: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  donutCenterText: {
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: '600',
+    opacity: 0.6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  externalLabelContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -35,
+    marginTop: -25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    width: 70,
+  },
+  externalLabelBubble: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 58,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  externalLabelPercent: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  externalLabelArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -1,
+  },
+  progressLegendContainer: {
+    marginTop: 14,
+    gap: 10,
+  },
+  progressLegendItem: {
+    width: '100%',
+    padding: 8,
+    borderRadius: 12,
+  },
+  progressLegendItemFocused: {
+    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.035)',
+  },
+  progressLegendHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 7,
+    gap: 10,
+  },
+  progressLegendIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressLegendInfo: {
+    flex: 1,
+  },
+  progressLegendLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 1,
+    letterSpacing: -0.1,
+  },
+  progressLegendCount: {
+    fontSize: 11,
+    fontWeight: '500',
+    opacity: 0.65,
+  },
+  progressLegendPercent: {
+    fontSize: 15,
+    fontWeight: '800',
+    minWidth: 42,
+    textAlign: 'right',
+    letterSpacing: -0.3,
+  },
+  progressLegendPercentContainer: {
+    minWidth: 50,
+    alignItems: 'flex-end',
+  },
+  progressBarBackground: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+
+  // ─── Stats Grid (4 Cards 2×2) ─────────────────────────────────────────────
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
   },
   statCard: {
     flex: 1,
     minWidth: '42%',
     backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 10,
-    borderWidth: 0,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: isDark ? 0.3 : 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderLeftWidth: 4,
-    borderRightWidth: 4,
-    borderRightColor: isDark ? '#3b82f6' : '#1266d4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: isDark ? 0.25 : 0.06,
+    shadowRadius: 10,
+    elevation: 3,
   },
   statCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 0,
+    marginBottom: 8,
   },
   statIconContainer: {
-    width: 26,
-    height: 26,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
   },
   trendBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  trendText: {
-    fontSize: 10,
-    fontWeight: '600',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 3,
   },
   statNumber: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '800',
-    color: colors.text,
+    letterSpacing: -0.5,
     marginBottom: 2,
   },
   statLabel: {
     fontSize: 11,
-    color: colors.sidebar.text.secondary,
-    fontWeight: '500',
+    fontWeight: '600',
+    opacity: 0.65,
+    letterSpacing: 0.3,
   },
   statSubtext: {
     fontSize: 10,
-    color: colors.sidebar.text.muted,
+    opacity: 0.5,
     marginTop: 2,
   },
   statExpand: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
@@ -211,7 +609,7 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
     height: 4,
     backgroundColor: colors.border,
     borderRadius: 2,
-    marginBottom: 8,
+    marginBottom: 6,
     overflow: 'hidden',
   },
   statProgressBar: {
@@ -221,288 +619,341 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
   statDetail: {
     fontSize: 11,
     color: colors.accent.primary,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'right',
   },
-  chartsContainer: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    marginHorizontal: 16,
-    marginVertical: 12,
-    padding: 20,
-    shadowColor: isDark ? '#000' : '#0ea5e9',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: isDark ? 0.4 : 0.12,
-    shadowRadius: 24,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: isDark ? 'rgba(51, 65, 85, 0.5)' : 'rgba(226, 232, 240, 0.8)',
+  statCardGrid: {
+    flex: 0.8,
+    minWidth: 180,
+    margin: 0,
   },
-
-  chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-
-  chartsTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-
-  chartsSubtitle: {
-    fontSize: 13,
-    color: colors.sidebar.text.secondary,
-    fontWeight: '500',
-  },
-
-  chartLegend: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    gap: 8,
-  },
-
-  legendButton: {
-    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(248, 250, 252, 0.9)',
-    borderWidth: 1.5,
-    borderColor: isDark ? 'rgba(51, 65, 85, 0.6)' : 'rgba(226, 232, 240, 0.8)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-
-  legendText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-
-  legendValue: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    marginLeft: 4,
-  },
-
-  legendValueText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-
-  chartWrapper: {
-    position: 'relative',
-    borderRadius: 16,
-    marginVertical: 8,
-    paddingTop: 8,
-  },
-
-  chartBackground: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 16,
-  },
-
-  chartScrollContent: {
-    paddingRight: 16,
-    paddingLeft: 4,
-  },
-
-  chart: {
-    borderRadius: 16,
-    marginVertical: 8,
-    paddingRight: 16,
-  },
-
-  axisLabelContainer: {
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-
-  axisLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-
-  dataPointsOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 40,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'flex-end',
-    pointerEvents: 'none',
-  },
-
-  dataPointTooltip: {
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-
-  tooltipDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginBottom: 4,
-  },
-
-  tooltipText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#0ea5e9',
-  },
-
-
-  chartSummary: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: isDark ? 'rgba(51, 65, 85, 0.5)' : 'rgba(226, 232, 240, 0.8)',
-  },
-
-  summaryItem: {
+  statsGridContainer: {
     flex: 1,
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    backgroundColor: isDark ? 'rgba(14, 165, 233, 0.1)' : 'rgba(240, 249, 255, 0.8)',
-    borderColor: isDark ? 'rgba(14, 165, 233, 0.2)' : 'rgba(14, 165, 233, 0.15)',
-  },
-  summaryItemBlue: {
-    backgroundColor: isDark ? '#0ea5e920' : '#f0f9ff',
-    borderColor: isDark ? '#0ea5e940' : '#0ea5e920',
-  },
-  summaryItemGreen: {
-    backgroundColor: isDark ? '#10b98120' : '#f0fdf4',
-    borderColor: isDark ? '#10b98140' : '#10b98120',
-  },
-  summaryItemPurple: {
-    backgroundColor: isDark ? '#8b5cf620' : '#faf5ff',
-    borderColor: isDark ? '#8b5cf640' : '#8b5cf620',
-  },
-  summaryIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    backgroundColor: isDark ? 'rgba(14, 165, 233, 0.2)' : '#ffffff',
-    shadowColor: '#0ea5e9',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-
-  summaryValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-
-  summaryLabel: {
-    fontSize: 10,
-    color: colors.sidebar.text.secondary,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  twoColumnLayout: {
-    flexDirection: 'row',
-    gap: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    alignItems: 'stretch',
-  },
-  column: {
-    flex: 1,
-  },
-  activityColumn: {
-    flex: 7,
-  },
-  upcomingColumn: {
-    flex: 3,
-  },
-  monthlyActivityColumn: {
-    flex: 2.2,
-    minWidth: 320,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  activityList: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderRadius: 20,
+    padding: 14,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: isDark ? 0.2 : 0.05,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  statsGridEnhanced: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignContent: 'space-between',
+    gap: 10,
+  },
+  statCardEnhanced: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderRadius: 20,
+    padding: 16,
+    minHeight: 110,
+    width: isMobile ? '100%' : '48%',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.2 : 0.07,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  statLeftColumn: {
+    flex: 1,
+    gap: 4,
+  },
+  statRightColumn: {
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    minWidth: 80,
+  },
+  statIconWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  trendText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statCardHeaderEnhanced: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    width: '100%',
+    position: 'relative',
+  },
+  statIconEnhanced: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trendBadgeEnhanced: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 3,
+  },
+  trendTextEnhanced: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  statNumberEnhanced: {
+    fontSize: 28,
+    fontWeight: '800',
+    marginBottom: 4,
+    letterSpacing: -0.8,
+  },
+  statLabelEnhanced: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+    opacity: 0.65,
+  },
+  statSubtextEnhanced: {
+    fontSize: 11,
+    fontWeight: '500',
+    opacity: 0.65,
+  },
+  statStatsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 3,
+  },
+  approvalBadgeEnhanced: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    minWidth: 22,
+    alignItems: 'center',
+  },
+  approvalBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  // ─── Monthly Activity Bar Chart
+  customBarChartContainer: {
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.22 : 0.06,
+    shadowRadius: 14,
+    elevation: 4,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  customBarChartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  customBarChartHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  customBarChartTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  customBarChartTotalBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    fontSize: 12,
+    fontWeight: '700',
+    overflow: 'hidden',
+  },
+  customBarChartLegend: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: isDark ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.9)',
+  },
+  customLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  customLegendDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+  customLegendText: {
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.7,
+  },
+  customBarChartScrollContent: {
+    paddingHorizontal: 4,
+  },
+  customBarsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 20,
+  },
+  customMonthColumn: {
+    alignItems: 'center',
+    width: 65,
+  },
+  customMonthLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 10,
+    opacity: 0.6,
+    letterSpacing: 0.2,
+  },
+  customBarsWrapper: {
+    height: 150,
+    justifyContent: 'flex-end',
+  },
+  customBarPair: {
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'flex-end',
+  },
+  customBarItem: {
+    alignItems: 'center',
+    width: 26,
+  },
+  customBar: {
+    width: 26,
+    minHeight: 4,
+    borderRadius: 6,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 4,
+  },
+  customBarValue: {
+    color: '#ffffff',
+    fontSize: 9,
+    fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  customBarChartFooter: {
+    borderTopWidth: 1,
+    paddingTop: 10,
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  customBarChartFooterText: {
+    fontSize: 10,
+    fontWeight: '600',
+    opacity: 0.5,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+
+  // ─── Yearly Bar Chart ─────────────────────────────────────────────────────
+  yearlyBarChartScrollContent: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  yearlyBarsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 14,
+    paddingRight: 16,
+  },
+  yearlyMonthColumn: {
+    alignItems: 'center',
+    width: 48,
+    minWidth: 48,
+  },
+  yearlyMonthLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginBottom: 7,
+    textAlign: 'center',
+    opacity: 0.6,
+    letterSpacing: 0.1,
+  },
+  yearlyBarsWrapper: {
+    height: 140,
+    justifyContent: 'flex-end',
+  },
+  yearlyBarPair: {
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'flex-end',
+  },
+  yearlyBarItem: {
+    alignItems: 'center',
+    width: 18,
+  },
+  yearlyBar: {
+    width: 18,
+    minHeight: 4,
+    borderRadius: 4,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 2,
+  },
+  yearlyBarValue: {
+    color: '#ffffff',
+    fontSize: 8,
+    fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
+  // ─── Activity Feed ────────────────────────────────────────────────────────
+  activityList: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.22 : 0.05,
+    shadowRadius: 14,
+    elevation: 3,
   },
   activityItem: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: 11,
+    paddingHorizontal: 2,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: isDark ? 'rgba(51,65,85,0.45)' : 'rgba(226,232,240,0.8)',
   },
   lastActivityItem: {
     borderBottomWidth: 0,
   },
   activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -514,215 +965,225 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   activityTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: -0.1,
   },
   activityTime: {
     fontSize: 11,
-    color: colors.sidebar.text.muted,
-    fontWeight: '500',
+    fontWeight: '600',
+    opacity: 0.5,
   },
   activityDescription: {
-    fontSize: 13,
-    color: colors.sidebar.text.secondary,
+    fontSize: 12,
+    opacity: 0.65,
   },
   emptyActivity: {
     alignItems: 'center',
     padding: 32,
   },
   emptyActivityText: {
-    fontSize: 14,
-    color: colors.sidebar.text.muted,
-    marginTop: 12,
-  },
-  upcomingCard: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  upcomingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  upcomingTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  viewAllText: {
-    fontSize: 12,
-    color: colors.accent.primary,
-    fontWeight: '600',
-  },
-  upcomingList: {
-    gap: 12,
-  },
-  upcomingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-  },
-  eventDate: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: isDark ? '#334155' : '#f8fafc',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: isDark ? '#475569' : '#e2e8f0',
-  },
-  eventDay: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  eventMonth: {
-    fontSize: 10,
-    color: colors.sidebar.text.secondary,
-    fontWeight: '600',
-  },
-  eventInfo: {
-    flex: 1,
-  },
-  eventName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  eventTime: {
-    fontSize: 11,
-    color: colors.sidebar.text.secondary,
-    marginBottom: 2,
-  },
-  eventAction: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: isDark ? '#334155' : '#f8fafc',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: isDark ? '#475569' : '#e2e8f0',
-  },
-  announcementCard: {
-    backgroundColor: colors.card,
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  announcementHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  announcementTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  announcementList: {
-    gap: 12,
-  },
-  announcementItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  announcementBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  announcementContent: {
-    flex: 1,
-  },
-  announcementText: {
     fontSize: 13,
-    fontWeight: '500',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  announcementTime: {
-    fontSize: 10,
-    color: colors.sidebar.text.muted,
+    marginTop: 10,
+    opacity: 0.5,
     fontWeight: '500',
   },
+
+  // ─── Pagination ───────────────────────────────────────────────────────────
   paginationContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
-    paddingTop: 16,
-    marginTop: 8,
+    gap: 14,
+    paddingTop: 14,
+    marginTop: 6,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: isDark ? 'rgba(51,65,85,0.5)' : 'rgba(226,232,240,0.8)',
   },
   paginationButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: isDark ? '#1e293b' : '#f8fafc',
     borderWidth: 1,
-    borderColor: isDark ? '#334155' : '#e2e8f0',
+    borderColor: isDark ? 'rgba(51,65,85,0.6)' : 'rgba(226,232,240,0.9)',
     gap: 4,
   },
   paginationButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   paginationButtonText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.accent.primary,
   },
   paginationButtonTextDisabled: {
-    color: '#cbd5e1',
+    color: isDark ? '#475569' : '#cbd5e1',
   },
   pageInfo: {
     alignItems: 'center',
   },
   pageInfoText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
+    fontSize: 13,
+    fontWeight: '700',
   },
+
+  // ─── Upcoming Events ──────────────────────────────────────────────────────
+  upcomingCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.22 : 0.05,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  upcomingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+    paddingHorizontal: 2,
+  },
+  upcomingTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  viewAllText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.accent.primary,
+  },
+  upcomingList: {
+    gap: 10,
+  },
+  upcomingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 3,
+  },
+  upcomingItemHovered: {
+    opacity: 0.8,
+    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+  },
+  eventDate: {
+    width: 48,
+    height: 48,
+    borderRadius: 13,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  eventDay: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  eventMonth: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    opacity: 0.6,
+  },
+  eventInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  eventName: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 2,
+    letterSpacing: -0.1,
+  },
+  eventTime: {
+    fontSize: 11,
+    opacity: 0.6,
+    marginBottom: 2,
+  },
+  eventAttendees: {
+    fontSize: 10,
+    color: '#10b981',
+    fontWeight: '700',
+  },
+  eventAction: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+
+  // ─── Announcements ────────────────────────────────────────────────────────
+  announcementCard: {
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: isDark ? 0.22 : 0.05,
+    shadowRadius: 14,
+    elevation: 3,
+  },
+  announcementHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+    paddingHorizontal: 2,
+  },
+  announcementTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+  },
+  announcementList: {
+    gap: 8,
+  },
+  announcementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 3,
+    borderBottomWidth: 1,
+  },
+  announcementBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  announcementContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  announcementText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 2,
+    letterSpacing: -0.1,
+  },
+  announcementTime: {
+    fontSize: 10,
+    opacity: 0.5,
+    fontWeight: '500',
+  },
+
+  // ─── Loading / Empty ──────────────────────────────────────────────────────
   loadingContainer: {
     padding: 24,
     alignItems: 'center',
@@ -731,77 +1192,72 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
   loadingText: {
     marginTop: 8,
     fontSize: 12,
-    color: colors.sidebar.text.secondary,
+    fontWeight: '500',
+    opacity: 0.6,
   },
   emptyContainer: {
-    padding: 32,
+    padding: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: colors.sidebar.text.muted,
-    marginBottom: 16,
+    marginTop: 10,
+    fontSize: 13,
+    opacity: 0.5,
+    marginBottom: 14,
+    fontWeight: '500',
   },
   createButton: {
-    backgroundColor: colors.accent.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
     borderRadius: 20,
   },
   createButtonText: {
     color: '#ffffff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  eventAttendees: {
-    fontSize: 10,
-    color: '#10b981',
-    marginTop: 2,
-    fontWeight: '500',
-  },
+
+  // ─── Approval Badge ───────────────────────────────────────────────────────
   approvalBadge: {
     backgroundColor: '#f59e0b',
   },
+
+  // ─── Role Distribution Legacy ──────────────────────────────────────────────
   roleDistributionContainer: {
     backgroundColor: colors.card,
     borderRadius: 20,
-    padding: 15,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: isDark ? 0.3 : 0.08,
+    shadowOpacity: isDark ? 0.25 : 0.07,
     shadowRadius: 12,
     elevation: 4,
     height: '100%',
     minHeight: 220,
     justifyContent: 'space-between',
   },
-
   roleHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
   },
-
   roleHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-
   roleTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     letterSpacing: -0.3,
   },
-
   roleSubtitle: {
-    fontSize: 14,
-    color: colors.sidebar.text.secondary,
+    fontSize: 13,
+    opacity: 0.6,
     fontWeight: '500',
   },
   roleTotalBadge: {
@@ -809,16 +1265,14 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
     fontWeight: '700',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
-
   roleBarsContainer: {
     gap: 16,
     flex: 1,
     justifyContent: 'center',
   },
-
   roleBarRow: {
     gap: 8,
   },
@@ -826,49 +1280,42 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
-
   roleLabelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-
   roleIcon: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
   },
-
   roleLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-
-
   roleBarWrapper: {
     height: 12,
     justifyContent: 'center',
   },
-
   roleBarBackground: {
-    height: 12,
+    height: 10,
     backgroundColor: isDark ? '#334155' : '#f1f5f9',
-    borderRadius: 6,
+    borderRadius: 5,
     overflow: 'hidden',
   },
   roleBarTrack: {
     height: 28,
-    backgroundColor: isDark ? 'rgba(51, 65, 85, 0.5)' : '#f1f5f9',
+    backgroundColor: isDark ? 'rgba(51,65,85,0.5)' : '#f1f5f9',
     borderRadius: 8,
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
   },
-
   roleBarFill: {
     height: '100%',
     borderRadius: 8,
@@ -884,16 +1331,11 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
   roleBarLabel: {
     paddingHorizontal: 10,
   },
-
   roleBarPercentage: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
-
   rolePercentageOutside: {
     fontSize: 12,
     fontWeight: '700',
@@ -903,159 +1345,132 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
     fontSize: 15,
     fontWeight: '700',
   },
-
   rolePercentage: {
     fontSize: 14,
     fontWeight: '700',
   },
-
   roleTotalContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 20,
-    paddingTop: 16,
-    borderTopWidth: 1.5,
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
   },
-
   roleTotalLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
-
   roleTotalValue: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
 
-  // Charts Grid Layout
-  chartsGrid: {
-    flexDirection: 'row',
-    gap: 16,
-    marginHorizontal: 16,
-    marginBottom: 10,
-    marginTop: 10,
-  },
-  chartColumn: {
+  summaryCard: {
     flex: 1,
-  },
-  lineChartColumn: {
-    flex: 2.2,
-  },
-  donutChartColumn: {
-    flex: 1, 
-    minWidth: 320,
-  },
-
-  // Donut Chart Styles
-  donutChartContainer: {
-    borderRadius: 24,
-    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    height: '100%',
-    justifyContent: 'space-between',
+    shadowOpacity: isDark ? 0.2 : 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
-
-  donutHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  summaryCardBlue: {
+    borderColor: isDark ? 'rgba(14,165,233,0.3)' : 'rgba(14,165,233,0.2)',
+    backgroundColor: isDark ? 'rgba(14,165,233,0.1)' : '#f0f9ff',
+  },
+  summaryCardGreen: {
+    borderColor: isDark ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.2)',
+    backgroundColor: isDark ? 'rgba(16,185,129,0.1)' : '#f0fdf4',
+  },
+  summaryCardPurple: {
+    borderColor: isDark ? 'rgba(139,92,246,0.3)' : 'rgba(139,92,246,0.2)',
+    backgroundColor: isDark ? 'rgba(139,92,246,0.1)' : '#faf5ff',
+  },
+  summaryLeft: {
+    flex: 1,
+    gap: 2,
+  },
+  summaryRight: {
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    width: 44,
   },
-
-  donutHeaderLeft: {
+  summaryRight1: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 44,
+    marginRight: 20,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  summaryValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  summarySub: {
+    fontSize: 10,
+    fontWeight: '500',
+    opacity: 0.7,
+  },
+  summaryTrend: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 4,
+    marginTop: 2,
   },
-
-  donutTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-
-  donutTotalBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    fontSize: 13,
+  summaryTrendText: {
+    fontSize: 10,
     fontWeight: '600',
   },
-
-  donutChartWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 12,
-    height: 200,
-    position: 'relative',
-  },
-
-  donutCenterLabel: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  donutCenterValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-
-  donutCenterText: {
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: '500',
-  },
-
-  
-  externalLabelContainer: {
+  tooltipContainer: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -35, 
-    marginTop: -25, 
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 100,
-    width: 70,
-  },
-
-  externalLabelBubble: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 60,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    minWidth: 120,
+    zIndex: 1000,
+    backgroundColor: isDark ? '#1e293b' : '#ffffff',
   },
-
-  externalLabelPercent: {
-    color: '#ffffff',
+  tooltipMonth: {
     fontSize: 12,
     fontWeight: '700',
+    marginBottom: 6,
+    textAlign: 'center',
   },
-
-  externalLabelArrow: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginTop: -2,
+  tooltipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 2,
   },
-
-  progressLegendPercentContainer: {
-    minWidth: 50,
-    alignItems: 'flex-end',
+  tooltipDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
+  tooltipText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  // ─── Donut Legacy ─────────────────────────────────────────────────────────
   donutLegendContainer: {
     marginTop: 10,
     gap: 8,
@@ -1101,379 +1516,4 @@ export const createDashboardStyles = (colors: any, isDark: boolean) => StyleShee
     borderRadius: 4,
     marginLeft: 8,
   },
-
-  // Progress Bar Legend Styles
-  progressLegendContainer: {
-    marginTop: 16,
-    gap: 14,
-  },
-
-  progressLegendItem: {
-    width: '100%',
-    padding: 8,
-    borderRadius: 12,
-    backgroundColor: 'transparent',
-  },
-
-  progressLegendItemFocused: {
-    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-  },
-
-  progressLegendHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 12,
-  },
-
-  progressLegendIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  progressLegendInfo: {
-    flex: 1,
-  },
-
-  progressLegendLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-
-  progressLegendCount: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-
-  progressLegendPercent: {
-    fontSize: 16,
-    fontWeight: '700',
-    minWidth: 40,
-    textAlign: 'right',
-  },
-
-  progressBarBackground: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
- 
-  customBarChartContainer: {
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.2 : 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  customBarChartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  customBarChartHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  customBarChartTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  customBarChartTotalBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  customBarChartLegend: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 20,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  customLegendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  customLegendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  customLegendText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.sidebar.text.secondary,
-  },
-  customBarChartScrollContent: {
-    paddingHorizontal: 4,
-  },
-  customBarsContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 24,
-  },
-  customMonthColumn: {
-    alignItems: 'center',
-    width: 70,
-  },
-  customMonthLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  customBarsWrapper: {
-    height: 160,
-    justifyContent: 'flex-end',
-  },
-  customBarPair: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'flex-end',
-  },
-  customBarItem: {
-    alignItems: 'center',
-    width: 28,
-  },
-  customBar: {
-    width: 28,
-    minHeight: 4,
-    borderRadius: 6,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 4,
-  },
-  customBarValue: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  customBarChartFooter: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 12,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  customBarChartFooterText: {
-    fontSize: 11,
-    color: colors.sidebar.text.muted,
-    fontWeight: '500',
-  },
-  
-
-  statsGridEnhanced: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignContent: 'space-between',
-    gap: 12,
-  },
-  statCardEnhanced: {
-    width: '48%',
-    borderRadius: 20,
-    padding: 16,
-    alignItems: 'center', 
-    justifyContent: 'center',
-    position: 'relative',
-  },
-
-  statCardHeaderEnhanced: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    width: '100%',
-    position: 'relative',
-  },
-
-  statIconEnhanced: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  trendBadgeEnhanced: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-
-  trendTextEnhanced: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  statNumberEnhanced: {
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 4,
-    letterSpacing: -0.5,
-  },
-
-  statLabelEnhanced: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-
-  statSubtextEnhanced: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-
-  statStatsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-
-  approvalBadgeEnhanced: {
-    backgroundColor: '#ef4444',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 24,
-    alignItems: 'center',
-  },
-
-  approvalBadgeText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-
- 
-  yearlyBarChartScrollContent: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-
-  yearlyBarsContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 16, 
-    paddingRight: 16,
-  },
-
-  yearlyMonthColumn: {
-    alignItems: 'center',
-    width: 50, 
-    minWidth: 50,
-  },
-
-  yearlyMonthLabel: {
-    fontSize: 11, 
-    fontWeight: '600',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-
-  yearlyBarsWrapper: {
-    height: 140,
-    justifyContent: 'flex-end',
-  },
-
-  yearlyBarPair: {
-    flexDirection: 'row',
-    gap: 4, 
-    alignItems: 'flex-end',
-  },
-
-  yearlyBarItem: {
-    alignItems: 'center',
-    width: 20, 
-  },
-
-  yearlyBar: {
-    width: 20,
-    minHeight: 4,
-    borderRadius: 4,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 2,
-  },
-
-  yearlyBarValue: {
-    color: '#ffffff',
-    fontSize: 9, 
-    fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-
-  ...(screenWidth < 768 && {
-    chartsGrid: {
-      flexDirection: 'column',
-      gap: 16,
-    },
-    chartColumn: {
-      flex: 1,
-      width: '100%',
-    },
-    lineChartColumn: {
-      flex: 1,
-    },
-    donutChartColumn: {
-      flex: 1,
-      minWidth: 'auto',
-    },
-    twoColumnLayout: {
-      flexDirection: 'column',
-    },
-    monthlyActivityColumn: {
-      flex: 1,
-      width: '100%',
-    },
-    statsColumn: {
-      flex: 1,
-      width: '100%',
-    },
-    customMonthColumn: {
-      width: 60,
-    },
-    customBarItem: {
-      width: 22,
-    },
-    customBar: {
-      width: 22,
-    },
-    customBarsContainer: {
-      gap: 16,
-    },
-  }),
 });

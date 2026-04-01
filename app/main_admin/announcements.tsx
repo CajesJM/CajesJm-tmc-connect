@@ -1,18 +1,19 @@
-import { Feather, FontAwesome6 } from '@expo/vector-icons';
+import { Feather, FontAwesome6, Ionicons } from '@expo/vector-icons';
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
   addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc,
 } from "firebase/firestore";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -47,6 +48,158 @@ interface Announcement {
   createdBy?: string;
   createdByName?: string;
 }
+const AnimatedAnnouncementItem = memo(function AnimatedAnnouncementItem({
+  item,
+  index,
+  currentPage,
+  itemsPerPage,
+  styles,
+  colors,
+  isMobile,
+  selectedAnnouncement,
+  setSelectedAnnouncement,
+  handleEditStart,
+  handleDelete,
+  getPriorityColor,
+  isNewAnnouncement,
+  isUrgentAnnouncement,
+  isImportantAnnouncement,
+}: {
+  item: Announcement;
+  index: number;
+  currentPage: number;
+  itemsPerPage: number;
+  styles: any;
+  colors: any;
+  isMobile: boolean;
+  selectedAnnouncement: string | null;
+  setSelectedAnnouncement: (id: string | null) => void;
+  handleEditStart: (item: Announcement) => void;
+  handleDelete: (id: string, title: string) => void;
+  getPriorityColor: (item: Announcement) => string;
+  isNewAnnouncement: (createdAt: any) => boolean;
+  isUrgentAnnouncement: (item: Announcement) => boolean;
+  isImportantAnnouncement: (item: Announcement) => boolean;
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 50, 
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const isActive = selectedAnnouncement === item.id;
+  const priorityColor = getPriorityColor(item);
+  const isPending = item.status === 'pending';
+  const isRejected = item.status === 'rejected';
+
+  return (
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateX: slideAnim }],
+      }}
+    >
+      <TouchableOpacity
+        style={[
+          styles.paginatedItem,
+          isActive && styles.paginatedItemActive,
+          isMobile && styles.paginatedItemMobile,
+        ]}
+        onPress={() => setSelectedAnnouncement(item.id)}
+      >
+        {/* Your existing item layout (same as renderPaginatedItem) */}
+        <View style={[styles.paginatedNumber, { backgroundColor: `${priorityColor}15` }]}>
+          <Text style={[styles.paginatedNumberText, { color: priorityColor }]}>
+            {(currentPage - 1) * itemsPerPage + index + 1}
+          </Text>
+        </View>
+
+        <View style={styles.paginatedInfo}>
+          <View style={[styles.paginatedTitleRow, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }]}>
+            <Text style={[styles.paginatedTitle, isMobile && styles.paginatedTitleMobile]} numberOfLines={1}>
+              {item.title}
+            </Text>
+
+            <View style={[styles.paginatedBadgeContainer, { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 4 }]}>
+              {isUrgentAnnouncement(item) && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#ef4444' }]}>
+                  <Text style={styles.paginatedBadgeText}>URGENT</Text>
+                </View>
+              )}
+              {isImportantAnnouncement(item) && !isUrgentAnnouncement(item) && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#f59e0b' }]}>
+                  <Text style={styles.paginatedBadgeText}>IMPORTANT</Text>
+                </View>
+              )}
+              {isNewAnnouncement(item.createdAt) && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#3b82f6' }]}>
+                  <Text style={styles.paginatedBadgeText}>NEW</Text>
+                </View>
+              )}
+              {isPending && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#f59e0b' }]}>
+                  <Text style={styles.paginatedBadgeText}>PENDING</Text>
+                </View>
+              )}
+              {isRejected && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#ef4444' }]}>
+                  <Text style={styles.paginatedBadgeText}>REJECTED</Text>
+                </View>
+              )}
+              {item.status === 'approved' && (
+                <View style={[styles.paginatedBadge, { backgroundColor: '#10b981' }]}>
+                  <Text style={styles.paginatedBadgeText}>APPROVED</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.paginatedMeta}>
+            <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
+              {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
+            </Text>
+          </View>
+
+          {item.createdByName && (
+            <Text style={[styles.paginatedCreator, isMobile && styles.paginatedCreatorMobile]}>
+              by {item.createdByName}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.paginatedActions}>
+          <TouchableOpacity
+            style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
+            onPress={() => handleEditStart(item)}
+          >
+            <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
+            onPress={() => handleDelete(item.id, item.title)}
+          >
+            <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
 
 export default function MainAdminAnnouncements() {
   const { width: screenWidth } = useWindowDimensions();
@@ -75,7 +228,7 @@ export default function MainAdminAnnouncements() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [itemsPerPage] = useState(isMobile ? 10 : 10);
 
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<string | null>(null);
@@ -91,7 +244,7 @@ export default function MainAdminAnnouncements() {
       setAnnouncements(list);
       setIsLoading(false);
     }, (error) => {
-      console.error("Error fetching announcements:", error);
+
       setIsLoading(false);
     });
     return () => unsubscribe();
@@ -169,6 +322,8 @@ export default function MainAdminAnnouncements() {
       return;
     }
 
+    setIsSubmitting(true); 
+
     try {
       await addDoc(collection(db, "updates"), {
         title: title.trim(),
@@ -182,8 +337,10 @@ export default function MainAdminAnnouncements() {
       resetForm();
       showAlert("Success", "Announcement created successfully!");
     } catch (error) {
-      console.error("Error adding announcement:", error);
+
       showAlert("Error", "Failed to create announcement");
+    } finally {
+      setIsSubmitting(false); 
     }
   };
 
@@ -208,6 +365,8 @@ export default function MainAdminAnnouncements() {
   const handleSaveEdit = async () => {
     if (!editingId || !title.trim() || !message.trim()) return;
 
+    setIsSubmitting(true);
+
     try {
       const announcementRef = doc(db, "updates", editingId);
       await updateDoc(announcementRef, {
@@ -219,8 +378,10 @@ export default function MainAdminAnnouncements() {
       resetForm();
       showAlert("Success", "Announcement updated successfully!");
     } catch (error) {
-      console.error("Error updating announcement:", error);
+
       showAlert("Error", "Failed to update announcement");
+    } finally {
+      setIsSubmitting(false);  
     }
   };
 
@@ -235,7 +396,7 @@ export default function MainAdminAnnouncements() {
           }
           showAlert("Success", "Announcement deleted successfully!");
         } catch (error) {
-          console.error("Error deleting announcement:", error);
+
           showAlert("Error", "Failed to delete announcement");
         }
       }
@@ -256,7 +417,7 @@ export default function MainAdminAnnouncements() {
                 }
                 showAlert("Success", "Announcement deleted successfully!");
               } catch (error) {
-                console.error("Error deleting announcement:", error);
+
                 showAlert("Error", "Failed to delete announcement");
               }
             }
@@ -322,107 +483,23 @@ export default function MainAdminAnnouncements() {
     return colors.accent.primary;
   };
 
-  const renderPaginatedItem = ({ item, index }: { item: Announcement; index: number }) => {
-    const isActive = selectedAnnouncement === item.id;
-    const priorityColor = getPriorityColor(item);
-    const isPending = item.status === 'pending';
-    const isRejected = item.status === 'rejected';
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.paginatedItem,
-          isActive && styles.paginatedItemActive,
-          isMobile && styles.paginatedItemMobile,
-        ]}
-        onPress={() => setSelectedAnnouncement(item.id)}
-      >
-        <View style={[styles.paginatedNumber, { backgroundColor: `${priorityColor}15` }]}>
-          <Text style={[styles.paginatedNumberText, { color: priorityColor }]}>
-            {(currentPage - 1) * itemsPerPage + index + 1}
-          </Text>
-        </View>
-
-        <View style={styles.paginatedInfo}>
-          <View style={[styles.paginatedTitleRow, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }]}>
-            <Text style={[styles.paginatedTitle, isMobile && styles.paginatedTitleMobile]} numberOfLines={1}>
-              {item.title}
-            </Text>
-
-            <View style={[styles.paginatedBadgeContainer, { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 4 }]}>
-              {isUrgentAnnouncement(item) && (
-                <View style={[styles.paginatedBadge, { backgroundColor: '#ef4444' }]}>
-                  <Text style={styles.paginatedBadgeText}>URGENT</Text>
-                </View>
-              )}
-              {isImportantAnnouncement(item) && !isUrgentAnnouncement(item) && (
-                <View style={[styles.paginatedBadge, { backgroundColor: '#f59e0b' }]}>
-                  <Text style={styles.paginatedBadgeText}>IMPORTANT</Text>
-                </View>
-              )}
-
-              {isNewAnnouncement(item.createdAt) && (
-                <View style={[styles.paginatedBadge, { backgroundColor: '#3b82f6' }]}>
-                  <Text style={styles.paginatedBadgeText}>NEW</Text>
-                </View>
-              )}
-
-              {isPending && (
-                <View style={[styles.paginatedBadge, { backgroundColor: '#f59e0b' }]}>
-                  <Text style={styles.paginatedBadgeText}>PENDING</Text>
-                </View>
-              )}
-              {isRejected && (
-                <View style={[styles.paginatedBadge, { backgroundColor: '#ef4444' }]}>
-                  <Text style={styles.paginatedBadgeText}>REJECTED</Text>
-                </View>
-              )}
-              {item.status === 'approved' && (
-                <View style={[styles.paginatedBadge, { backgroundColor: '#10b981' }]}>
-                  <Text style={styles.paginatedBadgeText}>APPROVED</Text>
-                </View>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.paginatedMeta}>
-            <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
-              {item.createdAt ? dayjs(item.createdAt.toDate()).fromNow() : 'Just now'}
-            </Text>
-          </View>
-
-          {item.createdByName && (
-            <Text style={[styles.paginatedCreator, isMobile && styles.paginatedCreatorMobile]}>
-              by {item.createdByName}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.paginatedActions}>
-          <TouchableOpacity
-            style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
-            onPress={() => handleEditStart(item)}
-          >
-            <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
-            onPress={() => handleDelete(item.id, item.title)}
-          >
-            <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    );
-  };
 
   const renderSearchResultItem = ({ item }: { item: Announcement }) => {
     const priorityColor = getPriorityColor(item);
     const isPending = item.status === 'pending';
     const isRejected = item.status === 'rejected';
+    const isActive = selectedAnnouncement === item.id;
 
     return (
-      <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile]}>
+      <TouchableOpacity
+        style={[
+          styles.searchResultItem,
+          isActive && styles.searchResultItemActive,
+          isMobile && styles.searchResultItemMobile,
+        ]}
+        onPress={() => setSelectedAnnouncement(item.id)}
+        activeOpacity={0.7}
+      >
         <View style={styles.searchResultHeader}>
           <View style={styles.searchResultTitleContainer}>
             <Text style={[styles.searchResultTitle, isMobile && styles.searchResultTitleMobile]} numberOfLines={1}>
@@ -461,16 +538,23 @@ export default function MainAdminAnnouncements() {
               )}
             </View>
           </View>
+
           <View style={styles.searchResultActions}>
             <TouchableOpacity
               style={[styles.searchResultEditButton, isMobile && styles.searchResultEditButtonMobile]}
-              onPress={() => handleEditStart(item)}
+              onPress={(e) => {
+                e.stopPropagation();      
+                handleEditStart(item);
+              }}
             >
               <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.searchResultDeleteButton, isMobile && styles.searchResultDeleteButtonMobile]}
-              onPress={() => handleDelete(item.id, item.title)}
+              onPress={(e) => {
+                e.stopPropagation();     
+                handleDelete(item.id, item.title);
+              }}
             >
               <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
             </TouchableOpacity>
@@ -497,7 +581,7 @@ export default function MainAdminAnnouncements() {
             Created by {item.createdByName}
           </Text>
         )}
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -550,9 +634,9 @@ export default function MainAdminAnnouncements() {
       >
         <View style={[styles.headerContent, isMobile && styles.headerContentMobile]}>
           <View>
-            <Text style={[styles.greetingText, isMobile && styles.greetingTextMobile]}>Welcome back,</Text>
+            <Text style={[styles.greetingText, { color: isDark ? colors.sidebar.text.secondary : '#ffffff' }]}>Welcome back,</Text>
             <Text style={[styles.userName, isMobile && styles.userNameMobile]}>{userData?.name || 'Admin'}</Text>
-            <Text style={[styles.roleText, isMobile && styles.roleTextMobile]}>Announcements Manager</Text>
+            <Text style={[styles.roleText, { color: isDark ? colors.sidebar.text.secondary : '#ffffff' }]}> Announcements Manager</Text>
           </View>
 
           <TouchableOpacity
@@ -576,7 +660,6 @@ export default function MainAdminAnnouncements() {
 
         <View style={[styles.dateSection, isMobile && styles.dateSectionMobile]}>
           <View style={[styles.dateContainer, isMobile && styles.dateContainerMobile]}>
-            <Feather name="calendar" size={isMobile ? 10 : 12} color={colors.sidebar.text.muted} />
             <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
@@ -696,7 +779,7 @@ export default function MainAdminAnnouncements() {
             <Text style={styles.resultsText}>
               {filterAnnouncementsByTime(announcements, activeFilter).length} announcement{filterAnnouncementsByTime(announcements, activeFilter).length !== 1 ? 's' : ''}
               {activeFilter !== 'all' && ` from ${activeFilter}`}
-              
+
             </Text>
           </View>
 
@@ -710,7 +793,25 @@ export default function MainAdminAnnouncements() {
               <FlatList
                 data={paginatedAnnouncements}
                 keyExtractor={(item) => item.id}
-                renderItem={renderPaginatedItem}
+                renderItem={({ item, index }) => (
+                  <AnimatedAnnouncementItem
+                    item={item}
+                    index={index}
+                    currentPage={currentPage}
+                    itemsPerPage={itemsPerPage}
+                    styles={styles}
+                    colors={colors}
+                    isMobile={isMobile}
+                    selectedAnnouncement={selectedAnnouncement}
+                    setSelectedAnnouncement={setSelectedAnnouncement}
+                    handleEditStart={handleEditStart}
+                    handleDelete={handleDelete}
+                    getPriorityColor={getPriorityColor}
+                    isNewAnnouncement={isNewAnnouncement}
+                    isUrgentAnnouncement={isUrgentAnnouncement}
+                    isImportantAnnouncement={isImportantAnnouncement}
+                  />
+                )}
                 style={styles.paginatedList}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={
@@ -726,97 +827,141 @@ export default function MainAdminAnnouncements() {
                 }
               />
 
-              {/* Selected Announcement Detail View */}
-              {selectedAnnouncement && (
-                <View style={[styles.selectedDetailContainer, isMobile && styles.selectedDetailContainerMobile]}>
-                  <View style={[styles.selectedDetailHeader, isMobile && styles.selectedDetailHeaderMobile]}>
-                    <Text style={[styles.selectedDetailTitle, isMobile && styles.selectedDetailTitleMobile]}>Details</Text>
-                    <TouchableOpacity onPress={() => setSelectedAnnouncement(null)}>
-                      <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
-                    </TouchableOpacity>
-                  </View>
+              <Modal
+                visible={!!selectedAnnouncement}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setSelectedAnnouncement(null)}
+              >
+                <TouchableOpacity
+                  style={styles.glassModalOverlay}
+                  activeOpacity={1}
+                  onPress={() => setSelectedAnnouncement(null)} 
+                >
+                  <TouchableOpacity
+                    style={[styles.glassModalContent, isMobile && styles.glassModalContentMobile]}
+                    activeOpacity={1}
+                    onPress={(e) => e.stopPropagation()}   
+                  >
+                    {/* Header */}
+                    <View style={styles.glassModalHeader}>
+                      <Text style={[styles.glassModalTitle, isMobile && styles.glassModalTitleMobile]}>
+                        Announcement Details
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setSelectedAnnouncement(null)}
+                        style={styles.glassModalClose}
+                      >
+                        <Feather name="x" size={isMobile ? 22 : 26} color={colors.sidebar.text.secondary} />
+                      </TouchableOpacity>
+                    </View>
 
-                  {(() => {
-                    const selected = announcements.find(a => a.id === selectedAnnouncement);
-                    if (!selected) return null;
+                    {(() => {
+                      const selected = announcements.find(a => a.id === selectedAnnouncement);
+                      if (!selected) return null;
 
-                    return (
-                      <View style={styles.selectedDetailContent}>
-                        <View style={[styles.selectedDetailBadges, isMobile && styles.selectedDetailBadgesMobile]}>
-                          {isNewAnnouncement(selected.createdAt) && (
-                            <View style={[styles.detailBadge, { backgroundColor: '#3b82f6' }, isMobile && styles.detailBadgeMobile]}>
-                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>NEW</Text>
-                            </View>
-                          )}
-                          {selected.status === 'pending' && (
-                            <View style={[styles.detailBadge, { backgroundColor: '#f59e0b' }, isMobile && styles.detailBadgeMobile]}>
-                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>PENDING</Text>
-                            </View>
-                          )}
-                          {selected.status === 'rejected' && (
-                            <View style={[styles.detailBadge, { backgroundColor: '#ef4444' }, isMobile && styles.detailBadgeMobile]}>
-                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>REJECTED</Text>
-                            </View>
-                          )}
-                          {selected.status === 'approved' && (
-                            <View style={[styles.detailBadge, { backgroundColor: '#10b981' }, isMobile && styles.detailBadgeMobile]}>
-                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>APPROVED</Text>
-                            </View>
-                          )}
-                          {isUrgentAnnouncement(selected) && (
-                            <View style={[styles.detailBadge, { backgroundColor: '#ef4444' }, isMobile && styles.detailBadgeMobile]}>
-                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>URGENT</Text>
-                            </View>
-                          )}
-                          {isImportantAnnouncement(selected) && !isUrgentAnnouncement(selected) && (
-                            <View style={[styles.detailBadge, { backgroundColor: '#f59e0b' }, isMobile && styles.detailBadgeMobile]}>
-                              <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>IMPORTANT</Text>
-                            </View>
-                          )}
-                        </View>
+                      const priorityColor = getPriorityColor(selected);
 
-                        <Text style={[styles.selectedDetailMessage, isMobile && styles.selectedDetailMessageMobile]}>
-                          {selected.message}
-                        </Text>
-
-                        <View style={[styles.selectedDetailFooter, isMobile && styles.selectedDetailFooterMobile]}>
-                          <View style={[styles.selectedDetailDate, isMobile && styles.selectedDetailDateMobile]}>
-                            <Feather name="calendar" size={isMobile ? 12 : 14} color={colors.sidebar.text.muted} />
-                            <Text style={[styles.selectedDetailDateText, isMobile && styles.selectedDetailDateTextMobile]}>
-                              {selected.createdAt ? dayjs(selected.createdAt.toDate()).format('MMM D, YYYY') : ''}
-                            </Text>
+                      return (
+                        <View style={styles.glassModalBody}>
+                          {/* Badges */}
+                          <View style={[styles.selectedDetailBadges, isMobile && styles.selectedDetailBadgesMobile]}>
+                            {isNewAnnouncement(selected.createdAt) && (
+                              <View style={[styles.detailBadge, { backgroundColor: '#3b82f6' }, isMobile && styles.detailBadgeMobile]}>
+                                <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>NEW</Text>
+                              </View>
+                            )}
+                            {selected.status === 'pending' && (
+                              <View style={[styles.detailBadge, { backgroundColor: '#f59e0b' }, isMobile && styles.detailBadgeMobile]}>
+                                <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>PENDING</Text>
+                              </View>
+                            )}
+                            {selected.status === 'rejected' && (
+                              <View style={[styles.detailBadge, { backgroundColor: '#ef4444' }, isMobile && styles.detailBadgeMobile]}>
+                                <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>REJECTED</Text>
+                              </View>
+                            )}
+                            {selected.status === 'approved' && (
+                              <View style={[styles.detailBadge, { backgroundColor: '#10b981' }, isMobile && styles.detailBadgeMobile]}>
+                                <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>APPROVED</Text>
+                              </View>
+                            )}
+                            {isUrgentAnnouncement(selected) && (
+                              <View style={[styles.detailBadge, { backgroundColor: '#ef4444' }, isMobile && styles.detailBadgeMobile]}>
+                                <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>URGENT</Text>
+                              </View>
+                            )}
+                            {isImportantAnnouncement(selected) && !isUrgentAnnouncement(selected) && (
+                              <View style={[styles.detailBadge, { backgroundColor: '#f59e0b' }, isMobile && styles.detailBadgeMobile]}>
+                                <Text style={[styles.detailBadgeText, isMobile && styles.detailBadgeTextMobile]}>IMPORTANT</Text>
+                              </View>
+                            )}
                           </View>
-                          {selected.createdByName && (
-                            <View style={[styles.selectedDetailCreator, isMobile && styles.selectedDetailCreatorMobile]}>
-                              <Feather name="user" size={isMobile ? 12 : 14} color={colors.sidebar.text.muted} />
-                              <Text style={[styles.selectedDetailCreatorText, isMobile && styles.selectedDetailCreatorTextMobile]}>
-                                by {selected.createdByName}
+
+                          {/* Title (big & colored) */}
+                          <Text
+                            style={[
+                              styles.glassDetailTitle,
+                              isMobile && styles.glassDetailTitleMobile,
+                              { color: priorityColor }
+                            ]}
+                            numberOfLines={3}
+                          >
+                            {selected.title}
+                          </Text>
+
+                          {/* Message */}
+                          <Text style={[styles.selectedDetailMessage, isMobile && styles.selectedDetailMessageMobile]}>
+                            {selected.message}
+                          </Text>
+
+                          {/* Footer */}
+                          <View style={[styles.selectedDetailFooter, isMobile && styles.selectedDetailFooterMobile]}>
+                            <View style={[styles.selectedDetailDate, isMobile && styles.selectedDetailDateMobile]}>
+                              <Feather name="calendar" size={isMobile ? 12 : 14} color={colors.sidebar.text.muted} />
+                              <Text style={[styles.selectedDetailDateText, isMobile && styles.selectedDetailDateTextMobile]}>
+                                {selected.createdAt ? dayjs(selected.createdAt.toDate()).format('MMM D, YYYY • h:mm A') : ''}
                               </Text>
                             </View>
-                          )}
 
-                          <View style={[styles.selectedDetailActions, isMobile && styles.selectedDetailActionsMobile]}>
-                            <TouchableOpacity
-                              style={[styles.selectedDetailEditButton, isMobile && styles.selectedDetailEditButtonMobile]}
-                              onPress={() => handleEditStart(selected)}
-                            >
-                              <Feather name="edit-2" size={isMobile ? 14 : 16} color={colors.accent.primary} />
-                              {!isMobile && <Text style={styles.selectedDetailEditText}>Edit</Text>}
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.selectedDetailDeleteButton, isMobile && styles.selectedDetailDeleteButtonMobile]}
-                              onPress={() => handleDelete(selected.id, selected.title)}
-                            >
-                              <Feather name="trash-2" size={isMobile ? 14 : 16} color="#ef4444" />
-                              {!isMobile && <Text style={styles.selectedDetailDeleteText}>Delete</Text>}
-                            </TouchableOpacity>
+                            {selected.createdByName && (
+                              <View style={[styles.selectedDetailCreator, isMobile && styles.selectedDetailCreatorMobile]}>
+                                <Feather name="user" size={isMobile ? 12 : 14} color={colors.sidebar.text.muted} />
+                                <Text style={[styles.selectedDetailCreatorText, isMobile && styles.selectedDetailCreatorTextMobile]}>
+                                  by {selected.createdByName}
+                                </Text>
+                              </View>
+                            )}
+
+                            <View style={[styles.selectedDetailActions, isMobile && styles.selectedDetailActionsMobile]}>
+                              <TouchableOpacity
+                                style={[styles.selectedDetailEditButton, isMobile && styles.selectedDetailEditButtonMobile]}
+                                onPress={() => {
+                                  setSelectedAnnouncement(null);
+                                  handleEditStart(selected);
+                                }}
+                              >
+                                <Feather name="edit-2" size={isMobile ? 14 : 16} color={colors.accent.primary} />
+                                {!isMobile && <Text style={styles.selectedDetailEditText}>Edit</Text>}
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.selectedDetailDeleteButton, isMobile && styles.selectedDetailDeleteButtonMobile]}
+                                onPress={() => {
+                                  setSelectedAnnouncement(null);
+                                  handleDelete(selected.id, selected.title);
+                                }}
+                              >
+                                <Feather name="trash-2" size={isMobile ? 14 : 16} color="#ef4444" />
+                                {!isMobile && <Text style={styles.selectedDetailDeleteText}>Delete</Text>}
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         </View>
-                      </View>
-                    );
-                  })()}
-                </View>
-              )}
+                      );
+                    })()}
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              </Modal>
 
               {renderPagination()}
             </>
@@ -903,107 +1048,96 @@ export default function MainAdminAnnouncements() {
         animationType="fade"
         onRequestClose={resetForm}
       >
-        <View style={styles.modernModalOverlay}>
-          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
-            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
-              <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
-                <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
-                  <FontAwesome6
-                    name={editingId ? "pen-to-square" : "bullhorn"}
-                    size={isMobile ? 16 : 20}
-                    color={colors.accent.primary}
-                  />
-                </View>
-                <View style={styles.modernModalTitleContainer}>
-                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
-                    {editingId ? 'Edit' : 'New'}
-                  </Text>
-                  <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>
-                    {editingId ? 'Update details' : 'Create announcement'}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={resetForm}
-                style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
-              >
-                <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
-              </TouchableOpacity>
-            </View>
+        {/* Outer overlay with blur (glass background) */}
+        <BlurView
+          intensity={80}
+          tint={isDark ? 'dark' : 'light'}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <TouchableOpacity
+            style={styles.glassModalOverlayTouch}
+            activeOpacity={1}
+            onPress={resetForm}
+          />
+        </BlurView>
 
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        {/* Modal container */}
+        <View style={styles.glassModalCentered}>
+          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)' }]}>
+            {/* Gradient header */}
+            <LinearGradient
+              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.glassModalGradientHeader}
             >
-              <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
-                <View style={styles.modernFormGroup}>
-                  <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Priority</Text>
-                  <View style={[styles.priorityContainer, isMobile && styles.priorityContainerMobile]}>
-                    <TouchableOpacity
-                      style={[
-                        styles.priorityButton,
-                        priority === 'normal' && styles.priorityButtonNormalActive,
-                        isMobile && styles.priorityButtonMobile
-                      ]}
-                      onPress={() => setPriority('normal')}
-                    >
-                      <View style={[
-                        styles.priorityIndicator,
-                        { backgroundColor: colors.accent.primary },
-                        isMobile && styles.priorityIndicatorMobile
-                      ]} />
-                      <Text style={[
-                        styles.priorityButtonText,
-                        priority === 'normal' && styles.priorityButtonTextActive,
-                        isMobile && styles.priorityButtonTextMobile
-                      ]}>Normal</Text>
-                    </TouchableOpacity>
+              <View style={styles.glassModalHeader}>
+                <View style={styles.glassModalHeaderLeft}>
+                  <View style={[styles.glassModalIconContainer, isMobile && styles.glassModalIconContainerMobile]}>
+                    <FontAwesome6
+                      name={editingId ? "pen-to-square" : "bullhorn"}
+                      size={isMobile ? 16 : 20}
+                      color={colors.accent.primary}
+                    />
+                  </View>
+                  <View>
+                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>
+                      {editingId ? 'Edit Announcement' : 'New Announcement'}
+                    </Text>
+                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>
+                      {editingId ? 'Update details' : 'Create announcement'}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={resetForm} style={styles.glassModalCloseButton}>
+                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
 
-                    <TouchableOpacity
-                      style={[
-                        styles.priorityButton,
-                        priority === 'important' && styles.priorityButtonImportantActive,
-                        isMobile && styles.priorityButtonMobile
-                      ]}
-                      onPress={() => setPriority('important')}
-                    >
-                      <View style={[
-                        styles.priorityIndicator,
-                        { backgroundColor: '#f59e0b' },
-                        isMobile && styles.priorityIndicatorMobile
-                      ]} />
-                      <Text style={[
-                        styles.priorityButtonText,
-                        priority === 'important' && styles.priorityButtonTextActive,
-                        isMobile && styles.priorityButtonTextMobile
-                      ]}>Important</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.priorityButton,
-                        priority === 'urgent' && styles.priorityButtonUrgentActive,
-                        isMobile && styles.priorityButtonMobile
-                      ]}
-                      onPress={() => setPriority('urgent')}
-                    >
-                      <View style={[
-                        styles.priorityIndicator,
-                        { backgroundColor: '#ef4444' },
-                        isMobile && styles.priorityIndicatorMobile
-                      ]} />
-                      <Text style={[
-                        styles.priorityButtonText,
-                        priority === 'urgent' && styles.priorityButtonTextActive,
-                        isMobile && styles.priorityButtonTextMobile
-                      ]}>Urgent</Text>
-                    </TouchableOpacity>
+            {/* Scrollable content */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.glassModalScrollContent}
+              style={{ backgroundColor: isDark ? 'rgba(15, 25, 35, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}
+            >
+              <View style={[styles.glassModalFormSection, { borderColor: 'rgba(255,255,255,0.2)' }]}>
+                {/* Priority */}
+                <View style={styles.glassFormGroup}>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>Priority</Text>
+                  <View style={[styles.glassPriorityContainer, isMobile && styles.glassPriorityContainerMobile]}>
+                    {[
+                      { value: 'normal', label: 'Normal', color: colors.accent.primary, activeColor: 'normal' },
+                      { value: 'important', label: 'Important', color: '#f59e0b', activeColor: 'important' },
+                      { value: 'urgent', label: 'Urgent', color: '#ef4444', activeColor: 'urgent' }
+                    ].map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.glassPriorityButton,
+                          priority === option.value && { backgroundColor: `${option.color}20`, borderColor: option.color },
+                          isMobile && styles.glassPriorityButtonMobile
+                        ]}
+                        onPress={() => setPriority(option.value as any)}
+                      >
+                        <View style={[styles.glassPriorityIndicator, { backgroundColor: option.color }]} />
+                        <Text style={[
+                          styles.glassPriorityButtonText,
+                          { color: priority === option.value ? option.color : colors.sidebar.text.secondary },
+                          isMobile && styles.glassPriorityButtonTextMobile
+                        ]}>
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
                 </View>
 
-                <View style={styles.modernFormGroup}>
-                  <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Title</Text>
+                {/* Title */}
+                <View style={styles.glassFormGroup}>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>Title</Text>
                   <TextInput
-                    style={[styles.modernFormInput, isMobile && styles.modernFormInputMobile]}
+                    style={[styles.glassFormInput, isMobile && styles.glassFormInputMobile]}
                     placeholder="Enter title"
                     placeholderTextColor={colors.sidebar.text.muted}
                     value={title}
@@ -1011,10 +1145,11 @@ export default function MainAdminAnnouncements() {
                   />
                 </View>
 
-                <View style={styles.modernFormGroup}>
-                  <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Message</Text>
+                {/* Message */}
+                <View style={styles.glassFormGroup}>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>Message</Text>
                   <TextInput
-                    style={[styles.modernFormInput, styles.modernTextArea, isMobile && styles.modernFormInputMobile]}
+                    style={[styles.glassFormInput, styles.glassTextArea, isMobile && styles.glassFormInputMobile]}
                     placeholder="Write message..."
                     placeholderTextColor={colors.sidebar.text.muted}
                     value={message}
@@ -1025,35 +1160,44 @@ export default function MainAdminAnnouncements() {
                   />
                 </View>
 
-                <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
+                {/* Actions */}
+                <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
                   <TouchableOpacity
                     style={[
-                      styles.modernSubmitButton,
-                      (!title.trim() || !message.trim()) && styles.modernSubmitButtonDisabled,
-                      isMobile && styles.modernSubmitButtonMobile
+                      styles.glassSubmitButton,
+                      (!title.trim() || !message.trim() || isSubmitting) && styles.glassSubmitButtonDisabled,
+                      isMobile && styles.glassSubmitButtonMobile
                     ]}
                     onPress={editingId ? handleSaveEdit : handleAddAnnouncement}
-                    disabled={!title.trim() || !message.trim()}
+                    disabled={!title.trim() || !message.trim() || isSubmitting}
                   >
-                    <Feather
-                      name={editingId ? "check-circle" : "send"}
-                      size={isMobile ? 16 : 18}
-                      color="#ffffff"
-                    />
-                    <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
-                      {editingId ? 'Save' : 'Publish'}
-                    </Text>
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <>
+                        <Feather
+                          name={editingId ? "check-circle" : "send"}
+                          size={isMobile ? 16 : 18}
+                          color="#ffffff"
+                        />
+                        <Text style={[styles.glassSubmitButtonText, isMobile && styles.glassSubmitButtonTextMobile]}>
+                          {editingId ? 'Save Changes' : 'Publish Announcement'}
+                        </Text>
+                      </>
+                    )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.modernCancelButton, isMobile && styles.modernCancelButtonMobile]}
+                    style={[styles.glassCancelButton, isMobile && styles.glassCancelButtonMobile]}
                     onPress={resetForm}
                   >
-                    <Text style={[styles.modernCancelButtonText, isMobile && styles.modernCancelButtonTextMobile]}>Cancel</Text>
+                    <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>
+                      Cancel
+                    </Text>
                   </TouchableOpacity>
                 </View>
-              </ScrollView>
-            </KeyboardAvoidingView>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

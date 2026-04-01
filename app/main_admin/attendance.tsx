@@ -1,4 +1,5 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
@@ -11,13 +12,13 @@ import {
   updateDoc,
   where, writeBatch
 } from 'firebase/firestore';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   TextInput as RNTextInput,
@@ -27,7 +28,6 @@ import {
   useWindowDimensions,
   View
 } from 'react-native';
-import DateTimePickerModal from "react-native-modal-datetime-picker";
 import QRCode from 'react-native-qrcode-svg';
 import PenaltyAnnouncementModal from '../../components/PenaltyAnnouncementModal';
 import { useAuth } from '../../context/AuthContext';
@@ -125,6 +125,97 @@ interface Student {
   course: string;
   role?: string;
 }
+const AnimatedBlock = memo(function AnimatedBlock({
+  block,
+  students,
+  index,
+  styles,
+  isMobile,
+  colors,
+  formatTime,
+}: {
+  block: string;
+  students: AttendanceRecord[];
+  index: number;
+  styles: any;
+  isMobile: boolean;
+  colors: any;
+  formatTime: (timestamp: any) => string;
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateX: slideAnim }],
+      }}
+    >
+      <View style={styles.blockSection}>
+        <View style={styles.blockHeader}>
+          <Text style={styles.blockTitle}>Block {block}</Text>
+          <Text style={styles.blockCount}>{students.length}</Text>
+        </View>
+        {students.map((record, idx) => (
+          <View key={idx} style={[styles.attendanceItem, isMobile && styles.attendanceItemMobile]}>
+            <View style={styles.studentRow}>
+              <View style={styles.studentInfo}>
+                <Text style={[styles.studentName, isMobile && styles.studentNameMobile]} numberOfLines={1}>
+                  {record.studentName}
+                </Text>
+                <Text style={styles.studentId}>{record.studentID}</Text>
+              </View>
+              <View style={styles.attendanceMeta}>
+                {record.location && (
+                  <View style={[
+                    styles.locationBadge,
+                    record.location.isWithinRadius ? styles.locationBadgeValid : styles.locationBadgeInvalid
+                  ]}>
+                    <Feather name={record.location.isWithinRadius ? "check" : "x"} size={10}
+                      color={record.location.isWithinRadius ? "#16a34a" : "#dc2626"} />
+                    <Text style={[
+                      styles.locationBadgeText,
+                      record.location.isWithinRadius ? styles.locationBadgeTextValid : styles.locationBadgeTextInvalid
+                    ]}>
+                      {record.location.isWithinRadius ? 'Verified' : 'Too Far'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <Text style={styles.studentDetails} numberOfLines={1}>
+              {record.course} • Year {record.yearLevel}
+            </Text>
+            <View style={styles.attendanceTimeContainer}>
+              <Feather name="clock" size={12} color={colors.sidebar.text.muted} />
+              <Text style={styles.attendanceTimeText}>
+                Attended at: {formatTime(record.timestamp)}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </Animated.View>
+  );
+});
 
 export default function MainAdminAttendance() {
   const { user, userData } = useAuth();
@@ -185,8 +276,6 @@ export default function MainAdminAttendance() {
   const [selectedEventForAction, setSelectedEventForAction] = useState<Event | null>(null);
 
 
-
-  // Pagination for missing list
   const [missingPage, setMissingPage] = useState(1);
   const missingItemsPerPage = 10;
 
@@ -199,15 +288,29 @@ export default function MainAdminAttendance() {
       return false;
     }
   };
+  const getSurname = (fullName: string): string => {
+    const parts = fullName.trim().split(/\s+/);
+    return parts[parts.length - 1];
+  };
 
+  const sortMissingStudents = (students: Student[]): Student[] => {
+    return [...students].sort((a, b) => {
+      // Sort by year level (extract numeric part)
+      const yearA = parseInt(String(a.yearLevel).match(/\d+/)?.[0] ?? '0');
+      const yearB = parseInt(String(b.yearLevel).match(/\d+/)?.[0] ?? '0');
+      if (yearA !== yearB) return yearA - yearB;
 
+      // Then by surname
+      const surnameA = getSurname(a.name).toLowerCase();
+      const surnameB = getSurname(b.name).toLowerCase();
+      return surnameA.localeCompare(surnameB);
+    });
+  };
   // Fetch students
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        console.log('Fetching students from Firestore...');
         const snapshot = await getDocs(collection(db, 'users'));
-        console.log('Students snapshot size:', snapshot.size);
 
         const studentsList = snapshot.docs
           .map(doc => ({
@@ -219,11 +322,8 @@ export default function MainAdminAttendance() {
             return role === 'student';
           }) as Student[];
 
-        console.log('Filtered students list (students only):', studentsList.length);
-        console.log('Students docs:', studentsList.map(s => ({ name: s.name, role: s.role, studentID: s.studentID })));
         setStudents(studentsList);
       } catch (error) {
-        console.error('Error fetching students:', error);
       }
     };
     fetchStudents();
@@ -254,7 +354,6 @@ export default function MainAdminAttendance() {
         });
         setEvents(eventsList);
       } catch (error) {
-        console.error('Error fetching events:', error);
         showAlert('Error', 'Failed to load events');
       } finally {
         setLoading(false);
@@ -349,7 +448,7 @@ export default function MainAdminAttendance() {
           setSentPenaltyEvents(prev => new Set([...prev, selectedEvent.id]));
         }
       } catch (error) {
-        console.error('Error fetching penalty statuses:', error);
+
       }
     };
 
@@ -419,7 +518,7 @@ export default function MainAdminAttendance() {
         setSentPenaltyEvents(sentEvents);
         setPenaltyDetails(details);
       } catch (error) {
-        console.error('Error fetching sent penalties:', error);
+
       }
     };
 
@@ -494,7 +593,7 @@ export default function MainAdminAttendance() {
 
       showAlert('Success', `Penalty announcements sent to ${studentIds.length} students.`);
     } catch (error) {
-      console.error('Error recording penalty sent:', error);
+
       showAlert('Error', 'Failed to record penalty announcement.');
     }
   };
@@ -590,7 +689,7 @@ export default function MainAdminAttendance() {
       setShowPenaltyModal(false);
       showAlert('Success', `Penalties sent to ${studentIds.length} students successfully!`);
     } catch (error) {
-      console.error('Error sending penalties:', error);
+
       showAlert('Error', 'Failed to send penalties. Please try again.');
     } finally {
       setLoading(false);
@@ -650,10 +749,9 @@ export default function MainAdminAttendance() {
   const confirmStopAttendance = async () => {
     if (!selectedEvent) return;
 
+    setIsSaving(true);
     try {
-      setLoading(true);
       const now = new Date().toISOString();
-
       const eventRef = doc(db, 'events', selectedEvent.id);
       await updateDoc(eventRef, {
         isActive: false,
@@ -666,20 +764,15 @@ export default function MainAdminAttendance() {
         qrExpiration: now
       };
       setSelectedEvent(updatedEvent);
-
-      setEvents(prev => prev.map(e =>
-        e.id === selectedEvent.id ? updatedEvent : e
-      ));
+      setEvents(prev => prev.map(e => e.id === selectedEvent.id ? updatedEvent : e));
 
       setShowStopConfirmModal(false);
-
       showAlert("Success", "Attendance stopped successfully!");
-
     } catch (error) {
-      console.error('Error stopping attendance:', error);
+
       showAlert("Error", "Failed to stop attendance. Please try again.");
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -716,6 +809,7 @@ export default function MainAdminAttendance() {
   const setManualExpiration = async () => {
     if (!selectedEvent || !customExpiration) return;
 
+    // Validation first – no isSaving set yet
     if (!isValidDate(customExpiration)) {
       showAlert("Error", "Please enter a valid date and time");
       return;
@@ -723,12 +817,13 @@ export default function MainAdminAttendance() {
 
     const expirationDate = new Date(customExpiration);
     const now = new Date();
-
     if (expirationDate <= now) {
       showAlert("Error", "Expiration date must be in the future");
       return;
     }
 
+    // Only now start saving
+    setIsSaving(true);
     try {
       const eventRef = doc(db, 'events', selectedEvent.id);
       await updateDoc(eventRef, {
@@ -754,9 +849,7 @@ export default function MainAdminAttendance() {
 
       setQrValue(newQrData);
       setSelectedEvent(updatedEvent);
-      setEvents(prev => prev.map(e =>
-        e.id === selectedEvent.id ? updatedEvent : e
-      ));
+      setEvents(prev => prev.map(e => e.id === selectedEvent.id ? updatedEvent : e));
 
       setCustomExpirationDate(null);
       setCustomExpiration('');
@@ -764,8 +857,10 @@ export default function MainAdminAttendance() {
       showAlert("Success", "Expiration date set successfully!");
       setShowExpirationModal(false);
     } catch (error) {
-      console.error('Error setting expiration:', error);
+
       showAlert("Error", "Failed to set expiration date");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -789,7 +884,7 @@ export default function MainAdminAttendance() {
       ));
 
     } catch (error) {
-      console.error('Error clearing expiration:', error);
+
       showAlert("Error", "Failed to clear expiration date");
     }
   };
@@ -801,11 +896,6 @@ export default function MainAdminAttendance() {
 
       if (eventDoc.exists()) {
         const eventData = eventDoc.data();
-        console.log('Fetched event:', eventId);
-        console.log('Full event data:', JSON.stringify(eventData, null, 2));
-        console.log('Attendees array:', eventData.attendees);
-        console.log('Attendees type:', typeof eventData.attendees);
-        console.log('Is array?', Array.isArray(eventData.attendees));
 
         if (eventData.attendees && Array.isArray(eventData.attendees) && eventData.attendees.length > 0) {
           const validAttendees = eventData.attendees
@@ -821,15 +911,15 @@ export default function MainAdminAttendance() {
           setAttendanceRecords(validAttendees);
           setCurrentPage(1);
         } else {
-          console.log('No attendees found for event:', eventId);
+
           setAttendanceRecords([]);
         }
       } else {
-        console.log('Event not found:', eventId);
+
         setAttendanceRecords([]);
       }
     } catch (error) {
-      console.error('Error fetching attendance:', error);
+
       setAttendanceRecords([]);
     }
   };
@@ -927,7 +1017,7 @@ export default function MainAdminAttendance() {
       setPaidStudentIds(prev => new Set([...prev, student.id]));
 
     } catch (error) {
-      console.error('Error marking as paid:', error);
+
       showAlert('Error', 'Failed to mark as paid. Please try again.');
     } finally {
       setProcessingPayment(null);
@@ -938,23 +1028,23 @@ export default function MainAdminAttendance() {
     // Fallback: try auth.currentUser if context user is null
     let currentUser = user;
     if (!currentUser && auth.currentUser) {
-      console.log('Using auth.currentUser as fallback');
+
       currentUser = auth.currentUser;
     }
     if (!currentUser) {
-      console.error('No user found in context or auth');
+
       showAlert('Error', 'You must be logged in to perform this action.');
       return;
     }
 
-    console.log('=== Starting handleCompletePenalty ===');
-    console.log('Student:', student.name, student.id);
-    console.log('Event:', event.id, event.title);
-    console.log('User:', currentUser.uid);
+
+
+
+
 
     try {
       setProcessingAction(student.id);
-      console.log('Processing action set for', student.id);
+
 
       // Query for the penalty document using studentId and eventId
       const penaltiesQuery = query(
@@ -962,12 +1052,12 @@ export default function MainAdminAttendance() {
         where('studentId', '==', student.id),
         where('eventId', '==', event.id)
       );
-      console.log('Executing query...');
+
       const snapshot = await getDocs(penaltiesQuery);
-      console.log('Query snapshot size:', snapshot.size);
+
 
       if (snapshot.empty) {
-        console.error('No penalty found for this student and event');
+
         showAlert('Error', 'Penalty record not found. Please ensure a penalty was sent for this student.');
         setProcessingAction(null);
         setShowCompleteConfirmModal(false);
@@ -977,11 +1067,9 @@ export default function MainAdminAttendance() {
       }
 
       const penaltyDoc = snapshot.docs[0];
-      console.log('Penalty document found:', penaltyDoc.id);
-      console.log('Penalty data:', penaltyDoc.data());
 
       const penaltyRef = doc(db, 'penalties', penaltyDoc.id);
-      console.log('Updating penalty document...');
+
 
       await updateDoc(penaltyRef, {
         status: 'completed',
@@ -989,14 +1077,14 @@ export default function MainAdminAttendance() {
         completedBy: currentUser.uid,
         updatedAt: serverTimestamp()
       });
-      console.log('Penalty document updated successfully');
+
 
       // Also update user's penalties array
       const userRef = doc(db, 'users', student.id);
       const userDoc = await getDoc(userRef);
 
       if (userDoc.exists()) {
-        console.log('Updating user penalties array...');
+
         const userData = userDoc.data();
         const existingPenalties = userData.penalties || [];
 
@@ -1007,18 +1095,18 @@ export default function MainAdminAttendance() {
         );
 
         await updateDoc(userRef, { penalties: updatedPenalties });
-        console.log('User penalties updated');
+
       }
 
       // Update local state
       setCompletedStudentIds(prev => new Set([...prev, student.id]));
-      console.log('Local state updated');
+
 
       showAlert('Success', `${student.name}'s penalty has been marked as completed.`);
-      console.log('=== Completed successfully ===');
+
 
     } catch (error) {
-      console.error('Error in handleCompletePenalty:', error);
+
       showAlert('Error', 'Failed to complete penalty. Please try again.');
     } finally {
       setProcessingAction(null);
@@ -1031,11 +1119,11 @@ export default function MainAdminAttendance() {
   const handleCancelCompletion = async (student: Student, event: Event) => {
     let currentUser = user;
     if (!currentUser && auth.currentUser) {
-      console.log('Using auth.currentUser as fallback for cancel');
+
       currentUser = auth.currentUser;
     }
     if (!currentUser) {
-      console.error('No user found for cancel');
+
       showAlert('Error', 'You must be logged in.');
       return;
     }
@@ -1051,7 +1139,7 @@ export default function MainAdminAttendance() {
       const snapshot = await getDocs(penaltiesQuery);
 
       if (snapshot.empty) {
-        console.error('No penalty found for this student and event');
+
         showAlert('Error', 'Penalty record not found.');
         return;
       }
@@ -1092,7 +1180,7 @@ export default function MainAdminAttendance() {
 
       showAlert('Success', `${student.name}'s completion has been cancelled.`);
     } catch (error) {
-      console.error('Error cancelling completion:', error);
+
       showAlert('Error', 'Failed to cancel completion. Please try again.');
     } finally {
       setProcessingAction(null);
@@ -1110,102 +1198,23 @@ export default function MainAdminAttendance() {
 
     try {
       if (Platform.OS === 'web') {
-        // Get the SVG as a data URL
         qrCodeRef.current.toDataURL(async (dataUrl: string) => {
           try {
-            // Convert the data URL to a blob
-            const response = await fetch(dataUrl);
-            const blob = await response.blob();
-            const objectUrl = URL.createObjectURL(blob);
-
-            // Open a new window with the QR image and event details
-            const printWindow = window.open('', '_blank');
-            if (printWindow) {
-              printWindow.document.write(`
-              <html>
-                <head>
-                  <title>QR Code - ${selectedEvent?.title || 'Event'}</title>
-                  <style>
-                    body {
-                      display: flex;
-                      justify-content: center;
-                      align-items: center;
-                      min-height: 100vh;
-                      margin: 0;
-                      font-family: Arial, sans-serif;
-                      background: white;
-                    }
-                    .container {
-                      text-align: center;
-                      padding: 20px;
-                      max-width: 90%;
-                    }
-                    .qr-image {
-                      max-width: 300px;
-                      height: auto;
-                      border: 1px solid #ccc;
-                      padding: 20px;
-                      background: white;
-                      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-                    }
-                    .title {
-                      font-size: 24px;
-                      margin-bottom: 20px;
-                    }
-                    .details {
-                      margin-top: 20px;
-                      color: #666;
-                    }
-                    @media print {
-                      .no-print {
-                        display: none;
-                      }
-                    }
-                  </style>
-                </head>
-                <body>
-                  <div class="container">
-                    <div class="title">${selectedEvent?.title || 'Event QR Code'}</div>
-                    <img src="${objectUrl}" class="qr-image" />
-                    <div class="details">
-                      <p>Event: ${selectedEvent?.title}</p>
-                      <p>Date: ${selectedEvent?.date ? formatDate(selectedEvent.date) : 'N/A'}</p>
-                      <p>Location: ${selectedEvent?.location}</p>
-                    </div>
-                    <div class="no-print" style="margin-top: 30px;">
-                      <button onclick="window.print();">Print / Save as PDF</button>
-                      <p style="font-size: 12px;">Use the print dialog to save as PDF or print directly.</p>
-                    </div>
-                  </div>
-                  <script>
-                    // Auto‑print after the image loads
-                    const img = document.querySelector('.qr-image');
-                    if (img.complete) {
-                      setTimeout(() => window.print(), 500);
-                    } else {
-                      img.onload = () => setTimeout(() => window.print(), 500);
-                    }
-                    // Clean up object URL after printing
-                    window.addEventListener('beforeunload', () => URL.revokeObjectURL('${objectUrl}'));
-                  </script>
-                </body>
-              </html>
-            `);
-              printWindow.document.close();
-              showAlert('Print Ready', 'A new window opened. Use the print dialog to save as PDF or print.');
-            } else {
-              showAlert('Popup Blocked', 'Please allow popups to print the QR code.');
-            }
+            // ✅ Direct download as PNG
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = `QR_${selectedEvent?.title?.replace(/\s+/g, '_') || 'event'}_${Date.now()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showAlert('Downloaded', 'QR code saved as PNG!');
           } catch (err) {
-            console.error('Error processing QR:', err);
-            showAlert(
-              'Download Failed',
-              'Could not prepare QR code. Please right‑click on the QR code above and select "Save image as..."'
-            );
+
+            showAlert('Error', 'Failed to download QR code.');
           }
         });
       } else {
-        // Native: save to gallery (unchanged)
+        // Native (unchanged)
         if (Platform.OS === 'ios') {
           const { status } = await MediaLibrary.requestPermissionsAsync();
           if (status !== 'granted') {
@@ -1213,7 +1222,6 @@ export default function MainAdminAttendance() {
             return;
           }
         }
-
         const dataUrl = await qrCodeRef.current.toDataURL();
         const base64Data = dataUrl.split(',')[1];
         const fileUri = (FileSystem as any).documentDirectory + `qr_${selectedEvent?.id}_${Date.now()}.png`;
@@ -1225,11 +1233,10 @@ export default function MainAdminAttendance() {
         showAlert('Success', 'QR code saved to your gallery!');
       }
     } catch (error) {
-      console.error('Error saving QR:', error);
+
       showAlert('Error', 'Failed to save QR code. Please try again.');
     }
   };
-
   const formatDate = (dateValue: string | { seconds: number; nanoseconds: number } | any) => {
     if (!dateValue) return null;
 
@@ -1366,19 +1373,13 @@ export default function MainAdminAttendance() {
 
       if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) return;
 
-      if (year < 2000 || year > 2100) return;
-      if (month < 1 || month > 12) return;
-      if (day < 1 || day > 31) return;
-      if (hours < 0 || hours > 23) return;
-      if (minutes < 0 || minutes > 59) return;
-
       const selectedDate = new Date(year, month - 1, day, hours, minutes);
       if (isNaN(selectedDate.getTime())) return;
 
       setCustomExpirationDate(selectedDate);
       setCustomExpiration(selectedDate.toISOString());
     } catch (error) {
-      console.error('Error parsing date:', error);
+
     }
   };
 
@@ -1433,13 +1434,13 @@ export default function MainAdminAttendance() {
   }, [missingAttendees, selectedYearLevel, selectedBlock]);
 
   useEffect(() => {
-    console.log('=== DEBUG ATTENDANCE ===');
-    console.log('Total attendance records:', attendanceRecords.length);
-    console.log('Total students in system:', students.length);
-    console.log('Missing attendees count:', missingAttendees.length);
-    console.log('Sample attendance record:', attendanceRecords[0]);
-    console.log('Sample student:', students[0]);
-    console.log('========================');
+
+
+
+
+
+
+
   }, [attendanceRecords, students, missingAttendees]);
 
   const filteredAttendedBySearch = useMemo(() => {
@@ -1596,36 +1597,139 @@ export default function MainAdminAttendance() {
       showAlert('No Event', 'Please select an event first.');
       return;
     }
-    const list = getFilteredMissing;
-    if (list.length === 0) {
+
+    // Use the filtered missing list and sort it
+    const unsortedList = getFilteredMissing;  // this is already computed in useMemo
+    const sortedList = sortMissingStudents(unsortedList);
+
+    if (sortedList.length === 0) {
       showAlert('No Data', 'There are no missing students to generate a receipt for.');
       return;
     }
-    showAlert(
-      'Receipt Generated',
-      `Event: ${selectedEvent.title}\nMissing students: ${list.length}\nIn a real implementation, a PDF would be created and saved.`
-    );
+
     if (Platform.OS === 'web') {
+      const html = generateReceiptHTML(selectedEvent, sortedList);
       const printWindow = window.open('', '_blank');
       if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head><title>Missing Students Receipt</title></head>
-            <body>
-              <h1>${selectedEvent.title}</h1>
-              <p>Date: ${formatDate(selectedEvent.date) || 'N/A'}</p>
-              <h2>Missing Students</h2>
-              <ul>
-                ${list.map(s => `<li>${s.name} (${s.studentID})</li>`).join('')}
-              </ul>
-            </body>
-          </html>
-        `);
-        printWindow.print();
+        printWindow.document.write(html);
+        printWindow.document.close();
+      } else {
+        showAlert('Popup Blocked', 'Please allow popups to generate the receipt.');
       }
+    } else {
+      // Native: show a sorted summary (can be enhanced later)
+      const summary = sortedList.map(s => `${s.name} (${s.studentID})`).join('\n');
+      showAlert(
+        'Missing Students (Sorted by Year & Name)',
+        `Total: ${sortedList.length}\n\n${summary.substring(0, 1000)}`
+      );
     }
   };
+  const generateReceiptHTML = (event: Event, missingList: Student[]) => {
+    const rows = missingList.map((s, idx) => {
+      const isCompleted = completedStudentIds.has(s.id);
+      const isPaid = paidStudentIds.has(s.id);
 
+      const statusBadge = isCompleted
+        ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;">✔ Completed</span>`
+        : isPaid
+          ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;">💳 Paid</span>`
+          : `<span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;">⏳ Pending</span>`;
+
+      return `
+      <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
+        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;color:#64748b;">${idx + 1}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-weight:500;color:#0f172a;">${s.name}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#475569;font-family:monospace;">${s.studentID}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#475569;text-align:center;">Year ${s.yearLevel || 'N/A'}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#475569;text-align:center;">Block ${s.block || 'N/A'}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;">${statusBadge}</td>
+      </tr>
+    `;
+    }).join('');
+
+    const completedCount = missingList.filter(s => completedStudentIds.has(s.id)).length;
+    const paidCount = missingList.filter(s => paidStudentIds.has(s.id)).length;
+    const pendingCount = missingList.length - completedCount - paidCount;
+
+    return `
+    <html>
+      <head>
+        <title>Penalty Receipt — ${event.title}</title>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f1f5f9; color: #0f172a; }
+          .page { max-width: 860px; margin: 32px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.10); overflow: hidden; }
+          .header { background: linear-gradient(135deg, #1e40af, #3b82f6); color: #fff; padding: 28px 32px 22px; }
+          .header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+          .header .meta { font-size: 13px; opacity: 0.85; margin-top: 6px; }
+          .summary { display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; }
+          .summary-card { flex: 1; padding: 16px 20px; border-right: 1px solid #e2e8f0; }
+          .summary-card:last-child { border-right: none; }
+          .summary-card .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+          .summary-card .value { font-size: 24px; font-weight: 700; color: #0f172a; }
+          .summary-card .value.green { color: #059669; }
+          .summary-card .value.yellow { color: #d97706; }
+          table { width: 100%; border-collapse: collapse; }
+          thead tr { background: #f8fafc; }
+          thead th { padding: 11px 14px; font-size: 12px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; text-align:left; }
+          thead th:first-child, thead th:nth-child(4), thead th:nth-child(5), thead th:last-child { text-align:center; }
+          .footer { padding: 16px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; display:flex; justify-content:space-between; }
+          @media print {
+            body { background: white; }
+            .page { box-shadow: none; margin: 0; border-radius: 0; }
+            .no-print { display: none !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="page">
+          <div class="header">
+            <h1>📋 Penalty Receipt</h1>
+            <div class="meta">Event: <strong>${event.title}</strong></div>
+            <div class="meta">Date: ${formatDate(event.date) || 'N/A'} &nbsp;|&nbsp; Location: ${event.location || 'N/A'}</div>
+            <div class="meta">Generated: ${new Date().toLocaleString()}</div>
+          </div>
+
+          <div class="summary">
+            <div class="summary-card">
+              <div class="label">Total Missing</div>
+              <div class="value">${missingList.length}</div>
+            </div>
+            <div class="summary-card">
+              <div class="label">Completed</div>
+              <div class="value green">${completedCount}</div>
+            </div>
+            <div class="summary-card">
+              <div class="label">Pending</div>
+              <div class="value yellow">${pendingCount}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Student Name</th>
+                <th>Student ID</th>
+                <th>Year</th>
+                <th>Block</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+
+          <div class="footer">
+            <span>Attendance Penalty Report</span>
+            <span class="no-print"><button onclick="window.print()" style="background:#1e40af;color:#fff;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;">🖨 Print / Save PDF</button></span>
+          </div>
+        </div>
+        <script>window.onload = () => setTimeout(() => window.print(), 600);</script>
+      </body>
+    </html>
+  `;
+  };
   const totalEventPages = Math.ceil(events.length / eventItemsPerPage);
   const paginatedEvents = useMemo(() => {
     const start = (eventPage - 1) * eventItemsPerPage;
@@ -1770,11 +1874,21 @@ export default function MainAdminAttendance() {
       >
         <View style={[styles.headerContent, isMobile && styles.headerContentMobile]}>
           <View>
-            <Text style={[styles.greetingText, isMobile && styles.greetingTextMobile]}>Welcome back,</Text>
-            <Text style={[styles.userName, isMobile && styles.userNameMobile]}>{userData?.name || 'Admin'}</Text>
-            <Text style={[styles.roleText, isMobile && styles.roleTextMobile]}>Attendance Manager</Text>
+            <Text style={[styles.greetingText, { color: isDark ? colors.sidebar.text.secondary : '#ffffff' }]}>
+              Welcome back,
+            </Text>
+            <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
+              {userData?.name || 'Admin'}
+            </Text>
+            <Text style={[styles.roleText, { color: isDark ? colors.sidebar.text.secondary : '#ffffff' }]}>
+              Attendance Manager
+            </Text>
           </View>
-          <TouchableOpacity style={[styles.profileButton, isMobile && styles.profileButtonMobile]} onPress={() => router.push('/main_admin/profile')}>
+
+          <TouchableOpacity
+            style={[styles.profileButton, isMobile && styles.profileButtonMobile]}
+            onPress={() => router.push('/main_admin/profile')}
+          >
             {userData?.photoURL ? (
               <Image source={{ uri: userData.photoURL }} style={styles.profileImage} />
             ) : (
@@ -1786,9 +1900,9 @@ export default function MainAdminAttendance() {
             )}
           </TouchableOpacity>
         </View>
+
         <View style={[styles.dateSection, isMobile && styles.dateSectionMobile]}>
           <View style={[styles.dateContainer, isMobile && styles.dateContainerMobile]}>
-            <Feather name="calendar" size={isMobile ? 10 : 12} color={colors.sidebar.text.muted} />
             <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
@@ -1798,6 +1912,7 @@ export default function MainAdminAttendance() {
               })}
             </Text>
           </View>
+          {/* Removed the calendar icon – matches Announcement */}
         </View>
       </LinearGradient>
 
@@ -2015,10 +2130,10 @@ export default function MainAdminAttendance() {
                       fetchAttendanceRecords(selectedEvent.id);
                     }
                   }}
-                  onSendPenalty={handleSendPenalty} 
+                  onSendPenalty={handleSendPenalty}
                   eventId={selectedEvent.id}
                   eventTitle={selectedEvent.title}
-                  eventDate={selectedEvent.date}     
+                  eventDate={selectedEvent.date}
                   missingStudents={missingAttendees.map(s => ({
                     id: s.id,
                     name: s.name,
@@ -2122,7 +2237,17 @@ export default function MainAdminAttendance() {
                         <FlatList
                           data={paginatedBlocks}
                           keyExtractor={(item) => item[0]}
-                          renderItem={renderBlockSection}
+                          renderItem={({ item, index }) => (
+                            <AnimatedBlock
+                              block={item[0]}
+                              students={item[1]}
+                              index={index}
+                              styles={styles}
+                              isMobile={isMobile}
+                              colors={colors}
+                              formatTime={formatTime}
+                            />
+                          )}
                           showsVerticalScrollIndicator={false}
                           contentContainerStyle={styles.attendanceListContent}
                         />
@@ -2295,7 +2420,7 @@ export default function MainAdminAttendance() {
                                   minWidth: 100,
                                 }}
                                 onPress={() => {
-                                  console.log('Complete button pressed - storing event:', selectedEvent?.id, 'student:', item.id);
+
                                   setSelectedStudentForAction(item);
                                   setSelectedEventForAction(selectedEvent);
                                   setShowCompleteConfirmModal(true);
@@ -2331,7 +2456,7 @@ export default function MainAdminAttendance() {
                                   minWidth: 100,
                                 }}
                                 onPress={() => {
-                                  console.log('Cancel button pressed - storing event:', selectedEvent?.id, 'student:', item.id);
+
                                   setSelectedStudentForAction(item);
                                   setSelectedEventForAction(selectedEvent);
                                   setShowCancelConfirmModal(true);
@@ -2401,98 +2526,169 @@ export default function MainAdminAttendance() {
       </ScrollView>
 
       {/* Modals (unchanged but use theme where appropriate) */}
-      <Modal visible={showEventModal} transparent animationType="fade" onRequestClose={() => setShowEventModal(false)}>
-        <View style={styles.modernModalOverlay}>
-          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
-            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
-              <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
-                <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
-                  <Feather name="calendar" size={isMobile ? 16 : 20} color={colors.accent.primary} />
-                </View>
-                <View style={styles.modernModalTitleContainer}>
-                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>Select Event</Text>
-                  <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>Choose an event to generate QR code</Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => setShowEventModal(false)} style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}>
-                <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
-              showsVerticalScrollIndicator={false}>
-              {loading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={colors.accent.primary} />
-                  <Text style={[styles.loadingText, isMobile && styles.loadingTextMobile]}>Loading events...</Text>
-                </View>
-              ) : events.length === 0 ? (
-                <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
-                  <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
-                    <Feather name="calendar" size={isMobile ? 32 : 40} color={colors.sidebar.text.muted} />
+      <Modal
+        visible={showEventModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowEventModal(false)}
+      >
+        <BlurView
+          intensity={80}
+          tint={isDark ? 'dark' : 'light'}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <TouchableOpacity
+            style={styles.glassModalOverlayTouch}
+            activeOpacity={1}
+            onPress={() => setShowEventModal(false)}
+          />
+        </BlurView>
+
+        <View style={styles.glassModalCentered}>
+          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)' }]}>
+            <LinearGradient
+              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.glassModalGradientHeader}
+            >
+              <View style={styles.glassModalHeader}>
+                <View style={styles.glassModalHeaderLeft}>
+                  <View style={[styles.glassModalIconContainer, isMobile && styles.glassModalIconContainerMobile]}>
+                    <Feather name="calendar" size={isMobile ? 16 : 20} color={colors.accent.primary} />
                   </View>
-                  <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No events available</Text>
+                  <View>
+                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>Select Event</Text>
+                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>
+                      Choose an event to generate QR code
+                    </Text>
+                  </View>
                 </View>
-              ) : (
-                <>
-                  {paginatedEvents.map(item => renderEventItem({ item }))}
-                  {totalEventPages > 1 && (
-                    <View style={[styles.paginationContainer, isMobile && styles.paginationContainerMobile, { marginTop: 16 }]}>
-                      <TouchableOpacity
-                        style={[styles.paginationButton, eventPage === 1 && styles.paginationButtonDisabled]}
-                        onPress={() => setEventPage(prev => Math.max(1, prev - 1))}
-                        disabled={eventPage === 1}
-                      >
-                        <Feather name="chevron-left" size={16} color={eventPage === 1 ? colors.sidebar.text.muted : colors.accent.primary} />
-                        <Text style={[styles.paginationButtonText, eventPage === 1 && styles.paginationButtonTextDisabled]}>Prev</Text>
-                      </TouchableOpacity>
-                      <View style={styles.pageInfo}>
-                        <Text style={styles.pageInfoText}>{eventPage}/{totalEventPages}</Text>
-                      </View>
-                      <TouchableOpacity
-                        style={[styles.paginationButton, eventPage === totalEventPages && styles.paginationButtonDisabled]}
-                        onPress={() => setEventPage(prev => Math.min(totalEventPages, prev + 1))}
-                        disabled={eventPage === totalEventPages}
-                      >
-                        <Text style={[styles.paginationButtonText, eventPage === totalEventPages && styles.paginationButtonTextDisabled]}>Next</Text>
-                        <Feather name="chevron-right" size={16} color={eventPage === totalEventPages ? colors.sidebar.text.muted : colors.accent.primary} />
-                      </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowEventModal(false)} style={styles.glassModalCloseButton}>
+                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.glassModalScrollContent}
+              style={{ backgroundColor: isDark ? 'rgba(15, 25, 35, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}
+            >
+              <View style={[styles.glassModalFormSection, { borderColor: 'rgba(255,255,255,0.2)' }]}>
+                {loading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.accent.primary} />
+                    <Text style={[styles.loadingText, isMobile && styles.loadingTextMobile]}>Loading events...</Text>
+                  </View>
+                ) : events.length === 0 ? (
+                  <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
+                    <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
+                      <Feather name="calendar" size={isMobile ? 32 : 40} color={colors.sidebar.text.muted} />
                     </View>
-                  )}
-                </>
-              )}
+                    <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No events available</Text>
+                  </View>
+                ) : (
+                  <>
+                    {paginatedEvents.map((item, idx) => (
+                      <React.Fragment key={item.id || idx}>
+                        {renderEventItem({ item })}
+                      </React.Fragment>
+                    ))}
+                    {totalEventPages > 1 && (
+                      <View style={[styles.paginationContainer, isMobile && styles.paginationContainerMobile, { marginTop: 16 }]}>
+                        <TouchableOpacity
+                          style={[styles.paginationButton, eventPage === 1 && styles.paginationButtonDisabled]}
+                          onPress={() => setEventPage(prev => Math.max(1, prev - 1))}
+                          disabled={eventPage === 1}
+                        >
+                          <Feather name="chevron-left" size={16} color={eventPage === 1 ? colors.sidebar.text.muted : colors.accent.primary} />
+                          <Text style={[styles.paginationButtonText, eventPage === 1 && styles.paginationButtonTextDisabled]}>Prev</Text>
+                        </TouchableOpacity>
+                        <View style={styles.pageInfo}>
+                          <Text style={styles.pageInfoText}>{eventPage}/{totalEventPages}</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.paginationButton, eventPage === totalEventPages && styles.paginationButtonDisabled]}
+                          onPress={() => setEventPage(prev => Math.min(totalEventPages, prev + 1))}
+                          disabled={eventPage === totalEventPages}
+                        >
+                          <Text style={[styles.paginationButtonText, eventPage === totalEventPages && styles.paginationButtonTextDisabled]}>Next</Text>
+                          <Feather name="chevron-right" size={16} color={eventPage === totalEventPages ? colors.sidebar.text.muted : colors.accent.primary} />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
             </ScrollView>
           </View>
         </View>
       </Modal>
 
-      <Modal visible={showStopConfirmModal} transparent animationType="fade" onRequestClose={() => setShowStopConfirmModal(false)}>
-        <View style={styles.modernModalOverlay}>
-          <View style={[styles.modernModalContainer, { maxWidth: 400 }]}>
-            <View style={styles.modernModalHeader}>
-              <View style={styles.modernModalHeaderLeft}>
-                <View style={[styles.modernModalIconContainer, { backgroundColor: '#ef444415' }]}>
-                  <Feather name="alert-triangle" size={20} color="#ef4444" />
+      <Modal
+        visible={showStopConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStopConfirmModal(false)}
+      >
+        <BlurView
+          intensity={80}
+          tint={isDark ? 'dark' : 'light'}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <TouchableOpacity
+            style={styles.glassModalOverlayTouch}
+            activeOpacity={1}
+            onPress={() => setShowStopConfirmModal(false)}
+          />
+        </BlurView>
+
+        <View style={styles.glassModalCentered}>
+          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 }]}>
+            <LinearGradient
+              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.glassModalGradientHeader}
+            >
+              <View style={styles.glassModalHeader}>
+                <View style={styles.glassModalHeaderLeft}>
+                  <View style={[styles.glassModalIconContainer, { backgroundColor: '#ef444415' }]}>
+                    <Feather name="alert-triangle" size={20} color="#ef4444" />
+                  </View>
+                  <View>
+                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>Stop Attendance?</Text>
+                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>This action cannot be undone</Text>
+                  </View>
                 </View>
-                <View style={styles.modernModalTitleContainer}>
-                  <Text style={styles.modernModalTitle}>Stop Attendance?</Text>
-                  <Text style={styles.modernModalSubtitle}>This action cannot be undone</Text>
-                </View>
+                <TouchableOpacity onPress={() => setShowStopConfirmModal(false)} style={styles.glassModalCloseButton}>
+                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => setShowStopConfirmModal(false)} style={styles.modernModalCloseButton}>
-                <Feather name="x" size={20} color={colors.sidebar.text.secondary} />
-              </TouchableOpacity>
-            </View>
-            <View style={[styles.modernModalContent, { paddingTop: 0 }]}>
+            </LinearGradient>
+
+            <View style={[styles.glassModalScrollContent, { padding: 20 }]}>
               <Text style={{ fontSize: 14, color: colors.sidebar.text.secondary, marginBottom: 20, lineHeight: 20 }}>
                 This will immediately expire the QR code. Students will no longer be able to mark their attendance for this event.
               </Text>
-              <View style={styles.modernFormActions}>
-                <TouchableOpacity style={styles.modernCancelButton} onPress={() => setShowStopConfirmModal(false)}>
-                  <Text style={styles.modernCancelButtonText}>Cancel</Text>
+              <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
+                <TouchableOpacity style={styles.glassCancelButton} onPress={() => setShowStopConfirmModal(false)}>
+                  <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.modernSubmitButton, { backgroundColor: '#ef4444' }]} onPress={confirmStopAttendance}>
-                  <Feather name="stop-circle" size={18} color="#ffffff" />
-                  <Text style={styles.modernSubmitButtonText}>Stop Attendance</Text>
+                <TouchableOpacity
+                  style={[styles.glassSubmitButton, { backgroundColor: '#ef4444' }]}
+                  onPress={confirmStopAttendance}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <Feather name="stop-circle" size={18} color="#ffffff" />
+                      <Text style={styles.glassSubmitButtonText}>Stop Attendance</Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -2500,226 +2696,292 @@ export default function MainAdminAttendance() {
         </View>
       </Modal>
 
-      <Modal visible={showExpirationModal} transparent animationType="fade" onRequestClose={() => setShowExpirationModal(false)}>
-        <View style={styles.modernModalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <View style={[styles.expirationModalContainer, isMobile && styles.expirationModalContainerMobile]}>
-              <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
-                <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
-                  <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
+      <Modal
+        visible={showExpirationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowExpirationModal(false)}
+      >
+        <BlurView
+          intensity={80}
+          tint={isDark ? 'dark' : 'light'}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <TouchableOpacity
+            style={styles.glassModalOverlayTouch}
+            activeOpacity={1}
+            onPress={() => setShowExpirationModal(false)}
+          />
+        </BlurView>
+
+        <View style={styles.glassModalCentered}>
+          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)', maxHeight: '85%' }]}>
+            <LinearGradient
+              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.glassModalGradientHeader}
+            >
+              <View style={styles.glassModalHeader}>
+                <View style={styles.glassModalHeaderLeft}>
+                  <View style={[styles.glassModalIconContainer, isMobile && styles.glassModalIconContainerMobile]}>
                     <Feather name="clock" size={isMobile ? 16 : 20} color="#f59e0b" />
                   </View>
-                  <View style={styles.modernModalTitleContainer}>
-                    <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>Set QR Expiration</Text>
-                    <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>For: {selectedEvent?.title}</Text>
+                  <View>
+                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>Set QR Expiration</Text>
+                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>
+                      For: {selectedEvent?.title}
+                    </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setShowExpirationModal(false)} style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}>
-                  <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
+                <TouchableOpacity onPress={() => setShowExpirationModal(false)} style={styles.glassModalCloseButton}>
+                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
                 </TouchableOpacity>
               </View>
+            </LinearGradient>
 
-              <ScrollView style={[styles.expirationModalContent, isMobile && styles.expirationModalContentMobile]}
-                showsVerticalScrollIndicator={false}>
-                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Quick Options</Text>
-                <View style={styles.expirationOptions}>
-                  {quickOptions.map((option, index) => {
-                    const isSelected = customExpiration === option.value;
-                    return (
-                      <TouchableOpacity
-                        key={index}
-                        style={[styles.expirationOption, isMobile && styles.expirationOptionMobile, isSelected && styles.expirationOptionActive]}
-                        onPress={() => setCustomExpiration(option.value)}
-                      >
-                        <Text style={[styles.expirationOptionText, isMobile && styles.expirationOptionTextMobile, isSelected && styles.expirationOptionTextActive]}>
-                          {option.label}
-                        </Text>
-                        {isSelected && <Feather name="check" size={16} color="#ffffff" />}
-                      </TouchableOpacity>
-                    );
-                  })}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.glassModalScrollContent}
+              style={{ backgroundColor: isDark ? 'rgba(15, 25, 35, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}
+            >
+              <View style={[styles.glassModalFormSection, { borderColor: 'rgba(255,255,255,0.2)' }]}>
+                {/* Quick options */}
+                <View style={styles.glassFormGroup}>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>Quick Options</Text>
+                  <View style={styles.expirationOptions}>
+                    {quickOptions.map((option, index) => {
+                      const isSelected = customExpiration === option.value;
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          style={[styles.expirationOption, isMobile && styles.expirationOptionMobile, isSelected && styles.expirationOptionActive]}
+                          onPress={() => setCustomExpiration(option.value)}
+                        >
+                          <Text style={[styles.expirationOptionText, isMobile && styles.expirationOptionTextMobile, isSelected && styles.expirationOptionTextActive]}>
+                            {option.label}
+                          </Text>
+                          {isSelected && <Feather name="check" size={16} color="#ffffff" />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
 
-                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Custom Date & Time</Text>
-                <TouchableOpacity style={[styles.modernLocationButton, { marginBottom: 16 }]} onPress={() => setCustomDatePickerVisible(true)}>
-                  <Feather name="calendar" size={20} color={colors.accent.primary} />
-                  <View style={styles.modernLocationButtonText}>
-                    <Text style={styles.modernLocationButtonTitle}>
-                      {customExpirationDate
-                        ? customExpirationDate.toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                        : 'Select custom date & time'}
-                    </Text>
-                    <Text style={styles.modernLocationButtonSubtitle}>{customExpirationDate ? 'Tap to change' : 'Choose expiration date'}</Text>
-                  </View>
-                </TouchableOpacity>
+                {/* Custom date */}
 
-                {Platform.OS === 'web' ? (
-                  <Modal visible={isCustomDatePickerVisible} transparent animationType="fade" onRequestClose={() => setCustomDatePickerVisible(false)}>
-                    <View style={styles.modernModalOverlay}>
-                      <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile, { maxWidth: 400 }]}>
-                        <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
-                          <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
-                            <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
-                              <Feather name="calendar" size={isMobile ? 16 : 20} color={colors.accent.primary} />
-                            </View>
-                            <View style={styles.modernModalTitleContainer}>
-                              <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>Select Date & Time</Text>
-                            </View>
-                          </View>
-                          <TouchableOpacity onPress={() => setCustomDatePickerVisible(false)} style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}>
-                            <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
-                          </TouchableOpacity>
-                        </View>
-                        <View style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}>
-                          <input
-                            type="datetime-local"
-                            value={customExpirationDate ? formatDateForWebInput(customExpirationDate) : ''}
-                            onChange={handleWebDateChange}
-                            min={formatDateForWebInput(new Date())}
-                            style={{
-                              width: '100%',
-                              padding: '12px',
-                              fontSize: '16px',
-                              borderRadius: '12px',
-                              border: `1px solid ${colors.border}`,
-                              marginBottom: '12px',
-                              backgroundColor: isDark ? colors.card : '#f8fafc',
-                              color: colors.text,
-                              fontFamily: 'inherit',
-                              outline: 'none',
-                            }}
-                          />
-                          <Text style={{ fontSize: 12, color: colors.sidebar.text.muted, marginBottom: 20, textAlign: 'center' }}>
-                            Format: YYYY-MM-DD HH:MM (24-hour)
-                          </Text>
-                          <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
-                            <TouchableOpacity style={[styles.modernSubmitButton, isMobile && styles.modernSubmitButtonMobile]} onPress={() => setCustomDatePickerVisible(false)}>
-                              <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>Confirm</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  </Modal>
-                ) : (
-                  <DateTimePickerModal
-                    isVisible={isCustomDatePickerVisible}
-                    mode="datetime"
-                    onConfirm={(date: Date) => { setCustomDatePickerVisible(false); setCustomExpirationDate(date); setCustomExpiration(date.toISOString()); }}
-                    onCancel={() => setCustomDatePickerVisible(false)}
-                    minimumDate={new Date()}
-                    date={customExpirationDate || new Date()}
-                  />
-                )}
+                <View style={styles.glassFormGroup}>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                    Custom Date & Time
+                  </Text>
 
-                <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
-                  <TouchableOpacity style={[styles.modernCancelButton, isMobile && styles.modernCancelButtonMobile]} onPress={() => setShowExpirationModal(false)}>
-                    <Text style={[styles.modernCancelButtonText, isMobile && styles.modernCancelButtonTextMobile]}>Cancel</Text>
+                  {/* Web: datetime-local input */}
+                  {Platform.OS === 'web' ? (
+                    <input
+                      type="datetime-local"
+                      value={
+                        customExpirationDate
+                          ? formatDateForWebInput(customExpirationDate)
+                          : ''
+                      }
+                      onChange={handleWebDateChange}
+                      style={{
+                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                        border: `1px solid ${colors.sidebar.border}`,
+                        borderRadius: 8,
+                        padding: '12px 16px',
+                        fontSize: 14,
+                        color: colors.text,
+                        width: '100%',
+                        marginBottom: 16,
+                        outline: 'none',
+                      }}
+                    />
+                  ) : (
+                    /* Native: placeholder for a real picker (could be replaced with DateTimePicker) */
+                    <TouchableOpacity
+                      style={[styles.glassFormInput, { marginBottom: 16 }]}
+                      onPress={() => setCustomDatePickerVisible(true)}
+                    >
+                      <Text style={{ color: colors.text }}>
+                        {customExpirationDate
+                          ? customExpirationDate.toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                          : 'Select custom date & time'}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: colors.sidebar.text.muted,
+                          marginTop: 2,
+                        }}
+                      >
+                        {customExpirationDate ? 'Tap to change' : 'Choose expiration date'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                {/* Actions */}
+                <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
+                  <TouchableOpacity style={styles.glassCancelButton} onPress={() => setShowExpirationModal(false)}>
+                    <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.modernSubmitButton, !customExpiration && styles.modernSubmitButtonDisabled, isMobile && styles.modernSubmitButtonMobile]}
+                    style={[styles.glassSubmitButton, !customExpiration && styles.glassSubmitButtonDisabled]}
                     onPress={setManualExpiration}
-                    disabled={!customExpiration}
+                    disabled={!customExpiration || isSaving}
                   >
                     <Feather name="check" size={isMobile ? 16 : 18} color="#ffffff" />
-                    <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>Set Expiration</Text>
+                    <Text style={[styles.glassSubmitButtonText, isMobile && styles.glassSubmitButtonTextMobile]}>Set Expiration</Text>
                   </TouchableOpacity>
                 </View>
-              </ScrollView>
-            </View>
-          </KeyboardAvoidingView>
+              </View>
+            </ScrollView>
+          </View>
         </View>
       </Modal>
 
       {/* Complete Confirmation Modal - MOVED OUTSIDE */}
-      <Modal visible={showCompleteConfirmModal} transparent animationType="fade" onRequestClose={() => setShowCompleteConfirmModal(false)}>
-        <View style={styles.modernModalOverlay}>
-          <View style={[styles.modernModalContainer, { maxWidth: 400 }]}>
-            <View style={styles.modernModalHeader}>
-              <View style={styles.modernModalHeaderLeft}>
-                <View style={[styles.modernModalIconContainer, { backgroundColor: '#10b98115' }]}>
-                  <Feather name="check-circle" size={20} color="#10b981" />
+      <Modal
+        visible={showCompleteConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCompleteConfirmModal(false)}
+      >
+        <BlurView
+          intensity={80}
+          tint={isDark ? 'dark' : 'light'}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <TouchableOpacity
+            style={styles.glassModalOverlayTouch}
+            activeOpacity={1}
+            onPress={() => setShowCompleteConfirmModal(false)}
+          />
+        </BlurView>
+
+        <View style={styles.glassModalCentered}>
+          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 }]}>
+            <LinearGradient
+              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.glassModalGradientHeader}
+            >
+              <View style={styles.glassModalHeader}>
+                <View style={styles.glassModalHeaderLeft}>
+                  <View style={[styles.glassModalIconContainer, { backgroundColor: '#10b98115' }]}>
+                    <Feather name="check-circle" size={20} color="#10b981" />
+                  </View>
+                  <View>
+                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>Complete Penalty?</Text>
+                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>This will mark the penalty as resolved</Text>
+                  </View>
                 </View>
-                <View style={styles.modernModalTitleContainer}>
-                  <Text style={styles.modernModalTitle}>Complete Penalty?</Text>
-                  <Text style={styles.modernModalSubtitle}>This will mark the penalty as resolved</Text>
-                </View>
+                <TouchableOpacity onPress={() => setShowCompleteConfirmModal(false)} style={styles.glassModalCloseButton}>
+                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => setShowCompleteConfirmModal(false)} style={styles.modernModalCloseButton}>
-                <Feather name="x" size={20} color={colors.sidebar.text.secondary} />
-              </TouchableOpacity>
-            </View>
-            <View style={[styles.modernModalContent, { paddingTop: 0 }]}>
+            </LinearGradient>
+
+            <View style={[styles.glassModalScrollContent, { padding: 20 }]}>
               <Text style={{ fontSize: 14, color: colors.sidebar.text.secondary, marginBottom: 20, lineHeight: 20 }}>
                 Are you sure you want to mark <Text style={{ fontWeight: '600', color: colors.text }}>{selectedStudentForAction?.name}</Text>'s penalty as completed?
                 This will remove the penalty from their profile.
               </Text>
-              <View style={styles.modernFormActions}>
-                <TouchableOpacity style={styles.modernCancelButton} onPress={() => setShowCompleteConfirmModal(false)}>
-                  <Text style={styles.modernCancelButtonText}>Cancel</Text>
+              <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
+                <TouchableOpacity style={styles.glassCancelButton} onPress={() => setShowCompleteConfirmModal(false)}>
+                  <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.modernSubmitButton, { backgroundColor: '#10b981' }]}
+                  style={[styles.glassSubmitButton, { backgroundColor: '#10b981' }]}
                   onPress={() => {
                     if (selectedStudentForAction && selectedEventForAction) {
                       handleCompletePenalty(selectedStudentForAction, selectedEventForAction);
                     } else {
-                      console.error('Missing student or event for completion');
                       showAlert('Error', 'Missing data. Please try again.');
                       setShowCompleteConfirmModal(false);
                     }
                   }}
                 >
                   <Feather name="check-circle" size={18} color="#ffffff" />
-                  <Text style={styles.modernSubmitButtonText}>Confirm Complete</Text>
+                  <Text style={styles.glassSubmitButtonText}>Confirm Complete</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
         </View>
       </Modal>
-
       {/* Cancel Completion Confirmation Modal - MOVED OUTSIDE */}
-      <Modal visible={showCancelConfirmModal} transparent animationType="fade" onRequestClose={() => setShowCancelConfirmModal(false)}>
-        <View style={styles.modernModalOverlay}>
-          <View style={[styles.modernModalContainer, { maxWidth: 400 }]}>
-            <View style={styles.modernModalHeader}>
-              <View style={styles.modernModalHeaderLeft}>
-                <View style={[styles.modernModalIconContainer, { backgroundColor: '#ef444415' }]}>
-                  <Feather name="x-circle" size={20} color="#ef4444" />
+      <Modal
+        visible={showCancelConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCancelConfirmModal(false)}
+      >
+        <BlurView
+          intensity={80}
+          tint={isDark ? 'dark' : 'light'}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <TouchableOpacity
+            style={styles.glassModalOverlayTouch}
+            activeOpacity={1}
+            onPress={() => setShowCancelConfirmModal(false)}
+          />
+        </BlurView>
+
+        <View style={styles.glassModalCentered}>
+          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 }]}>
+            <LinearGradient
+              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.glassModalGradientHeader}
+            >
+              <View style={styles.glassModalHeader}>
+                <View style={styles.glassModalHeaderLeft}>
+                  <View style={[styles.glassModalIconContainer, { backgroundColor: '#ef444415' }]}>
+                    <Feather name="x-circle" size={20} color="#ef4444" />
+                  </View>
+                  <View>
+                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>Cancel Completion?</Text>
+                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>This will revert the penalty to pending</Text>
+                  </View>
                 </View>
-                <View style={styles.modernModalTitleContainer}>
-                  <Text style={styles.modernModalTitle}>Cancel Completion?</Text>
-                  <Text style={styles.modernModalSubtitle}>This will revert the penalty to pending</Text>
-                </View>
+                <TouchableOpacity onPress={() => setShowCancelConfirmModal(false)} style={styles.glassModalCloseButton}>
+                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => setShowCancelConfirmModal(false)} style={styles.modernModalCloseButton}>
-                <Feather name="x" size={20} color={colors.sidebar.text.secondary} />
-              </TouchableOpacity>
-            </View>
-            <View style={[styles.modernModalContent, { paddingTop: 0 }]}>
+            </LinearGradient>
+
+            <View style={[styles.glassModalScrollContent, { padding: 20 }]}>
               <Text style={{ fontSize: 14, color: colors.sidebar.text.secondary, marginBottom: 20, lineHeight: 20 }}>
                 Are you sure you want to cancel the completion for <Text style={{ fontWeight: '600', color: colors.text }}>{selectedStudentForAction?.name}</Text>?
                 The penalty will reappear on their profile as pending.
               </Text>
-              <View style={styles.modernFormActions}>
-                <TouchableOpacity style={styles.modernCancelButton} onPress={() => setShowCancelConfirmModal(false)}>
-                  <Text style={styles.modernCancelButtonText}>Keep Completed</Text>
+              <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
+                <TouchableOpacity style={styles.glassCancelButton} onPress={() => setShowCancelConfirmModal(false)}>
+                  <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>Keep Completed</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.modernSubmitButton, { backgroundColor: '#ef4444' }]}
+                  style={[styles.glassSubmitButton, { backgroundColor: '#ef4444' }]}
                   onPress={() => {
                     if (selectedStudentForAction && selectedEventForAction) {
                       handleCancelCompletion(selectedStudentForAction, selectedEventForAction);
                     } else {
-                      console.error('Missing student or event for cancellation');
                       showAlert('Error', 'Missing data. Please try again.');
                       setShowCancelConfirmModal(false);
                     }
                   }}
                 >
                   <Feather name="x-circle" size={18} color="#ffffff" />
-                  <Text style={styles.modernSubmitButtonText}>Confirm Cancel</Text>
+                  <Text style={styles.glassSubmitButtonText}>Confirm Cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>

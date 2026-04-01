@@ -14,45 +14,59 @@ export const createUsersStyles = (
       backgroundColor: colors.background,
     },
     headerGradient: {
-      paddingTop: isMobile ? 10 : 15,
-      paddingBottom: isMobile ? 5 : 8,
-      paddingHorizontal: isMobile ? 15 : 20,
+      paddingTop: isMobile ? 15 : 20,
+      paddingBottom: isMobile ? 8 : 12,
+      paddingHorizontal: isMobile ? 16 : 24,
     },
     headerContent: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: isMobile ? 15 : 20,
+      marginBottom: isMobile ? 12 : 16,
     },
     greetingText: {
-      fontSize: isMobile ? 12 : 14,
+      fontSize: isMobile ? 11 : 13,
+      fontWeight: '500',
+      letterSpacing: 0.3,
       color: colors.sidebar.text.muted,
-      marginBottom: 4,
+      opacity: 0.75,
+      marginBottom: 2,
     },
     userName: {
-      fontSize: isMobile ? 20 : 24,
-      fontWeight: '700',
+      fontSize: isMobile ? 20 : 26,
+      fontWeight: '800',
+      letterSpacing: -0.8,
       color: '#ffffff',
       marginBottom: 2,
     },
     roleText: {
       fontSize: isMobile ? 10 : 12,
+      fontWeight: '500',
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
       color: colors.sidebar.text.muted,
+      opacity: 0.6,
+      marginLeft: -4,
     },
     profileButton: {
-      width: isMobile ? 40 : 50,
-      height: isMobile ? 40 : 50,
-      borderRadius: isMobile ? 20 : 25,
-      borderWidth: 2,
-      borderColor: '#ffffff',
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      borderWidth: 2.5,
+      borderColor: 'rgba(255,255,255,0.7)',
       overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 6,
     },
     profileImage: {
       width: '100%',
       height: '100%',
     },
     profileFallback: {
-      backgroundColor: colors.accent.primary,
+      backgroundColor: 'rgba(255,255,255,0.2)',
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -65,21 +79,23 @@ export const createUsersStyles = (
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginTop: isMobile ? -5 : 0,
+      marginTop: 0,
     },
     dateContainer: {
-      marginLeft: isMobile ? -5 : -10,
-      marginTop: isMobile ? -15 : -20,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
-      paddingHorizontal: isMobile ? 5 : 8,
+      paddingHorizontal: isMobile ? 6 : 8,
       paddingVertical: isMobile ? 4 : 6,
+      marginLeft: 0,
+      marginTop: 0,
     },
     dateText: {
-      fontSize: isMobile ? 9 : 11,
-      color: '#ffffff',
+      fontSize: isMobile ? 10 : 12,
       fontWeight: '500',
+      letterSpacing: 0.2,
+      color: '#ffffff',
+      marginLeft: -8,
     },
     headerActions: {
       flexDirection: 'row',
@@ -94,7 +110,26 @@ export const createUsersStyles = (
       alignItems: 'center',
       position: 'relative',
     },
-    
+    resultsInfo: {
+      paddingHorizontal: isMobile ? 12 : 16,
+      marginTop: 8,
+      marginBottom: 12,
+    },
+    resultsText: {
+      fontSize: isMobile ? 11 : 13,
+      color: colors.sidebar.text.secondary,
+    },
+    paginatedTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 4,
+    },
+    paginatedLocationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+
     // Main Content Grid
     mainContent: {
       flex: 1,
@@ -270,7 +305,7 @@ export const createUsersStyles = (
       borderRadius: 8,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: 'transparent', // will be overridden inline
+      backgroundColor: 'transparent',
     },
     paginationContainer: {
       flexDirection: 'row',
@@ -432,7 +467,7 @@ export const createUsersStyles = (
       borderRadius: 6,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: 'transparent', // overridden inline
+      backgroundColor: 'transparent',
     },
     searchResultFooter: {
       flexDirection: 'row',
@@ -451,7 +486,7 @@ export const createUsersStyles = (
       fontSize: isMobile ? 10 : 11,
       color: colors.sidebar.text.muted,
     },
-    // Empty / loading states
+
     emptyState: {
       alignItems: 'center',
       paddingVertical: isMobile ? 30 : 48,
@@ -699,10 +734,10 @@ export const createUsersStyles = (
       fontWeight: '700',
     },
     statusBadgeActive: {
-      backgroundColor: '#10b981', // semantic, not theme-dependent
+      backgroundColor: '#10b981',
     },
     statusBadgeInactive: {
-      backgroundColor: '#ef4444', // semantic
+      backgroundColor: '#ef4444',
     },
     courseGrid: {
       flexDirection: 'row',
@@ -741,6 +776,282 @@ export const createUsersStyles = (
     courseChipTextSelected: {
       color: '#ffffff',
     },
+    searchResultItemActive: {
+      backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+      borderColor: colors.accent.primary,
+      borderWidth: 1.5,
+      shadowColor: colors.accent.primary,
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    // Glassmorphism Modal
+    glassModalOverlay: {
+      flex: 1,
+      backgroundColor: isDark ? 'rgba(15, 23, 42, 0.75)' : 'rgba(15, 23, 42, 0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: isMobile ? 16 : 24,
+    },
+    glassModalContent: {
+      width: '100%',
+      maxWidth: 520,
+      backgroundColor: isDark
+        ? 'rgba(255, 255, 255, 0.09)'
+        : 'rgba(255, 255, 255, 0.85)',
+      borderWidth: 1,
+      borderColor: isDark
+        ? 'rgba(255, 255, 255, 0.18)'
+        : 'rgba(255, 255, 255, 0.6)',
+      borderRadius: 28,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 20 },
+      shadowOpacity: isDark ? 0.4 : 0.15,
+      shadowRadius: 30,
+      elevation: 20,
+    },
+    glassModalContentMobile: {
+      maxWidth: '100%',
+      borderRadius: 24,
+    },
+    glassModalTitleMobile: {
+      fontSize: 17,
+    },
+    glassModalClose: {
+      padding: 4,
+    },
+    glassModalBody: {
+      padding: isMobile ? 20 : 28,
+    },
+    glassDetailTitle: {
+      fontSize: isDesktop ? 26 : isTablet ? 24 : 22,
+      fontWeight: '700',
+      lineHeight: 30,
+      marginBottom: 16,
+      marginTop: 8,
+    },
+    glassDetailTitleMobile: {
+      fontSize: 20,
+      lineHeight: 26,
+    },
+
+    glassModalOverlayTouch: {
+      flex: 1,
+    },
+    glassModalCentered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
+    glassModalContainer: {
+      width: '100%',
+      maxWidth: 500,
+      maxHeight: '85%',
+      borderRadius: 28,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.3)',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.3,
+      shadowRadius: 20,
+      elevation: 15,
+    },
+    glassModalGradientHeader: {
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      overflow: 'hidden',
+    },
+    glassModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+    },
+    glassModalHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    glassModalIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(59,130,246,0.15)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    glassModalIconContainerMobile: {
+      width: 32,
+      height: 32,
+    },
+    glassModalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      letterSpacing: -0.5,
+      color: colors.text,
+    },
+    glassModalSubtitle: {
+      fontSize: 13,
+      marginTop: 2,
+      color: colors.sidebar.text.secondary,
+    },
+    glassModalCloseButton: {
+      padding: 4,
+    },
+    glassModalScrollContent: {
+      paddingBottom: 20,
+    },
+    glassModalFormSection: {
+      marginHorizontal: 16,
+      marginVertical: 12,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+      overflow: 'hidden',
+      backgroundColor: 'transparent',
+    },
+    glassFormGroup: {
+      marginHorizontal: 16,
+      marginTop: 16,
+    },
+    glassFormLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 8,
+      color: colors.text,
+    },
+    glassPriorityContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    glassPriorityContainerMobile: {
+      gap: 8,
+    },
+    glassPriorityButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 40,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+      backgroundColor: 'rgba(255,255,255,0.05)',
+    },
+    glassPriorityButtonMobile: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    glassPriorityIndicator: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: 8,
+    },
+    glassPriorityButtonText: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.sidebar.text.secondary,
+    },
+    glassPriorityButtonTextMobile: {
+      fontSize: 12,
+    },
+    glassFormInput: {
+      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: colors.text,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
+    glassFormInputMobile: {
+      fontSize: 14,
+      paddingVertical: 10,
+    },
+    glassTextArea: {
+      minHeight: 100,
+      textAlignVertical: 'top',
+    },
+    glassFormActions: {
+      flexDirection: 'row',
+      gap: 12,
+      marginHorizontal: 16,
+      marginTop: 24,
+      marginBottom: 16,
+    },
+    glassFormActionsMobile: {
+      flexDirection: 'column',
+      gap: 10,
+    },
+    glassSubmitButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.accent.primary,
+      paddingVertical: 12,
+      borderRadius: 40,
+      shadowColor: colors.accent.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    glassSubmitButtonMobile: {
+      paddingVertical: 10,
+    },
+    glassSubmitButtonDisabled: {
+      opacity: 0.5,
+    },
+    glassSubmitButtonText: {
+      color: '#ffffff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    glassSubmitButtonTextMobile: {
+      fontSize: 14,
+    },
+    glassCancelButton: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      borderRadius: 40,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.3)',
+      backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    glassCancelButtonMobile: {
+      paddingVertical: 10,
+    },
+    glassCancelButtonText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.sidebar.text.secondary,
+    },
+    glassCancelButtonTextMobile: {
+      fontSize: 14,
+    },
+    glassFormHelperText: {
+      fontSize: 12,
+      marginTop: 4,
+      marginLeft: 4,
+      fontStyle: 'italic',
+      color: colors.sidebar.text.muted,
+    },
+
     // All the mobile-specific styles from the original (to support conditional isMobile usage)
     headerGradientMobile: { paddingTop: 10, paddingBottom: 5, paddingHorizontal: 15 },
     headerContentMobile: { marginBottom: 15 },

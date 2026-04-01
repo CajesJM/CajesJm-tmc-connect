@@ -5,7 +5,6 @@ import { ActivityIndicator, useColorScheme, View } from 'react-native';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface ThemeColors {
-  // Existing structure
   sidebar: {
     background: string;
     border: string;
@@ -34,13 +33,12 @@ export interface ThemeColors {
   border: string;
   statusBar: 'light' | 'dark';
 
-  // New properties needed by admin profile style
   textSecondary: string;
   textMuted: string;
   error: string;
   success?: string;
   warning?: string;
-  primary?: string; // optional, but we can map from accent.primary
+  primary?: string; 
 }
 
 interface ThemeContextType {
@@ -79,9 +77,8 @@ const lightColors: ThemeColors = {
   card: '#FFFFFF',
   border: '#E2E8F0',
   statusBar: 'dark',
-  // New properties
   textSecondary: '#64748B',
-  textMuted: '#94A3B8',
+  textMuted: '#64748B',
   error: '#EF4444',
   success: '#10B981',
   warning: '#F59E0B',
@@ -116,9 +113,8 @@ const darkColors: ThemeColors = {
   card: '#1E293B',
   border: '#334155',
   statusBar: 'light',
-  // New properties
   textSecondary: '#8B98B5',
-  textMuted: '#5A6B8C',
+  textMuted: '#94A3B8',
   error: '#EF4444',
   success: '#10B981',
   warning: '#F59E0B',

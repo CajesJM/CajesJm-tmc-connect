@@ -13,6 +13,7 @@ import { auth, db } from "../lib/firebaseConfig";
 type Role = "main_admin" | "assistant_admin" | "student" | null;
 
 interface UserData {
+  createdAt: any;
   email: string;
   role: Role;
   name: string;
@@ -71,7 +72,6 @@ async function readUserData(): Promise<UserData | null> {
       return data ? JSON.parse(data) : null;
     }
   } catch (error) {
-    console.warn("Error reading user data:", error);
     return null;
   }
 }
@@ -93,10 +93,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (email: string, password: string): Promise<UserData> => {
   setLoading(true);
-  
-  try { 
-    console.log("AuthContext - Starting login for:", email);
-    
+
+  try {
     if (!email || !password) {
       setLoading(false);
       throw new Error("Email and password are required");
@@ -141,16 +139,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(firebaseUser);
     setUserData(completeUserData);
     await storeUserData(completeUserData);
-    
-    console.log("Login successful. Role:", completeUserData.role);
     setLoading(false);
-    
+
     return completeUserData; 
     
   } catch (error: any) {
-    console.log("AuthContext - Login error:", error);
     setLoading(false);
-    
+
     // Better error messages
     if (error.code === 'auth/invalid-credential') {
       throw new Error("Invalid email or password."); 
@@ -173,7 +168,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUserData(null);
       await storeUserData(null);
     } catch (error) {
-      console.error("Logout error:", error);
       throw error;
     }
   };

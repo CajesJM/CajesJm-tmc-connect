@@ -1,9 +1,7 @@
-// utils/pdfGenerator.ts
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 
-// Use type assertion to handle TypeScript errors
 const fs: any = FileSystem;
 
 interface PDFData {

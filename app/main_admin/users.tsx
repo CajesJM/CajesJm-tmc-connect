@@ -1,4 +1,5 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
@@ -12,13 +13,13 @@ import {
   updateDoc,
   where
 } from 'firebase/firestore';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   TextInput as RNTextInput,
@@ -40,8 +41,6 @@ const showAlert = (title: string, message?: string) => {
     Alert.alert(title, message);
   }
 };
-
-// Stable TextInput component that accepts base style via inputStyle prop
 const FormTextInput = ({
   style,
   value,
@@ -87,6 +86,7 @@ interface User {
   email: string;
   username: string;
   name: string;
+  surname?: string;
   role: 'main_admin' | 'assistant_admin' | 'student';
   studentID?: string;
   createdAt: any;
@@ -97,6 +97,152 @@ interface User {
   active?: boolean;
   deactivatedAt?: string;
 }
+
+const AnimatedUserItem = memo(function AnimatedUserItem({
+  item,
+  index,
+  currentPage,
+  itemsPerPage,
+  styles,
+  colors,
+  isMobile,
+  selectedUserId,
+  setSelectedUserId,
+  handleEditUser,
+  handleDeleteUser,
+  handleToggleActive,
+  getRoleColor,
+  getRoleBgColor,
+  isCurrentUser,
+}: {
+  item: User;
+  index: number;
+  currentPage: number;
+  itemsPerPage: number;
+  styles: any;
+  colors: any;
+  isMobile: boolean;
+  selectedUserId: string | null;
+  setSelectedUserId: (id: string | null) => void;
+  handleEditUser: (user: User) => void;
+  handleDeleteUser: (id: string, name: string) => void;
+  handleToggleActive: (user: User) => void;
+  getRoleColor: (role: string) => string;
+  getRoleBgColor: (role: string) => string;
+  isCurrentUser: boolean;
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const isActive = selectedUserId === item.id;
+  const roleColor = getRoleColor(item.role);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateX: slideAnim }],
+      }}
+    >
+      <TouchableOpacity
+        style={[
+          styles.paginatedItem,
+          isActive && styles.paginatedItemActive,
+          isMobile && styles.paginatedItemMobile,
+          !item.active && { opacity: 0.6 },
+        ]}
+        onPress={() => setSelectedUserId(item.id)}
+      >
+        <View style={[styles.paginatedNumber, { backgroundColor: `${roleColor}15` }]}>
+          <Text style={[styles.paginatedNumberText, { color: roleColor }]}>
+            {(currentPage - 1) * itemsPerPage + index + 1}
+          </Text>
+        </View>
+
+        <View style={styles.paginatedInfo}>
+          <View style={styles.paginatedTitleRow}>
+            <Text style={[styles.paginatedName, isMobile && styles.paginatedNameMobile]} numberOfLines={1}>
+              {item.surname ? `${item.surname}, ${item.name}` : item.name}
+            </Text>
+            {!item.active && (
+              <View style={styles.inactiveBadge}>
+                <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={[styles.paginatedMeta, { justifyContent: 'space-between' }]}>
+            <Text style={[styles.paginatedEmail, isMobile && styles.paginatedEmailMobile]}>
+              {item.email}
+            </Text>
+            <View style={[styles.paginatedBadge, { backgroundColor: getRoleBgColor(item.role) }]}>
+              <Text style={[styles.paginatedBadgeText, { color: roleColor }]}>
+                {item.role.replace('_', ' ').toUpperCase()}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.paginatedLocationRow}>
+            <Feather name="at-sign" size={8} color={colors.accent.primary} />
+            <Text style={[styles.paginatedUsername, { marginLeft: 4 }]} numberOfLines={1}>
+              {item.username}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.paginatedActions}>
+          <TouchableOpacity
+            style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
+            onPress={() => handleEditUser(item)}
+          >
+            <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
+          </TouchableOpacity>
+          {!isCurrentUser && (
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.paginatedStatusButton,
+                  { backgroundColor: item.active ? '#fff7ed' : '#e6f7e6' },
+                  isMobile && styles.paginatedStatusButtonMobile,
+                ]}
+                onPress={() => handleToggleActive(item)}
+              >
+                <Feather
+                  name={item.active ? 'user-x' : 'user-check'}
+                  size={isMobile ? 12 : 14}
+                  color={item.active ? '#ef4444' : '#10b981'}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
+                onPress={() => handleDeleteUser(item.id, item.name)}
+              >
+                <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
 
 export default function UserManagement() {
   const { user, userData } = useAuth();
@@ -133,6 +279,7 @@ export default function UserManagement() {
     email: '',
     username: '',
     name: '',
+    surname: '',
     role: 'student' as 'main_admin' | 'assistant_admin' | 'student',
     password: '',
     studentID: '',
@@ -164,6 +311,7 @@ export default function UserManagement() {
       const searchLower = searchQuery.toLowerCase();
       const results = users.filter(user =>
         user.name.toLowerCase().includes(searchLower) ||
+        (user.surname && user.surname.toLowerCase().includes(searchLower)) ||
         user.email.toLowerCase().includes(searchLower) ||
         user.username.toLowerCase().includes(searchLower) ||
         user.role.toLowerCase().includes(searchLower) ||
@@ -213,6 +361,7 @@ export default function UserManagement() {
           email: data.email,
           username: data.username || '',
           name: data.name,
+          surname: data.surname || '',
           role: data.role,
           studentID: data.studentID,
           createdAt: data.createdAt,
@@ -224,10 +373,17 @@ export default function UserManagement() {
           deactivatedAt: data.deactivatedAt,
         } as User);
       });
+      usersList.sort((a, b) => {
+        const surnameA = (a.surname || a.name.split(' ').pop() || '').toLowerCase();
+        const surnameB = (b.surname || b.name.split(' ').pop() || '').toLowerCase();
+        if (surnameA < surnameB) return -1;
+        if (surnameA > surnameB) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
 
       setUsers(usersList);
     } catch (error) {
-      console.error('Error fetching users:', error);
+
       Alert.alert('Error', 'Failed to load users');
     } finally {
       setLoading(false);
@@ -236,7 +392,10 @@ export default function UserManagement() {
 
   const validateCreateUser = (): { isValid: boolean; errorMessage: string } => {
     if (!newUser.name?.trim()) {
-      return { isValid: false, errorMessage: 'Please enter the full name.' };
+      return { isValid: false, errorMessage: 'Please enter the name.' };
+    }
+    if (newUser.role === 'student' && !newUser.surname?.trim()) {
+      return { isValid: false, errorMessage: 'Surname is required for students.' };
     }
     if (!newUser.username?.trim()) {
       return { isValid: false, errorMessage: 'Please enter a username.' };
@@ -283,6 +442,7 @@ export default function UserManagement() {
     const validation = validateCreateUser();
     if (!validation.isValid) {
       showAlert('Validation Error', validation.errorMessage);
+      setModalLoading(false);
       return;
     }
     try {
@@ -320,8 +480,9 @@ export default function UserManagement() {
         username: newUser.username.trim(),
         email: newUser.email.trim(),
         name: newUser.name.trim(),
+        surname: newUser.surname.trim(),
         role: newUser.role,
-        createdAt: new Date().toISOString(),
+        createdAt: new Date(),
         uid: uid,
         active: true,
       };
@@ -343,7 +504,7 @@ export default function UserManagement() {
       resetForm();
       fetchUsers();
     } catch (error: any) {
-      console.error('Error creating user:', error);
+
       let errorMessage = 'Failed to create user. Please try again.';
       if (error.code === 'auth/weak-password') {
         errorMessage = 'Password is too weak. Please use at least 6 characters.';
@@ -362,12 +523,37 @@ export default function UserManagement() {
     if (!selectedUser) {
       return { isValid: false, errorMessage: 'No user selected.' };
     }
+
+    // Name required
     if (!selectedUser.name?.trim()) {
-      return { isValid: false, errorMessage: 'Please enter the full name.' };
+      return { isValid: false, errorMessage: 'Please enter the name.' };
     }
+
+    // Surname required for students
+    if (selectedUser.role === 'student' && !selectedUser.surname?.trim()) {
+      return { isValid: false, errorMessage: 'Surname is required for students.' };
+    }
+
+    // Email validation
+    if (!selectedUser.email?.trim()) {
+      return { isValid: false, errorMessage: 'Please enter an email address.' };
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(selectedUser.email.trim())) {
+      return { isValid: false, errorMessage: 'Please enter a valid email address (e.g., user@example.com).' };
+    }
+
+    // Username validation
+    if (!selectedUser.username?.trim()) {
+      return { isValid: false, errorMessage: 'Please enter a username.' };
+    }
+
+    // Role required
     if (!selectedUser.role) {
       return { isValid: false, errorMessage: 'Please select a role.' };
     }
+
+    // Student-specific fields
     if (selectedUser.role === 'student') {
       if (!selectedUser.studentID?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the Student ID.' };
@@ -385,6 +571,7 @@ export default function UserManagement() {
         return { isValid: false, errorMessage: 'Please select the gender.' };
       }
     }
+
     return { isValid: true, errorMessage: '' };
   };
 
@@ -395,25 +582,56 @@ export default function UserManagement() {
       return;
     }
     if (!selectedUser) return;
+
     try {
       setModalLoading(true);
+
+      // --- Uniqueness checks
+      const trimmedEmail = selectedUser.email.trim();
+      const trimmedUsername = selectedUser.username.trim();
+
+      // Check email uniqueness
+      const emailConflict = users.some(
+        u => u.id !== selectedUser.id && u.email.trim() === trimmedEmail
+      );
+      if (emailConflict) {
+        showAlert('Email Already Exists', `Email "${trimmedEmail}" is already used by another user.`);
+        setModalLoading(false);
+        return;
+      }
+
+      const usernameConflict = users.some(
+        u => u.id !== selectedUser.id && u.username.trim() === trimmedUsername
+      );
+      if (usernameConflict) {
+        showAlert('Username Already Exists', `Username "${trimmedUsername}" is already taken.`);
+        setModalLoading(false);
+        return;
+      }
+
+      // Student ID uniqueness (already present)
       if (selectedUser.role === 'student' && selectedUser.studentID) {
         const trimmedStudentID = selectedUser.studentID.trim();
         const duplicateUser = users.find(u =>
-          u.id !== selectedUser.id &&
-          u.studentID?.trim() === trimmedStudentID
+          u.id !== selectedUser.id && u.studentID?.trim() === trimmedStudentID
         );
         if (duplicateUser) {
-          showAlert('Duplicate Student ID', `Student ID "${trimmedStudentID}" is already registered to ${duplicateUser.name}. Please use a different Student ID.`);
+          showAlert('Duplicate Student ID', `Student ID "${trimmedStudentID}" is already registered to ${duplicateUser.name}.`);
           setModalLoading(false);
           return;
         }
       }
+
       const userRef = doc(db, 'users', selectedUser.id);
       const updateData: any = {
         name: selectedUser.name.trim(),
+        surname: selectedUser.surname?.trim(),
         role: selectedUser.role,
+        email: trimmedEmail,          
+        username: trimmedUsername,    
       };
+
+      // Student-specific fields
       if (selectedUser.role === 'student') {
         updateData.studentID = selectedUser.studentID?.trim() || null;
         updateData.course = selectedUser.course?.trim() || null;
@@ -421,6 +639,7 @@ export default function UserManagement() {
         updateData.block = selectedUser.block?.trim() || null;
         updateData.gender = selectedUser.gender || null;
       } else {
+       
         if (selectedUser.studentID?.trim()) {
           updateData.studentID = selectedUser.studentID.trim();
         }
@@ -430,12 +649,13 @@ export default function UserManagement() {
         updateData.gender = null;
       }
       await updateDoc(userRef, updateData);
+
       showAlert('Success', 'User updated successfully!');
       setShowEditModal(false);
       setSelectedUser(null);
-      fetchUsers();
+      fetchUsers(); // Refresh the user list
     } catch (error: any) {
-      console.error('Error updating user:', error);
+      console.error('Update user error:', error);
       showAlert('Error', error.message || 'Failed to update user. Please try again.');
     } finally {
       setModalLoading(false);
@@ -452,7 +672,7 @@ export default function UserManagement() {
           window.alert(`"${userName}" deleted successfully!`);
           fetchUsers();
         } catch (error: any) {
-          console.error('Error deleting user:', error);
+
           window.alert('Failed to delete user: ' + (error.message || 'Unknown error'));
         } finally {
           setModalLoading(false);
@@ -474,7 +694,7 @@ export default function UserManagement() {
                 Alert.alert('Success', `"${userName}" deleted successfully!`);
                 fetchUsers();
               } catch (error: any) {
-                console.error('Error deleting user:', error);
+
                 Alert.alert('Error', 'Failed to delete user: ' + (error.message || 'Unknown error'));
               } finally {
                 setModalLoading(false);
@@ -517,7 +737,7 @@ export default function UserManagement() {
           );
           window.alert(`User ${action}d successfully`);
         } catch (error: any) {
-          console.error(`Error ${action}ing user:`, error);
+
           window.alert(`Failed to ${action} user: ${error.message || 'Unknown error'}`);
         } finally {
           setModalLoading(false);
@@ -555,7 +775,7 @@ export default function UserManagement() {
               );
               Alert.alert('Success', `User ${action}d successfully`);
             } catch (error: any) {
-              console.error(`Error ${action}ing user:`, error);
+
               Alert.alert('Error', `Failed to ${action} user: ${error.message || 'Unknown error'}`);
             } finally {
               setModalLoading(false);
@@ -571,6 +791,7 @@ export default function UserManagement() {
       email: '',
       username: '',
       name: '',
+      surname: '',
       role: 'student',
       password: '',
       studentID: '',
@@ -586,6 +807,10 @@ export default function UserManagement() {
     resetForm();
     setShowCreateModal(false);
     setShowEditModal(false);
+  };
+  const handleEditUser = (user: User) => {
+    setSelectedUser(user);
+    setShowEditModal(true);
   };
 
   const handleNextPage = () => {
@@ -629,141 +854,63 @@ export default function UserManagement() {
   }, [users]);
 
   const renderPaginatedItem = ({ item, index }: { item: User; index: number }) => {
-  const isActive = selectedUserId === item.id;
-  const roleColor = getRoleColor(item.role);
-  const isCurrentUser = item.email === userData?.email;
+    const isActive = selectedUserId === item.id;
+    const roleColor = getRoleColor(item.role);
+    const isCurrentUser = item.email === userData?.email;
 
-  return (
-    <TouchableOpacity
-      style={[
-        styles.paginatedItem,
-        isActive && styles.paginatedItemActive,
-        isMobile && styles.paginatedItemMobile,
-        !item.active && { opacity: 0.6 }
-      ]}
-      onPress={() => setSelectedUserId(item.id)}
-    >
-      <View style={[styles.paginatedNumber, { backgroundColor: `${roleColor}15` }]}>
-        <Text style={[styles.paginatedNumberText, { color: roleColor }]}>
-          {(currentPage - 1) * itemsPerPage + index + 1}
-        </Text>
-      </View>
-      <View style={styles.paginatedInfo}>
-        {/* Row 1: Name + Inactive Badge (badge on the right) */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={[styles.paginatedName, isMobile && styles.paginatedNameMobile]} numberOfLines={1}>
-            {item.name}
+    return (
+      <TouchableOpacity
+        style={[
+          styles.paginatedItem,
+          isActive && styles.paginatedItemActive,
+          isMobile && styles.paginatedItemMobile,
+          !item.active && { opacity: 0.6 }
+        ]}
+        onPress={() => setSelectedUserId(item.id)}
+      >
+        <View style={[styles.paginatedNumber, { backgroundColor: `${roleColor}15` }]}>
+          <Text style={[styles.paginatedNumberText, { color: roleColor }]}>
+            {(currentPage - 1) * itemsPerPage + index + 1}
           </Text>
-          {!item.active && (
-            <View style={styles.inactiveBadge}>
-              <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
-            </View>
-          )}
         </View>
-
-        {/* Row 2: Email + Role Badge (badge on the right) */}
-        <View style={[styles.paginatedMeta, { justifyContent: 'space-between' }]}>
-          <Text style={[styles.paginatedEmail, isMobile && styles.paginatedEmailMobile]}>
-            {item.email}
-          </Text>
-          <View style={[styles.paginatedBadge, { backgroundColor: getRoleBgColor(item.role) }]}>
-            <Text style={[styles.paginatedBadgeText, { color: roleColor }]}>
-              {item.role.replace('_', ' ').toUpperCase()}
+        <View style={styles.paginatedInfo}>
+          {/* Row 1: Name + Inactive Badge (badge on the right) */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={[styles.paginatedName, isMobile && styles.paginatedNameMobile]} numberOfLines={1}>
+              {item.surname ? `${item.surname}, ${item.name}` : item.name}
             </Text>
-          </View>
-        </View>
-
-        {/* Row 3: Username */}
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Feather name="at-sign" size={8} color={colors.accent.primary} />
-          <Text style={[styles.paginatedUsername, { marginLeft: 4 }]} numberOfLines={1}>
-            {item.username}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.paginatedActions}>
-        {/* action buttons unchanged */}
-        <TouchableOpacity
-          style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
-          onPress={() => {
-            setSelectedUser(item);
-            setShowEditModal(true);
-          }}
-        >
-          <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
-        </TouchableOpacity>
-        {!isCurrentUser && (
-          <>
-            <TouchableOpacity
-              style={[
-                styles.paginatedStatusButton,
-                { backgroundColor: item.active ? '#fff7ed' : '#e6f7e6' },
-                isMobile && styles.paginatedStatusButtonMobile
-              ]}
-              onPress={() => handleToggleActive(item)}
-            >
-              <Feather
-                name={item.active ? "user-x" : "user-check"}
-                size={isMobile ? 12 : 14}
-                color={item.active ? "#ef4444" : "#10b981"}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
-              onPress={() => handleDeleteUser(item.id, item.name)}
-            >
-              <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-};
-
-  const renderSearchResultItem = ({ item }: { item: User }) => {
-  const roleColor = getRoleColor(item.role);
-  const isCurrentUser = item.email === userData?.email;
-
-  return (
-    <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile]}>
-      <View style={styles.searchResultHeader}>
-        {/* Title row: name on left, badges on right */}
-        <View style={[styles.searchResultTitleContainer, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-          <Text style={[styles.searchResultTitle, isMobile && styles.searchResultTitleMobile]} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <View style={styles.searchResultBadges}>
             {!item.active && (
-              <View style={[styles.searchResultBadge, { backgroundColor: colors.sidebar.text.muted }]}>
-                <Text style={styles.searchResultBadgeText}>INACTIVE</Text>
+              <View style={styles.inactiveBadge}>
+                <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
               </View>
             )}
-            <View style={[styles.searchResultBadge, { backgroundColor: getRoleBgColor(item.role) }]}>
-              <Text style={[styles.searchResultBadgeText, { color: roleColor }]}>
+          </View>
+
+
+          {/* Row 2: Email + Role Badge (badge on the right) */}
+          <View style={[styles.paginatedMeta, { justifyContent: 'space-between' }]}>
+            <Text style={[styles.paginatedEmail, isMobile && styles.paginatedEmailMobile]}>
+              {item.email}
+            </Text>
+            <View style={[styles.paginatedBadge, { backgroundColor: getRoleBgColor(item.role) }]}>
+              <Text style={[styles.paginatedBadgeText, { color: roleColor }]}>
                 {item.role.replace('_', ' ').toUpperCase()}
               </Text>
             </View>
           </View>
-        </View>
 
-        {/* Email and matched student ID indicator (unchanged) */}
-        <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile]}>
-          {item.email}
-        </Text>
-        {searchQuery && item.studentID && item.studentID.toLowerCase().includes(searchQuery.toLowerCase()) && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-            <Feather name="hash" size={10} color="#10b981" />
-            <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile, { color: '#10b981', fontWeight: '600', marginLeft: 4 }]}>
-              ID: {item.studentID} (matched)
+          {/* Row 3: Username */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Feather name="at-sign" size={8} color={colors.accent.primary} />
+            <Text style={[styles.paginatedUsername, { marginLeft: 4 }]} numberOfLines={1}>
+              {item.username}
             </Text>
           </View>
-        )}
-
-        {/* Action buttons (unchanged) */}
-        <View style={styles.searchResultActions}>
+        </View>
+        <View style={styles.paginatedActions}>
+          {/* action buttons unchanged */}
           <TouchableOpacity
-            style={[styles.searchResultEditButton, isMobile && styles.searchResultEditButtonMobile]}
+            style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
             onPress={() => {
               setSelectedUser(item);
               setShowEditModal(true);
@@ -775,9 +922,9 @@ export default function UserManagement() {
             <>
               <TouchableOpacity
                 style={[
-                  styles.searchResultStatusButton,
+                  styles.paginatedStatusButton,
                   { backgroundColor: item.active ? '#fff7ed' : '#e6f7e6' },
-                  isMobile && styles.searchResultStatusButtonMobile
+                  isMobile && styles.paginatedStatusButtonMobile
                 ]}
                 onPress={() => handleToggleActive(item)}
               >
@@ -788,7 +935,7 @@ export default function UserManagement() {
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.searchResultDeleteButton, isMobile && styles.searchResultDeleteButtonMobile]}
+                style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
                 onPress={() => handleDeleteUser(item.id, item.name)}
               >
                 <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
@@ -796,30 +943,125 @@ export default function UserManagement() {
             </>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
+    );
+  };
 
-      {/* Footer (username and student ID) unchanged */}
-      <View style={styles.searchResultFooter}>
-        <View style={styles.searchResultRole}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Feather name="at-sign" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
-            <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile, { marginLeft: 4 }]}>
-              {item.username}
+  const renderSearchResultItem = ({ item }: { item: User }) => {
+    const roleColor = getRoleColor(item.role);
+    const isCurrentUser = item.email === userData?.email;
+    const isActive = selectedUserId === item.id;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.searchResultItem,
+          isActive && styles.searchResultItemActive,
+          isMobile && styles.searchResultItemMobile,
+        ]}
+        onPress={() => setSelectedUserId(item.id)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.searchResultHeader}>
+          {/* Title row: name on left, badges on right */}
+          <View style={[styles.searchResultTitleContainer, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+            <Text style={[styles.searchResultTitle, isMobile && styles.searchResultTitleMobile]} numberOfLines={1}>
+              {item.surname ? `${item.surname}, ${item.name}` : item.name}
             </Text>
+            <View style={styles.searchResultBadges}>
+              {!item.active && (
+                <View style={[styles.searchResultBadge, { backgroundColor: colors.sidebar.text.muted }]}>
+                  <Text style={styles.searchResultBadgeText}>INACTIVE</Text>
+                </View>
+              )}
+              <View style={[styles.searchResultBadge, { backgroundColor: getRoleBgColor(item.role) }]}>
+                <Text style={[styles.searchResultBadgeText, { color: roleColor }]}>
+                  {item.role.replace('_', ' ').toUpperCase()}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Email and matched student ID indicator */}
+          <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile]}>
+            {item.email}
+          </Text>
+          {searchQuery && item.studentID && item.studentID.toLowerCase().includes(searchQuery.toLowerCase()) && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              <Feather name="hash" size={10} color="#10b981" />
+              <Text style={[styles.searchResultEmail, isMobile && styles.searchResultEmailMobile, { color: '#10b981', fontWeight: '600', marginLeft: 4 }]}>
+                ID: {item.studentID} (matched)
+              </Text>
+            </View>
+          )}
+
+          {/* Action buttons */}
+          <View style={styles.searchResultActions}>
+            <TouchableOpacity
+              style={[styles.searchResultEditButton, isMobile && styles.searchResultEditButtonMobile]}
+              onPress={(e) => {
+                e.stopPropagation();
+                setSelectedUser(item);
+                setShowEditModal(true);
+              }}
+            >
+              <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
+            </TouchableOpacity>
+            {!isCurrentUser && (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.searchResultStatusButton,
+                    { backgroundColor: item.active ? '#fff7ed' : '#e6f7e6' },
+                    isMobile && styles.searchResultStatusButtonMobile
+                  ]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleToggleActive(item);
+                  }}
+                >
+                  <Feather
+                    name={item.active ? "user-x" : "user-check"}
+                    size={isMobile ? 12 : 14}
+                    color={item.active ? "#ef4444" : "#10b981"}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.searchResultDeleteButton, isMobile && styles.searchResultDeleteButtonMobile]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteUser(item.id, item.name);
+                  }}
+                >
+                  <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
-        {item.studentID && (
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Feather name="hash" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
-            <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile, { marginLeft: 4 }]}>
-              {item.studentID}
-            </Text>
+
+        {/* Footer (username and student ID) */}
+        <View style={styles.searchResultFooter}>
+          <View style={styles.searchResultRole}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Feather name="at-sign" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
+              <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile, { marginLeft: 4 }]}>
+                {item.username}
+              </Text>
+            </View>
           </View>
-        )}
-      </View>
-    </View>
-  );
-};
+          {item.studentID && (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Feather name="hash" size={isMobile ? 8 : 10} color={colors.sidebar.text.muted} />
+              <Text style={[styles.searchResultRoleText, isMobile && styles.searchResultRoleTextMobile, { marginLeft: 4 }]}>
+                {item.studentID}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderSelectedDetail = (selected: User) => {
     const roleColor = getRoleColor(selected.role);
@@ -831,6 +1073,13 @@ export default function UserManagement() {
           <Feather name="user" size={16} color={colors.accent.primary} />
           <Text style={styles.modernDetailRowText}>
             {selected.name}
+          </Text>
+        </View>
+
+        <View style={styles.modernDetailRow}>
+          <Feather name="user" size={16} color={colors.accent.primary} />
+          <Text style={styles.modernDetailRowText}>
+            Surname: {selected.surname || '—'}
           </Text>
         </View>
 
@@ -1023,47 +1272,68 @@ export default function UserManagement() {
         animationType="fade"
         onRequestClose={handleCloseForm}
       >
-        <View style={styles.modernModalOverlay}>
-          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
-            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
-              <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
-                <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
-                  <Feather
-                    name={isEdit ? "edit-2" : "user-plus"}
-                    size={isMobile ? 16 : 20}
-                    color={colors.accent.primary}
-                  />
-                </View>
-                <View style={styles.modernModalTitleContainer}>
-                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
-                    {isEdit ? 'Edit User' : 'New User'}
-                  </Text>
-                  <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>
-                    {isEdit ? 'Update user details' : 'Create a new user account'}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={handleCloseForm}
-                style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
-              >
-                <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
-              </TouchableOpacity>
-            </View>
+        {/* Outer blur overlay */}
+        <BlurView
+          intensity={80}
+          tint={isDark ? 'dark' : 'light'}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <TouchableOpacity
+            style={styles.glassModalOverlayTouch}
+            activeOpacity={1}
+            onPress={handleCloseForm}
+          />
+        </BlurView>
 
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={{ flex: 1 }}
+        {/* Modal container */}
+        <View style={styles.glassModalCentered}>
+          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)' }]}>
+            {/* Gradient header */}
+            <LinearGradient
+              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.glassModalGradientHeader}
             >
-              <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
-              showsVerticalScrollIndicator={false}>
-                <View style={styles.modernFormGroup}>
-                  <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Full Name *</Text>
+              <View style={styles.glassModalHeader}>
+                <View style={styles.glassModalHeaderLeft}>
+                  <View style={[styles.glassModalIconContainer, isMobile && styles.glassModalIconContainerMobile]}>
+                    <Feather
+                      name={isEdit ? 'edit-2' : 'user-plus'}
+                      size={isMobile ? 16 : 20}
+                      color={colors.accent.primary}
+                    />
+                  </View>
+                  <View>
+                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>
+                      {isEdit ? 'Edit User' : 'New User'}
+                    </Text>
+                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>
+                      {isEdit ? 'Update user details' : 'Create a new user account'}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity onPress={handleCloseForm} style={styles.glassModalCloseButton}>
+                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
+
+            {/* Scrollable content */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.glassModalScrollContent}
+              style={{ backgroundColor: isDark ? 'rgba(15, 25, 35, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}
+            >
+              <View style={[styles.glassModalFormSection, { borderColor: 'rgba(255,255,255,0.2)' }]}>
+                {/* Name */}
+                <View style={styles.glassFormGroup}>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>Name *</Text>
                   <FormTextInput
-                    inputStyle={styles.modernFormInput}
+                    inputStyle={styles.glassFormInput}
                     placeholder="Enter full name"
                     value={isEdit ? selectedUser?.name || '' : newUser.name}
-                    onChangeText={(text: string) =>
+                    onChangeText={(text) =>
                       isEdit
                         ? setSelectedUser(prev => prev ? { ...prev, name: text } : null)
                         : setNewUser({ ...newUser, name: text })
@@ -1071,40 +1341,63 @@ export default function UserManagement() {
                   />
                 </View>
 
-                <View style={styles.modernFormGroup}>
-                  <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Username *</Text>
-                  {isEdit ? (
-                    <Text style={styles.emailText}>@{selectedUser?.username}</Text>
-                  ) : (
-                    <FormTextInput
-                      inputStyle={styles.modernFormInput}
-                      placeholder="Enter username (e.g., john.cajes)"
-                      value={newUser.username}
-                      onChangeText={(text: string) => setNewUser({ ...newUser, username: text })}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
+                {/* Surname */}
+                <View style={styles.glassFormGroup}>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                    Surname {(isEdit ? selectedUser?.role : newUser.role) === 'student' ? '*' : '(optional)'}
+                  </Text>
+                  <FormTextInput
+                    inputStyle={styles.glassFormInput}
+                    placeholder="Enter surname (e.g., Cajes)"
+                    value={isEdit ? selectedUser?.surname || '' : newUser.surname}
+                    onChangeText={(text) =>
+                      isEdit
+                        ? setSelectedUser(prev => prev ? { ...prev, surname: text } : null)
+                        : setNewUser({ ...newUser, surname: text })
+                    }
+                  />
+                  {(isEdit ? selectedUser?.role : newUser.role) !== 'student' && (
+                    <Text style={[styles.glassFormHelperText, { color: colors.sidebar.text.muted }]}>Optional for admin accounts</Text>
                   )}
                 </View>
 
-                <View style={styles.modernFormGroup}>
-                  <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Email *</Text>
-                  {isEdit ? (
-                    <Text style={styles.emailText}>{selectedUser?.email}</Text>
-                  ) : (
-                    <FormTextInput
-                      inputStyle={styles.modernFormInput}
-                      placeholder="Enter email address"
-                      value={newUser.email}
-                      onChangeText={(text: string) => setNewUser({ ...newUser, email: text })}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                    />
-                  )}
+                {/* Username */}
+                <View style={styles.glassFormGroup}>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>Username *</Text>
+                  <FormTextInput
+                    inputStyle={styles.glassFormInput}
+                    placeholder="Enter username"
+                    value={isEdit ? selectedUser?.username || '' : newUser.username}
+                    onChangeText={(text) =>
+                      isEdit
+                        ? setSelectedUser(prev => prev ? { ...prev, username: text } : null)
+                        : setNewUser({ ...newUser, username: text })
+                    }
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
                 </View>
 
-                <View style={styles.modernFormGroup}>
-                  <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Role *</Text>
+                {/* Email */}
+                <View style={styles.glassFormGroup}>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>Email *</Text>
+                  <FormTextInput
+                    inputStyle={styles.glassFormInput}
+                    placeholder="Enter email address"
+                    value={isEdit ? selectedUser?.email || '' : newUser.email}
+                    onChangeText={(text) =>
+                      isEdit
+                        ? setSelectedUser(prev => prev ? { ...prev, email: text } : null)
+                        : setNewUser({ ...newUser, email: text })
+                    }
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+
+                {/* Role */}
+                <View style={styles.glassFormGroup}>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>Role *</Text>
                   <View style={styles.modernRoleSelector}>
                     {(['student', 'assistant_admin', 'main_admin'] as const).map((role) => (
                       <TouchableOpacity
@@ -1122,8 +1415,8 @@ export default function UserManagement() {
                                 course: undefined,
                                 yearLevel: undefined,
                                 block: undefined,
-                                gender: undefined
-                              })
+                                gender: undefined,
+                              }),
                             });
                           } else {
                             setNewUser({
@@ -1138,10 +1431,12 @@ export default function UserManagement() {
                           }
                         }}
                       >
-                        <Text style={[
-                          styles.modernRoleOptionText,
-                          (isEdit ? selectedUser?.role : newUser.role) === role && styles.modernRoleOptionTextSelected,
-                        ]}>
+                        <Text
+                          style={[
+                            styles.modernRoleOptionText,
+                            (isEdit ? selectedUser?.role : newUser.role) === role && styles.modernRoleOptionTextSelected,
+                          ]}
+                        >
                           {role.replace('_', ' ').toUpperCase()}
                         </Text>
                       </TouchableOpacity>
@@ -1149,28 +1444,29 @@ export default function UserManagement() {
                   </View>
                 </View>
 
+                {/* Student-specific fields */}
                 {(isEdit ? selectedUser?.role : newUser.role) === 'student' && (
                   <>
-                    <View style={styles.modernFormGroup}>
-                      <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Student ID *</Text>
+                    <View style={styles.glassFormGroup}>
+                      <Text style={[styles.glassFormLabel, { color: colors.text }]}>Student ID *</Text>
                       <FormTextInput
-                        inputStyle={styles.modernFormInput}
+                        inputStyle={styles.glassFormInput}
                         placeholder="Enter student ID"
                         value={isEdit ? selectedUser?.studentID || '' : newUser.studentID}
-                        onChangeText={(text: string) =>
+                        onChangeText={(text) =>
                           isEdit
                             ? setSelectedUser(prev => prev ? { ...prev, studentID: text } : null)
                             : setNewUser({ ...newUser, studentID: text })
                         }
                       />
-                      {!isEdit && <Text style={styles.fieldNote}>This will be used as the password</Text>}
+                      {!isEdit && <Text style={[styles.glassFormHelperText, { color: colors.sidebar.text.muted }]}>This will be used as the password</Text>}
                     </View>
 
-                    <View style={styles.modernFormGroup}>
-                      <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Course *</Text>
+                    <View style={styles.glassFormGroup}>
+                      <Text style={[styles.glassFormLabel, { color: colors.text }]}>Course *</Text>
                       <CourseSelector
                         value={isEdit ? selectedUser?.course || '' : newUser.course}
-                        onSelect={(course: string) =>
+                        onSelect={(course) =>
                           isEdit
                             ? setSelectedUser(prev => prev ? { ...prev, course } : null)
                             : setNewUser({ ...newUser, course })
@@ -1179,8 +1475,8 @@ export default function UserManagement() {
                       />
                     </View>
 
-                    <View style={styles.modernFormGroup}>
-                      <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Year Level *</Text>
+                    <View style={styles.glassFormGroup}>
+                      <Text style={[styles.glassFormLabel, { color: colors.text }]}>Year Level *</Text>
                       <View style={styles.modernRoleSelector}>
                         {(['1st Year', '2nd Year', '3rd Year', '4th Year'] as const).map((year) => (
                           <TouchableOpacity
@@ -1195,10 +1491,12 @@ export default function UserManagement() {
                                 : setNewUser({ ...newUser, yearLevel: year })
                             }
                           >
-                            <Text style={[
-                              styles.modernRoleOptionText,
-                              (isEdit ? selectedUser?.yearLevel : newUser.yearLevel) === year && styles.modernRoleOptionTextSelected,
-                            ]}>
+                            <Text
+                              style={[
+                                styles.modernRoleOptionText,
+                                (isEdit ? selectedUser?.yearLevel : newUser.yearLevel) === year && styles.modernRoleOptionTextSelected,
+                              ]}
+                            >
                               {year}
                             </Text>
                           </TouchableOpacity>
@@ -1206,13 +1504,13 @@ export default function UserManagement() {
                       </View>
                     </View>
 
-                    <View style={styles.modernFormGroup}>
-                      <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Block *</Text>
+                    <View style={styles.glassFormGroup}>
+                      <Text style={[styles.glassFormLabel, { color: colors.text }]}>Block *</Text>
                       <FormTextInput
-                        inputStyle={styles.modernFormInput}
+                        inputStyle={styles.glassFormInput}
                         placeholder="Enter block (e.g., 1, 2, 3)"
                         value={isEdit ? selectedUser?.block || '' : newUser.block}
-                        onChangeText={(text: string) =>
+                        onChangeText={(text) =>
                           isEdit
                             ? setSelectedUser(prev => prev ? { ...prev, block: text } : null)
                             : setNewUser({ ...newUser, block: text })
@@ -1220,8 +1518,8 @@ export default function UserManagement() {
                       />
                     </View>
 
-                    <View style={styles.modernFormGroup}>
-                      <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Gender *</Text>
+                    <View style={styles.glassFormGroup}>
+                      <Text style={[styles.glassFormLabel, { color: colors.text }]}>Gender *</Text>
                       <View style={styles.modernRoleSelector}>
                         {(['Male', 'Female'] as const).map((gender) => (
                           <TouchableOpacity
@@ -1236,10 +1534,12 @@ export default function UserManagement() {
                                 : setNewUser({ ...newUser, gender })
                             }
                           >
-                            <Text style={[
-                              styles.modernRoleOptionText,
-                              (isEdit ? selectedUser?.gender : newUser.gender) === gender && styles.modernRoleOptionTextSelected,
-                            ]}>
+                            <Text
+                              style={[
+                                styles.modernRoleOptionText,
+                                (isEdit ? selectedUser?.gender : newUser.gender) === gender && styles.modernRoleOptionTextSelected,
+                              ]}
+                            >
                               {gender}
                             </Text>
                           </TouchableOpacity>
@@ -1249,39 +1549,42 @@ export default function UserManagement() {
                   </>
                 )}
 
+                {/* Password for admins (only on create) */}
                 {!isEdit && (newUser.role === 'assistant_admin' || newUser.role === 'main_admin') && (
-                  <View style={styles.modernFormGroup}>
-                    <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Password *</Text>
+                  <View style={styles.glassFormGroup}>
+                    <Text style={[styles.glassFormLabel, { color: colors.text }]}>Password *</Text>
                     <FormTextInput
-                      inputStyle={styles.modernFormInput}
+                      inputStyle={styles.glassFormInput}
                       placeholder="Enter password"
                       value={newUser.password}
-                      onChangeText={(text: string) => setNewUser({ ...newUser, password: text })}
+                      onChangeText={(text) => setNewUser({ ...newUser, password: text })}
                       secureTextEntry
                     />
                   </View>
                 )}
 
+                {/* Optional Student ID for admins (on edit) */}
                 {isEdit && (selectedUser?.role === 'assistant_admin' || selectedUser?.role === 'main_admin') && (
-                  <View style={styles.modernFormGroup}>
-                    <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Student ID (Optional)</Text>
+                  <View style={styles.glassFormGroup}>
+                    <Text style={[styles.glassFormLabel, { color: colors.text }]}>Student ID (Optional)</Text>
                     <FormTextInput
-                      inputStyle={styles.modernFormInput}
+                      inputStyle={styles.glassFormInput}
                       placeholder="Enter student ID if applicable"
                       value={selectedUser?.studentID || ''}
-                      onChangeText={(text: string) =>
+                      onChangeText={(text) =>
                         setSelectedUser(prev => prev ? { ...prev, studentID: text } : null)
                       }
                     />
                   </View>
                 )}
 
-                <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
+                {/* Actions */}
+                <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
                   <TouchableOpacity
                     style={[
-                      styles.modernSubmitButton,
-                      modalLoading && styles.modernSubmitButtonDisabled,
-                      isMobile && styles.modernSubmitButtonMobile
+                      styles.glassSubmitButton,
+                      modalLoading && styles.glassSubmitButtonDisabled,
+                      isMobile && styles.glassSubmitButtonMobile,
                     ]}
                     onPress={isEdit ? handleUpdateUser : handleCreateUser}
                     disabled={modalLoading}
@@ -1291,11 +1594,11 @@ export default function UserManagement() {
                     ) : (
                       <>
                         <Feather
-                          name={isEdit ? "check-circle" : "plus-circle"}
+                          name={isEdit ? 'check-circle' : 'plus-circle'}
                           size={isMobile ? 16 : 18}
                           color="#ffffff"
                         />
-                        <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
+                        <Text style={[styles.glassSubmitButtonText, isMobile && styles.glassSubmitButtonTextMobile]}>
                           {isEdit ? 'Update' : 'Create'}
                         </Text>
                       </>
@@ -1303,14 +1606,14 @@ export default function UserManagement() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.modernCancelButton, isMobile && styles.modernCancelButtonMobile]}
+                    style={[styles.glassCancelButton, isMobile && styles.glassCancelButtonMobile]}
                     onPress={handleCloseForm}
                   >
-                    <Text style={[styles.modernCancelButtonText, isMobile && styles.modernCancelButtonTextMobile]}>Cancel</Text>
+                    <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
-              </ScrollView>
-            </KeyboardAvoidingView>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1332,9 +1635,9 @@ export default function UserManagement() {
       >
         <View style={[styles.headerContent, isMobile && styles.headerContentMobile]}>
           <View>
-            <Text style={[styles.greetingText, isMobile && styles.greetingTextMobile]}>Welcome back,</Text>
+            <Text style={[styles.greetingText, { color: isDark ? colors.sidebar.text.secondary : '#ffffff' }]}>Welcome back,</Text>
             <Text style={[styles.userName, isMobile && styles.userNameMobile]}>{userData?.name || 'Admin'}</Text>
-            <Text style={[styles.roleText, isMobile && styles.roleTextMobile]}>User Manager</Text>
+            <Text style={[styles.roleText, { color: isDark ? colors.sidebar.text.secondary : '#ffffff' }]}>User Manager</Text>
           </View>
 
           <TouchableOpacity
@@ -1358,7 +1661,6 @@ export default function UserManagement() {
 
         <View style={[styles.dateSection, isMobile && styles.dateSectionMobile]}>
           <View style={[styles.dateContainer, isMobile && styles.dateContainerMobile]}>
-            <Feather name="calendar" size={isMobile ? 10 : 12} color={colors.sidebar.text.muted} />
             <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
@@ -1456,6 +1758,12 @@ export default function UserManagement() {
               </ScrollView>
             </View>
           </View>
+          <View style={styles.resultsInfo}>
+            <Text style={styles.resultsText}>
+              {filterUsersByRole(users, activeFilter).length} user{filterUsersByRole(users, activeFilter).length !== 1 ? 's' : ''}
+              {activeFilter !== 'all' && ` from ${activeFilter.replace('_', ' ')}`}
+            </Text>
+          </View>
 
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -1468,7 +1776,25 @@ export default function UserManagement() {
                 <FlatList
                   data={paginatedUsers}
                   keyExtractor={(item) => item.id}
-                  renderItem={renderPaginatedItem}
+                  renderItem={({ item, index }) => (
+                    <AnimatedUserItem
+                      item={item}
+                      index={index}
+                      currentPage={currentPage}
+                      itemsPerPage={itemsPerPage}
+                      styles={styles}
+                      colors={colors}
+                      isMobile={isMobile}
+                      selectedUserId={selectedUserId}
+                      setSelectedUserId={setSelectedUserId}
+                      handleEditUser={handleEditUser}
+                      handleDeleteUser={handleDeleteUser}
+                      handleToggleActive={handleToggleActive}
+                      getRoleColor={getRoleColor}
+                      getRoleBgColor={getRoleBgColor}
+                      isCurrentUser={item.email === userData?.email}
+                    />
+                  )}
                   style={styles.paginatedList}
                   showsVerticalScrollIndicator={false}
                   ListEmptyComponent={
@@ -1499,7 +1825,7 @@ export default function UserManagement() {
               <Feather name="search" size={isMobile ? 14 : 16} color={colors.sidebar.text.secondary} />
               <FormTextInput
                 style={[styles.searchInput, isMobile && styles.searchInputMobile]}
-                inputStyle={styles.searchInput} // reuse searchInput style as base
+                inputStyle={styles.searchInput}
                 placeholder="Search by name, email, username, or student ID..."
                 value={searchQuery}
                 onChangeText={handleSearch}
@@ -1565,42 +1891,44 @@ export default function UserManagement() {
       {/* Create/Edit Modal */}
       {renderForm(showEditModal)}
 
-      {/* User Details Modal */}
+      {/* Glassmorphism User Details Modal */}
       <Modal
         visible={selectedUserId !== null}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setSelectedUserId(null)}
       >
-        <View style={styles.modernModalOverlay}>
-          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
-            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
-              <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
-                <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
-                  <Feather name="user" size={isMobile ? 16 : 20} color={colors.accent.primary} />
-                </View>
-                <View style={styles.modernModalTitleContainer}>
-                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
-                    User Details
-                  </Text>
-                </View>
-              </View>
+        <TouchableOpacity
+          style={styles.glassModalOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectedUserId(null)}
+        >
+          <TouchableOpacity
+            style={[styles.glassModalContent, isMobile && styles.glassModalContentMobile]}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <View style={styles.glassModalHeader}>
+              <Text style={[styles.glassModalTitle, isMobile && styles.glassModalTitleMobile]}>
+                User Details
+              </Text>
               <TouchableOpacity
                 onPress={() => setSelectedUserId(null)}
-                style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+                style={styles.glassModalClose}
               >
-                <Feather name="x" size={isMobile ? 18 : 20} color={colors.sidebar.text.secondary} />
+                <Feather name="x" size={isMobile ? 22 : 26} color={colors.sidebar.text.secondary} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
-            showsVerticalScrollIndicator={false}>
+            {/* Body */}
+            <View style={styles.glassModalBody}>
               {selectedUserId && renderSelectedDetail(
                 users.find(u => u.id === selectedUserId)!
               )}
-            </ScrollView>
-          </View>
-        </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

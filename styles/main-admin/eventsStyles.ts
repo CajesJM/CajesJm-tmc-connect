@@ -6,15 +6,16 @@ export const createEventsStyles = (
     isDark: boolean,
     isMobile: boolean,
     isTablet: boolean,
-    isDesktop: boolean
+    isDesktop: boolean,
+    screenHeight: number
 ) => {
-    // Helper to get status badge background – stays independent of theme
+
     const getStatusBg = (status?: string) => {
         switch (status) {
             case 'pending': return '#f59e0b';
             case 'approved': return '#10b981';
             case 'rejected': return '#ef4444';
-            default: return colors.accent.primary; // fallback
+            default: return colors.accent.primary;
         }
     };
 
@@ -24,45 +25,59 @@ export const createEventsStyles = (
             backgroundColor: colors.background,
         },
         headerGradient: {
-            paddingTop: isMobile ? 10 : 15,
-            paddingBottom: isMobile ? 5 : 8,
-            paddingHorizontal: isMobile ? 15 : 20,
+            paddingTop: isMobile ? 15 : 20,
+            paddingBottom: isMobile ? 8 : 12,
+            paddingHorizontal: isMobile ? 16 : 24,
         },
         headerContent: {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: isMobile ? 15 : 20,
+            marginBottom: isMobile ? 12 : 16,
         },
         greetingText: {
-            fontSize: isMobile ? 12 : 14,
+            fontSize: isMobile ? 11 : 13,
+            fontWeight: '500',
+            letterSpacing: 0.3,
             color: colors.sidebar.text.muted,
-            marginBottom: 4,
+            opacity: 0.75,
+            marginBottom: 2,
         },
         userName: {
-            fontSize: isMobile ? 20 : 24,
-            fontWeight: '700',
+            fontSize: isMobile ? 20 : 26,
+            fontWeight: '800',
+            letterSpacing: -0.8,
             color: '#ffffff',
             marginBottom: 2,
         },
         roleText: {
             fontSize: isMobile ? 10 : 12,
+            fontWeight: '500',
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
             color: colors.sidebar.text.muted,
+            opacity: 0.6,
+            marginLeft: -4,
         },
         profileButton: {
-            width: isMobile ? 40 : 50,
-            height: isMobile ? 40 : 50,
-            borderRadius: isMobile ? 20 : 25,
-            borderWidth: 2,
-            borderColor: '#ffffff',
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            borderWidth: 2.5,
+            borderColor: 'rgba(255,255,255,0.7)',
             overflow: 'hidden',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+            elevation: 6,
         },
         profileImage: {
             width: '100%',
             height: '100%',
         },
         profileFallback: {
-            backgroundColor: colors.accent.primary,
+            backgroundColor: 'rgba(255,255,255,0.2)',
             justifyContent: 'center',
             alignItems: 'center',
         },
@@ -75,21 +90,23 @@ export const createEventsStyles = (
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginTop: isMobile ? -5 : 0,
+            marginTop: 0,
         },
         dateContainer: {
-            marginLeft: isMobile ? -5 : -10,
-            marginTop: isMobile ? -15 : -20,
             flexDirection: 'row',
             alignItems: 'center',
             gap: 4,
-            paddingHorizontal: isMobile ? 5 : 8,
+            paddingHorizontal: isMobile ? 6 : 8,
             paddingVertical: isMobile ? 4 : 6,
+            marginLeft: 0,
+            marginTop: 0,
         },
         dateText: {
-            fontSize: isMobile ? 9 : 11,
-            color: '#ffffff',
+            fontSize: isMobile ? 10 : 12,
             fontWeight: '500',
+            letterSpacing: 0.2,
+            color: '#ffffff',
+            marginLeft: -8,
         },
         headerActions: {
             flexDirection: 'row',
@@ -495,7 +512,7 @@ export const createEventsStyles = (
             color: colors.sidebar.text.muted,
         },
 
-        // Empty / loading states
+
         emptyState: {
             alignItems: 'center',
             paddingVertical: isMobile ? 30 : 48,
@@ -531,6 +548,15 @@ export const createEventsStyles = (
         loadingText: {
             marginTop: 8,
             fontSize: isMobile ? 11 : 12,
+            color: colors.sidebar.text.secondary,
+        },
+        resultsInfo: {
+            paddingHorizontal: isMobile ? 12 : 16,
+            marginTop: 8,
+            marginBottom: 12,
+        },
+        resultsText: {
+            fontSize: isMobile ? 11 : 13,
             color: colors.sidebar.text.secondary,
         },
 
@@ -718,7 +744,7 @@ export const createEventsStyles = (
             paddingHorizontal: 10,
             paddingVertical: 4,
             borderRadius: 6,
-            backgroundColor: colors.accent.primary, // will be overridden by dynamic status
+            backgroundColor: colors.accent.primary,
         },
         modernDetailTitle: {
             fontSize: isMobile ? 16 : 18,
@@ -826,8 +852,75 @@ export const createEventsStyles = (
             fontSize: 13,
             fontWeight: '500',
         },
+        // ────── Glassmorphism Modal Styles 
+        glassModalOverlay: {
+            flex: 1,
+            backgroundColor: isDark ? 'rgba(15, 23, 42, 0.78)' : 'rgba(15, 23, 42, 0.65)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: isMobile ? 16 : 24,
+        },
+        glassModalContent: {
+            width: '100%',
+            maxWidth: 560,
+            backgroundColor: isDark
+                ? 'rgba(255, 255, 255, 0.09)'
+                : 'rgba(255, 255, 255, 0.88)',
+            borderWidth: 1,
+            borderColor: isDark
+                ? 'rgba(255, 255, 255, 0.18)'
+                : 'rgba(255, 255, 255, 0.65)',
+            borderRadius: 28,
+            overflow: 'hidden',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 25 },
+            shadowOpacity: isDark ? 0.45 : 0.18,
+            shadowRadius: 35,
+            elevation: 25,
+        },
+        glassModalContentMobile: {
+            maxWidth: '100%',
+            borderRadius: 24,
+        },
+        glassModalHeader: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: isMobile ? 20 : 24,
+            paddingVertical: 20,
+            borderBottomWidth: 1,
+            borderBottomColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
+        },
+        glassModalTitle: {
+            fontSize: isDesktop ? 21 : 19,
+            fontWeight: '700',
+            color: colors.text,
+        },
+        glassModalTitleMobile: {
+            fontSize: 18,
+        },
+        glassModalClose: {
+            padding: 6,
+        },
+        glassModalBody: {
+            padding: isMobile ? 20 : 28,
+            maxHeight: isMobile ? screenHeight * 0.85 : 620,
+        },
+        glassModalBodyMobile: {
+            padding: 18,
+        },
 
-        // Map styles (if used)
+        searchResultItemActive: {
+            backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
+            borderColor: '#0ea5e9',
+            borderWidth: 1.5,
+            shadowColor: '#0ea5e9',
+            shadowOpacity: 0.15,
+            shadowRadius: 8,
+            elevation: 3,
+        },
+
+        // Map styles 
         mapContainer: {
             borderRadius: 12,
             overflow: 'hidden',
@@ -943,6 +1036,183 @@ export const createEventsStyles = (
             flex: 1,
             minHeight: 200,
         },
+        paginatedTitleRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 4,
+        },
+        paginatedBadgeContainer: {
+            flexDirection: 'row',
+            gap: 4,
+            marginLeft: 8,
+        },
+        paginatedLocationRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+        },
+        glassModalOverlayTouch: {
+            flex: 1,
+        },
+        glassModalCentered: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+        },
+        glassModalContainer: {
+            width: '100%',
+            maxWidth: 500,
+            maxHeight: '85%',
+            borderRadius: 28,
+            overflow: 'hidden',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.3)',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.3,
+            shadowRadius: 20,
+            elevation: 15,
+        },
+        glassModalGradientHeader: {
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            overflow: 'hidden',
+        },
+        glassModalHeaderLeft: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+        },
+        glassModalIconContainer: {
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: 'rgba(59,130,246,0.15)',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        glassModalIconContainerMobile: {
+            width: 32,
+            height: 32,
+        },
+
+        glassModalSubtitle: {
+            fontSize: 13,
+            marginTop: 2,
+        },
+        glassModalCloseButton: {
+            padding: 4,
+        },
+        glassModalScrollContent: {
+            paddingBottom: 20,
+        },
+        glassModalFormSection: {
+            marginHorizontal: 16,
+            marginVertical: 12,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.2)',
+            overflow: 'hidden',
+            backgroundColor: 'transparent',
+        },
+        glassFormGroup: {
+            marginHorizontal: 16,
+            marginTop: 16,
+        },
+        glassFormLabel: {
+            fontSize: 14,
+            fontWeight: '600',
+            marginBottom: 8,
+        },
+        glassFormInput: {
+            backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+            borderRadius: 12,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            fontSize: 16,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.2)',
+        },
+        glassFormInputMobile: {
+            fontSize: 14,
+            paddingVertical: 10,
+        },
+        glassTextArea: {
+            minHeight: 100,
+            textAlignVertical: 'top',
+        },
+        glassFormActions: {
+            flexDirection: 'row',
+            gap: 12,
+            marginHorizontal: 16,
+            marginTop: 24,
+            marginBottom: 16,
+        },
+        glassFormActionsMobile: {
+            flexDirection: 'column',
+            gap: 10,
+        },
+        glassSubmitButton: {
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            backgroundColor: colors.accent.primary,
+            paddingVertical: 12,
+            borderRadius: 40,
+            shadowColor: colors.accent.primary,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 4,
+        },
+        glassSubmitButtonMobile: {
+            paddingVertical: 10,
+        },
+        glassSubmitButtonDisabled: {
+            opacity: 0.5,
+        },
+        glassSubmitButtonText: {
+            color: '#ffffff',
+            fontSize: 16,
+            fontWeight: '600',
+        },
+        glassSubmitButtonTextMobile: {
+            fontSize: 14,
+        },
+        glassCancelButton: {
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 12,
+            borderRadius: 40,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.3)',
+            backgroundColor: 'rgba(255,255,255,0.1)',
+        },
+        glassCancelButtonMobile: {
+            paddingVertical: 10,
+        },
+        glassCancelButtonText: {
+            fontSize: 16,
+            fontWeight: '500',
+        },
+        glassCancelButtonTextMobile: {
+            fontSize: 14,
+        },
+        glassFormHelperText: {
+            fontSize: 12,
+            marginTop: 4,
+            marginLeft: 4,
+        },
+
         paginatedItemMobile: { padding: 10, gap: 8 },
         paginatedTitleMobile: { fontSize: 13 },
         paginatedDateMobile: { fontSize: 10 },

@@ -1,17 +1,16 @@
-import {
-  Feather
-} from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, Timestamp, updateDoc, where } from 'firebase/firestore';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Image,
-  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -110,11 +109,141 @@ interface NewEventState {
   };
 }
 
+const AnimatedEventItem = memo(function AnimatedEventItem({
+  item,
+  index,
+  currentPage,
+  itemsPerPage,
+  styles,
+  colors,
+  isMobile,
+  selectedEvent,
+  setSelectedEvent,
+  handleEditEvent,
+  handleDeleteEvent,
+  getPriorityColor,
+  getEventStatusBadge,
+  formatShortDate,
+  getStatusColor,
+}: {
+  item: Event;
+  index: number;
+  currentPage: number;
+  itemsPerPage: number;
+  styles: any;
+  colors: any;
+  isMobile: boolean;
+  selectedEvent: string | null;
+  setSelectedEvent: (id: string | null) => void;
+  handleEditEvent: (item: Event) => void;
+  handleDeleteEvent: (id: string, title: string) => void;
+  getPriorityColor: (date: Date) => string;
+  getEventStatusBadge: (date: Date) => { text: string; color: string };
+  formatShortDate: (date: Date) => string;
+  getStatusColor: (status?: string) => string;
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const isActive = selectedEvent === item.id;
+  const priorityColor = getPriorityColor(item.date);
+  const badge = getEventStatusBadge(item.date);
+  const statusColor = getStatusColor(item.status);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateX: slideAnim }],
+      }}
+    >
+      <TouchableOpacity
+        style={[
+          styles.paginatedItem,
+          isActive && styles.paginatedItemActive,
+          isMobile && styles.paginatedItemMobile,
+        ]}
+        onPress={() => setSelectedEvent(item.id)}
+      >
+        <View style={[styles.paginatedNumber, { backgroundColor: `${priorityColor}15` }]}>
+          <Text style={[styles.paginatedNumberText, { color: priorityColor }]}>
+            {(currentPage - 1) * itemsPerPage + index + 1}
+          </Text>
+        </View>
+
+        <View style={styles.paginatedInfo}>
+          <View style={styles.paginatedTitleRow}>
+            <Text style={[styles.paginatedTitle, isMobile && styles.paginatedTitleMobile]} numberOfLines={1}>
+              {item.title}
+            </Text>
+
+            <View style={styles.paginatedBadgeContainer}>
+              {item.status && (
+                <View style={[styles.paginatedBadge, { backgroundColor: statusColor }]}>
+                  <Text style={styles.paginatedBadgeText}>{item.status.toUpperCase()}</Text>
+                </View>
+              )}
+              <View style={[styles.paginatedBadge, { backgroundColor: badge.color }]}>
+                <Text style={styles.paginatedBadgeText}>{badge.text}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.paginatedMeta}>
+            <Text style={[styles.paginatedDate, isMobile && styles.paginatedDateMobile]}>
+              {formatShortDate(item.date)}
+            </Text>
+          </View>
+
+          <View style={styles.paginatedLocationRow}>
+            <Feather name="map-pin" size={8} color="#0ea5e9" />
+            <Text style={[styles.paginatedLocation, { marginLeft: 4 }]} numberOfLines={1}>
+              {item.location}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.paginatedActions}>
+          <TouchableOpacity
+            style={[styles.paginatedEditButton, isMobile && styles.paginatedEditButtonMobile]}
+            onPress={() => handleEditEvent(item)}
+          >
+            <Feather name="edit-2" size={isMobile ? 12 : 14} color={colors.accent.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.paginatedDeleteButton, isMobile && styles.paginatedDeleteButtonMobile]}
+            onPress={() => handleDeleteEvent(item.id, item.title)}
+          >
+            <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
+
 
 export default function MainAdminEvents() {
   const { user, userData } = useAuth();
   const router = useRouter();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   const isMobile = screenWidth < 640;
   const isTablet = screenWidth >= 640 && screenWidth < 1024;
@@ -153,12 +282,12 @@ export default function MainAdminEvents() {
   const [selectedEventIsWithinRange, setIsSelectedEventWithinRange] = useState<boolean | null>(null);
   const [checkingSelectedEventLocation, setCheckingSelectedEventLocation] = useState(false);
   const { colors, isDark } = useTheme();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const styles = useMemo(
-    () => createEventsStyles(colors, isDark, isMobile, isTablet, isDesktop),
-    [colors, isDark, isMobile, isTablet, isDesktop]
+    () => createEventsStyles(colors, isDark, isMobile, isTablet, isDesktop, screenHeight),
+    [colors, isDark, isMobile, isTablet, isDesktop, screenHeight]
   );
-
   const TextInput = ({
     style,
     value,
@@ -239,7 +368,7 @@ export default function MainAdminEvents() {
         setRefreshing(false);
       },
       (error: unknown) => {
-        console.error('Error fetching events:', error);
+
         showAlert('Error', 'Failed to load events');
         setLoading(false);
         setRefreshing(false);
@@ -365,7 +494,7 @@ export default function MainAdminEvents() {
 
     } catch (error: unknown) {
       setLocationLoading(false);
-      console.error('Error getting location:', error);
+
 
       let errorMessage = 'Failed to get current location. Please try again or enter coordinates manually.';
 
@@ -517,7 +646,7 @@ export default function MainAdminEvents() {
         await Linking.openURL(url);
       }
     } catch (error) {
-      console.error('Error opening maps:', error);
+
       showAlert('Error', 'Could not open maps application');
     }
   };
@@ -565,7 +694,7 @@ export default function MainAdminEvents() {
       );
 
     } catch (error) {
-      console.error('Error checking location:', error);
+
       showAlert('Error', 'Failed to get your location. Please try again.');
     } finally {
       setCheckingSelectedEventLocation(false);
@@ -574,9 +703,11 @@ export default function MainAdminEvents() {
 
   const handleCreateEvent = async () => {
     if (!newEvent.title?.trim() || !newEvent.description?.trim() || !newEvent.location?.trim()) {
-      showAlert('Error', 'Please fill in all required fields: Title, Description, and Location');
+      showAlert('Error', 'Please fill in all required fields');
       return;
     }
+
+    setIsSubmitting(true);
 
     try {
       setLoading(true);
@@ -603,10 +734,11 @@ export default function MainAdminEvents() {
       showAlert('Success', 'Event created successfully!');
 
     } catch (error: unknown) {
-      console.error('Error creating event:', error);
+
       showAlert('Error', 'Failed to create event');
     } finally {
       setLoading(false);
+      setIsSubmitting(false);
     }
   };
   const handleWebDateChange = (event: any) => {
@@ -618,7 +750,7 @@ export default function MainAdminEvents() {
       const [datePart, timePart] = localDateString.split('T');
 
       if (!datePart || !timePart) {
-        console.warn('Invalid date format');
+
         return;
       }
 
@@ -626,39 +758,39 @@ export default function MainAdminEvents() {
       const [hours, minutes] = timePart.split(':').map(Number);
 
       if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) {
-        console.warn('Invalid date components');
+
         return;
       }
 
       if (year < 2000 || year > 2100) {
-        console.warn('Year out of valid range');
+
         return;
       }
 
       if (month < 1 || month > 12) {
-        console.warn('Invalid month');
+
         return;
       }
 
       if (day < 1 || day > 31) {
-        console.warn('Invalid day');
+
         return;
       }
 
       if (hours < 0 || hours > 23) {
-        console.warn('Invalid hours');
+
         return;
       }
 
       if (minutes < 0 || minutes > 59) {
-        console.warn('Invalid minutes');
+
         return;
       }
 
       const localDate = new Date(year, month - 1, day, hours, minutes);
 
       if (isNaN(localDate.getTime())) {
-        console.warn('Invalid date created');
+
         return;
       }
 
@@ -667,7 +799,6 @@ export default function MainAdminEvents() {
       maxFutureDate.setFullYear(now.getFullYear() + 5);
 
       if (localDate < now) {
-        // Allow past dates
       }
 
       if (localDate > maxFutureDate) {
@@ -678,7 +809,7 @@ export default function MainAdminEvents() {
       setNewEvent({ ...newEvent, date: localDate });
 
     } catch (error) {
-      console.error('Error parsing date:', error);
+
     }
   };
   const formatDateForWebInput = (date: Date) => {
@@ -696,6 +827,8 @@ export default function MainAdminEvents() {
       showAlert('Error', 'Please fill in all required fields');
       return;
     }
+
+    setIsSubmitting(true);
 
     try {
       setLoading(true);
@@ -725,10 +858,11 @@ export default function MainAdminEvents() {
       setEditingEvent(null);
       showAlert('Success', 'Event updated successfully!');
     } catch (error: unknown) {
-      console.error('Error updating event:', error);
+
       showAlert('Error', 'Failed to update event');
     } finally {
       setLoading(false);
+      setIsSubmitting(false);
     }
   };
   const headerGradientColors = isDark
@@ -773,7 +907,7 @@ export default function MainAdminEvents() {
       setShowEditForm(true);
 
     } catch (error: unknown) {
-      console.error('Error setting up edit form:', error);
+
       showAlert('Error', 'Failed to load event for editing');
     }
   };
@@ -783,7 +917,7 @@ export default function MainAdminEvents() {
       if (Platform.OS === 'web') {
         return window.confirm(`Are you sure you want to delete "${eventTitle}"?`);
       } else {
-        // We'll handle via Alert, so return a promise
+
         return new Promise<boolean>((resolve) => {
           Alert.alert(
             'Delete Event',
@@ -801,11 +935,8 @@ export default function MainAdminEvents() {
     if (!confirmed) return;
 
     try {
-      // Delete the event document
       const eventRef = doc(db, 'events', eventId);
       await deleteDoc(eventRef);
-
-      // Delete all penalties that reference this event
       const penaltiesQuery = query(
         collection(db, 'penalties'),
         where('eventId', '==', eventId)
@@ -816,7 +947,7 @@ export default function MainAdminEvents() {
 
       showAlert('Success', `"${eventTitle}" and its associated penalties deleted successfully!`);
     } catch (error: unknown) {
-      console.error('Error deleting event:', error);
+
       showAlert('Error', 'Failed to delete event. Please check console for details.');
     }
   };
@@ -937,7 +1068,14 @@ export default function MainAdminEvents() {
     const badge = getEventStatusBadge(eventDate);
     return badge.color;
   };
-
+  const getStatusColor = (status?: string) => {
+    switch (status) {
+      case 'pending': return '#f59e0b';
+      case 'approved': return '#10b981';
+      case 'rejected': return '#ef4444';
+      default: return '#64748b';
+    }
+  };
   const stats = useMemo(() => {
     const total = events.length;
     const upcoming = events.filter(event => event.date > new Date()).length;
@@ -947,7 +1085,7 @@ export default function MainAdminEvents() {
 
   const renderPaginatedItem = ({ item, index }: { item: Event; index: number }) => {
     const isActive = selectedEvent === item.id;
-    const priorityColor = getPriorityColor(item.date); 
+    const priorityColor = getPriorityColor(item.date);
 
     return (
       <TouchableOpacity
@@ -1027,23 +1165,29 @@ export default function MainAdminEvents() {
 
   const renderSearchResultItem = ({ item }: { item: Event }) => {
     const badge = getEventStatusBadge(item.date);
+    const isActive = selectedEvent === item.id;
 
     return (
-      <View style={[styles.searchResultItem, isMobile && styles.searchResultItemMobile]}>
+      <TouchableOpacity
+        style={[
+          styles.searchResultItem,
+          isActive && styles.searchResultItemActive,
+          isMobile && styles.searchResultItemMobile,
+        ]}
+        onPress={() => setSelectedEvent(item.id)}
+        activeOpacity={0.7}
+      >
         <View style={styles.searchResultHeader}>
           <View style={styles.searchResultTitleContainer}>
             <Text style={[styles.searchResultTitle, isMobile && styles.searchResultTitleMobile]} numberOfLines={1}>
               {item.title}
             </Text>
             <View style={styles.searchResultBadges}>
-              {/* Status badge */}
               {item.status && (
                 <View style={[styles.searchResultBadge, getStatusBadgeStyle(item.status)]}>
                   <Text style={styles.searchResultBadgeText}>{item.status.toUpperCase()}</Text>
                 </View>
               )}
-
-              {/* Event date badge */}
               {(() => {
                 const badge = getEventStatusBadge(item.date);
                 return (
@@ -1054,22 +1198,30 @@ export default function MainAdminEvents() {
               })()}
             </View>
           </View>
+
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Feather name="map-pin" size={10} color="#0ea5e9" />
             <Text style={[styles.searchResultLocation, isMobile && styles.searchResultLocationMobile, { marginLeft: 4 }]} numberOfLines={1}>
               {item.location}
             </Text>
           </View>
+
           <View style={styles.searchResultActions}>
             <TouchableOpacity
               style={[styles.searchResultEditButton, isMobile && styles.searchResultEditButtonMobile]}
-              onPress={() => handleEditEvent(item)}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleEditEvent(item);
+              }}
             >
               <Feather name="edit-2" size={isMobile ? 12 : 14} color="#3b82f6" />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.searchResultDeleteButton, isMobile && styles.searchResultDeleteButtonMobile]}
-              onPress={() => handleDeleteEvent(item.id, item.title)}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleDeleteEvent(item.id, item.title);
+              }}
             >
               <Feather name="trash-2" size={isMobile ? 12 : 14} color="#ef4444" />
             </TouchableOpacity>
@@ -1094,7 +1246,7 @@ export default function MainAdminEvents() {
             </Text>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -1318,48 +1470,64 @@ export default function MainAdminEvents() {
       animationType="fade"
       onRequestClose={handleCloseForm}
     >
-      <View style={styles.modernModalOverlay}>
-        <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
-          <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
-            <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
-              <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
-                <Feather
-                  name={isEdit ? "edit-2" : "calendar"}
-                  size={isMobile ? 16 : 20}
-                  color="#0ea5e9"
-                />
-              </View>
-              <View style={styles.modernModalTitleContainer}>
-                <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
-                  {isEdit ? 'Edit Event' : 'New Event'}
-                </Text>
-                <Text style={[styles.modernModalSubtitle, isMobile && styles.modernModalSubtitleMobile]}>
-                  {isEdit ? 'Update event details' : 'Create a new event'}
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={handleCloseForm}
-              style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
-            >
-              <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
-            </TouchableOpacity>
-          </View>
+      {/* Outer blur overlay */}
+      <BlurView
+        intensity={80}
+        tint={isDark ? 'dark' : 'light'}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      >
+        <TouchableOpacity
+          style={styles.glassModalOverlayTouch}
+          activeOpacity={1}
+          onPress={handleCloseForm}
+        />
+      </BlurView>
 
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1 }}
+      {/* Modal container */}
+      <View style={styles.glassModalCentered}>
+        <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)' }]}>
+          {/* Gradient header */}
+          <LinearGradient
+            colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.glassModalGradientHeader}
           >
-            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
-            showsVerticalScrollIndicator={false}>
+            <View style={styles.glassModalHeader}>
+              <View style={styles.glassModalHeaderLeft}>
+                <View style={[styles.glassModalIconContainer, isMobile && styles.glassModalIconContainerMobile]}>
+                  <Feather
+                    name={isEdit ? "edit-2" : "calendar"}
+                    size={isMobile ? 16 : 20}
+                    color={colors.accent.primary}
+                  />
+                </View>
+                <View>
+                  <Text style={[styles.glassModalTitle, { color: colors.text }]}>
+                    {isEdit ? 'Edit Event' : 'New Event'}
+                  </Text>
+                  <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>
+                    {isEdit ? 'Update event details' : 'Create a new event'}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={handleCloseForm} style={styles.glassModalCloseButton}>
+                <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+
+          {/* Scrollable content */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.glassModalScrollContent}
+            style={{ backgroundColor: isDark ? 'rgba(15, 25, 35, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}
+          >
+            <View style={[styles.glassModalFormSection, { borderColor: 'rgba(255,255,255,0.2)' }]}>
               {/* Campus Image Selection */}
-              <View style={styles.modernFormGroup}>
-                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Campus Image (Optional)</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={{ marginBottom: 8 }}
-                >
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>Campus Image (Optional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     {CAMPUS_LOCATIONS.map((location) => (
                       <TouchableOpacity
@@ -1371,7 +1539,7 @@ export default function MainAdminEvents() {
                             borderRadius: 12,
                             overflow: 'hidden',
                             borderWidth: 2,
-                            borderColor: selectedCampusLocation?.id === location.id ? '#0ea5e9' : '#e2e8f0',
+                            borderColor: selectedCampusLocation?.id === location.id ? colors.accent.primary : colors.border,
                           },
                           isMobile && { width: 60, height: 60 }
                         ]}
@@ -1387,122 +1555,130 @@ export default function MainAdminEvents() {
                   </View>
                 </ScrollView>
                 {selectedCampusLocation && (
-                  <Text style={styles.modernLocationButtonSubtitle}>
+                  <Text style={[styles.glassFormHelperText, { color: colors.sidebar.text.muted }]}>
                     Selected: {selectedCampusLocation.name}
                   </Text>
                 )}
               </View>
 
-              <View style={styles.modernFormGroup}>
-                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Title *</Text>
-                <FormTextInput
-                  inputStyle={styles.modernFormInput}
+              {/* Title */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>Title *</Text>
+                <TextInput
+                  style={[styles.glassFormInput, isMobile && styles.glassFormInputMobile]}
                   placeholder="Enter event title"
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={newEvent.title}
-                  onChangeText={(text: string) => setNewEvent({ ...newEvent, title: text })}
+                  onChangeText={(text) => setNewEvent({ ...newEvent, title: text })}
                 />
               </View>
 
-              <View style={styles.modernFormGroup}>
-                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Description *</Text>
-                <FormTextInput
-                  inputStyle={styles.modernFormInput}
-                  style={[styles.modernTextArea, isMobile && styles.modernFormInputMobile]}
+              {/* Description */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>Description *</Text>
+                <TextInput
+                  style={[styles.glassFormInput, styles.glassTextArea, isMobile && styles.glassFormInputMobile]}
                   placeholder="Describe your event..."
+                  placeholderTextColor={colors.sidebar.text.muted}
                   value={newEvent.description}
-                  onChangeText={(text: string) => setNewEvent({ ...newEvent, description: text })}
+                  onChangeText={(text) => setNewEvent({ ...newEvent, description: text })}
                   multiline
                   numberOfLines={4}
+                  textAlignVertical="top"
                 />
               </View>
 
-              <View style={styles.modernFormGroup}>
-                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Date & Time *</Text>
+              {/* Date & Time */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>Date & Time *</Text>
                 <TouchableOpacity
-                  style={styles.modernLocationButton}
+                  style={styles.glassFormInput}
                   onPress={showDatePickerModal}
                 >
-                  <Feather name="calendar" size={20} color="#0ea5e9" />
-                  <View style={styles.modernLocationButtonText}>
-                    <Text style={styles.modernLocationButtonTitle}>
-                      {formatDate(newEvent.date)}
-                    </Text>
-                    <Text style={styles.modernLocationButtonSubtitle}>
-                      Tap to change date and time
-                    </Text>
-                  </View>
+                  <Text style={{ color: colors.text }}>
+                    {formatDate(newEvent.date)}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.sidebar.text.muted, marginTop: 2 }}>
+                    Tap to change date and time
+                  </Text>
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.modernFormGroup}>
-                <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location *</Text>
+              {/* Location */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>Location *</Text>
                 <TouchableOpacity
-                  style={styles.modernLocationButton}
+                  style={styles.glassFormInput}
                   onPress={() => setShowLocationPicker(true)}
                 >
-                  <Feather name="map-pin" size={20} color="#0ea5e9" />
-                  <View style={styles.modernLocationButtonText}>
-                    <Text style={styles.modernLocationButtonTitle}>
-                      {newEvent.location || 'Set location'}
-                    </Text>
-                    <Text style={styles.modernLocationButtonSubtitle}>
-                      {newEvent.location ? 'Tap to modify' : 'Enter location details'}
-                    </Text>
-                  </View>
+                  <Text style={{ color: colors.text }}>
+                    {newEvent.location || 'Set location'}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.sidebar.text.muted, marginTop: 2 }}>
+                    {newEvent.location ? 'Tap to modify' : 'Enter location details'}
+                  </Text>
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity
-                style={styles.modernCoordinatesButton}
-                onPress={() => setShowCoordinatesModal(true)}
-              >
-                <Feather name="map" size={20} color="#f59e0b" />
-                <View style={styles.modernLocationButtonText}>
-                  <Text style={styles.modernLocationButtonTitle}>
+              {/* Coordinates */}
+              <View style={styles.glassFormGroup}>
+                <TouchableOpacity
+                  style={[styles.glassFormInput, { marginBottom: 20 }]}
+                  onPress={() => setShowCoordinatesModal(true)}
+                >
+                  <Text style={{ color: colors.text }}>
                     {newEvent.coordinates ? 'Verification Location Set' : 'Set Verification Location'}
                   </Text>
-                  <Text style={styles.modernLocationButtonSubtitle}>
+                  <Text style={{ fontSize: 12, color: colors.sidebar.text.muted, marginTop: 2 }}>
                     {newEvent.coordinates
                       ? `Lat: ${newEvent.coordinates.latitude.toFixed(4)}, Lng: ${newEvent.coordinates.longitude.toFixed(4)}`
                       : 'Add coordinates for attendance verification'}
                   </Text>
-                </View>
-              </TouchableOpacity>
-
-              <View style={[styles.modernFormActions, isMobile && styles.modernFormActionsMobile]}>
-                <TouchableOpacity
-                  style={[
-                    styles.modernSubmitButton,
-                    (!newEvent.title.trim() || !newEvent.description.trim() || !newEvent.location.trim()) && styles.modernSubmitButtonDisabled,
-                    isMobile && styles.modernSubmitButtonMobile
-                  ]}
-                  onPress={isEdit ? handleUpdateEvent : handleCreateEvent}
-                  disabled={!newEvent.title.trim() || !newEvent.description.trim() || !newEvent.location.trim()}
-                >
-                  <Feather
-                    name={isEdit ? "check-circle" : "plus-circle"}
-                    size={isMobile ? 16 : 18}
-                    color="#ffffff"
-                  />
-                  <Text style={[styles.modernSubmitButtonText, isMobile && styles.modernSubmitButtonTextMobile]}>
-                    {isEdit ? 'Update' : 'Create'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.modernCancelButton, isMobile && styles.modernCancelButtonMobile]}
-                  onPress={handleCloseForm}
-                >
-                  <Text style={[styles.modernCancelButtonText, isMobile && styles.modernCancelButtonTextMobile]}>Cancel</Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
+
+              {/* Actions */}
+              <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
+                <TouchableOpacity
+                  style={[
+                    styles.glassSubmitButton,
+                    (!newEvent.title.trim() || !newEvent.description.trim() || !newEvent.location.trim() || isSubmitting) && styles.glassSubmitButtonDisabled,
+                    isMobile && styles.glassSubmitButtonMobile
+                  ]}
+                  onPress={isEdit ? handleUpdateEvent : handleCreateEvent}
+                  disabled={!newEvent.title.trim() || !newEvent.description.trim() || !newEvent.location.trim() || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <>
+                      <Feather
+                        name={isEdit ? "check-circle" : "plus-circle"}
+                        size={isMobile ? 16 : 18}
+                        color="#ffffff"
+                      />
+                      <Text style={[styles.glassSubmitButtonText, isMobile && styles.glassSubmitButtonTextMobile]}>
+                        {isEdit ? 'Update Event' : 'Create Event'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.glassCancelButton, isMobile && styles.glassCancelButtonMobile]}
+                  onPress={handleCloseForm}
+                >
+                  <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
   );
-
   return (
     <View style={styles.container}>
       {/* Header with Gradient */}
@@ -1514,9 +1690,15 @@ export default function MainAdminEvents() {
       >
         <View style={[styles.headerContent, isMobile && styles.headerContentMobile]}>
           <View>
-            <Text style={[styles.greetingText, isMobile && styles.greetingTextMobile]}>Welcome back,</Text>
-            <Text style={[styles.userName, isMobile && styles.userNameMobile]}>{userData?.name || 'Admin'}</Text>
-            <Text style={[styles.roleText, isMobile && styles.roleTextMobile]}>Events Manager</Text>
+            <Text style={[styles.greetingText, { color: isDark ? colors.sidebar.text.secondary : '#ffffff' }]}>
+              Welcome back,
+            </Text>
+            <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
+              {userData?.name || 'Admin'}
+            </Text>
+            <Text style={[styles.roleText, { color: isDark ? colors.sidebar.text.secondary : '#ffffff' }]}>
+              Events Manager
+            </Text>
           </View>
 
           <TouchableOpacity
@@ -1540,7 +1722,6 @@ export default function MainAdminEvents() {
 
         <View style={[styles.dateSection, isMobile && styles.dateSectionMobile]}>
           <View style={[styles.dateContainer, isMobile && styles.dateContainerMobile]}>
-            <Feather name="calendar" size={isMobile ? 10 : 12} color="#94a3b8" />
             <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
@@ -1639,6 +1820,12 @@ export default function MainAdminEvents() {
               </ScrollView>
             </View>
           </View>
+          <View style={styles.resultsInfo}>
+            <Text style={styles.resultsText}>
+              {filterEventsByTime(events, activeFilter).length} event{filterEventsByTime(events, activeFilter).length !== 1 ? 's' : ''}
+              {activeFilter !== 'all' && ` from ${activeFilter}`}
+            </Text>
+          </View>
 
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -1652,7 +1839,25 @@ export default function MainAdminEvents() {
                 <FlatList
                   data={paginatedEvents}
                   keyExtractor={(item) => item.id}
-                  renderItem={renderPaginatedItem}
+                  renderItem={({ item, index }) => (
+                    <AnimatedEventItem
+                      item={item}
+                      index={index}
+                      currentPage={currentPage}
+                      itemsPerPage={itemsPerPage}
+                      styles={styles}
+                      colors={colors}
+                      isMobile={isMobile}
+                      selectedEvent={selectedEvent}
+                      setSelectedEvent={setSelectedEvent}
+                      handleEditEvent={handleEditEvent}
+                      handleDeleteEvent={handleDeleteEvent}
+                      getPriorityColor={getPriorityColor}
+                      getEventStatusBadge={getEventStatusBadge}
+                      formatShortDate={formatShortDate}
+                      getStatusColor={getStatusColor}
+                    />
+                  )}
                   style={styles.paginatedList}
                   showsVerticalScrollIndicator={false}
                   ListEmptyComponent={
@@ -1864,7 +2069,7 @@ export default function MainAdminEvents() {
             </View>
 
             <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
-            showsVerticalScrollIndicator={false}>
+              showsVerticalScrollIndicator={false}>
               {/* Location Name */}
               <View style={styles.modernFormGroup}>
                 <Text style={[styles.modernFormLabel, isMobile && styles.modernFormLabelMobile]}>Location Name</Text>
@@ -1984,7 +2189,7 @@ export default function MainAdminEvents() {
                     borderColor: selectedCampusLocation?.id === item.id ? '#0ea5e9' : '#e2e8f0',
                   }}
                   onPress={() => handleSelectCampusImage(item)}
-                  
+
                 >
                   <Image source={item.image} style={{ width: 50, height: 50, borderRadius: 8, marginRight: 12 }} />
                   <View style={{ flex: 1 }}>
@@ -2035,7 +2240,7 @@ export default function MainAdminEvents() {
             </View>
 
             <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
-            showsVerticalScrollIndicator={false}>
+              showsVerticalScrollIndicator={false}>
               <TouchableOpacity
                 style={[styles.modernLocationButton, isMobile && styles.modernFormInputMobile]}
                 onPress={getCurrentLocation}
@@ -2117,38 +2322,48 @@ export default function MainAdminEvents() {
         </View>
       </Modal>
 
-      {/* Event Details Modal */}
+      {/* Glassmorphism Event Detail Modal */}
       <Modal
         visible={selectedEvent !== null}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setSelectedEvent(null)}
       >
-        <View style={styles.modernModalOverlay}>
-          <View style={[styles.modernModalContainer, isMobile && styles.modernModalContainerMobile]}>
-            {/* Modal Header */}
-            <View style={[styles.modernModalHeader, isMobile && styles.modernModalHeaderMobile]}>
+        <TouchableOpacity
+          style={styles.glassModalOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectedEvent(null)}
+        >
+          <TouchableOpacity
+            style={[styles.glassModalContent, isMobile && styles.glassModalContentMobile]}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <View style={styles.glassModalHeader}>
               <View style={[styles.modernModalHeaderLeft, isMobile && styles.modernModalHeaderLeftMobile]}>
                 <View style={[styles.modernModalIconContainer, isMobile && styles.modernModalIconContainerMobile]}>
                   <Feather name="calendar" size={isMobile ? 16 : 20} color="#0ea5e9" />
                 </View>
                 <View style={styles.modernModalTitleContainer}>
-                  <Text style={[styles.modernModalTitle, isMobile && styles.modernModalTitleMobile]}>
+                  <Text style={[styles.glassModalTitle, isMobile && styles.glassModalTitleMobile]}>
                     Event Details
                   </Text>
                 </View>
               </View>
               <TouchableOpacity
                 onPress={() => setSelectedEvent(null)}
-                style={[styles.modernModalCloseButton, isMobile && styles.modernModalCloseButtonMobile]}
+                style={styles.glassModalClose}
               >
-                <Feather name="x" size={isMobile ? 18 : 20} color="#64748b" />
+                <Feather name="x" size={isMobile ? 22 : 26} color="#64748b" />
               </TouchableOpacity>
             </View>
 
-            {/* Modal Content */}
-            <ScrollView style={[styles.modernModalContent, isMobile && styles.modernModalContentMobile]}
-            showsVerticalScrollIndicator={false}>
+            {/* Content */}
+            <ScrollView
+              style={[styles.glassModalBody, isMobile && styles.glassModalBodyMobile]}
+              showsVerticalScrollIndicator={false}
+            >
               {selectedEvent && renderSelectedDetail(
                 events.find(e => e.id === selectedEvent)!,
                 selectedEventUserLocation,
@@ -2158,8 +2373,8 @@ export default function MainAdminEvents() {
                 openLocationInMaps
               )}
             </ScrollView>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     </View>
   );

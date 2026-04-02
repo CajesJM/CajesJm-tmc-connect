@@ -157,7 +157,6 @@ export default function SuperAdminLogin() {
             setFailedAttempts(storedAttempts);
             setLockoutUntil(storedLockout);
           } else {
-            // Lockout has expired, clear it
             localStorage.removeItem('superAdminLoginAttempts');
             setFailedAttempts(0);
             setLockoutUntil(null);
@@ -290,7 +289,6 @@ export default function SuperAdminLogin() {
 
     } catch (err: any) {
       console.log("Login error:", err.message);
-      // Increment failed attempts
       const newAttempts = failedAttempts + 1;
       setFailedAttempts(newAttempts);
 
@@ -300,9 +298,11 @@ export default function SuperAdminLogin() {
         setLockoutUntil(lockoutTime);
         setRemainingLockoutSeconds(60);
         saveLockoutState(newAttempts, lockoutTime);
+        setError(`Too many failed attempts. Please wait 60 seconds before trying again.`);
       } else {
         setError(`Invalid username or password. ${3 - newAttempts} attempt(s) remaining.`);
       }
+    } finally {
       setBusy(false);
     }
   };

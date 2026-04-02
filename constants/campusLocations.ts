@@ -7,39 +7,33 @@ export interface CampusLocation {
 
 export const CAMPUS_LOCATIONS: CampusLocation[] = [
   {
-    id: 'library-hall',
-    name: 'Library Hall',
-    image: require('../assets/images/campusLocations/sampleevents.jpg'),
-    description: 'Main library and study hall'
+    id: 'tmc-new-building',
+    name: 'TMC New Building',
+    image: require('../assets/images/campusLocations/TMC-new-building.jpeg'),
+    description: 'TMC new building'
   },
   {
-    id: 'main-campus',
-    name: 'Main Campus',
-    image: require('../assets/images/campusLocations/sampleevents.jpg'),
-    description: 'Central campus area'
+    id: 'tennis-court',
+    name: 'Tennis Court',
+    image: require('../assets/images/campusLocations/Tennis-court.jpeg'),
+    description: 'Outdoor tennis court'
   },
   {
-    id: 'expansion-building',
-    name: 'Expansion Building',
-    image: require('../assets/images/campusLocations/sampleevents.jpg'),
-    description: 'New academic building'
+    id: 'river-side',
+    name: 'River Side',
+    image: require('../assets/images/campusLocations/River-Side.jpeg'),
+    description: 'Scenic river view area'
   },
   {
-    id: 'gymnasium',
-    name: 'Gymnasium',
-    image: require('../assets/images/campusLocations/sampleevents.jpg'),
-    description: 'Sports and events venue'
+    id: 'motorpool',
+    name: 'Motorpool',
+    image: require('../assets/images/campusLocations/Motorpool.jpeg'),
+    description: 'Vehicle parking and maintenance area'
   },
   {
-    id: 'auditorium',
-    name: 'Auditorium',
-    image: require('../assets/images/campusLocations/sampleevents.jpg'),
-    description: 'Main events and performances hall'
+    id: 'guinobatan',
+    name: 'Guinobatan Gymnasium',
+    image: require('../assets/images/campusLocations/Guinobatan.jpeg'),
+    description: 'Gymnasium for performances and sports events'
   },
-  {
-    id: 'cafeteria',
-    name: 'Cafeteria',
-    image: require('../assets/images/campusLocations/sampleevents.jpg'),
-    description: 'Student dining area'
-  }
 ];

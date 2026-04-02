@@ -1,243 +1,240 @@
-import { Dimensions, StyleSheet } from "react-native";
+import { Dimensions, Platform, StyleSheet } from "react-native";
 
 const { width, height } = Dimensions.get("window");
-const isSmallScreen = width < 380;
-const isTablet = width > 700;
+
+export const COLORS = {
+  gradientStart: "#3A5BF0",
+  gradientMid:   "#5B3FD4",
+  gradientEnd:   "#7B2FF7",
+
+  white:         "#FFFFFF",
+  whiteHigh:     "rgba(255,255,255,0.95)",
+  whiteMid:      "rgba(255,255,255,0.70)",
+  whiteLow:      "rgba(255,255,255,0.45)",
+  whiteGhost:    "rgba(255,255,255,0.15)",
+
+  orb1:          "rgba(255,255,255,0.10)",
+  orb2:          "rgba(91,63,212,0.35)",
+  orb3:          "rgba(58,91,240,0.25)",
+
+  progressTrack: "rgba(255,255,255,0.25)",
+  progressFill:  "#FFFFFF",
+};
+
+export const FONTS = {
+  display: Platform.select({
+    ios:     "Georgia",
+    android: "serif",
+    default: "Georgia, serif",
+  }),
+  body: Platform.select({
+    ios:     "Helvetica Neue",
+    android: "sans-serif",
+    default: "'Helvetica Neue', sans-serif",
+  }),
+};
 
 export const LandingStyles = StyleSheet.create({
-  // Container
+
   container: {
     flex: 1,
-    backgroundColor: "#0A0A0A",
-    position: "relative",
-    overflow: "hidden",
+  },
+  gradient: {
+    flex: 1,
   },
 
-  background: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#0A0A0A",
+  // ── Floating orbs ───────────────────────────────────────────────
+  orbsContainer: {
+    ...StyleSheet.absoluteFillObject,
+    pointerEvents: "none",
   },
-
-  gradientOverlay: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    backgroundImage: "linear-gradient(135deg, #0A0A0A 0%, #1a0a2a 100%)",
-  },
-
-  slideBackground: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-  },
-
-  floatingOrbs: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-  },
-
   orb: {
     position: "absolute",
-    borderRadius: 500,
+    borderRadius: 999,
   },
-
   orb1: {
-    width: 300,
-    height: 300,
-    backgroundColor: "rgba(139, 92, 246, 0.15)",
-    top: -100,
-    left: -100,
+    width:  width * 0.75,
+    height: width * 0.75,
+    top:    -width * 0.25,
+    right:  -width * 0.20,
+    backgroundColor: COLORS.orb1,
+    borderWidth: 1,
+    borderColor: COLORS.whiteLow,
   },
-
   orb2: {
-    width: 200,
-    height: 200,
-    backgroundColor: "rgba(236, 72, 153, 0.1)",
-    bottom: -50,
-    right: -50,
+    width:  width * 0.55,
+    height: width * 0.55,
+    bottom: height * 0.12,
+    left:   -width * 0.18,
+    backgroundColor: COLORS.orb2,
   },
-
   orb3: {
-    width: 150,
-    height: 150,
-    backgroundColor: "rgba(59, 130, 246, 0.1)",
-    top: "50%",
-    right: "27%",
+    width:  width * 0.40,
+    height: width * 0.40,
+    bottom: height * 0.30,
+    right:  -width * 0.08,
+    backgroundColor: COLORS.orb3,
   },
 
+  // ── Main content wrapper ────────────────────────────────────────
   mainContainer: {
     flex: 1,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 32,
   },
 
-  contentCard: {
-    width: isTablet ? "70%" : "100%",
-    maxWidth: 450,
-    borderRadius: 32,
-    paddingVertical: isTablet ? 50 : 40,
-    paddingHorizontal: isTablet ? 40 : 30,
-    alignItems: "center",
-    borderWidth: 0.7, 
-    borderColor: "rgba(139, 92, 246, 0.4)", 
-   
-    backdropFilter: "blur(20px)",
-  },
-
+  // ── Logo section ────────────────────────────────────────────────
   logoSection: {
-    alignItems: 'center',
-    marginBottom: 30,
-    position: 'relative',
+    alignItems: "center",
+    marginBottom: 36,
   },
-
-  logo: {
+ 
+  logoGlowRing: {
+    width:  104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: COLORS.whiteGhost,
+    borderWidth: 1.5,
+    borderColor: COLORS.whiteLow,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Inner ring — adds depth
+  logoInnerRing: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    borderWidth: 1.5, 
-    borderColor: "rgba(139, 92, 246, 0.4)", 
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    zIndex: 2,
+    backgroundColor: COLORS.whiteGhost,
+    borderWidth: 1,
+    borderColor: COLORS.whiteLow,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logo: {
+    width:  100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.white,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
   },
 
-  logoGlow: {
-    position: 'absolute',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: "rgba(139, 92, 246, 0.15)", 
-    zIndex: 1,
-  },
-
+  // ── Text content ────────────────────────────────────────────────
   textContent: {
     alignItems: "center",
-    marginBottom: 40,
   },
-
-  welcomeText: {
-    fontSize: isSmallScreen ? 13 : isTablet ? 16 : 14,
-    color: "rgba(255, 255, 255, 0.7)",
-    fontWeight: "600",
+  eyebrow: {
+    fontSize: 11,
+    fontFamily: FONTS.body,
+    fontWeight: "700",
+    color: COLORS.whiteMid,
     letterSpacing: 3.5,
     textTransform: "uppercase",
-    marginBottom: 8,
-    fontFamily: "System",
-  },
-
-  brandName: {
-    fontSize: isSmallScreen ? 38 : isTablet ? 64 : 50,
-    fontWeight: "900",
-    color: "#FFFFFF",
-    textAlign: "center",
-    letterSpacing: -1,
-    marginBottom: 25,
-    textShadowColor: "rgba(139, 92, 246, 0.3)",
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 15,
-    fontFamily: "System",
-  },
-
-  subtitleSection: {
     marginBottom: 10,
-    alignItems: "center",
   },
-
-  subtitle: {
-    fontSize: isSmallScreen ? 16 : isTablet ? 20 : 18,
-    color: "rgba(255, 255, 255, 0.85)",
-    fontWeight: "300",
+  brandName: {
+    fontSize: 42,
+    fontFamily: FONTS.display,
+    fontWeight: "700",
+    color: COLORS.whiteHigh,
+    letterSpacing: -1,
+    marginBottom: 20,
+  },
+  brandAccent: {
+    // "Connect" rendered via a nested Text with this style
+    color: "rgba(200,210,255,0.95)",
+    fontFamily: FONTS.display,
+    fontWeight: "700",
+    fontSize: 42,
+    letterSpacing: -1,
+  },
+  subtitleLine: {
+    fontSize: 14,
+    fontFamily: FONTS.body,
+    color: COLORS.whiteMid,
+    lineHeight: 22,
     textAlign: "center",
-    lineHeight: 28,
-    fontFamily: "System",
-    letterSpacing: 0.3,
   },
 
-  divider: {
-    width: 80,
-    height: 2.5, 
-    backgroundColor: "rgba(139, 92, 246, 0.6)", 
-    borderRadius: 2,
-    marginTop: 25,
-  },
-
-  skipButton: {
-    marginTop: 20,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 25,
-    borderWidth: 0.5, 
-    borderColor: "rgba(139, 92, 246, 0.3)", 
-  },
-
-  skipButtonContent: {
+  // Decorative dot-divider between subtitle lines
+  dotRow: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 16,
+  },
+  dot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.whiteLow,
+  },
+  dotActive: {
+    width: 20,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.whiteMid,
+  },
+
+  // ── Progress section ────────────────────────────────────────────
+  progressSection: {
+    position: "absolute",
+    bottom: Platform.OS === "ios" ? 48 : 36,
+    left: 40,
+    right: 40,
     alignItems: "center",
     gap: 10,
   },
-
-  skipText: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 15,
-    fontWeight: "500",
-    letterSpacing: 0.5,
-    fontFamily: "System",
-  },
-
-  skipArrow: {
-    color: "rgba(139, 92, 246, 0.9)",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-
-  progressSection: {
-    position: "absolute",
-    bottom: isSmallScreen ? 40 : 60,
-    width: "100%",
-    alignItems: "center",
-    paddingHorizontal: 20,
-  },
-
-  progressContainer: {
-    width: "100%",
-    maxWidth: 400,
+  progressRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 15,
-    marginBottom: 12,
+    width: "100%",
+    gap: 12,
   },
-
-  progressBackground: {
+  progressTrack: {
     flex: 1,
     height: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 2,
+    backgroundColor: COLORS.progressTrack,
     overflow: "hidden",
   },
-
   progressFill: {
     height: "100%",
-    backgroundColor: "rgba(139, 92, 246, 0.9)", 
     borderRadius: 2,
+    backgroundColor: COLORS.progressFill,
   },
-
-  progressText: {
-    color: "rgba(255, 255, 255, 0.7)",
-    fontSize: 13,
-    fontWeight: "600",
-    fontFamily: "System",
-    minWidth: 35,
-  },
-
-  progressLabel: {
-    color: "rgba(255, 255, 255, 0.5)",
+  progressPercent: {
     fontSize: 12,
-    fontWeight: "400",
-    fontFamily: "System",
+    fontFamily: FONTS.body,
+    fontWeight: "600",
+    color: COLORS.whiteMid,
+    minWidth: 32,
+    textAlign: "right",
+  },
+  progressLabel: {
+    fontSize: 12,
+    fontFamily: FONTS.body,
+    color: COLORS.whiteLow,
+    letterSpacing: 0.5,
+  },
+
+  // ── Skip tap hint ────────────────────────────────────────────────
+  skipHint: {
+    marginTop: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  skipHintText: {
+    fontSize: 12,
+    fontFamily: FONTS.body,
+    color: COLORS.whiteLow,
     letterSpacing: 0.5,
   },
 });

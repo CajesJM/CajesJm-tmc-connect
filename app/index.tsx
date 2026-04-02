@@ -1,208 +1,136 @@
 import { useFocusEffect } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
-  Image,
   Text,
+  TouchableOpacity,
   useWindowDimensions,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from "../context/AuthContext";
-import { LandingStyles } from "../styles/LandingStyles";
+import { COLORS, LandingStyles } from "../styles/LandingStyles";
+
+import { Easing } from "react-native";
+
+const EASE_OUT_CUBIC = Easing.out(Easing.cubic);
+const EASE_IN_OUT = Easing.inOut(Easing.cubic);
 
 export default function Landing() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isAuthenticated, userData } = useAuth();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+
   const [isAnimating, setIsAnimating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [entranceComplete, setEntranceComplete] = useState(false);
 
-  //intervals and timeouts
   const progressIntervalRef = useRef<number | null>(null);
   const transitionTimerRef = useRef<number | null>(null);
   const entranceTimerRef = useRef<number | null>(null);
 
-  // Animation values 
-  const entranceAnim = useRef(new Animated.Value(0)).current;
-  const contentOpacity = useRef(new Animated.Value(0)).current;
-  const contentScale = useRef(new Animated.Value(0.8)).current;
+  // Entrance
   const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.6)).current;
   const logoRotate = useRef(new Animated.Value(0)).current;
-  const orb1Anim = useRef(new Animated.Value(0)).current;
-  const orb2Anim = useRef(new Animated.Value(0)).current;
-  const orb3Anim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(1)).current;
-  const logoMove = useRef(new Animated.Value(0)).current;
+  const ringScale = useRef(new Animated.Value(0.5)).current;
+  const ringOpacity = useRef(new Animated.Value(0)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const textTranslate = useRef(new Animated.Value(24)).current;
+  const orb1Opacity = useRef(new Animated.Value(0)).current;
+  const orb1Scale = useRef(new Animated.Value(0.4)).current;
+  const orb2Opacity = useRef(new Animated.Value(0)).current;
+  const orb2Scale = useRef(new Animated.Value(0.4)).current;
+  const orb3Opacity = useRef(new Animated.Value(0)).current;
+  const orb3Scale = useRef(new Animated.Value(0.4)).current;
+  const progressOpacity = useRef(new Animated.Value(0)).current;
 
+  // Exit
+  const screenOpacity = useRef(new Animated.Value(1)).current;
+  const screenTranslateY = useRef(new Animated.Value(0)).current;
+  const logoExitScale = useRef(new Animated.Value(1)).current;
+  const logoExitTranslate = useRef(new Animated.Value(0)).current;
+
+  // ── Auth-based redirect ────────────────────────────────────────
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (userData?.role === "main_admin") {
+      router.replace("/main_admin");
+    } else if (userData?.role === "assistant_admin") {
+      router.replace("/assistant_admin/(tabs)/announcements");
+    } else if (userData?.role === "student") {
+      router.replace("/student/(tabs)/announcements");
+    }
+  }, [isAuthenticated, userData, router]);
+
+  // ── Reset all animated values ────────────────────────────────
   const resetAnimations = useCallback(() => {
-    // Stop all animations
-    entranceAnim.stopAnimation();
-    contentOpacity.stopAnimation();
-    contentScale.stopAnimation();
-    logoOpacity.stopAnimation();
-    logoRotate.stopAnimation();
-    orb1Anim.stopAnimation();
-    orb2Anim.stopAnimation();
-    orb3Anim.stopAnimation();
-    fadeAnim.stopAnimation();
-    slideAnim.stopAnimation();
-    logoScale.stopAnimation();
-    logoMove.stopAnimation();
+    [
+      logoOpacity, logoScale, logoRotate, ringScale, ringOpacity,
+      textOpacity, textTranslate, orb1Opacity, orb1Scale,
+      orb2Opacity, orb2Scale, orb3Opacity, orb3Scale,
+      progressOpacity, screenOpacity, screenTranslateY,
+      logoExitScale, logoExitTranslate,
+    ].forEach((v) => v.stopAnimation());
 
-    entranceAnim.setValue(0);
-    contentOpacity.setValue(0);
-    contentScale.setValue(0.8);
     logoOpacity.setValue(0);
+    logoScale.setValue(0.6);
     logoRotate.setValue(0);
-    orb1Anim.setValue(0);
-    orb2Anim.setValue(0);
-    orb3Anim.setValue(0);
-    fadeAnim.setValue(1);
-    slideAnim.setValue(0);
-    logoScale.setValue(1);
-    logoMove.setValue(0);
+    ringScale.setValue(0.5);
+    ringOpacity.setValue(0);
+    textOpacity.setValue(0);
+    textTranslate.setValue(24);
+    orb1Opacity.setValue(0);
+    orb1Scale.setValue(0.4);
+    orb2Opacity.setValue(0);
+    orb2Scale.setValue(0.4);
+    orb3Opacity.setValue(0);
+    orb3Scale.setValue(0.4);
+    progressOpacity.setValue(0);
+    screenOpacity.setValue(1);
+    screenTranslateY.setValue(0);
+    logoExitScale.setValue(1);
+    logoExitTranslate.setValue(0);
 
     setIsAnimating(false);
     setProgress(0);
     setEntranceComplete(false);
 
-    if (progressIntervalRef.current !== null) {
-      clearInterval(progressIntervalRef.current);
-      progressIntervalRef.current = null;
-    }
-    if (transitionTimerRef.current !== null) {
-      clearTimeout(transitionTimerRef.current);
-      transitionTimerRef.current = null;
-    }
-    if (entranceTimerRef.current !== null) {
-      clearTimeout(entranceTimerRef.current);
-      entranceTimerRef.current = null;
-    }
+    if (progressIntervalRef.current !== null) clearInterval(progressIntervalRef.current);
+    if (transitionTimerRef.current !== null) clearTimeout(transitionTimerRef.current);
+    if (entranceTimerRef.current !== null) clearTimeout(entranceTimerRef.current);
+    progressIntervalRef.current = null;
+    transitionTimerRef.current = null;
+    entranceTimerRef.current = null;
   }, [
-    entranceAnim, contentOpacity, contentScale, logoOpacity, logoRotate,
-    orb1Anim, orb2Anim, orb3Anim, fadeAnim, slideAnim, logoScale, logoMove
+    logoOpacity, logoScale, logoRotate, ringScale, ringOpacity,
+    textOpacity, textTranslate, orb1Opacity, orb1Scale,
+    orb2Opacity, orb2Scale, orb3Opacity, orb3Scale,
+    progressOpacity, screenOpacity, screenTranslateY,
+    logoExitScale, logoExitTranslate,
   ]);
 
-  const playEntranceAnimation = useCallback(() => {
-
-    Animated.parallel([
-      Animated.timing(entranceAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: false,
-      }),
-      Animated.timing(orb1Anim, {
-        toValue: 1,
-        duration: 800,
-        delay: 200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(orb2Anim, {
-        toValue: 1,
-        duration: 800,
-        delay: 300,
-        useNativeDriver: false,
-      }),
-      Animated.timing(orb3Anim, {
-        toValue: 1,
-        duration: 800,
-        delay: 400,
-        useNativeDriver: false,
-      }),
-      Animated.timing(logoOpacity, {
-        toValue: 1,
-        duration: 600,
-        delay: 400,
-        useNativeDriver: false,
-      }),
-      Animated.timing(logoRotate, {
-        toValue: 1,
-        duration: 800,
-        delay: 400,
-        useNativeDriver: false,
-      }),
-      Animated.timing(contentOpacity, {
-        toValue: 1,
-        duration: 800,
-        delay: 600,
-        useNativeDriver: false,
-      }),
-      Animated.timing(contentScale, {
-        toValue: 1,
-        duration: 800,
-        delay: 600,
-        useNativeDriver: false,
-      }),
-    ]).start(() => {
-      setEntranceComplete(true);
-      startAutoTransition();
-    });
-  }, [entranceAnim, orb1Anim, orb2Anim, orb3Anim, logoOpacity, logoRotate, contentOpacity, contentScale]);
-
-  const startAutoTransition = useCallback(() => {
-    if (isAnimating) return;
-
+  // ── Progress ticker ────────────────────────────────────────────
+  const startProgressTicker = useCallback(() => {
     setProgress(0);
-
     progressIntervalRef.current = setInterval(() => {
       setProgress((prev) => {
-        const newProgress = prev + 100 / 30;
-        if (newProgress >= 100) {
-          if (progressIntervalRef.current !== null) {
-            clearInterval(progressIntervalRef.current);
-            progressIntervalRef.current = null;
-          }
+        const next = prev + 100 / 30;
+        if (next >= 100) {
+          clearInterval(progressIntervalRef.current!);
+          progressIntervalRef.current = null;
           return 100;
         }
-        return newProgress;
+        return next;
       });
     }, 100) as unknown as number;
+  }, []);
 
-    transitionTimerRef.current = setTimeout(() => {
-      startTransitionAnimation();
-    }, 3000) as unknown as number;
-  }, [isAnimating]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      if (userData?.role === "main_admin") {
-        router.replace("/main_admin"); 
-      } else if (userData?.role === "assistant_admin") {
-        router.replace("/assistant_admin/(tabs)/announcements"); 
-      } else if (userData?.role === "student") {
-        router.replace("/student/(tabs)/announcements"); 
-      }
-    }
-  }, [isAuthenticated, userData, router]);
-
-  useEffect(() => {
-    entranceTimerRef.current = setTimeout(() => {
-      playEntranceAnimation();
-    }, 300) as unknown as number;
-
-    return () => {
-      resetAnimations();
-    };
-  }, [playEntranceAnimation, resetAnimations]);
-
-  useFocusEffect(
-    useCallback(() => {
-      resetAnimations();
-      entranceTimerRef.current = setTimeout(() => {
-        playEntranceAnimation();
-      }, 300) as unknown as number;
-
-      return () => {
-        resetAnimations();
-      };
-    }, [resetAnimations, playEntranceAnimation])
-  );
-
+  // ── Exit / transition animation ────────────────────────────────
   const startTransitionAnimation = useCallback(() => {
     if (isAnimating) return;
     setIsAnimating(true);
@@ -211,202 +139,302 @@ export default function Landing() {
       clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
     }
-
     setProgress(100);
 
     Animated.parallel([
-      Animated.timing(logoMove, {
-        toValue: -100,
-        duration: 1500,
-        useNativeDriver: false,
+      Animated.timing(logoExitTranslate, {
+        toValue: -80,
+        duration: 700,
+        easing: EASE_IN_OUT,
+        useNativeDriver: true,
       }),
-      Animated.timing(logoScale, {
-        toValue: 0.5,
-        duration: 1500,
-        useNativeDriver: false,
+      Animated.timing(logoExitScale, {
+        toValue: 0.65,
+        duration: 700,
+        easing: EASE_IN_OUT,
+        useNativeDriver: true,
       }),
-      Animated.timing(fadeAnim, {
+      Animated.timing(textOpacity, {
         toValue: 0,
-        duration: 1500,
-        useNativeDriver: false,
+        duration: 350,
+        easing: EASE_IN_OUT,
+        useNativeDriver: true,
       }),
-      Animated.timing(slideAnim, {
-        toValue: -width,
-        duration: 1500,
-        useNativeDriver: false,
+      Animated.timing(progressOpacity, {
+        toValue: 0,
+        duration: 300,
+        easing: EASE_IN_OUT,
+        useNativeDriver: true,
       }),
+      Animated.timing(orb1Opacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(orb2Opacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(orb3Opacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+
+      Animated.sequence([
+        Animated.delay(500),
+        Animated.timing(screenOpacity, {
+          toValue: 0,
+          duration: 400,
+          easing: EASE_IN_OUT,
+          useNativeDriver: true,
+        }),
+      ]),
     ]).start(() => {
       router.push("/login");
     });
-  }, [isAnimating, fadeAnim, slideAnim, logoScale, logoMove, width, router]);
+  }, [
+    isAnimating, logoExitTranslate, logoExitScale, textOpacity,
+    progressOpacity, orb1Opacity, orb2Opacity, orb3Opacity,
+    screenOpacity, router,
+  ]);
+
+  // ── Entrance animation ─────────────────────────────────────────
+  const playEntranceAnimation = useCallback(() => {
+    Animated.sequence([
+      // 1. Orbs bloom in
+      Animated.parallel([
+        Animated.timing(orb1Opacity, { toValue: 1, duration: 700, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+        Animated.timing(orb1Scale, { toValue: 1, duration: 700, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+        Animated.timing(orb2Opacity, { toValue: 1, duration: 700, delay: 100, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+        Animated.timing(orb2Scale, { toValue: 1, duration: 700, delay: 100, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+        Animated.timing(orb3Opacity, { toValue: 1, duration: 700, delay: 200, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+        Animated.timing(orb3Scale, { toValue: 1, duration: 700, delay: 200, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+      ]),
+
+      // 2. Glow ring expands
+      Animated.parallel([
+        Animated.timing(ringOpacity, { toValue: 1, duration: 500, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+        Animated.timing(ringScale, { toValue: 1, duration: 600, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+      ]),
+
+      // 3. Logo spins in
+      Animated.parallel([
+        Animated.timing(logoOpacity, { toValue: 1, duration: 500, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+        Animated.timing(logoScale, { toValue: 1, duration: 600, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+        Animated.timing(logoRotate, { toValue: 1, duration: 700, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+      ]),
+
+      // 4. Text slides up + fades in
+      Animated.parallel([
+        Animated.timing(textOpacity, { toValue: 1, duration: 550, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+        Animated.timing(textTranslate, { toValue: 0, duration: 550, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+      ]),
+
+      // 5. Progress bar fades in
+      Animated.timing(progressOpacity, { toValue: 1, duration: 400, easing: EASE_OUT_CUBIC, useNativeDriver: true }),
+
+    ]).start(() => {
+      setEntranceComplete(true);
+      startProgressTicker();
+      transitionTimerRef.current = setTimeout(() => {
+        startTransitionAnimation();
+      }, 3000) as unknown as number;
+    });
+  }, [
+    orb1Opacity, orb1Scale, orb2Opacity, orb2Scale, orb3Opacity, orb3Scale,
+    ringOpacity, ringScale, logoOpacity, logoScale, logoRotate,
+    textOpacity, textTranslate, progressOpacity,
+    startProgressTicker, startTransitionAnimation,
+  ]);
+
+  // ── Lifecycle ──────────────────────────────────────────────────
+  useEffect(() => {
+    entranceTimerRef.current = setTimeout(playEntranceAnimation, 300) as unknown as number;
+    return () => { resetAnimations(); };
+  }, [playEntranceAnimation, resetAnimations]);
+
+  useFocusEffect(
+    useCallback(() => {
+      resetAnimations();
+      entranceTimerRef.current = setTimeout(playEntranceAnimation, 300) as unknown as number;
+      return () => { resetAnimations(); };
+    }, [resetAnimations, playEntranceAnimation])
+  );
+
+  // ── Derived animated styles ────────────────────────────────────
+  const logoRotateDeg = logoRotate.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
 
   const handleSkipToLogin = () => {
-    if (entranceComplete && !isAnimating) {
-      startTransitionAnimation();
-    }
+    if (entranceComplete && !isAnimating) startTransitionAnimation();
   };
 
   return (
-    <SafeAreaView style={LandingStyles.container}>
-
-      <View style={LandingStyles.background}>
+    <>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+      <View style={{ flex: 1 }}>
         <Animated.View
-          style={[
-            LandingStyles.gradientOverlay,
-            {
-              opacity: entranceAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, 1]
-              }),
-            },
-          ]}
-        />
-
-
-        <Animated.View
-          style={[
-            LandingStyles.slideBackground,
-            {
-              transform: [{ translateX: slideAnim }],
-            },
-          ]}
+          style={{
+            flex: 1,
+            opacity: screenOpacity,
+            transform: [{ translateY: screenTranslateY }],
+          }}
         >
-          <View style={LandingStyles.floatingOrbs}>
-            <Animated.View
-              style={[
-                LandingStyles.orb,
-                LandingStyles.orb1,
-                {
-                  opacity: orb1Anim,
-                  transform: [
-                    {
-                      scale: orb1Anim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.3, 1]
-                      })
-                    },
-                  ],
-                }
-              ]}
-            />
-            <Animated.View
-              style={[
-                LandingStyles.orb,
-                LandingStyles.orb2,
-                {
-                  opacity: orb2Anim,
-                  transform: [
-                    {
-                      scale: orb2Anim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.3, 1]
-                      })
-                    },
-                  ],
-                }
-              ]}
-            />
-            <Animated.View
-              style={[
-                LandingStyles.orb,
-                LandingStyles.orb3,
-                {
-                  opacity: orb3Anim,
-                  transform: [
-                    {
-                      scale: orb3Anim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.3, 1]
-                      })
-                    },
-                  ],
-                }
-              ]}
-            />
-          </View>
-        </Animated.View>
-      </View>
-
-      <View style={LandingStyles.mainContainer}>
-        {/* Content Card */}
-        <Animated.View
-          style={[
-            LandingStyles.contentCard,
-            {
-              opacity: contentOpacity,
-              transform: [
-                { scale: contentScale }
-              ],
-            },
-          ]}
-        >
-          {/* Logo Section */}
-          <Animated.View
-            style={[
-              LandingStyles.logoSection,
-              {
-                opacity: logoOpacity,
-                transform: [
-                  { translateY: logoMove },
-                  { scale: logoScale },
-                  {
-                    rotate: logoRotate.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '360deg']
-                    })
-                  }
-                ],
-              },
-            ]}
+          <LinearGradient
+            colors={[COLORS.gradientStart, COLORS.gradientMid, COLORS.gradientEnd]}
+            start={{ x: 0.1, y: 0 }}
+            end={{ x: 0.9, y: 1 }}
+            style={LandingStyles.gradient}
           >
-            <Image
-              source={require('../assets/images/Logo/TMC_Connect.png')}
-              style={LandingStyles.logo}
-              resizeMode="contain"
-            />
-            <View style={LandingStyles.logoGlow} />
-          </Animated.View>
 
-          {/* Text Content */}
-          <View style={LandingStyles.textContent}>
-            <Text style={LandingStyles.welcomeText}>WELCOME TO</Text>
-            <Text style={LandingStyles.brandName}>TMC Connect</Text>
-
-            <View style={LandingStyles.subtitleSection}>
-              <Text style={LandingStyles.subtitle}>Your campus hub for</Text>
-              <Text style={LandingStyles.subtitle}>announcements, events,</Text>
-              <Text style={LandingStyles.subtitle}>and attendance</Text>
-              <View style={LandingStyles.divider} />
+            {/* ── Floating orbs ─────────────────────────────────── */}
+            <View style={LandingStyles.orbsContainer} pointerEvents="none">
+              <Animated.View
+                style={[
+                  LandingStyles.orb,
+                  LandingStyles.orb1,
+                  {
+                    opacity: orb1Opacity,
+                    transform: [{ scale: orb1Scale }],
+                  },
+                ]}
+              />
+              <Animated.View
+                style={[
+                  LandingStyles.orb,
+                  LandingStyles.orb2,
+                  {
+                    opacity: orb2Opacity,
+                    transform: [{ scale: orb2Scale }],
+                  },
+                ]}
+              />
+              <Animated.View
+                style={[
+                  LandingStyles.orb,
+                  LandingStyles.orb3,
+                  {
+                    opacity: orb3Opacity,
+                    transform: [{ scale: orb3Scale }],
+                  },
+                ]}
+              />
             </View>
-          </View>
 
+            {/* ── Main content ──────────────────────────────────── */}
+            <View style={LandingStyles.mainContainer}>
 
-        </Animated.View>
-
-        {/* Progress Indicator */}
-        {entranceComplete && !isAnimating && (
-          <View style={LandingStyles.progressSection}>
-            <View style={LandingStyles.progressContainer}>
-              <View style={LandingStyles.progressBackground}>
-                <View
+              <Animated.View
+                style={[
+                  LandingStyles.logoSection,
+                  {
+                    transform: [
+                      { translateY: logoExitTranslate },
+                      { scale: logoExitScale },
+                    ],
+                  },
+                ]}
+              >
+                <Animated.View
                   style={[
-                    LandingStyles.progressFill,
+                    LandingStyles.logoGlowRing,
                     {
-                      width: `${progress}%`,
+                      opacity: ringOpacity,
+                      transform: [{ scale: ringScale }],
                     },
                   ]}
-                />
-              </View>
-              <Text style={LandingStyles.progressText}>
-                {Math.round(progress)}%
-              </Text>
+                >
+                  <Animated.View style={LandingStyles.logoInnerRing}>
+                    <Animated.Image
+                      source={require("../assets/images/Logo/TMC_Connect.png")}
+                      style={[
+                        LandingStyles.logo,
+                        {
+                          opacity: logoOpacity,
+                          transform: [
+                            { scale: logoScale },
+                            { rotate: logoRotateDeg },
+                          ],
+                        },
+                      ]}
+                      resizeMode="contain"
+                    />
+                  </Animated.View>
+                </Animated.View>
+              </Animated.View>
+
+              {/* Text content */}
+              <Animated.View
+                style={[
+                  LandingStyles.textContent,
+                  {
+                    opacity: textOpacity,
+                    transform: [{ translateY: textTranslate }],
+                  },
+                ]}
+              >
+                <Text style={LandingStyles.eyebrow}>Welcome to</Text>
+
+                <Text>
+                  <Text style={LandingStyles.brandName}>TMC </Text>
+                  <Text style={LandingStyles.brandAccent}>Connect</Text>
+                </Text>
+
+                <Text style={[LandingStyles.subtitleLine, { marginTop: 8 }]}>
+                  Your campus hub for announcements,
+                </Text>
+                <Text style={LandingStyles.subtitleLine}>
+                  events, and attendance
+                </Text>
+
+                {/* Dot indicator row */}
+                <View style={LandingStyles.dotRow}>
+                  <View style={LandingStyles.dot} />
+                  <View style={LandingStyles.dotActive} />
+                  <View style={LandingStyles.dot} />
+                </View>
+              </Animated.View>
             </View>
-            <Text style={LandingStyles.progressLabel}>
-              Loading login screen...
-            </Text>
-          </View>
-        )}
+
+            {/* ── Progress section ──────────────────────────────── */}
+            <Animated.View
+              style={[LandingStyles.progressSection, { opacity: progressOpacity }]}
+            >
+              <View style={LandingStyles.progressRow}>
+                <View style={LandingStyles.progressTrack}>
+                  <View
+                    style={[
+                      LandingStyles.progressFill,
+                      { width: `${Math.min(progress, 100)}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={LandingStyles.progressPercent}>
+                  {Math.round(progress)}%
+                </Text>
+              </View>
+              <Text style={LandingStyles.progressLabel}>
+                Loading login screen...
+              </Text>
+
+              {entranceComplete && !isAnimating && (
+                <TouchableOpacity
+                  onPress={handleSkipToLogin}
+                  style={LandingStyles.skipHint}
+                  activeOpacity={0.6}
+                >
+                  <Text style={LandingStyles.skipHintText}>Tap to continue</Text>
+                </TouchableOpacity>
+              )}
+            </Animated.View>
+
+          </LinearGradient>
+        </Animated.View>
       </View>
-    </SafeAreaView>
+    </>
   );
 }

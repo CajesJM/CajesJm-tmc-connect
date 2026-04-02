@@ -285,15 +285,20 @@ export default function SuperAdminLogin() {
       setError(null);
       localStorage.removeItem('superAdminLoginAttempts');
       setLoadingMessage("Access granted! Loading dashboard");
-      router.replace('/main_admin');
-
+      try {
+        await router.replace('/main_admin');
+      } catch (navError) {
+        console.error("Navigation error:", navError);
+        setError("Unable to open the dashboard. Please restart the app.");
+        setBusy(false);
+      }
     } catch (err: any) {
       console.log("Login error:", err.message);
       const newAttempts = failedAttempts + 1;
       setFailedAttempts(newAttempts);
 
       if (newAttempts >= 3) {
-        // Lockout for 60 seconds
+
         const lockoutTime = Date.now() + 60 * 1000;
         setLockoutUntil(lockoutTime);
         setRemainingLockoutSeconds(60);

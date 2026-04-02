@@ -1,203 +1,256 @@
-import { Dimensions, StyleSheet } from "react-native";
+import { Dimensions, Platform, StyleSheet } from "react-native";
 
 const { width, height } = Dimensions.get("window");
-const isSmallScreen = width < 380;
-const isTablet = width > 700;
+
+export const COLORS = {
+
+  gradientStart: "#3A5BF0",   
+  gradientMid:   "#5B3FD4",   
+  gradientEnd:   "#7B2FF7",  
+
+  white:         "#FFFFFF",
+  formBg:        "#F5F7FF",   
+  inputBg:       "#ECEEF8",
+  inputBorder:   "#DDE0F5",
+
+  titleDark:     "#1A1D3A",
+  subtitleGray:  "#6B7280",
+  placeholderGray:"#A0A3B5",
+  linkBlue:      "#4C6EF5",
+
+  errorRed:      "#EF4444",
+  errorBg:       "#FFF0F0",
+
+  dividerLine:   "#D1D5F0",
+  iconTint:      "#8B92C4",
+};
+
+export const FONTS = {
+
+  title: Platform.select({
+    ios:     "Georgia",
+    android: "serif",
+    default: "Georgia, serif",
+  }),
+  body: Platform.select({
+    ios:     "Helvetica Neue",
+    android: "sans-serif",
+    default: "'Helvetica Neue', sans-serif",
+  }),
+};
 
 export const LoginStyles = StyleSheet.create({
-  backgroundImage: {
+
+ 
+  root: {
     flex: 1,
-    width: '100%',
-    height: '100%',
+    backgroundColor: COLORS.formBg,
   },
-  
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  
-  outerContainer: {
-    flex: 1,
-  },
-  
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-  },
-  
-  card: {
-    width: isTablet ? "70%" : "90%",
-    maxWidth: 420,
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: 32,
-    paddingVertical: isTablet ? 50 : 40,
-    paddingHorizontal: isTablet ? 40 : 28,
+
+
+  header: {
+    width: "100%",
+    height: height * 0.35,
+    justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.15)",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 8,
-    backdropFilter: 'blur(10px)',
+    paddingTop: Platform.OS === "ios" ? 50 : 35,
+    // Wave bottom edge
+    borderBottomLeftRadius: width * 0.30,
+    borderBottomRightRadius: width * 0.30,
+    overflow: "hidden",
   },
-  
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
+
+  // ── Logo block inside header ────────────────────────────────────
+  logoWrapper: {
+    alignItems: "center",
+    justifyContent: "center",
   },
-  
   logoGlow: {
-    shadowColor: '#8B5CF6',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
     elevation: 10,
   },
-  
   logo: {
-    width: isTablet ? 140 : 110,
-    height: isTablet ? 140 : 110,
-    borderRadius: 60,
-    borderWidth: 3,
-    borderColor: "rgba(139, 92, 246, 0.5)",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+
   },
-  
+  appName: {
+    marginTop: 14,
+    fontSize: 13,
+    fontFamily: FONTS.body,
+    fontWeight: "600",
+    letterSpacing: 3,
+    color: "rgba(255,255,255,0.80)",
+    textTransform: "uppercase",
+  },
+
+  keyboardView: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 28,
+    paddingTop: 36,
+    paddingBottom: 40,
+  },
+
+  // ── Form section heading ───────────────────────────────────────
+  titleRow: {
+    marginBottom: 6,
+    marginTop: 14,
+  },
   title: {
-    fontSize: isSmallScreen ? 28 : isTablet ? 36 : 32,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    textAlign: "center",
+    fontSize: 34,
+    fontFamily: FONTS.title,
+    fontWeight: "700",
+    color: COLORS.titleDark,
     letterSpacing: -0.5,
-    marginBottom: 8,
   },
-  
+  titleAccent: {
+    color: COLORS.gradientStart,   
+    fontFamily: FONTS.title,
+    fontWeight: "700",
+    fontSize: 34,
+    letterSpacing: -0.5,
+  },
   subtitle: {
-    fontSize: isSmallScreen ? 14 : isTablet ? 16 : 15,
-    color: "rgba(255, 255, 255, 0.75)",
-    textAlign: "center",
-    marginBottom: 36,
-    fontWeight: "500",
+    fontSize: 14,
+    fontFamily: FONTS.body,
+    color: COLORS.subtitleGray,
+    marginBottom: 32,
+    lineHeight: 20,
   },
-  
-  inputContainer: {
-    width: "100%",
+
+  // ── Input fields ───────────────────────────────────────────────
+  inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: COLORS.inputBg,
+    borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-    backgroundColor: "rgba(255, 255, 255, 0.08)",
-    borderRadius: 20,
-    marginBottom: 16,
+    borderColor: COLORS.inputBorder,
     paddingHorizontal: 16,
-    position: "relative",
+    marginBottom: 16,
+    height: 56,
+    shadowColor: "#4C6EF5",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 1,
   },
-  
+  inputWrapperFocused: {
+    borderColor: COLORS.gradientStart,
+    backgroundColor: "#FFFFFF",
+    shadowOpacity: 0.12,
+  },
   inputIcon: {
     marginRight: 12,
   },
-  
   input: {
     flex: 1,
-    paddingVertical: 16,
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "500",
+    fontSize: 15,
+    fontFamily: FONTS.body,
+    color: COLORS.titleDark,
   },
-  
-  eyeIcon: {
-    padding: 8,
+  eyeButton: {
+    padding: 4,
+    marginLeft: 8,
   },
-  
-  errorContainer: {
+
+  // ── Error banner ───────────────────────────────────────────────
+  errorBanner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 100, 100, 0.15)",
-    borderRadius: 12,
-    paddingVertical: 10,
+    backgroundColor: COLORS.errorBg,
+    borderRadius: 10,
     paddingHorizontal: 14,
-    marginBottom: 20,
-    width: "100%",
+    paddingVertical: 10,
+    marginBottom: 16,
+    gap: 8,
   },
-  
-  error: {
-    color: "#FF6B6B",
-    marginLeft: 8,
-    fontSize: 13,
-    fontWeight: "500",
+  errorText: {
     flex: 1,
+    fontSize: 13,
+    fontFamily: FONTS.body,
+    color: COLORS.errorRed,
+    lineHeight: 18,
   },
-  
+
+  // ── Primary CTA button ──────
+  buttonGradient: {
+    borderRadius: 16,
+    marginTop: 8,
+    shadowColor: COLORS.gradientMid,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.38,
+    shadowRadius: 16,
+    elevation: 8,
+  },
   button: {
-    backgroundColor: "#8B5CF6",
-    borderRadius: 25,
-    paddingVertical: 16,
-    width: "100%",
+    height: 56,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
-    shadowColor: "#8B5CF6",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
-  
+  buttonDisabled: {
+    opacity: 0.65,
+  },
   buttonText: {
-    color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: 16,
+    fontFamily: FONTS.body,
     fontWeight: "700",
+    color: "#FFFFFF",
     letterSpacing: 0.5,
   },
-  
-  disabled: {
-    opacity: 0.6,
+
+  // ── Forgot password ────────────────────────────────────────────
+  forgotRow: {
+    alignItems: "center",
+    marginTop: 18,
   },
-  
-  forgotPassword: {
-    marginTop: 20,
-    padding: 8,
-  },
-  
-  forgotPasswordText: {
-    color: "rgba(255, 255, 255, 0.7)",
+  forgotText: {
     fontSize: 14,
+    fontFamily: FONTS.body,
+    color: COLORS.linkBlue,
     fontWeight: "500",
   },
-  
-  decorativeLine: {
+
+  dividerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 30,
-    width: "100%",
+    marginTop: 32,
+    gap: 12,
   },
-  
-  line: {
+  dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: COLORS.dividerLine,
   },
-  
-  decorativeText: {
-    color: "rgba(255, 255, 255, 0.5)",
+  dividerLabel: {
     fontSize: 12,
-    marginHorizontal: 12,
-    fontWeight: "500",
+    fontFamily: FONTS.body,
+    color: COLORS.placeholderGray,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+
+  statusBarSpacer: {
+    height: Platform.OS === "android" ? 28 : 0,
   },
 });

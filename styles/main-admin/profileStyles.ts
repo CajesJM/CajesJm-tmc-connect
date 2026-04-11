@@ -1,7 +1,7 @@
-import { Dimensions, StyleSheet } from 'react-native';
+import { Dimensions, StyleSheet } from 'react-native'
 
-const { width: screenWidth } = Dimensions.get('window');
-const isMobile = screenWidth < 768;
+const { width: screenWidth } = Dimensions.get('window')
+const isMobile = screenWidth < 768
 
 export const createProfileStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
@@ -610,4 +610,4 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       alignItems: 'center',
       minWidth: 50,
     },
-  });
+  })

@@ -239,7 +239,7 @@ export default function StudentProfile() {
   const [showPenaltiesModal, setShowPenaltiesModal] = useState(false);
   const [penaltyLoading, setPenaltyLoading] = useState(false);
   const [penaltyMap, setPenaltyMap] = useState<Record<string, { status: string; id: string }>>({});
-  const { incrementUnread, clearUnread } = useNotifications();
+  const { clearUnread } = useNotifications();
   const isFocused = useRef(true);
   const initialLoadDone = useRef(false);
   const lastPenaltyTimestamp = useRef<string | null>(null);
@@ -914,10 +914,6 @@ export default function StudentProfile() {
           );
           if (newest && newest.createdAt) {
             const newestMillis = newest.createdAt.toMillis?.() || newest.createdAt.getTime();
-            const lastMillis = lastPenaltyTimestamp.current ? parseInt(lastPenaltyTimestamp.current) : 0;
-            if (newestMillis > lastMillis && initialLoadDone.current && !isFocused.current) {
-              incrementUnread('profile');
-            }
             lastPenaltyTimestamp.current = newestMillis.toString();
           }
         }

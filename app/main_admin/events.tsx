@@ -27,6 +27,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { db } from '../../lib/firebaseConfig';
 import { createEventsStyles } from '../../styles/main-admin/eventsStyles';
+import { notificationService } from '../../utils/notifications';
 
 const showAlert = (title: string, message?: string) => {
   if (Platform.OS === 'web') {
@@ -283,41 +284,12 @@ export default function MainAdminEvents() {
   const [checkingSelectedEventLocation, setCheckingSelectedEventLocation] = useState(false);
   const { colors, isDark } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const MAX_DESCRIPTION_LENGTH = 500;
+  const MAX_LOCATION_DESC_LENGTH = 200;
 
   const styles = useMemo(
     () => createEventsStyles(colors, isDark, isMobile, isTablet, isDesktop, screenHeight),
     [colors, isDark, isMobile, isTablet, isDesktop, screenHeight]
-  );
-  const TextInput = ({
-    style,
-    value,
-    onChangeText,
-    placeholder,
-    multiline,
-    numberOfLines,
-    keyboardType,
-    ...props
-  }: {
-    style?: any;
-    value: string;
-    onChangeText: (text: string) => void;
-    placeholder?: string;
-    multiline?: boolean;
-    numberOfLines?: number;
-    keyboardType?: any;
-    [key: string]: any;
-  }) => (
-    <RNTextInput
-      style={[styles.modernFormInput, style]}
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={placeholder}
-      placeholderTextColor="#94a3b8"
-      multiline={multiline}
-      numberOfLines={numberOfLines}
-      keyboardType={keyboardType}
-      {...props}
-    />
   );
 
   const [eventCoordinates, setEventCoordinates] = useState<CoordinatesState>({
@@ -714,6 +686,7 @@ export default function MainAdminEvents() {
 
       const locationImageRef = selectedCampusLocation ? selectedCampusLocation.id : '';
 
+      // 1. Create the event document
       const eventData = {
         title: newEvent.title.trim(),
         description: newEvent.description.trim(),
@@ -724,17 +697,37 @@ export default function MainAdminEvents() {
         locationDescription: newEvent.locationDescription?.trim() || '',
         createdAt: Timestamp.now(),
         attendees: [],
-        coordinates: newEvent.coordinates || null
+        coordinates: newEvent.coordinates || null,
+        status: 'approved', // Main admin creates approved events directly
       };
 
       const docRef = await addDoc(collection(db, 'events'), eventData);
 
+      // 2. Notify all students
+      const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'));
+      const studentSnap = await getDocs(studentsQuery);
+      const studentIds = studentSnap.docs.map(doc => doc.id);
+
+      if (studentIds.length > 0) {
+        const notificationPromises = studentIds.map(studentId =>
+          notificationService.createNotification({
+            userId: studentId,
+            title: `New Event: ${newEvent.title.trim()}`,
+            message: newEvent.description.trim(),
+            type: 'event',
+            timestamp: new Date(),
+            priority: 'medium',
+            data: { eventId: docRef.id }
+          })
+        );
+        await Promise.all(notificationPromises);
+      }
+
       resetForm();
       setShowCreateForm(false);
-      showAlert('Success', 'Event created successfully!');
-
+      showAlert('Success', `Event created and ${studentIds.length} student(s) notified!`);
     } catch (error: unknown) {
-
+      console.error(error);
       showAlert('Error', 'Failed to create event');
     } finally {
       setLoading(false);
@@ -823,7 +816,7 @@ export default function MainAdminEvents() {
   };
 
   const handleUpdateEvent = async () => {
-    if (!editingEvent || !newEvent.title || !newEvent.description || !newEvent.location) {
+    if (!editingEvent || !newEvent.title.trim() || !newEvent.description.trim() || !newEvent.location.trim()) {
       showAlert('Error', 'Please fill in all required fields');
       return;
     }
@@ -840,7 +833,9 @@ export default function MainAdminEvents() {
         date: Timestamp.fromDate(newEvent.date),
         location: newEvent.location,
         locationDescription: newEvent.locationDescription || '',
+        updatedAt: Timestamp.now(),
       };
+
       if (selectedCampusLocation) {
         updateData.locationImage = selectedCampusLocation.id;
       }
@@ -853,12 +848,32 @@ export default function MainAdminEvents() {
 
       await updateDoc(eventRef, updateData);
 
+      // 🔔 Notify all students about the update
+      const studentsQuery = query(collection(db, 'users'), where('role', '==', 'student'));
+      const studentSnap = await getDocs(studentsQuery);
+      const studentIds = studentSnap.docs.map(doc => doc.id);
+
+      if (studentIds.length > 0) {
+        const notificationPromises = studentIds.map(studentId =>
+          notificationService.createNotification({
+            userId: studentId,
+            title: `Event Updated: ${newEvent.title.trim()}`,
+            message: `The event "${newEvent.title.trim()}" has been updated. Check the new details!`,
+            type: 'event',
+            timestamp: new Date(),
+            priority: 'medium',
+            data: { eventId: editingEvent.id }
+          })
+        );
+        await Promise.all(notificationPromises);
+      }
+
       resetForm();
       setShowEditForm(false);
       setEditingEvent(null);
-      showAlert('Success', 'Event updated successfully!');
+      showAlert('Success', `Event updated and ${studentIds.length} student(s) notified!`);
     } catch (error: unknown) {
-
+      console.error(error);
       showAlert('Error', 'Failed to update event');
     } finally {
       setLoading(false);
@@ -1526,7 +1541,7 @@ export default function MainAdminEvents() {
             <View style={[styles.glassModalFormSection, { borderColor: 'rgba(255,255,255,0.2)' }]}>
               {/* Campus Image Selection */}
               <View style={styles.glassFormGroup}>
-                <Text style={[styles.glassFormLabel, { color: colors.text }]}>Campus Image (Optional)</Text>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>Campus Image *</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     {CAMPUS_LOCATIONS.map((location) => (
@@ -1564,8 +1579,8 @@ export default function MainAdminEvents() {
               {/* Title */}
               <View style={styles.glassFormGroup}>
                 <Text style={[styles.glassFormLabel, { color: colors.text }]}>Title *</Text>
-                <TextInput
-                  style={[styles.glassFormInput, isMobile && styles.glassFormInputMobile]}
+                <FormTextInput
+                  inputStyle={[styles.glassFormInput, isMobile && styles.glassFormInputMobile]}
                   placeholder="Enter event title"
                   placeholderTextColor={colors.sidebar.text.muted}
                   value={newEvent.title}
@@ -1576,7 +1591,7 @@ export default function MainAdminEvents() {
               {/* Description */}
               <View style={styles.glassFormGroup}>
                 <Text style={[styles.glassFormLabel, { color: colors.text }]}>Description *</Text>
-                <TextInput
+                <FormTextInput
                   style={[styles.glassFormInput, styles.glassTextArea, isMobile && styles.glassFormInputMobile]}
                   placeholder="Describe your event..."
                   placeholderTextColor={colors.sidebar.text.muted}
@@ -1585,7 +1600,17 @@ export default function MainAdminEvents() {
                   multiline
                   numberOfLines={4}
                   textAlignVertical="top"
+                  maxLength={MAX_DESCRIPTION_LENGTH}
                 />
+                {/* Character counter */}
+                <View style={styles.characterCounterContainer}>
+                  <Text style={[styles.characterCounterText, { color: colors.sidebar.text.muted }]}>
+                    {newEvent.description.length}/{MAX_DESCRIPTION_LENGTH} characters
+                  </Text>
+                  {newEvent.description.length >= MAX_DESCRIPTION_LENGTH && (
+                    <Text style={styles.characterCounterWarning}>Limit reached</Text>
+                  )}
+                </View>
               </View>
 
               {/* Date & Time */}
@@ -2092,7 +2117,16 @@ export default function MainAdminEvents() {
                   style={[styles.modernTextArea, isMobile && styles.modernFormInputMobile]}
                   multiline
                   numberOfLines={3}
+                  maxLength={MAX_LOCATION_DESC_LENGTH}
                 />
+                <View style={styles.characterCounterContainer}>
+                  <Text style={[styles.characterCounterText, { color: colors.sidebar.text.muted }]}>
+                    {newEvent.locationDescription.length}/{MAX_LOCATION_DESC_LENGTH} characters
+                  </Text>
+                  {newEvent.locationDescription.length >= MAX_LOCATION_DESC_LENGTH && (
+                    <Text style={styles.characterCounterWarning}>Limit reached</Text>
+                  )}
+                </View>
               </View>
 
               {/* Image Selection */}

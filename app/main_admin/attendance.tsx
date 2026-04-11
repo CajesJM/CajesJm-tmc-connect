@@ -34,6 +34,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { auth, db } from "../../lib/firebaseConfig";
 import { createAttendanceStyles } from '../../styles/main-admin/attendanceStyles';
+import { notificationService } from '../../utils/notifications';
 
 const showAlert = (title: string, message?: string) => {
   if (Platform.OS === 'web') {
@@ -612,7 +613,6 @@ export default function MainAdminAttendance() {
     return '';
   };
   const handleSendPenalty = async () => {
-
     if (!selectedEvent || !user) return;
 
     const penaltiesQuery = query(
@@ -644,11 +644,11 @@ export default function MainAdminAttendance() {
         const penaltyData = {
           eventId: selectedEvent.id,
           eventTitle: selectedEvent.title,
-          eventDate: getEventDateISO(selectedEvent.date), // ✅ Added
+          eventDate: getEventDateISO(selectedEvent.date),
           studentId: student.id,
           studentName: student.name,
-          studentID: student.studentID,          // ✅ Add back if needed
-          status: 'pending',                     // ✅ Must be 'pending'
+          studentID: student.studentID,
+          status: 'pending',
           createdAt: timestamp,
           sentBy: user.uid,
           sentAt: timestamp,
@@ -685,11 +685,31 @@ export default function MainAdminAttendance() {
       });
 
       await batch.commit();
+
+      // 🔔 NEW: Create a notification for each student
+      const notificationPromises = missingAttendees.map(student =>
+        notificationService.createNotification({
+          userId: student.id,
+          title: `Penalty Issued: ${selectedEvent.title}`,
+          message: `You have received a penalty for missing the event "${selectedEvent.title}". Please check your profile for details.`,
+          type: 'user',        // 'user' maps to the profile tab in NotificationContext
+          timestamp: new Date(),
+          priority: 'high',
+          data: {
+            eventId: selectedEvent.id,
+            eventTitle: selectedEvent.title,
+            penaltyId: `${selectedEvent.id}_${student.id}`,
+            status: 'pending'
+          }
+        })
+      );
+      await Promise.all(notificationPromises);
+
       setSentPenaltyEvents(prev => new Set([...prev, selectedEvent.id]));
       setShowPenaltyModal(false);
-      showAlert('Success', `Penalties sent to ${studentIds.length} students successfully!`);
+      showAlert('Success', `Penalties sent to ${studentIds.length} students and notifications created successfully!`);
     } catch (error) {
-
+      console.error(error);
       showAlert('Error', 'Failed to send penalties. Please try again.');
     } finally {
       setLoading(false);

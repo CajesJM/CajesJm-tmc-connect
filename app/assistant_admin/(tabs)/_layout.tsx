@@ -11,21 +11,24 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { NotificationProvider, useNotifications } from '../../../context/NotificationContext';
 import { useTheme } from '../../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-const TabIcon = ({
+const TabIconWithBadge = ({
   name,
   focused,
+  badgeCount,
   colors,
 }: {
   name: keyof typeof Ionicons.glyphMap;
   focused: boolean;
-  colors: any;
+  badgeCount?: number;
+  colors: any; // ThemeColors
 }) => {
   const iconName = focused ? name : `${name}-outline`;
-  const validIconName = iconName as keyof typeof Ionicons.glyphMap; 
+  const validIconName = iconName as keyof typeof Ionicons.glyphMap;
 
   return (
     <Animated.View
@@ -36,16 +39,23 @@ const TabIcon = ({
       ]}
     >
       <Ionicons
-        name={validIconName} 
+        name={validIconName}
         size={22}
         color={focused ? colors.accent.primary : colors.sidebar.text.secondary}
       />
       {focused && <View style={[styles.activeIndicator, { backgroundColor: colors.accent.primary }]} />}
+      {badgeCount !== undefined && badgeCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+        </View>
+      )}
     </Animated.View>
   );
 };
 
-export default function AdminTabsLayout() {
+// Inner component that uses the notification context and theme
+function TabsContent() {
+  const { unreadCounts } = useNotifications();
   const { colors, isDark } = useTheme();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -154,7 +164,12 @@ export default function AdminTabsLayout() {
           options={{
             title: 'Dashboard',
             tabBarIcon: ({ focused }) => (
-              <TabIcon name="home" focused={focused} colors={colors} />
+              <TabIconWithBadge
+                name="home"
+                focused={focused}
+                badgeCount={unreadCounts.home}
+                colors={colors}
+              />
             ),
           }}
         />
@@ -165,7 +180,12 @@ export default function AdminTabsLayout() {
           options={{
             title: 'Announcements',
             tabBarIcon: ({ focused }) => (
-              <TabIcon name="megaphone" focused={focused} colors={colors} />
+              <TabIconWithBadge
+                name="megaphone"
+                focused={focused}
+                badgeCount={unreadCounts.announcements}
+                colors={colors}
+              />
             ),
           }}
         />
@@ -233,7 +253,12 @@ export default function AdminTabsLayout() {
           options={{
             title: 'Events',
             tabBarIcon: ({ focused }) => (
-              <TabIcon name="calendar" focused={focused} colors={colors} />
+              <TabIconWithBadge
+                name="calendar"
+                focused={focused}
+                badgeCount={unreadCounts.events}
+                colors={colors}
+              />
             ),
           }}
         />
@@ -244,12 +269,26 @@ export default function AdminTabsLayout() {
           options={{
             title: 'Profile',
             tabBarIcon: ({ focused }) => (
-              <TabIcon name="person" focused={focused} colors={colors} />
+              <TabIconWithBadge
+                name="person"
+                focused={focused}
+                badgeCount={unreadCounts.profile}
+                colors={colors}
+              />
             ),
           }}
         />
       </Tabs>
     </View>
+  );
+}
+
+// Main layout – wraps everything with the NotificationProvider and ThemeProvider
+export default function AdminTabsLayout() {
+  return (
+    <NotificationProvider>
+      <TabsContent />
+    </NotificationProvider>
   );
 }
 
@@ -272,6 +311,25 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ef4444', // keep red for badge
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+  },
+  badgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   // QR Button Styles
   qrButtonContainer: {

@@ -1,6 +1,7 @@
-import { Dimensions, StyleSheet } from 'react-native';
+import { Dimensions, Platform, StyleSheet } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isMobile = Platform.OS === 'ios' || Platform.OS === 'android';
 
 export const styles = StyleSheet.create({
   container: {
@@ -40,19 +41,15 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
   },
-  roleBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginTop: 8,
-  },
+    roleBadge: {
+      marginTop: 8,
+      alignSelf: 'flex-start',
+    },
   roleText: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
+      fontSize: isMobile ? 12 : 13,
+      color: '#ffffff',
+      fontWeight: '600',
+    },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',

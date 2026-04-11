@@ -13,6 +13,26 @@ export interface Notification {
 }
 
 class NotificationService {
+
+    async markNotificationsAsReadByTypes(
+        userId: string,
+        types: ('event' | 'announcement' | 'attendance' | 'user' | 'system')[]
+    ): Promise<void> {
+        if (!types.length) return;
+        try {
+            const q = query(
+                collection(db, 'notifications'),
+                where('userId', '==', userId),
+                where('read', '==', false),
+                where('type', 'in', types)
+            );
+            const snapshot = await getDocs(q);
+            const updates = snapshot.docs.map(doc => updateDoc(doc.ref, { read: true }));
+            await Promise.all(updates);
+        } catch (error) {
+            console.error('Error marking notifications by types:', error);
+        }
+    }
     private listeners: (() => void)[] = [];
 
     listenForNotifications(
@@ -23,7 +43,7 @@ class NotificationService {
             collection(db, 'notifications'),
             where('userId', '==', userId),
             orderBy('timestamp', 'desc'),
-            limit(20)
+            limit(10)
         );
 
         const unsubscribe = onSnapshot(notificationsQuery, (snapshot) => {

@@ -1,8 +1,8 @@
 import * as SecureStore from "expo-secure-store";
 import {
-  signInWithEmailAndPassword,
-  signOut,
-  User
+    signInWithEmailAndPassword,
+    signOut,
+    User
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import React, { createContext, useContext, useState } from "react";
@@ -92,74 +92,70 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string): Promise<UserData> => {
-  setLoading(true);
+    try {
+      if (!email || !password) {
+        throw new Error("Email and password are required");
+      }
 
-  try {
-    if (!email || !password) {
+      if (!email.includes('@')) {
+        throw new Error("Invalid email format");
+      }
+
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+
+      // Get user data from Firestore (including role and active status)
+      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+      if (!userDoc.exists()) {
+        throw new Error("User account not found in database.");
+      }
+
+      const userDataFromDB = userDoc.data() as UserData & { active?: boolean };
+      
+      // Check if user is active
+      if (userDataFromDB.active === false) {
+        // Sign out the user since they're deactivated
+        await signOut(auth);
+        throw new Error("This account has been deactivated. Please contact an administrator.");
+      }
+      
+      // Validate that role exists
+      if (!userDataFromDB.role) {
+        throw new Error("User role not assigned. Contact administrator.");
+      }
+
+      const completeUserData = {
+        ...userDataFromDB,
+        email: firebaseUser.email || userDataFromDB.email,
+      };
+
+      setUser(firebaseUser);
+      setUserData(completeUserData);
+      await storeUserData(completeUserData);
       setLoading(false);
-      throw new Error("Email and password are required");
+
+      return completeUserData; 
+      
+    } catch (error: any) {
+      // Ensure user is cleared on any error
+      setUser(null);
+      setUserData(null);
+      await storeUserData(null);
+
+      // Better error messages
+      if (error.code === 'auth/invalid-credential') {
+        throw new Error("Invalid email or password."); 
+      } else if (error.code === 'auth/user-not-found') {
+        throw new Error("User not found.");
+      } else if (error.code === 'auth/wrong-password') {
+        throw new Error("Incorrect password.");
+      } else if (error.message.includes("deactivated")) {
+        throw error;
+      } else {
+        throw error;
+      }
     }
-
-    if (!email.includes('@')) {
-      setLoading(false);
-      throw new Error("Invalid email format");
-    }
-
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const firebaseUser = userCredential.user;
-
-    // Get user data from Firestore (including role and active status)
-    const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-    if (!userDoc.exists()) {
-      setLoading(false);
-      throw new Error("User account not found in database.");
-    }
-
-    const userDataFromDB = userDoc.data() as UserData & { active?: boolean };
-    
-    // Check if user is active
-    if (userDataFromDB.active === false) {
-      // Sign out the user since they're deactivated
-      await signOut(auth);
-      setLoading(false);
-      throw new Error("This account has been deactivated. Please contact an administrator.");
-    }
-    
-    // Validate that role exists
-    if (!userDataFromDB.role) {
-      setLoading(false);
-      throw new Error("User role not assigned. Contact administrator.");
-    }
-
-    const completeUserData = {
-      ...userDataFromDB,
-      email: firebaseUser.email || userDataFromDB.email,
-    };
-
-    setUser(firebaseUser);
-    setUserData(completeUserData);
-    await storeUserData(completeUserData);
-    setLoading(false);
-
-    return completeUserData; 
-    
-  } catch (error: any) {
-    setLoading(false);
-
-    // Better error messages
-    if (error.code === 'auth/invalid-credential') {
-      throw new Error("Invalid email or password."); 
-    } else if (error.code === 'auth/user-not-found') {
-      throw new Error("User not found.");
-    } else if (error.code === 'auth/wrong-password') {
-      throw new Error("Incorrect password.");
-    } else if (error.message.includes("deactivated")) {
-      throw error;
-    } else {
-      throw new Error("Login failed. Please try again.");
-    }
-  }
-};
+  };
 
   const logout = async () => {
     try {

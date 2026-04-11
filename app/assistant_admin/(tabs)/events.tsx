@@ -148,7 +148,7 @@ export default function AssistantAdminEvents() {
             createdAt: data.createdAt?.toDate(),
             attendees: data.attendees || [],
             coordinates: data.coordinates,
-            status: data.status || 'pending',
+            status: data.status || 'approved',
             createdBy: data.createdBy,
             createdByName: data.createdByName,
           };
@@ -571,7 +571,7 @@ export default function AssistantAdminEvents() {
     const diffDays = Math.ceil((eventDate.getTime() - now.getTime()) / (1000 * 3600 * 24));
     if (diffDays === 0) return { text: 'TODAY', color: '#16a34a' };
     if (diffDays === 1) return { text: 'TOMORROW', color: '#2563eb' };
-    if (diffDays > 1) return { text: `IN ${diffDays} DAYS`, color: '#d97706' };
+    if (diffDays > 1) return { text: 'UPCOMING', color: '#8b5cf6' };
     return { text: 'PAST', color: '#64748b' };
   };
 

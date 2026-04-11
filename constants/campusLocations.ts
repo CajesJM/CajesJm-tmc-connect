@@ -6,6 +6,12 @@ export interface CampusLocation {
 }
 
 export const CAMPUS_LOCATIONS: CampusLocation[] = [
+    {
+    id: 'optional',
+    name: 'Optional',
+    image: require('../assets/images/campusLocations/optional.jpg'),
+    description: 'Optional location for events without a specific venue'
+  },
   {
     id: 'tmc-new-building',
     name: 'TMC New Building',

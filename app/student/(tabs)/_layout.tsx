@@ -15,7 +15,6 @@ import { useTheme } from '../../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-// Tab icon component with badge – now uses theme colors
 const TabIconWithBadge = ({
   name,
   focused,
@@ -25,7 +24,7 @@ const TabIconWithBadge = ({
   name: keyof typeof Ionicons.glyphMap;
   focused: boolean;
   badgeCount?: number;
-  colors: any; // ThemeColors
+  colors: any; 
 }) => {
   const iconName = focused ? name : `${name}-outline`;
   const validIconName = iconName as keyof typeof Ionicons.glyphMap;

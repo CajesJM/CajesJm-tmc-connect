@@ -61,6 +61,19 @@ export const createAnnouncementStyles = (
             shadowRadius: 8,
             elevation: 6,
         },
+        characterCounterContainer: {
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: 8,
+        },
+        characterCounterText: {
+            fontSize: 12,
+        },
+        characterCounterWarning: {
+            fontSize: 12,
+            color: '#ef4444',
+        },
         profileImage: {
             width: '100%',
             height: '100%',

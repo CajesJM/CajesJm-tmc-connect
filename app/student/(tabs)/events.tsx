@@ -89,7 +89,7 @@ export default function StudentEventsScreen() {
 
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const { incrementUnread, clearUnread } = useNotifications();
+  const { clearUnread } = useNotifications();
   const isFocused = useRef(true);
   const initialLoadDone = useRef(false);
   const lastEventCreatedAt = useRef<string | null>(null);
@@ -189,12 +189,6 @@ export default function StudentEventsScreen() {
 
           if (newestEvent && newestEvent.createdAt) {
             const newestMillis = newestEvent.createdAt.getTime();
-            const lastMillis = lastEventCreatedAt.current ? parseInt(lastEventCreatedAt.current) : 0;
-
-            if (newestMillis > lastMillis && initialLoadDone.current && !isFocused.current) {
-              incrementUnread('events');
-            }
-
             lastEventCreatedAt.current = newestMillis.toString();
           }
         }

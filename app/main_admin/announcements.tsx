@@ -441,7 +441,6 @@ export default function MainAdminAnnouncements() {
     setIsSubmitting(true)
 
     try {
-      // 1. Create announcement
       const docRef = await addDoc(collection(db, 'announcements'), {
         title: title.trim(),
         message: message.trim(),
@@ -452,15 +451,12 @@ export default function MainAdminAnnouncements() {
         createdAt: serverTimestamp(),
       })
 
-      // 2. Get all student userIds (adjust collection name if different)
       const studentsQuery = query(
         collection(db, 'users'),
         where('role', '==', 'student')
       )
       const studentSnap = await getDocs(studentsQuery)
       const studentIds = studentSnap.docs.map((doc) => doc.id)
-
-      // 3. Create a notification for each student
       const notificationPromises = studentIds.map((studentId) =>
         notificationService.createNotification({
           userId: studentId,

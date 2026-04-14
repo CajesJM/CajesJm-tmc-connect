@@ -81,8 +81,6 @@ interface Announcement {
   status?: string
 }
 
-// ─── Animated Counter ─────────────────────────────────────────────────────────
-
 const AnimatedCounter = ({
   value,
   duration = 1500,
@@ -111,8 +109,6 @@ const AnimatedCounter = ({
 
   return <Text style={[styles.counterText, { color }]}>{displayValue}</Text>
 }
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
 
 const StatCard = ({
   title,
@@ -320,7 +316,7 @@ const AdminContentDistribution = ({
       icon: 'megaphone-outline' as const,
       description: 'Active announcements',
     },
-  ].filter((s) => s.value > 0) // hide zero segments
+  ].filter((s) => s.value > 0)
 
   if (total === 0) {
     return (
@@ -510,7 +506,6 @@ const AdminContentDistribution = ({
           />
         </View>
 
-        {/* Legend grid */}
         <View
           style={{
             flexDirection: 'row',
@@ -618,8 +613,6 @@ const AdminContentDistribution = ({
     </Animated.View>
   )
 }
-
-// ─── FIX 1: Analytics Overview
 
 const InteractiveChart = ({
   monthlyStats,
@@ -803,13 +796,11 @@ const InteractiveChart = ({
           ))}
         </View>
 
-        {/* Chart — no PanResponder wrapper, use horizontal ScrollView only */}
         <View style={styles.chartWrapper}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingRight: 20 }}
-            // prevent nested scroll conflicts
             nestedScrollEnabled
           >
             <LineChart
@@ -902,10 +893,6 @@ const InteractiveChart = ({
     </Animated.View>
   )
 }
-
-// ─── FIX 2: Content Distribution donut (with pending + rejected) ──────────────
-
-// ─── Activity Item ─────────────────────────────────────────────────────────────
 
 const ActivityItem = ({
   activity,
@@ -1150,8 +1137,8 @@ export default function AssistantAdminDashboard() {
     useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [pastEvents, setPastEvents] = useState<Event[]>([])
 
-  // ── Entry animation ──
   useEffect(() => {
     Animated.parallel([
       Animated.timing(headerAnim, {
@@ -1258,6 +1245,29 @@ export default function AssistantAdminDashboard() {
     } catch (error) {
       console.error('Error fetching donut data:', error)
     }
+  }
+  const fetchPastEvents = () => {
+    const now = new Date()
+    const pastQuery = query(
+      collection(db, 'events'),
+      where('date', '<', now),
+      orderBy('date', 'desc'),
+      limit(5)
+    )
+    return onSnapshot(pastQuery, (snapshot) => {
+      const events = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        const eventDate = data.date?.toDate()
+        return {
+          id: doc.id,
+          title: data.title,
+          date: eventDate,
+          location: data.location,
+          attendees: data.attendees || [],
+        }
+      })
+      setPastEvents(events)
+    })
   }
 
   const fetchUpcomingEvents = () => {
@@ -1416,7 +1426,7 @@ export default function AssistantAdminDashboard() {
     }
   }
 
-  const calculateMonthlyStats = async () => {
+  const calculateMonthlyStats = async (): Promise<MonthlyStats[]> => {
     try {
       const now = new Date()
       const months: MonthlyStats[] = []
@@ -1425,12 +1435,11 @@ export default function AssistantAdminDashboard() {
         months.push({
           month: d.toLocaleString('default', { month: 'short' }),
           events: 0,
-
           attendance: 0,
           announcements: 0,
         })
       }
-      // Fetch events from last 6 months and count
+
       const eventsSnap = await getDocs(collection(db, 'events'))
       eventsSnap.docs.forEach((doc) => {
         const data = doc.data()
@@ -1449,9 +1458,12 @@ export default function AssistantAdminDashboard() {
           }
         }
       })
+
       setMonthlyStats(months)
+      return months
     } catch (error) {
       console.error('Error calculating monthly stats:', error)
+      return []
     }
   }
   useEffect(() => {
@@ -1460,6 +1472,7 @@ export default function AssistantAdminDashboard() {
     const u1 = setupRealtimeActivities()
     const u2 = fetchUpcomingEvents()
     const u3 = fetchRecentAnnouncements()
+    const u5 = fetchPastEvents()
     calculateMonthlyStats()
 
     if (userData?.email) {
@@ -1475,6 +1488,7 @@ export default function AssistantAdminDashboard() {
         u2()
         u3()
         u4()
+        u5()
         notificationService.cleanup()
       }
     }
@@ -1482,6 +1496,7 @@ export default function AssistantAdminDashboard() {
       u1()
       u2()
       u3()
+      u5()
     }
   }, [userData])
 
@@ -1500,35 +1515,40 @@ export default function AssistantAdminDashboard() {
     ]).finally(() => setRefreshing(false))
   }, [])
 
-  // FIX 4: download with proper web fallback and error recovery
   const handleDownloadReport = async () => {
     try {
       setDownloadLoading(true)
 
-      // Ensure monthlyStats is fetched (if not already)
-      if (!monthlyStats || monthlyStats.length === 0) {
-        await calculateMonthlyStats()
-      }
+      const freshMonthlyStats = await calculateMonthlyStats()
+
+      // Use donut data for accurate totals (all events/announcements)
+      const totalEvents =
+        adminDonutData.upcoming +
+        adminDonutData.past +
+        adminDonutData.pending +
+        adminDonutData.rejected
+      const totalAnnouncements = adminDonutData.announcements
 
       const pdfData = {
         stats: {
-          totalUsers: 0, // assistant admin doesn't track all users
-          totalEvents: dashboardStats.myEvents,
-          totalAnnouncements: dashboardStats.myAnnouncements,
+          totalUsers: 0,
+          totalEvents: totalEvents,
+          totalAnnouncements: totalAnnouncements,
           activeAttendees: dashboardStats.totalAttendance,
-          upcomingEvents: dashboardStats.upcomingEvents,
-          pendingVerifications:
-            dashboardStats.pendingMyEvents +
-            dashboardStats.pendingMyAnnouncements,
+          upcomingEvents: adminDonutData.upcoming,
+          pendingVerifications: adminDonutData.pending,
           activeUsers: 0,
           totalAttendance: dashboardStats.totalAttendance,
         },
-        monthlyStats: monthlyStats || [],
+        monthlyStats: freshMonthlyStats,
         recentActivities: recentActivities.slice(0, 10),
         upcomingEvents: upcomingEvents,
+        pastEvents: pastEvents,
       }
 
-      const fileUri = await generateDashboardPDF(pdfData)
+      const fileUri = await generateDashboardPDF(pdfData, {
+        isAssistantAdmin: true,
+      })
       await sharePDF(fileUri)
       Alert.alert('Success', 'Report generated successfully!')
     } catch (error) {
@@ -1879,6 +1899,12 @@ export default function AssistantAdminDashboard() {
             </View>
           </LinearGradient>
         </Animated.View>
+        {/* FIX 2: Content Distribution with pending + rejected */}
+        <AdminContentDistribution
+          donutData={adminDonutData}
+          isDark={isDark}
+          colors={colors}
+        />
 
         {/* FIX 1: Analytics Overview */}
         {monthlyStats.length > 0 && (
@@ -1890,134 +1916,8 @@ export default function AssistantAdminDashboard() {
           />
         )}
 
-        {/* FIX 2: Content Distribution with pending + rejected */}
-        <AdminContentDistribution
-          donutData={adminDonutData}
-          isDark={isDark}
-          colors={colors}
-        />
-
-        {/* Quick Actions */}
-        <View style={styles.quickActionsSection}>
-          <Text
-            style={[
-              styles.sectionTitle,
-              { color: isDark ? '#ffffff' : '#1e293b' },
-            ]}
-          >
-            Quick Actions
-          </Text>
-          <View style={styles.quickActionsGrid}>
-            <QuickActionButton
-              title='Announcement'
-              icon='mic'
-              colors={['#f59e0b', '#d97706'] as const}
-              onPress={() => navigateTo('announcements')}
-              delay={0}
-            />
-            <QuickActionButton
-              title='New Event'
-              icon='plus-circle'
-              colors={['#3b82f6', '#2563eb'] as const}
-              onPress={() => navigateTo('events')}
-              delay={100}
-            />
-            <QuickActionButton
-              title='QR Check-in'
-              icon='maximize'
-              colors={['#10b981', '#059669'] as const}
-              onPress={() => navigateTo('attendance')}
-              delay={200}
-            />
-          </View>
-        </View>
-
         {/* Two Column Layout */}
         <View style={styles.twoColumnLayout}>
-          {/* Recent Activity */}
-          <View style={styles.column}>
-            <View style={styles.sectionHeader}>
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: isDark ? '#ffffff' : '#1e293b' },
-                ]}
-              >
-                Recent Activity
-              </Text>
-              {activitiesLoading && (
-                <ActivityIndicator size='small' color='#3b82f6' />
-              )}
-            </View>
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: isDark ? '#1e293b' : '#ffffff' },
-              ]}
-            >
-              {displayedActivities.length > 0 ? (
-                <>
-                  {displayedActivities.map((activity, index) => (
-                    <ActivityItem
-                      key={activity.id}
-                      activity={activity}
-                      index={index}
-                      isLast={index === displayedActivities.length - 1}
-                    />
-                  ))}
-                  {totalPages > 1 && (
-                    <View style={styles.paginationContainer}>
-                      <TouchableOpacity
-                        style={[
-                          styles.paginationButton,
-                          currentPage === 1 && styles.paginationButtonDisabled,
-                        ]}
-                        onPress={() =>
-                          currentPage > 1 && setCurrentPage((p) => p - 1)
-                        }
-                        disabled={currentPage === 1}
-                      >
-                        <Feather
-                          name='chevron-left'
-                          size={18}
-                          color={currentPage === 1 ? '#64748b' : '#3b82f6'}
-                        />
-                      </TouchableOpacity>
-                      <Text style={styles.paginationText}>
-                        {currentPage} / {totalPages}
-                      </Text>
-                      <TouchableOpacity
-                        style={[
-                          styles.paginationButton,
-                          currentPage === totalPages &&
-                            styles.paginationButtonDisabled,
-                        ]}
-                        onPress={() =>
-                          currentPage < totalPages &&
-                          setCurrentPage((p) => p + 1)
-                        }
-                        disabled={currentPage === totalPages}
-                      >
-                        <Feather
-                          name='chevron-right'
-                          size={18}
-                          color={
-                            currentPage === totalPages ? '#64748b' : '#3b82f6'
-                          }
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </>
-              ) : (
-                <View style={styles.emptyState}>
-                  <Feather name='activity' size={40} color='#64748b' />
-                  <Text style={styles.emptyStateText}>No recent activity</Text>
-                </View>
-              )}
-            </View>
-          </View>
-
           {/* Upcoming Events + Announcements */}
           <View style={styles.column}>
             <View style={styles.sectionHeader}>

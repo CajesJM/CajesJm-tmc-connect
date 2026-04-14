@@ -2,10 +2,11 @@ import { Dimensions, StyleSheet } from 'react-native'
 
 const { width: screenWidth } = Dimensions.get('window')
 const isMobile = screenWidth < 768
+const isTablet = screenWidth >= 768 && screenWidth < 1024
 
 export const createProfileStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
-    // ─── Root ────────────────────────────────────────────────────────────────
+    // ─── Root & Container ───────────────────────────────────────────────────
     container: {
       flex: 1,
       backgroundColor: colors.background,
@@ -14,12 +15,13 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       flex: 1,
     },
     scrollContent: {
-      paddingHorizontal: 16,
-      paddingBottom: 40,
-      gap: 14,
+      paddingHorizontal: isMobile ? 12 : 20,
+      paddingTop: 12,
+      paddingBottom: 24,
+      gap: 12,
     },
 
-    // ─── Header Gradient (full width) ────────────────────────────────────────
+    // ─── Header (PRESERVED - UNCHANGED) ────────────────────────────────────
     headerGradient: {
       paddingTop: 20,
       paddingBottom: 12,
@@ -80,8 +82,6 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       fontSize: 18,
       fontWeight: '700',
     },
-
-    // Date row + header actions
     dateSection: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -120,77 +120,96 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       borderColor: 'rgba(239,68,68,0.3)',
     },
 
-    // ─── Profile Identity Card ────────────────────────────────────────────────
-    identityCard: {
+    // ─── Hero Card (Compact) ────────────────────────────────────────────────
+    heroCard: {
       backgroundColor: colors.card,
-      borderRadius: 20,
+      borderRadius: 18,
       borderWidth: 1,
       borderColor: colors.border,
       overflow: 'hidden',
-      shadowColor: isDark ? '#000' : '#64748b',
+      shadowColor: isDark ? '#000' : '#0f172a',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.3 : 0.07,
-      shadowRadius: 16,
+      shadowOpacity: isDark ? 0.3 : 0.06,
+      shadowRadius: 12,
       elevation: 4,
     },
-    identityAccent: {
-      height: 4,
-    },
-    identityBody: {
-      padding: 20,
+    heroCardContent: {
       flexDirection: isMobile ? 'column' : 'row',
       alignItems: isMobile ? 'center' : 'flex-start',
-      gap: 16,
+      padding: 16,
+      gap: 12,
     },
 
-    // Large avatar inside card
-    largeAvatarWrapper: {
+    // Avatar Section (Smaller)
+    avatarSection: {
+      alignItems: 'center',
       position: 'relative',
     },
-    largeAvatarButton: {
-      width: 88,
-      height: 88,
-      borderRadius: 44,
+    avatarButton: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
       overflow: 'hidden',
-      borderWidth: 3,
-      borderColor: '#0ea5e9',
-      shadowColor: '#0ea5e9',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.35,
-      shadowRadius: 12,
-      elevation: 6,
+      position: 'relative',
     },
-    largeAvatarImage: {
+    avatarImage: {
       width: '100%',
       height: '100%',
+      borderRadius: 40,
     },
-    largeAvatarFallback: {
-      flex: 1,
+    avatarFallback: {
+      width: '100%',
+      height: '100%',
       backgroundColor: isDark ? 'rgba(14,165,233,0.2)' : '#e0f2fe',
       justifyContent: 'center',
       alignItems: 'center',
+      borderRadius: 40,
+      borderWidth: 2,
+      borderColor: '#0ea5e9',
     },
-    largeAvatarInitials: {
-      fontSize: 30,
+    avatarInitials: {
+      fontSize: 28,
       fontWeight: '800',
       color: '#0ea5e9',
-      letterSpacing: -1,
     },
-    largeAvatarEditBadge: {
+    avatarEditOverlay: {
       position: 'absolute',
-      bottom: 2,
-      right: 2,
-      width: 24,
+      bottom: 0,
+      right: 0,
+      left: 0,
       height: 24,
-      borderRadius: 12,
-      backgroundColor: '#0ea5e9',
+      backgroundColor: 'rgba(0,0,0,0.5)',
       justifyContent: 'center',
       alignItems: 'center',
-      borderWidth: 2,
-      borderColor: colors.card,
+    },
+    avatarMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : '#d1fae5',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(16,185,129,0.3)' : 'rgba(16,185,129,0.3)',
+    },
+    statusIndicator: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#10b981',
+    },
+    statusText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#10b981',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
 
-    identityDetails: {
+    // Identity Section (Smaller)
+    identitySection: {
       flex: 1,
       alignItems: isMobile ? 'center' : 'flex-start',
     },
@@ -199,415 +218,538 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       fontWeight: '800',
       color: colors.text,
       letterSpacing: -0.5,
-      marginBottom: 3,
+      marginBottom: 2,
     },
     identityEmail: {
       fontSize: 13,
       color: colors.sidebar?.text?.secondary || '#64748b',
       fontWeight: '500',
-      marginBottom: 10,
+      marginBottom: 12,
     },
-    rolePill: {
+    roleBadge: {
+      borderRadius: 20,
+      overflow: 'hidden',
+      marginBottom: 8,
+      shadowColor: '#0ea5e9',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    roleBadgeGradient: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
       paddingHorizontal: 12,
-      paddingVertical: 5,
-      borderRadius: 20,
-      backgroundColor: isDark ? 'rgba(14,165,233,0.15)' : '#e0f2fe',
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(14,165,233,0.3)' : 'rgba(14,165,233,0.25)',
-      alignSelf: isMobile ? 'center' : 'flex-start',
+      paddingVertical: 6,
     },
-    rolePillDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-      backgroundColor: '#0ea5e9',
-    },
-    rolePillText: {
+    roleBadgeText: {
       fontSize: 11,
       fontWeight: '700',
-      color: '#0ea5e9',
+      color: '#ffffff',
       textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      letterSpacing: 0.6,
+    },
+    memberSince: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    memberSinceText: {
+      fontSize: 11,
+      color: colors.sidebar?.text?.muted || '#94a3b8',
+      fontWeight: '500',
     },
 
-    // ─── Stats Row ────────────────────────────────────────────────────────────
-    statsRow: {
+    // Stats Grid (Tighter)
+    statsGrid: {
       flexDirection: 'row',
       borderTopWidth: 1,
       borderTopColor: colors.border,
+      backgroundColor: isDark
+        ? 'rgba(255,255,255,0.02)'
+        : 'rgba(248,250,252,0.8)',
     },
-    statCell: {
+    statItem: {
       flex: 1,
-      paddingVertical: 14,
       alignItems: 'center',
-      gap: 2,
+      paddingVertical: 12,
+      borderRightWidth: 1,
+      borderRightColor: colors.border,
     },
-    statDivider: {
-      width: 1,
-      backgroundColor: colors.border,
+    statItemFirst: {
+      borderLeftWidth: 0,
+    },
+    statItemLast: {
+      borderRightWidth: 0,
+    },
+    statIconContainer: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 4,
     },
     statValue: {
-      fontSize: 22,
+      fontSize: 18,
       fontWeight: '800',
       color: colors.text,
       letterSpacing: -0.5,
+      marginBottom: 2,
     },
     statLabel: {
       fontSize: 10,
       fontWeight: '600',
       color: colors.sidebar?.text?.muted || '#94a3b8',
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: 0.4,
     },
 
-    // ─── Section shell ────────────────────────────────────────────────────────
-    sectionCard: {
+    // ─── Section Container (Compact) ────────────────────────────────────────
+    section: {
       backgroundColor: colors.card,
-      borderRadius: 20,
+      borderRadius: 18,
       borderWidth: 1,
       borderColor: colors.border,
       overflow: 'hidden',
-      shadowColor: isDark ? '#000' : '#64748b',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: isDark ? 0.22 : 0.05,
-      shadowRadius: 12,
-      elevation: 3,
+      shadowColor: isDark ? '#000' : '#0f172a',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.2 : 0.04,
+      shadowRadius: 8,
+      elevation: 2,
     },
     sectionHeader: {
-      paddingHorizontal: 18,
-      paddingTop: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingTop: 14,
       paddingBottom: 10,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
+    sectionTitleContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    sectionIconContainer: {
+      width: 28,
+      height: 28,
+      borderRadius: 6,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
     sectionTitle: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '700',
-      color: colors.sidebar?.text?.muted || '#94a3b8',
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      color: colors.text,
+      letterSpacing: -0.2,
+    },
+    refreshButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 6,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
 
-    // ─── Quick Action Grid ────────────────────────────────────────────────────
+    // ─── Quick Access Grid (Smaller tiles) ─────────────────────────────────
     quickGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       padding: 12,
-      gap: 10,
-    },
-    quickTile: {
-      width: isMobile ? '46%' : '22%',
-      flexGrow: 1,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc',
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingVertical: 14,
-      paddingHorizontal: 12,
-      alignItems: 'center',
       gap: 8,
     },
+    quickTile: {
+      width: isMobile ? '47%' : '23%',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc',
+      borderRadius: 14,
+      padding: 12,
+      alignItems: 'center',
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      position: 'relative',
+    },
     quickTileIcon: {
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       borderRadius: 12,
       justifyContent: 'center',
       alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 2,
     },
     quickTileLabel: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '700',
       color: colors.text,
       textAlign: 'center',
     },
+    quickTileArrow: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+    },
 
-    // ─── Account info list ────────────────────────────────────────────────────
-    infoRow: {
+    // ─── Account Information (Tighter rows) ─────────────────────────────────
+    infoList: {
+      paddingHorizontal: 16,
+      paddingVertical: 4,
+    },
+    infoItem: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 18,
-      paddingVertical: 13,
+      paddingVertical: 10,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    infoRowLast: {
+    infoItemLast: {
       borderBottomWidth: 0,
+    },
+    infoItemLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    infoIconContainer: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    infoIconContainerHighlight: {
+      backgroundColor: isDark ? 'rgba(14,165,233,0.15)' : '#e0f2fe',
     },
     infoLabel: {
       fontSize: 13,
       fontWeight: '600',
       color: colors.sidebar?.text?.secondary || '#64748b',
     },
+    infoItemRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
     infoValue: {
       fontSize: 13,
       fontWeight: '700',
       color: colors.text,
-      maxWidth: '55%',
       textAlign: 'right',
     },
-
-    // ─── Logout ───────────────────────────────────────────────────────────────
-    logoutCard: {
-      backgroundColor: isDark ? 'rgba(239,68,68,0.08)' : '#fef2f2',
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)',
-      overflow: 'hidden',
+    infoValueHighlight: {
+      color: '#0ea5e9',
     },
-    logoutButton: {
+    copyButton: {
+      padding: 6,
+      borderRadius: 6,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
+    },
+
+    // ─── Analytics Section (More compact) ───────────────────────────────────
+    analyticsContent: {
+      padding: 16,
+      gap: 14,
+    },
+
+    // Metrics Row
+    metricsRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 15,
       gap: 10,
     },
-    logoutText: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: '#ef4444',
-      letterSpacing: 0.2,
-    },
-
-    // ─── Footer ───────────────────────────────────────────────────────────────
-    footer: {
-      alignItems: 'center',
-      paddingVertical: 20,
-      gap: 3,
-    },
-    footerText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.sidebar?.text?.muted || '#94a3b8',
-    },
-    footerSub: {
-      fontSize: 10,
-      color: colors.sidebar?.text?.muted || '#94a3b8',
-      opacity: 0.7,
-    },
-
-    // ─── Upload overlay (if needed) ───────────────────────────────────────────
-    uploadOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: 44,
-    },
-
-    // ─── Analytics section ────────────────────────────────────────────────────
-    analyticsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 10,
-      padding: 14,
-    },
-
-    highlightCard: {
-      flex: 1,
-      minWidth: isMobile ? '45%' : '22%',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc',
-      borderRadius: 14,
+    metricCard: {
+      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc',
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
       padding: 14,
-      gap: 6,
+      gap: 8,
     },
-    highlightIconRow: {
+    metricCardLarge: {
+      flex: 1,
+    },
+    metricHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
     },
-    highlightIconBox: {
-      width: 34,
-      height: 34,
+    metricIconBox: {
+      width: 36,
+      height: 36,
       borderRadius: 10,
       justifyContent: 'center',
       alignItems: 'center',
     },
-    highlightTrend: {
+    metricTrend: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 3,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 16,
     },
-    highlightTrendText: {
-      fontSize: 10,
+    metricTrendText: {
+      fontSize: 11,
       fontWeight: '700',
     },
-    highlightValue: {
-      fontSize: 26,
+    metricBody: {
+      gap: 2,
+    },
+    metricValue: {
+      fontSize: 28,
       fontWeight: '800',
       color: colors.text,
       letterSpacing: -0.8,
-      marginTop: 4,
     },
-    highlightLabel: {
-      fontSize: 11,
+    metricLabel: {
+      fontSize: 12,
       fontWeight: '600',
       color: colors.sidebar?.text?.muted || '#94a3b8',
       textTransform: 'uppercase',
-      letterSpacing: 0.6,
+      letterSpacing: 0.4,
+    },
+    metricFooter: {
+      marginTop: 4,
+    },
+    metricBar: {
+      height: 4,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+      borderRadius: 2,
+      overflow: 'hidden',
+    },
+    metricBarFill: {
+      height: '100%',
+      borderRadius: 2,
     },
 
-    chartBlock: {
-      width: '100%',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc',
+    // Status Grid
+    statusGrid: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    statusItem: {
+      flex: 1,
       borderRadius: 14,
+      padding: 12,
+      alignItems: 'center',
+      gap: 4,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+    },
+    statusHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    statusValue: {
+      fontSize: 18,
+      fontWeight: '800',
+      letterSpacing: -0.5,
+    },
+    statusLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+      opacity: 0.8,
+    },
+
+    // Chart Container
+    chartContainer: {
+      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc',
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
+      padding: 16,
+      gap: 12,
+    },
+    chartHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 2,
+    },
+    chartTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.text,
+      letterSpacing: -0.2,
+    },
+    chartSubtitle: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.sidebar?.text?.muted || '#94a3b8',
+    },
+    chartContent: {
+      gap: 12,
+    },
+    chartRow: {
+      gap: 6,
+    },
+    chartRowHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    chartRowMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    chartDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    chartRowLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    chartRowValue: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.sidebar?.text?.secondary || '#64748b',
+    },
+    chartTrack: {
+      height: 6,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+      borderRadius: 3,
+      overflow: 'hidden',
+    },
+    chartFill: {
+      height: '100%',
+      borderRadius: 3,
+    },
+
+    // Rate Container
+    rateContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+    },
+    rateVisual: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rateRing: {
+      width: 70,
+      height: 70,
+      borderRadius: 35,
+      borderWidth: 6,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+    },
+    ratePercent: {
+      fontSize: 18,
+      fontWeight: '800',
+      letterSpacing: -0.5,
+    },
+    rateDetails: {
+      flex: 1,
+      gap: 4,
+    },
+    rateTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.text,
+      letterSpacing: -0.2,
+    },
+    rateDescription: {
+      fontSize: 11,
+      color: colors.sidebar?.text?.secondary || '#64748b',
+      lineHeight: 16,
+      fontWeight: '500',
+    },
+    rateProgress: {
+      marginTop: 4,
+    },
+    rateTrack: {
+      height: 6,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+      borderRadius: 3,
+      overflow: 'hidden',
+    },
+    rateFill: {
+      height: '100%',
+      borderRadius: 3,
+    },
+
+    // ─── Logout Card (Smaller) ──────────────────────────────────────────────
+    logoutCard: {
+      backgroundColor: isDark ? 'rgba(239,68,68,0.08)' : '#fef2f2',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)',
+      overflow: 'hidden',
+      marginTop: 2,
+    },
+    logoutContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
       padding: 14,
       gap: 12,
     },
-    chartBlockTitle: {
+    logoutIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+      backgroundColor: isDark ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.1)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    logoutTextContainer: {
+      flex: 1,
+      gap: 2,
+    },
+    logoutTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#ef4444',
+      letterSpacing: -0.2,
+    },
+    logoutSubtitle: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: isDark ? 'rgba(239,68,68,0.7)' : 'rgba(239,68,68,0.6)',
+    },
+
+    // ─── Footer (Reduced) ───────────────────────────────────────────────────
+    footer: {
+      alignItems: 'center',
+      paddingVertical: 20,
+      gap: 4,
+      marginTop: 4,
+    },
+    footerBrand: {
       fontSize: 13,
       fontWeight: '700',
       color: colors.text,
       letterSpacing: -0.2,
     },
-    chartBlockSub: {
-      fontSize: 11,
+    footerVersion: {
+      fontSize: 10,
+      fontWeight: '600',
       color: colors.sidebar?.text?.muted || '#94a3b8',
-      marginTop: -8,
-    },
-    barRow: {
-      gap: 6,
-    },
-    barMeta: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    barMetaLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 7,
-    },
-    barDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-    },
-    barLabel: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    barValueText: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.sidebar?.text?.secondary || '#64748b',
-    },
-    barTrack: {
-      height: 8,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
-      borderRadius: 4,
-      overflow: 'hidden',
-    },
-    barFill: {
-      height: '100%',
-      borderRadius: 4,
-    },
-
-    statusRow: {
-      flexDirection: 'row',
-      gap: 8,
-      width: '100%',
-    },
-    statusCell: {
-      flex: 1,
-      borderRadius: 12,
-      paddingVertical: 12,
-      paddingHorizontal: 10,
-      alignItems: 'center',
-      gap: 4,
-    },
-    statusCellValue: {
-      fontSize: 20,
-      fontWeight: '800',
-      letterSpacing: -0.5,
-    },
-    statusCellLabel: {
-      fontSize: 10,
-      fontWeight: '600',
       textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-
-    rateBlock: {
-      width: '100%',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc',
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: colors.border,
-      padding: 14,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 16,
-    },
-    rateRing: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
-      borderWidth: 7,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    rateRingValue: {
-      fontSize: 15,
-      fontWeight: '800',
-      letterSpacing: -0.5,
-    },
-    rateInfo: {
-      flex: 1,
-      gap: 4,
-    },
-    rateTitle: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: colors.text,
-    },
-    rateSub: {
-      fontSize: 11,
-      color: colors.sidebar?.text?.secondary || '#64748b',
-      lineHeight: 16,
-    },
-    rateBarTrack: {
-      height: 6,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)',
-      borderRadius: 3,
-      overflow: 'hidden',
-      marginTop: 4,
-    },
-    rateBarFill: {
-      height: '100%',
-      borderRadius: 3,
-    },
-    combinedNote: {
-      fontSize: 10,
-      color: colors.sidebar?.text?.muted,
-      textAlign: 'center',
-      marginTop: 8,
-    },
-    highlightCardRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 14,
-      gap: 12,
-    },
-    highlightCardLeft: {
-      flex: 1,
-      gap: 6,
-    },
-    highlightCardRight: {
-      justifyContent: 'center',
-      alignItems: 'center',
-      minWidth: 50,
+      letterSpacing: 0.6,
     },
   })

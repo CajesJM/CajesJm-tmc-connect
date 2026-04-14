@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore'
 import React, { useEffect, useMemo, useState } from 'react'
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -88,6 +89,7 @@ export default function AssistantAdminAnnouncements() {
     'normal'
   )
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
@@ -177,6 +179,7 @@ export default function AssistantAdminAnnouncements() {
       return
     }
 
+    setIsSubmitting(true)
     try {
       await addDoc(collection(db, 'announcements'), {
         title: title.trim(),
@@ -192,12 +195,15 @@ export default function AssistantAdminAnnouncements() {
     } catch (error) {
       console.error('Error adding announcement:', error)
       Alert.alert('Error', 'Failed to create announcement')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleSaveEdit = async () => {
     if (!editingId || !title.trim() || !message.trim()) return
 
+    setIsSubmitting(true)
     try {
       const announcementRef = doc(db, 'announcements', editingId)
       await updateDoc(announcementRef, {
@@ -212,6 +218,8 @@ export default function AssistantAdminAnnouncements() {
     } catch (error) {
       console.error('Error updating announcement:', error)
       Alert.alert('Error', 'Failed to update announcement')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -275,6 +283,7 @@ export default function AssistantAdminAnnouncements() {
     setMessage('')
     setPriority('normal')
     setShowCreateForm(false)
+    setIsSubmitting(false)
   }
 
   const openDetailModal = (announcement: Announcement) => {
@@ -524,7 +533,7 @@ export default function AssistantAdminAnnouncements() {
       >
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.greeting}>Welcome back,</Text>
+            <Text style={styles.greeting}>My Announcements,</Text>
             <Text style={styles.userName}>{userData?.name || 'Assistant'}</Text>
             <Text style={styles.role}>Assistant Admin</Text>
           </View>
@@ -549,7 +558,6 @@ export default function AssistantAdminAnnouncements() {
 
         <View style={styles.headerBottom}>
           <View style={styles.dateContainer}>
-            <Feather name='calendar' size={12} color='#94a3b8' />
             <Text style={styles.dateText}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: 'long',
@@ -853,20 +861,26 @@ export default function AssistantAdminAnnouncements() {
                 <TouchableOpacity
                   style={[
                     styles.submitButton,
-                    (!title.trim() || !message.trim()) &&
+                    (isSubmitting || !title.trim() || !message.trim()) &&
                       styles.submitButtonDisabled,
                   ]}
                   onPress={editingId ? handleSaveEdit : handleAddAnnouncement}
-                  disabled={!title.trim() || !message.trim()}
+                  disabled={isSubmitting || !title.trim() || !message.trim()}
                 >
-                  <Feather
-                    name={editingId ? 'check-circle' : 'send'}
-                    size={18}
-                    color='#ffffff'
-                  />
-                  <Text style={styles.submitButtonText}>
-                    {editingId ? 'Save Changes' : 'Submit for Approval'}
-                  </Text>
+                  {isSubmitting ? (
+                    <ActivityIndicator size='small' color='#ffffff' />
+                  ) : (
+                    <>
+                      <Feather
+                        name={editingId ? 'check-circle' : 'send'}
+                        size={18}
+                        color='#ffffff'
+                      />
+                      <Text style={styles.submitButtonText}>
+                        {editingId ? 'Save Changes' : 'Submit for Approval'}
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
 
                 <TouchableOpacity

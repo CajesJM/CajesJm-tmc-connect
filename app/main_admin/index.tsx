@@ -1223,6 +1223,7 @@ export default function MainAdminDashboard() {
   const [animatedMonthlyStats, setAnimatedMonthlyStats] = useState([])
   const eventSparklineData = monthlyStats.map((stat) => stat.events)
   const attendanceSparklineData = monthlyStats.map((stat) => stat.attendance)
+  const [pastEvents, setPastEvents] = useState<Event[]>([])
 
   const handleTouch = (event: any) => {
     if (!monthlyStats.length || !chartContainerRef.current) return
@@ -1357,7 +1358,6 @@ export default function MainAdminDashboard() {
     height: 0,
   })
 
-  // ─── CHANGE 1: AnimatedBar replaced with AnimatedBarEnhanced ──────────────
   const AnimatedBarEnhanced: React.FC<AnimatedBarProps> = ({
     height,
     color,
@@ -1903,6 +1903,7 @@ export default function MainAdminDashboard() {
     const unsubscribeActivities = setupRealtimeActivities()
     const unsubscribeEvents = fetchUpcomingEvents()
     const unsubscribeAnnouncements = fetchRecentAnnouncements()
+    const unsubscribePastEvents = fetchPastEvents()
 
     calculateMonthlyStats()
     calculateYearlyStats()
@@ -1911,6 +1912,7 @@ export default function MainAdminDashboard() {
       unsubscribeActivities()
       unsubscribeEvents()
       unsubscribeAnnouncements()
+      unsubscribePastEvents()
     }
   }, [])
 
@@ -2396,15 +2398,42 @@ export default function MainAdminDashboard() {
     }
   }, [chartDataReady])
 
+  const fetchPastEvents = () => {
+    const now = new Date()
+    const pastQuery = query(
+      collection(db, 'events'),
+      where('date', '<', now),
+      orderBy('date', 'desc'),
+      limit(5)
+    )
+    return onSnapshot(pastQuery, (snapshot) => {
+      const events = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        const eventDate = data.date?.toDate()
+        return {
+          id: doc.id,
+          title: data.title,
+          date: eventDate,
+          location: data.location,
+          attendees: data.attendees || [],
+        }
+      })
+      setPastEvents(events)
+    })
+  }
+
   const handleDownloadReport = async () => {
-    console.log('Main admin monthlyStats length:', monthlyStats?.length)
     try {
       setDownloadLoading(true)
       const pdfData = {
-        stats: dashboardStats,
+        stats: {
+          ...dashboardStats,
+          pendingVerifications: pendingApprovals.length,
+        },
         monthlyStats: monthlyStats,
         recentActivities: recentActivities.slice(0, 10),
         upcomingEvents: upcomingEvents,
+        pastEvents: pastEvents,
       }
       const fileUri = await generateDashboardPDF(pdfData)
       await sharePDF(fileUri)

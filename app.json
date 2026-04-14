@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "TMC Connect needs your location to verify attendance at campus events.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "TMC Connect needs your location to verify attendance at campus events."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "TMC Connect needs your location to verify attendance at campus events.",
+        "NSPhotoLibraryUsageDescription": "This app needs access to save QR codes to your photos."
       }
     },
     "android": {
@@ -26,7 +27,9 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.FOREGROUND_SERVICE"
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {

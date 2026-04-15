@@ -1,5 +1,5 @@
-import { StyleSheet } from 'react-native';
-import { ThemeColors } from '../../context/ThemeContext';
+import { StyleSheet } from 'react-native'
+import { ThemeColors } from '../../context/ThemeContext'
 
 export const createStudentAnnouncementStyles = (
   colors: ThemeColors,
@@ -76,6 +76,7 @@ export const createStudentAnnouncementStyles = (
       paddingHorizontal: isMobile ? 8 : 10,
       paddingVertical: isMobile ? 4 : 6,
       marginTop: -20,
+      marginLeft: -6,
     },
     dateText: {
       fontSize: isMobile ? 10 : 12,
@@ -455,7 +456,7 @@ export const createStudentAnnouncementStyles = (
       width: isMobile ? 24 : 28,
       height: isMobile ? 24 : 28,
       borderRadius: isMobile ? 12 : 14,
-    
+
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -464,5 +465,5 @@ export const createStudentAnnouncementStyles = (
       fontWeight: '600',
       color: colors.text,
     },
-  });
-};
+  })
+}

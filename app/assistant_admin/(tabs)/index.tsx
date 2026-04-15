@@ -374,10 +374,16 @@ const AdminContentDistribution = ({
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginBottom: 16,
+            marginBottom: 10,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
             <View
               style={{
                 width: 36,
@@ -1899,14 +1905,13 @@ export default function AssistantAdminDashboard() {
             </View>
           </LinearGradient>
         </Animated.View>
-        {/* FIX 2: Content Distribution with pending + rejected */}
+
         <AdminContentDistribution
           donutData={adminDonutData}
           isDark={isDark}
           colors={colors}
         />
 
-        {/* FIX 1: Analytics Overview */}
         {monthlyStats.length > 0 && (
           <InteractiveChart
             monthlyStats={monthlyStats}
@@ -1916,9 +1921,7 @@ export default function AssistantAdminDashboard() {
           />
         )}
 
-        {/* Two Column Layout */}
         <View style={styles.twoColumnLayout}>
-          {/* Upcoming Events + Announcements */}
           <View style={styles.column}>
             <View style={styles.sectionHeader}>
               <Text

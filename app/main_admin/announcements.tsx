@@ -943,7 +943,7 @@ export default function MainAdminAnnouncements() {
                 { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
               ]}
             >
-              Welcome back,
+              Announcements Dashboard,
             </Text>
             <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
               {userData?.name || 'Admin'}

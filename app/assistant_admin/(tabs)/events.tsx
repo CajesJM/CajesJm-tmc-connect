@@ -16,11 +16,10 @@ import {
   Timestamp,
   updateDoc,
 } from 'firebase/firestore'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -133,9 +132,11 @@ export default function AssistantAdminEvents() {
   >('all')
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 5
 
+  // Location check state
   const [checkingLocation, setCheckingLocation] = useState(false)
   const [userLocation, setUserLocation] = useState<{
     latitude: number
@@ -144,11 +145,7 @@ export default function AssistantAdminEvents() {
   const [distance, setDistance] = useState<number | null>(null)
   const [isWithinRange, setIsWithinRange] = useState<boolean | null>(null)
 
-  const fadeAnim = useRef(new Animated.Value(1)).current
-  const prevButtonScale = useRef(new Animated.Value(1)).current
-  const nextButtonScale = useRef(new Animated.Value(1)).current
-  const pageChangeRef = useRef(false)
-
+  // --- Firestore listener ---
   useEffect(() => {
     const q = query(collection(db, 'events'), orderBy('date', 'desc'))
     const unsubscribe = onSnapshot(
@@ -355,36 +352,6 @@ export default function AssistantAdminEvents() {
     }
   }
 
-  const animatePrevButton = () => {
-    Animated.sequence([
-      Animated.timing(prevButtonScale, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(prevButtonScale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start()
-  }
-
-  const animateNextButton = () => {
-    Animated.sequence([
-      Animated.timing(nextButtonScale, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(nextButtonScale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start()
-  }
-
   // Pagination
   const totalPages = Math.ceil(filteredEvents.length / itemsPerPage)
   const paginatedEvents = filteredEvents.slice(
@@ -393,48 +360,11 @@ export default function AssistantAdminEvents() {
   )
 
   const goToPreviousPage = () => {
-    if (currentPage > 1) {
-      animatePrevButton()
-      pageChangeRef.current = true
-
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }).start(() => {
-        setCurrentPage(currentPage - 1)
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }).start(() => {
-          pageChangeRef.current = false
-        })
-      })
-    }
+    if (currentPage > 1) setCurrentPage(currentPage - 1)
   }
 
   const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      animateNextButton()
-      pageChangeRef.current = true
-
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }).start(() => {
-        setCurrentPage(currentPage + 1)
-
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }).start(() => {
-          pageChangeRef.current = false
-        })
-      })
-    }
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1)
   }
 
   const resetForm = () => {
@@ -830,63 +760,57 @@ export default function AssistantAdminEvents() {
     if (totalPages <= 1) return null
     return (
       <View style={styles.paginationContainer}>
-        <Animated.View style={{ transform: [{ scale: prevButtonScale }] }}>
-          <TouchableOpacity
+        <TouchableOpacity
+          style={[
+            styles.paginationButton,
+            currentPage === 1 && styles.paginationButtonDisabled,
+          ]}
+          onPress={goToPreviousPage}
+          disabled={currentPage === 1}
+        >
+          <Feather
+            name='chevron-left'
+            size={18}
+            color={currentPage === 1 ? colors.sidebar.text.muted : colors.text}
+          />
+          <Text
             style={[
-              styles.paginationButton,
-              currentPage === 1 && styles.paginationButtonDisabled,
+              styles.paginationText,
+              currentPage === 1 && styles.paginationTextDisabled,
             ]}
-            onPress={goToPreviousPage}
-            disabled={currentPage === 1}
           >
-            <Feather
-              name='chevron-left'
-              size={18}
-              color={
-                currentPage === 1 ? colors.sidebar.text.muted : colors.text
-              }
-            />
-            <Text
-              style={[
-                styles.paginationText,
-                currentPage === 1 && styles.paginationTextDisabled,
-              ]}
-            >
-              Prev
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
+            Prev
+          </Text>
+        </TouchableOpacity>
         <Text style={styles.paginationPageInfo}>
           {currentPage} / {totalPages}
         </Text>
-        <Animated.View style={{ transform: [{ scale: nextButtonScale }] }}>
-          <TouchableOpacity
+        <TouchableOpacity
+          style={[
+            styles.paginationButton,
+            currentPage === totalPages && styles.paginationButtonDisabled,
+          ]}
+          onPress={goToNextPage}
+          disabled={currentPage === totalPages}
+        >
+          <Text
             style={[
-              styles.paginationButton,
-              currentPage === totalPages && styles.paginationButtonDisabled,
+              styles.paginationText,
+              currentPage === totalPages && styles.paginationTextDisabled,
             ]}
-            onPress={goToNextPage}
-            disabled={currentPage === totalPages}
           >
-            <Text
-              style={[
-                styles.paginationText,
-                currentPage === totalPages && styles.paginationTextDisabled,
-              ]}
-            >
-              Next
-            </Text>
-            <Feather
-              name='chevron-right'
-              size={18}
-              color={
-                currentPage === totalPages
-                  ? colors.sidebar.text.muted
-                  : colors.text
-              }
-            />
-          </TouchableOpacity>
-        </Animated.View>
+            Next
+          </Text>
+          <Feather
+            name='chevron-right'
+            size={18}
+            color={
+              currentPage === totalPages
+                ? colors.sidebar.text.muted
+                : colors.text
+            }
+          />
+        </TouchableOpacity>
       </View>
     )
   }
@@ -1044,27 +968,26 @@ export default function AssistantAdminEvents() {
         </Text>
       </View>
 
-      <Animated.View style={{ opacity: fadeAnim, flex: 1 }}>
-        <FlatList
-          data={paginatedEvents}
-          keyExtractor={(item) => item.id}
-          renderItem={renderEventCard}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true)
-                setTimeout(() => setRefreshing(false), 2000)
-              }}
-              colors={[colors.accent.primary]}
-            />
-          }
-          ListEmptyComponent={renderEmptyState}
-        />
-      </Animated.View>
-      {renderPagination()}
+      <FlatList
+        data={paginatedEvents}
+        keyExtractor={(item) => item.id}
+        renderItem={renderEventCard}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true)
+              setTimeout(() => setRefreshing(false), 2000)
+            }}
+            colors={[colors.accent.primary]}
+          />
+        }
+        ListEmptyComponent={renderEmptyState}
+        ListFooterComponent={renderPagination}
+        ListFooterComponentStyle={styles.paginationWrapper}
+      />
 
       {/* Create/Edit Modal */}
       <Modal

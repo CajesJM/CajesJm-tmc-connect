@@ -1,5 +1,5 @@
-import { StyleSheet } from 'react-native';
-import { ThemeColors } from '../../context/ThemeContext';
+import { StyleSheet } from 'react-native'
+import { ThemeColors } from '../../context/ThemeContext'
 
 export const createEventStyles = (
   colors: ThemeColors,
@@ -79,6 +79,7 @@ export const createEventStyles = (
       paddingHorizontal: isMobile ? 8 : 10,
       paddingVertical: isMobile ? 4 : 6,
       marginTop: -20,
+      marginLeft: -6,
     },
     dateText: {
       fontSize: isMobile ? 10 : 12,
@@ -698,5 +699,5 @@ export const createEventStyles = (
       fontWeight: 'bold',
       color: '#fff',
     },
-  });
-};
+  })
+}

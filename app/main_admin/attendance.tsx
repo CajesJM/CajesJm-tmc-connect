@@ -1,18 +1,25 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import * as FileSystem from 'expo-file-system';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as MediaLibrary from 'expo-media-library';
-import { useRouter } from 'expo-router';
+import { Feather, Ionicons } from '@expo/vector-icons'
+import { BlurView } from 'expo-blur'
+import * as FileSystem from 'expo-file-system'
+import { LinearGradient } from 'expo-linear-gradient'
+import * as MediaLibrary from 'expo-media-library'
+import * as Print from 'expo-print'
+import { useRouter } from 'expo-router'
+import * as Sharing from 'expo-sharing'
 import {
-  collection, doc, getDoc, getDocs, onSnapshot,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
-  where, writeBatch
-} from 'firebase/firestore';
-import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
+  where,
+  writeBatch,
+} from 'firebase/firestore'
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -26,31 +33,31 @@ import {
   Text,
   TouchableOpacity,
   useWindowDimensions,
-  View
-} from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
-import PenaltyAnnouncementModal from '../../components/PenaltyAnnouncementModal';
-import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import { auth, db } from "../../lib/firebaseConfig";
-import { createAttendanceStyles } from '../../styles/main-admin/attendanceStyles';
-import { notificationService } from '../../utils/notifications';
+  View,
+} from 'react-native'
+import QRCode from 'react-native-qrcode-svg'
+import PenaltyAnnouncementModal from '../../components/PenaltyAnnouncementModal'
+import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
+import { auth, db } from '../../lib/firebaseConfig'
+import { createAttendanceStyles } from '../../styles/main-admin/attendanceStyles'
+import { notificationService } from '../../utils/notifications'
 
 const showAlert = (title: string, message?: string) => {
   if (Platform.OS === 'web') {
-    window.alert(message ? `${title}\n${message}` : title);
+    window.alert(message ? `${title}\n${message}` : title)
   } else {
-    Alert.alert(title, message);
+    Alert.alert(title, message)
   }
-};
+}
 
 interface PenaltyStatus {
-  status: 'pending' | 'paid' | 'completed' | 'cancelled';
-  sentAt?: string;
-  completedAt?: string;
-  cancelledAt?: string;
-  completedBy?: string;
-  cancelledBy?: string;
+  status: 'pending' | 'paid' | 'completed' | 'cancelled'
+  sentAt?: string
+  completedAt?: string
+  cancelledAt?: string
+  completedBy?: string
+  cancelledBy?: string
 }
 
 const FormTextInput = ({
@@ -61,70 +68,71 @@ const FormTextInput = ({
   inputStyle,
   ...props
 }: {
-  style?: any;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder?: string;
-  inputStyle?: any;
-  [key: string]: any;
+  style?: any
+  value: string
+  onChangeText: (text: string) => void
+  placeholder?: string
+  inputStyle?: any
+  [key: string]: any
 }) => (
   <RNTextInput
     style={[inputStyle, style]}
     value={value}
     onChangeText={onChangeText}
     placeholder={placeholder}
-    placeholderTextColor="#94a3b8"
+    placeholderTextColor='#94a3b8'
     {...props}
   />
-);
+)
 
 interface Event {
-  id: string;
-  title: string;
-  location: string;
-  date: string | { seconds: number; nanoseconds: number };
+  id: string
+  title: string
+  location: string
+  date: string | { seconds: number; nanoseconds: number }
   coordinates?: {
-    latitude: number;
-    longitude: number;
-    radius: number;
-  };
-  qrExpiration?: string | null;
-  isActive?: boolean;
-  status?: 'pending' | 'approved' | 'rejected';
+    latitude: number
+    longitude: number
+    radius: number
+  }
+  qrExpiration?: string | null
+  isActive?: boolean
+  status?: 'pending' | 'approved' | 'rejected'
 }
 
 interface AttendanceRecord {
-  studentName: string;
-  studentID: string;
-  yearLevel: string;
-  block: string;
-  course: string;
-  gender: string;
-  timestamp?: string | { seconds: number; nanoseconds: number };
-  role?: string;
+  studentName: string
+  studentID: string
+  yearLevel: string
+  block: string
+  course: string
+  gender: string
+  timestamp?: string | { seconds: number; nanoseconds: number }
+  role?: string
   location?: {
-    isWithinRadius: boolean;
-    distance?: number;
-    accuracy?: number;
-  };
+    isWithinRadius: boolean
+    distance?: number
+    accuracy?: number
+  }
 }
 interface PenaltyRecord {
-  eventId: string;
-  eventTitle: string;
-  status: 'pending' | 'paid';
-  paidAt?: string;
-  paidBy?: string;
-  amount?: number;
-  createdAt: string;
+  eventId: string
+  eventTitle: string
+  status: 'pending' | 'paid'
+  paidAt?: string
+  paidBy?: string
+  amount?: number
+  createdAt: string
 }
 interface Student {
-  id: string;
-  name: string;
-  studentID: string;
-  yearLevel: string;
-  block: string;
-  course: string;
-  role?: string;
+  id: string
+  name: string
+  surname?: string
+  studentID: string
+  yearLevel: string
+  block: string
+  course: string
+  role?: string
 }
 const AnimatedBlock = memo(function AnimatedBlock({
   block,
@@ -135,16 +143,16 @@ const AnimatedBlock = memo(function AnimatedBlock({
   colors,
   formatTime,
 }: {
-  block: string;
-  students: AttendanceRecord[];
-  index: number;
-  styles: any;
-  isMobile: boolean;
-  colors: any;
-  formatTime: (timestamp: any) => string;
+  block: string
+  students: AttendanceRecord[]
+  index: number
+  styles: any
+  isMobile: boolean
+  colors: any
+  formatTime: (timestamp: any) => string
 }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const slideAnim = useRef(new Animated.Value(20)).current
 
   useEffect(() => {
     Animated.parallel([
@@ -160,8 +168,8 @@ const AnimatedBlock = memo(function AnimatedBlock({
         delay: index * 50,
         useNativeDriver: true,
       }),
-    ]).start();
-  }, []);
+    ]).start()
+  }, [])
 
   return (
     <Animated.View
@@ -176,26 +184,51 @@ const AnimatedBlock = memo(function AnimatedBlock({
           <Text style={styles.blockCount}>{students.length}</Text>
         </View>
         {students.map((record, idx) => (
-          <View key={idx} style={[styles.attendanceItem, isMobile && styles.attendanceItemMobile]}>
+          <View
+            key={idx}
+            style={[
+              styles.attendanceItem,
+              isMobile && styles.attendanceItemMobile,
+            ]}
+          >
             <View style={styles.studentRow}>
               <View style={styles.studentInfo}>
-                <Text style={[styles.studentName, isMobile && styles.studentNameMobile]} numberOfLines={1}>
+                <Text
+                  style={[
+                    styles.studentName,
+                    isMobile && styles.studentNameMobile,
+                  ]}
+                  numberOfLines={1}
+                >
                   {record.studentName}
                 </Text>
                 <Text style={styles.studentId}>{record.studentID}</Text>
               </View>
               <View style={styles.attendanceMeta}>
                 {record.location && (
-                  <View style={[
-                    styles.locationBadge,
-                    record.location.isWithinRadius ? styles.locationBadgeValid : styles.locationBadgeInvalid
-                  ]}>
-                    <Feather name={record.location.isWithinRadius ? "check" : "x"} size={10}
-                      color={record.location.isWithinRadius ? "#16a34a" : "#dc2626"} />
-                    <Text style={[
-                      styles.locationBadgeText,
-                      record.location.isWithinRadius ? styles.locationBadgeTextValid : styles.locationBadgeTextInvalid
-                    ]}>
+                  <View
+                    style={[
+                      styles.locationBadge,
+                      record.location.isWithinRadius
+                        ? styles.locationBadgeValid
+                        : styles.locationBadgeInvalid,
+                    ]}
+                  >
+                    <Feather
+                      name={record.location.isWithinRadius ? 'check' : 'x'}
+                      size={10}
+                      color={
+                        record.location.isWithinRadius ? '#16a34a' : '#dc2626'
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.locationBadgeText,
+                        record.location.isWithinRadius
+                          ? styles.locationBadgeTextValid
+                          : styles.locationBadgeTextInvalid,
+                      ]}
+                    >
                       {record.location.isWithinRadius ? 'Verified' : 'Too Far'}
                     </Text>
                   </View>
@@ -206,7 +239,11 @@ const AnimatedBlock = memo(function AnimatedBlock({
               {record.course} • Year {record.yearLevel}
             </Text>
             <View style={styles.attendanceTimeContainer}>
-              <Feather name="clock" size={12} color={colors.sidebar.text.muted} />
+              <Feather
+                name='clock'
+                size={12}
+                color={colors.sidebar.text.muted}
+              />
               <Text style={styles.attendanceTimeText}>
                 Attended at: {formatTime(record.timestamp)}
               </Text>
@@ -215,133 +252,153 @@ const AnimatedBlock = memo(function AnimatedBlock({
         ))}
       </View>
     </Animated.View>
-  );
-});
+  )
+})
 
 export default function MainAdminAttendance() {
-  const { user, userData } = useAuth();
-  const router = useRouter();
-  const { width: screenWidth } = useWindowDimensions();
-  const { colors, isDark } = useTheme();
+  const { user, userData } = useAuth()
+  const router = useRouter()
+  const { width: screenWidth } = useWindowDimensions()
+  const { colors, isDark } = useTheme()
 
-  const isMobile = screenWidth < 640;
-  const isTablet = screenWidth >= 640 && screenWidth < 1024;
-  const isDesktop = screenWidth >= 1024;
+  const isMobile = screenWidth < 640
+  const isTablet = screenWidth >= 640 && screenWidth < 1024
+  const isDesktop = screenWidth >= 1024
 
   const styles = useMemo(
     () => createAttendanceStyles(colors, isDark, isMobile, isTablet, isDesktop),
     [colors, isDark, isMobile, isTablet, isDesktop]
-  );
+  )
 
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const qrWrapperRef = useRef<View>(null);
-  const qrCodeRef = useRef<any>(null);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [showEventModal, setShowEventModal] = useState<boolean>(false);
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [selectedYearLevel, setSelectedYearLevel] = useState<string>('all');
-  const [selectedBlock, setSelectedBlock] = useState<string>('all');
-  const [showExpirationModal, setShowExpirationModal] = useState<boolean>(false);
-  const [customExpiration, setCustomExpiration] = useState<string>('');
-  const [showStopConfirmModal, setShowStopConfirmModal] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<string>('');
-  const [qrValue, setQrValue] = useState<string>('');
-  const [isCustomDatePickerVisible, setCustomDatePickerVisible] = useState(false);
-  const [customExpirationDate, setCustomExpirationDate] = useState<Date | null>(null);
-  const [quickOptions, setQuickOptions] = useState<Array<{ label: string; value: string }>>([]);
-  const [isSaving, setIsSaving] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null)
+  const qrWrapperRef = useRef<View>(null)
+  const qrCodeRef = useRef<any>(null)
+  const [events, setEvents] = useState<Event[]>([])
+  const [showEventModal, setShowEventModal] = useState<boolean>(false)
+  const [attendanceRecords, setAttendanceRecords] = useState<
+    AttendanceRecord[]
+  >([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [refreshing, setRefreshing] = useState<boolean>(false)
+  const [selectedYearLevel, setSelectedYearLevel] = useState<string>('all')
+  const [selectedBlock, setSelectedBlock] = useState<string>('all')
+  const [showExpirationModal, setShowExpirationModal] = useState<boolean>(false)
+  const [customExpiration, setCustomExpiration] = useState<string>('')
+  const [showStopConfirmModal, setShowStopConfirmModal] = useState(false)
+  const [timeLeft, setTimeLeft] = useState<string>('')
+  const [qrValue, setQrValue] = useState<string>('')
+  const [isCustomDatePickerVisible, setCustomDatePickerVisible] =
+    useState(false)
+  const [customExpirationDate, setCustomExpirationDate] = useState<Date | null>(
+    null
+  )
+  const [quickOptions, setQuickOptions] = useState<
+    Array<{ label: string; value: string }>
+  >([])
+  const [isSaving, setIsSaving] = useState(false)
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [paginatedBlocks, setPaginatedBlocks] = useState<[string, AttendanceRecord[]][]>([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [eventPage, setEventPage] = useState(1);
-  const [eventItemsPerPage] = useState(5);
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [paginatedBlocks, setPaginatedBlocks] = useState<
+    [string, AttendanceRecord[]][]
+  >([])
+  const [totalPages, setTotalPages] = useState(1)
+  const [eventPage, setEventPage] = useState(1)
+  const [eventItemsPerPage] = useState(5)
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [mode, setMode] = useState<'qr' | 'receipt'>('qr');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [students, setStudents] = useState<Student[]>([])
+  const [mode, setMode] = useState<'qr' | 'receipt'>('qr')
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const [showPenaltyModal, setShowPenaltyModal] = useState(false);
-  const [paidStudentIds, setPaidStudentIds] = useState<Set<string>>(new Set());
-  const [processingPayment, setProcessingPayment] = useState<string | null>(null);
-  const [sentPenaltyEvents, setSentPenaltyEvents] = useState<Set<string>>(new Set());
-  const [penaltyDetails, setPenaltyDetails] = useState<{ [eventId: string]: { studentIds: string[], sentAt: string } }>({});
-  const [completedStudentIds, setCompletedStudentIds] = useState<Set<string>>(new Set());
-  const [showCompleteConfirmModal, setShowCompleteConfirmModal] = useState(false);
-  const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
-  const [selectedStudentForAction, setSelectedStudentForAction] = useState<Student | null>(null);
-  const [processingAction, setProcessingAction] = useState<string | null>(null);
-  const [selectedEventForAction, setSelectedEventForAction] = useState<Event | null>(null);
+  const [showPenaltyModal, setShowPenaltyModal] = useState(false)
+  const [paidStudentIds, setPaidStudentIds] = useState<Set<string>>(new Set())
+  const [processingPayment, setProcessingPayment] = useState<string | null>(
+    null
+  )
+  const [sentPenaltyEvents, setSentPenaltyEvents] = useState<Set<string>>(
+    new Set()
+  )
+  const [penaltyDetails, setPenaltyDetails] = useState<{
+    [eventId: string]: { studentIds: string[]; sentAt: string }
+  }>({})
+  const [completedStudentIds, setCompletedStudentIds] = useState<Set<string>>(
+    new Set()
+  )
+  const [showCompleteConfirmModal, setShowCompleteConfirmModal] =
+    useState(false)
+  const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false)
+  const [selectedStudentForAction, setSelectedStudentForAction] =
+    useState<Student | null>(null)
+  const [processingAction, setProcessingAction] = useState<string | null>(null)
+  const [selectedEventForAction, setSelectedEventForAction] =
+    useState<Event | null>(null)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
 
-
-  const [missingPage, setMissingPage] = useState(1);
-  const missingItemsPerPage = 10;
+  const [missingPage, setMissingPage] = useState(1)
+  const missingItemsPerPage = 10
 
   const isValidDate = (dateString: any): boolean => {
-    if (!dateString) return false;
+    if (!dateString) return false
     try {
-      const date = new Date(dateString);
-      return !isNaN(date.getTime());
+      const date = new Date(dateString)
+      return !isNaN(date.getTime())
     } catch (error) {
-      return false;
+      return false
     }
-  };
+  }
   const getSurname = (fullName: string): string => {
-    const parts = fullName.trim().split(/\s+/);
-    return parts[parts.length - 1];
-  };
+    const parts = fullName.trim().split(/\s+/)
+    return parts[parts.length - 1]
+  }
 
   const sortMissingStudents = (students: Student[]): Student[] => {
     return [...students].sort((a, b) => {
       // Sort by year level (extract numeric part)
-      const yearA = parseInt(String(a.yearLevel).match(/\d+/)?.[0] ?? '0');
-      const yearB = parseInt(String(b.yearLevel).match(/\d+/)?.[0] ?? '0');
-      if (yearA !== yearB) return yearA - yearB;
+      const yearA = parseInt(String(a.yearLevel).match(/\d+/)?.[0] ?? '0')
+      const yearB = parseInt(String(b.yearLevel).match(/\d+/)?.[0] ?? '0')
+      if (yearA !== yearB) return yearA - yearB
 
       // Then by surname
-      const surnameA = getSurname(a.name).toLowerCase();
-      const surnameB = getSurname(b.name).toLowerCase();
-      return surnameA.localeCompare(surnameB);
-    });
-  };
+      const surnameA = getSurname(a.name).toLowerCase()
+      const surnameB = getSurname(b.name).toLowerCase()
+      return surnameA.localeCompare(surnameB)
+    })
+  }
   // Fetch students
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        const snapshot = await getDocs(collection(db, 'users'));
+        const snapshot = await getDocs(collection(db, 'users'))
 
         const studentsList = snapshot.docs
-          .map(doc => ({
+          .map((doc) => ({
             id: doc.id,
             ...doc.data(),
           }))
           .filter((student: any) => {
-            const role = (student.role || 'student').toString().toLowerCase().trim();
-            return role === 'student';
-          }) as Student[];
+            const role = (student.role || 'student')
+              .toString()
+              .toLowerCase()
+              .trim()
+            return role === 'student'
+          }) as Student[]
 
-        setStudents(studentsList);
-      } catch (error) {
-      }
-    };
-    fetchStudents();
-  }, []);
-
-
+        setStudents(studentsList)
+      } catch (error) {}
+    }
+    fetchStudents()
+  }, [])
 
   // Fetch events
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        setLoading(true);
-        const eventsCollection = collection(db, 'events');
-        const eventSnapshot = await getDocs(eventsCollection);
+        setLoading(true)
+        const eventsCollection = collection(db, 'events')
+        const eventSnapshot = await getDocs(eventsCollection)
 
-        const eventsList = eventSnapshot.docs.map(doc => {
-          const eventData = doc.data();
+        const eventsList = eventSnapshot.docs.map((doc) => {
+          const eventData = doc.data()
           return {
             id: doc.id,
             title: eventData.title || '',
@@ -351,22 +408,21 @@ export default function MainAdminAttendance() {
             qrExpiration: eventData.qrExpiration || null,
             isActive: eventData.isActive !== false,
             status: eventData.status || 'approved',
-          };
-        });
-        setEvents(eventsList);
+          }
+        })
+        setEvents(eventsList)
       } catch (error) {
-        showAlert('Error', 'Failed to load events');
+        showAlert('Error', 'Failed to load events')
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchEvents();
-
+    fetchEvents()
 
     const unsubscribe = onSnapshot(collection(db, 'events'), (snapshot) => {
-      const updatedEvents = snapshot.docs.map(doc => {
-        const eventData = doc.data();
+      const updatedEvents = snapshot.docs.map((doc) => {
+        const eventData = doc.data()
         return {
           id: doc.id,
           title: eventData.title || '',
@@ -376,122 +432,136 @@ export default function MainAdminAttendance() {
           qrExpiration: eventData.qrExpiration || null,
           isActive: eventData.isActive !== false,
           status: eventData.status || 'approved',
-        };
-      });
-      setEvents(updatedEvents);
-    });
+        }
+      })
+      setEvents(updatedEvents)
+    })
 
-    return () => unsubscribe();
-  }, []);
-
+    return () => unsubscribe()
+  }, [])
 
   // QR expiration helpers
   const isQRCodeExpired = (event: Event | null): boolean => {
-    if (!event) return false;
-    if (event.isActive === false) return true;
-    if (!event.qrExpiration) return false;
+    if (!event) return false
+    if (event.isActive === false) return true
+    if (!event.qrExpiration) return false
     try {
-      const expirationTime = new Date(event.qrExpiration);
-      const now = new Date();
-      return now > expirationTime;
+      const expirationTime = new Date(event.qrExpiration)
+      const now = new Date()
+      return now > expirationTime
     } catch (error) {
-      return false;
+      return false
     }
-  };
+  }
 
   useEffect(() => {
     if (showExpirationModal) {
-      const now = new Date();
+      const now = new Date()
       const options = [
-        { label: '1 hour', value: new Date(now.getTime() + 60 * 60 * 1000).toISOString() },
-        { label: '6 hours', value: new Date(now.getTime() + 6 * 60 * 60 * 1000).toISOString() },
-        { label: '12 hours', value: new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString() },
-        { label: '24 hours', value: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString() },
-        { label: '1 week', value: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString() },
-      ];
-      setQuickOptions(options);
+        {
+          label: '1 hour',
+          value: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
+        },
+        {
+          label: '6 hours',
+          value: new Date(now.getTime() + 6 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          label: '12 hours',
+          value: new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          label: '24 hours',
+          value: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          label: '1 week',
+          value: new Date(
+            now.getTime() + 7 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+        },
+      ]
+      setQuickOptions(options)
     }
-  }, [showExpirationModal]);
+  }, [showExpirationModal])
 
   useEffect(() => {
-    if (!selectedEvent) return;
+    if (!selectedEvent) return
 
     const fetchPenaltyStatuses = async () => {
       try {
         const penaltiesQuery = query(
           collection(db, 'penalties'),
           where('eventId', '==', selectedEvent.id)
-        );
+        )
 
-        const penaltiesSnapshot = await getDocs(penaltiesQuery);
+        const penaltiesSnapshot = await getDocs(penaltiesQuery)
 
-        const paidIds = new Set<string>();
-        const completedIds = new Set<string>();
-        const pendingIds = new Set<string>(); // Track pending penalties
+        const paidIds = new Set<string>()
+        const completedIds = new Set<string>()
+        const pendingIds = new Set<string>() // Track pending penalties
 
-        penaltiesSnapshot.docs.forEach(doc => {
-          const data = doc.data();
+        penaltiesSnapshot.docs.forEach((doc) => {
+          const data = doc.data()
           if (data.status === 'paid') {
-            paidIds.add(data.studentId);
+            paidIds.add(data.studentId)
           } else if (data.status === 'completed') {
-            completedIds.add(data.studentId);
+            completedIds.add(data.studentId)
           } else if (data.status === 'pending') {
-            pendingIds.add(data.studentId);
+            pendingIds.add(data.studentId)
           }
-        });
+        })
 
-        setPaidStudentIds(paidIds);
-        setCompletedStudentIds(completedIds);
+        setPaidStudentIds(paidIds)
+        setCompletedStudentIds(completedIds)
 
         // Check if any penalties have been sent (pending or paid or completed)
-        const hasAnyPenalties = penaltiesSnapshot.size > 0;
+        const hasAnyPenalties = penaltiesSnapshot.size > 0
         if (hasAnyPenalties && !sentPenaltyEvents.has(selectedEvent.id)) {
-          setSentPenaltyEvents(prev => new Set([...prev, selectedEvent.id]));
+          setSentPenaltyEvents((prev) => new Set([...prev, selectedEvent.id]))
         }
-      } catch (error) {
+      } catch (error) {}
+    }
 
-      }
-    };
-
-    fetchPenaltyStatuses();
+    fetchPenaltyStatuses()
 
     // Real-time listener
     const penaltiesQuery = query(
       collection(db, 'penalties'),
       where('eventId', '==', selectedEvent.id)
-    );
+    )
 
     const unsubscribe = onSnapshot(penaltiesQuery, (snapshot) => {
-      const paidIds = new Set<string>();
-      const completedIds = new Set<string>();
-      const pendingIds = new Set<string>();
+      const paidIds = new Set<string>()
+      const completedIds = new Set<string>()
+      const pendingIds = new Set<string>()
 
-      snapshot.docs.forEach(doc => {
-        const data = doc.data();
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data()
         if (data.status === 'paid') {
-          paidIds.add(data.studentId);
+          paidIds.add(data.studentId)
         } else if (data.status === 'completed') {
-          completedIds.add(data.studentId);
+          completedIds.add(data.studentId)
         } else if (data.status === 'pending') {
-          pendingIds.add(data.studentId);
+          pendingIds.add(data.studentId)
         }
-      });
+      })
 
-      setPaidStudentIds(paidIds);
-      setCompletedStudentIds(completedIds);
+      setPaidStudentIds(paidIds)
+      setCompletedStudentIds(completedIds)
 
       // Update sent penalty status if any penalties exist
-      const hasAnyPenalties = snapshot.size > 0;
+      const hasAnyPenalties = snapshot.size > 0
       if (hasAnyPenalties && selectedEvent) {
-        setSentPenaltyEvents(prev => new Set([...prev, selectedEvent.id]));
+        setSentPenaltyEvents((prev) => new Set([...prev, selectedEvent.id]))
       }
-    });
+    })
 
-    return () => unsubscribe();
-  }, [selectedEvent]);
+    return () => unsubscribe()
+  }, [selectedEvent])
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid) return
 
     const fetchSentPenalties = async () => {
       try {
@@ -499,80 +569,85 @@ export default function MainAdminAttendance() {
         const announcementsQuery = query(
           collection(db, 'penaltyAnnouncements'),
           where('sentBy', '==', user.uid)
-        );
+        )
 
-        const snapshot = await getDocs(announcementsQuery);
-        const sentEvents = new Set<string>();
-        const details: { [eventId: string]: { studentIds: string[], sentAt: string } } = {};
+        const snapshot = await getDocs(announcementsQuery)
+        const sentEvents = new Set<string>()
+        const details: {
+          [eventId: string]: { studentIds: string[]; sentAt: string }
+        } = {}
 
-        snapshot.docs.forEach(doc => {
-          const data = doc.data();
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data()
           if (data.eventId) {
-            sentEvents.add(data.eventId);
+            sentEvents.add(data.eventId)
             details[data.eventId] = {
               studentIds: data.studentIds || [],
-              sentAt: data.sentAt
-            };
+              sentAt: data.sentAt,
+            }
           }
-        });
+        })
 
-        setSentPenaltyEvents(sentEvents);
-        setPenaltyDetails(details);
-      } catch (error) {
+        setSentPenaltyEvents(sentEvents)
+        setPenaltyDetails(details)
+      } catch (error) {}
+    }
 
-      }
-    };
-
-    fetchSentPenalties();
+    fetchSentPenalties()
 
     // Real-time listener
     const announcementsQuery = query(
       collection(db, 'penaltyAnnouncements'),
       where('sentBy', '==', user.uid)
-    );
+    )
 
     const unsubscribe = onSnapshot(announcementsQuery, (snapshot) => {
-      const sentEvents = new Set<string>();
-      const details: { [eventId: string]: { studentIds: string[], sentAt: string } } = {};
+      const sentEvents = new Set<string>()
+      const details: {
+        [eventId: string]: { studentIds: string[]; sentAt: string }
+      } = {}
 
-      snapshot.docs.forEach(doc => {
-        const data = doc.data();
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data()
         if (data.eventId) {
-          sentEvents.add(data.eventId);
+          sentEvents.add(data.eventId)
           details[data.eventId] = {
             studentIds: data.studentIds || [],
-            sentAt: data.sentAt
-          };
+            sentAt: data.sentAt,
+          }
         }
-      });
+      })
 
-      setSentPenaltyEvents(sentEvents);
-      setPenaltyDetails(details);
-    });
+      setSentPenaltyEvents(sentEvents)
+      setPenaltyDetails(details)
+    })
 
-    return () => unsubscribe();
-  }, [user?.uid]);
+    return () => unsubscribe()
+  }, [user?.uid])
 
   // Check if penalty was sent for this event
   const hasPenaltyBeenSent = (eventId: string): boolean => {
-    return sentPenaltyEvents.has(eventId);
-  };
+    return sentPenaltyEvents.has(eventId)
+  }
 
   const hasStudentReceivedPenalty = (studentId: string): boolean => {
-    if (!selectedEvent) return false;
+    if (!selectedEvent) return false
     // Check by looking at the penalty status sets
-    return paidStudentIds.has(studentId) ||
+    return (
+      paidStudentIds.has(studentId) ||
       completedStudentIds.has(studentId) ||
-      (sentPenaltyEvents.has(selectedEvent.id) && missingAttendees.some(s => s.id === studentId));
-  };
+      (sentPenaltyEvents.has(selectedEvent.id) &&
+        missingAttendees.some((s) => s.id === studentId))
+    )
+  }
 
   // Record that penalties were sent (call this when sending penalty)
   const recordPenaltySent = async (eventId: string, studentIds: string[]) => {
-    if (!user?.uid) return;
+    if (!user?.uid) return
 
     try {
-      const announcementId = `${eventId}_${user.uid}_${Date.now()}`;
-      const announcementRef = doc(db, 'penaltyAnnouncements', announcementId);
+      const announcementId = `${eventId}_${user.uid}_${Date.now()}`
+      const announcementRef = doc(db, 'penaltyAnnouncements', announcementId)
 
       await setDoc(announcementRef, {
         eventId: eventId,
@@ -580,66 +655,74 @@ export default function MainAdminAttendance() {
         sentBy: user.uid,
         sentAt: new Date().toISOString(),
         sentAtTimestamp: serverTimestamp(),
-        count: studentIds.length
-      });
+        count: studentIds.length,
+      })
 
       // Also update the event document to track that penalties were sent
-      const eventRef = doc(db, 'events', eventId);
+      const eventRef = doc(db, 'events', eventId)
       await updateDoc(eventRef, {
         penaltiesSent: true,
         penaltiesSentAt: new Date().toISOString(),
         penaltiesSentBy: user.uid,
-        penaltiesCount: studentIds.length
-      });
+        penaltiesCount: studentIds.length,
+      })
 
-      showAlert('Success', `Penalty announcements sent to ${studentIds.length} students.`);
+      showAlert(
+        'Success',
+        `Penalty announcements sent to ${studentIds.length} students.`
+      )
     } catch (error) {
-
-      showAlert('Error', 'Failed to record penalty announcement.');
+      showAlert('Error', 'Failed to record penalty announcement.')
     }
-  };
+  }
   const getEventDateISO = (date: any): string => {
-    if (!date) return '';
+    if (!date) return ''
     if (typeof date === 'object' && date.toDate) {
-      return date.toDate().toISOString();
+      return date.toDate().toISOString()
     }
     if (typeof date === 'string') {
-      const d = new Date(date);
-      return isNaN(d.getTime()) ? '' : d.toISOString();
+      const d = new Date(date)
+      return isNaN(d.getTime()) ? '' : d.toISOString()
     }
     if (typeof date === 'object' && date.seconds) {
-      return new Date(date.seconds * 1000).toISOString();
+      return new Date(date.seconds * 1000).toISOString()
     }
-    return '';
-  };
+    return ''
+  }
   const handleSendPenalty = async () => {
-    if (!selectedEvent || !user) return;
+    if (!selectedEvent || !user) return
 
     const penaltiesQuery = query(
       collection(db, 'penalties'),
       where('eventId', '==', selectedEvent.id)
-    );
-    const existingPenalties = await getDocs(penaltiesQuery);
+    )
+    const existingPenalties = await getDocs(penaltiesQuery)
     if (existingPenalties.size > 0) {
-      showAlert('Already Sent', 'Penalties have already been sent for this event.');
-      return;
+      showAlert(
+        'Already Sent',
+        'Penalties have already been sent for this event.'
+      )
+      return
     }
 
     if (missingAttendees.length === 0) {
-      showAlert('No Students', 'There are no missing students to send penalties to.');
-      return;
+      showAlert(
+        'No Students',
+        'There are no missing students to send penalties to.'
+      )
+      return
     }
 
     try {
-      setLoading(true);
-      const batch = writeBatch(db);
-      const studentIds: string[] = [];
-      const timestamp = new Date().toISOString();
+      setLoading(true)
+      const batch = writeBatch(db)
+      const studentIds: string[] = []
+      const timestamp = new Date().toISOString()
 
       for (const student of missingAttendees) {
-        const penaltyId = `${selectedEvent.id}_${student.id}`;
-        const penaltyRef = doc(db, 'penalties', penaltyId);
-        studentIds.push(student.id);
+        const penaltyId = `${selectedEvent.id}_${student.id}`
+        const penaltyRef = doc(db, 'penalties', penaltyId)
+        studentIds.push(student.id)
 
         const penaltyData = {
           eventId: selectedEvent.id,
@@ -652,210 +735,218 @@ export default function MainAdminAttendance() {
           createdAt: timestamp,
           sentBy: user.uid,
           sentAt: timestamp,
-          updatedAt: serverTimestamp()
-        };
+          updatedAt: serverTimestamp(),
+        }
 
-        batch.set(penaltyRef, penaltyData);
+        batch.set(penaltyRef, penaltyData)
 
         // Also add to user's penalties array
-        const userRef = doc(db, 'users', student.id);
-        const userDoc = await getDoc(userRef);
+        const userRef = doc(db, 'users', student.id)
+        const userDoc = await getDoc(userRef)
         if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const existingPenalties = userData.penalties || [];
+          const userData = userDoc.data()
+          const existingPenalties = userData.penalties || []
           existingPenalties.push({
             id: penaltyId,
             eventId: selectedEvent.id,
             eventTitle: selectedEvent.title,
             status: 'pending',
             createdAt: timestamp,
-            sentAt: timestamp
-          });
-          batch.update(userRef, { penalties: existingPenalties });
+            sentAt: timestamp,
+          })
+          batch.update(userRef, { penalties: existingPenalties })
         }
       }
 
-      // Update event document
-      const eventRef = doc(db, 'events', selectedEvent.id);
+      const eventRef = doc(db, 'events', selectedEvent.id)
       batch.update(eventRef, {
         penaltiesSent: true,
         penaltiesSentAt: timestamp,
         penaltiesSentBy: user.uid,
-        penaltiesCount: studentIds.length
-      });
+        penaltiesCount: studentIds.length,
+      })
 
-      await batch.commit();
+      await batch.commit()
 
-      // 🔔 NEW: Create a notification for each student
-      const notificationPromises = missingAttendees.map(student =>
+      const notificationPromises = missingAttendees.map((student) =>
         notificationService.createNotification({
           userId: student.id,
           title: `Penalty Issued: ${selectedEvent.title}`,
           message: `You have received a penalty for missing the event "${selectedEvent.title}". Please check your profile for details.`,
-          type: 'user',        // 'user' maps to the profile tab in NotificationContext
+          type: 'user',
           timestamp: new Date(),
           priority: 'high',
           data: {
             eventId: selectedEvent.id,
             eventTitle: selectedEvent.title,
             penaltyId: `${selectedEvent.id}_${student.id}`,
-            status: 'pending'
-          }
+            status: 'pending',
+          },
         })
-      );
-      await Promise.all(notificationPromises);
+      )
+      await Promise.all(notificationPromises)
 
-      setSentPenaltyEvents(prev => new Set([...prev, selectedEvent.id]));
-      setShowPenaltyModal(false);
-      showAlert('Success', `Penalties sent to ${studentIds.length} students and notifications created successfully!`);
+      setSentPenaltyEvents((prev) => new Set([...prev, selectedEvent.id]))
+      setShowPenaltyModal(false)
+      showAlert(
+        'Success',
+        `Penalties sent to ${studentIds.length} students and notifications created successfully!`
+      )
     } catch (error) {
-      console.error(error);
-      showAlert('Error', 'Failed to send penalties. Please try again.');
+      console.error(error)
+      showAlert('Error', 'Failed to send penalties. Please try again.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
   useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null
 
-    if (selectedEvent && selectedEvent.qrExpiration && !isQRCodeExpired(selectedEvent)) {
+    if (
+      selectedEvent &&
+      selectedEvent.qrExpiration &&
+      !isQRCodeExpired(selectedEvent)
+    ) {
       const updateTimeLeft = () => {
-        const now = new Date();
-        const expiration = new Date(selectedEvent.qrExpiration!);
-        const diff = expiration.getTime() - now.getTime();
+        const now = new Date()
+        const expiration = new Date(selectedEvent.qrExpiration!)
+        const diff = expiration.getTime() - now.getTime()
 
         if (diff <= 0) {
-          setTimeLeft('Expired');
-          const updatedEvent = { ...selectedEvent, isActive: false };
-          setSelectedEvent(updatedEvent);
-          return;
+          setTimeLeft('Expired')
+          const updatedEvent = { ...selectedEvent, isActive: false }
+          setSelectedEvent(updatedEvent)
+          return
         }
 
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        const hours = Math.floor(diff / (1000 * 60 * 60))
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000)
 
         if (hours > 0) {
-          setTimeLeft(`${hours}h ${minutes}m`);
+          setTimeLeft(`${hours}h ${minutes}m`)
         } else if (minutes > 0) {
-          setTimeLeft(`${minutes}m ${seconds}s`);
+          setTimeLeft(`${minutes}m ${seconds}s`)
         } else {
-          setTimeLeft(`${seconds}s`);
+          setTimeLeft(`${seconds}s`)
         }
-      };
+      }
 
-      updateTimeLeft();
-      intervalId = setInterval(updateTimeLeft, 1000);
+      updateTimeLeft()
+      intervalId = setInterval(updateTimeLeft, 1000)
     } else {
-      setTimeLeft('');
+      setTimeLeft('')
     }
 
     return () => {
       if (intervalId !== null) {
-        clearInterval(intervalId);
+        clearInterval(intervalId)
       }
-    };
-  }, [selectedEvent]);
+    }
+  }, [selectedEvent])
 
   const stopAttendance = () => {
-    if (!selectedEvent) return;
+    if (!selectedEvent) return
     if (selectedEvent.isActive === false) {
-      showAlert("Info", "Attendance is already stopped for this event");
-      return;
+      showAlert('Info', 'Attendance is already stopped for this event')
+      return
     }
-    setShowStopConfirmModal(true);
-  };
+    setShowStopConfirmModal(true)
+  }
 
   const confirmStopAttendance = async () => {
-    if (!selectedEvent) return;
+    if (!selectedEvent) return
 
-    setIsSaving(true);
+    setIsSaving(true)
     try {
-      const now = new Date().toISOString();
-      const eventRef = doc(db, 'events', selectedEvent.id);
+      const now = new Date().toISOString()
+      const eventRef = doc(db, 'events', selectedEvent.id)
       await updateDoc(eventRef, {
         isActive: false,
-        qrExpiration: now
-      });
+        qrExpiration: now,
+      })
 
       const updatedEvent = {
         ...selectedEvent,
         isActive: false,
-        qrExpiration: now
-      };
-      setSelectedEvent(updatedEvent);
-      setEvents(prev => prev.map(e => e.id === selectedEvent.id ? updatedEvent : e));
+        qrExpiration: now,
+      }
+      setSelectedEvent(updatedEvent)
+      setEvents((prev) =>
+        prev.map((e) => (e.id === selectedEvent.id ? updatedEvent : e))
+      )
 
-      setShowStopConfirmModal(false);
-      showAlert("Success", "Attendance stopped successfully!");
+      setShowStopConfirmModal(false)
+      showAlert('Success', 'Attendance stopped successfully!')
     } catch (error) {
-
-      showAlert("Error", "Failed to stop attendance. Please try again.");
+      showAlert('Error', 'Failed to stop attendance. Please try again.')
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
-
+  }
 
   const generateEventQRCode = (event: Event) => {
-    if (!event) return;
+    if (!event) return
 
     const qrData = JSON.stringify({
       type: 'attendance',
       eventId: event.id,
       eventTitle: event.title,
       generatedAt: new Date().toISOString(),
-      expiresAt: event.qrExpiration && isValidDate(event.qrExpiration)
-        ? event.qrExpiration
-        : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      usesManualExpiration: !!(event.qrExpiration && isValidDate(event.qrExpiration)),
-      eventLocation: event.coordinates
-    });
+      expiresAt:
+        event.qrExpiration && isValidDate(event.qrExpiration)
+          ? event.qrExpiration
+          : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      usesManualExpiration: !!(
+        event.qrExpiration && isValidDate(event.qrExpiration)
+      ),
+      eventLocation: event.coordinates,
+    })
 
-    setQrValue(qrData);
-    setSelectedEvent(event);
-    setShowEventModal(false);
-    fetchAttendanceRecords(event.id);
-  };
+    setQrValue(qrData)
+    setSelectedEvent(event)
+    setShowEventModal(false)
+    fetchAttendanceRecords(event.id)
+  }
 
   const refreshAttendance = async () => {
-    if (!selectedEvent) return;
+    if (!selectedEvent) return
 
-    setRefreshing(true);
-    await fetchAttendanceRecords(selectedEvent.id);
-    setRefreshing(false);
-  };
+    setRefreshing(true)
+    await fetchAttendanceRecords(selectedEvent.id)
+    setRefreshing(false)
+  }
 
   const setManualExpiration = async () => {
-    if (!selectedEvent || !customExpiration) return;
+    if (!selectedEvent || !customExpiration) return
 
     // Validation first – no isSaving set yet
     if (!isValidDate(customExpiration)) {
-      showAlert("Error", "Please enter a valid date and time");
-      return;
+      showAlert('Error', 'Please enter a valid date and time')
+      return
     }
 
-    const expirationDate = new Date(customExpiration);
-    const now = new Date();
+    const expirationDate = new Date(customExpiration)
+    const now = new Date()
     if (expirationDate <= now) {
-      showAlert("Error", "Expiration date must be in the future");
-      return;
+      showAlert('Error', 'Expiration date must be in the future')
+      return
     }
 
     // Only now start saving
-    setIsSaving(true);
+    setIsSaving(true)
     try {
-      const eventRef = doc(db, 'events', selectedEvent.id);
+      const eventRef = doc(db, 'events', selectedEvent.id)
       await updateDoc(eventRef, {
         qrExpiration: customExpiration,
-        isActive: true
-      });
+        isActive: true,
+      })
 
       const updatedEvent = {
         ...selectedEvent,
         qrExpiration: customExpiration,
-        isActive: true
-      };
+        isActive: true,
+      }
 
       const newQrData = JSON.stringify({
         type: 'attendance',
@@ -864,60 +955,62 @@ export default function MainAdminAttendance() {
         generatedAt: new Date().toISOString(),
         expiresAt: customExpiration,
         usesManualExpiration: true,
-        eventLocation: updatedEvent.coordinates
-      });
+        eventLocation: updatedEvent.coordinates,
+      })
 
-      setQrValue(newQrData);
-      setSelectedEvent(updatedEvent);
-      setEvents(prev => prev.map(e => e.id === selectedEvent.id ? updatedEvent : e));
+      setQrValue(newQrData)
+      setSelectedEvent(updatedEvent)
+      setEvents((prev) =>
+        prev.map((e) => (e.id === selectedEvent.id ? updatedEvent : e))
+      )
 
-      setCustomExpirationDate(null);
-      setCustomExpiration('');
+      setCustomExpirationDate(null)
+      setCustomExpiration('')
 
-      showAlert("Success", "Expiration date set successfully!");
-      setShowExpirationModal(false);
+      showAlert('Success', 'Expiration date set successfully!')
+      setShowExpirationModal(false)
     } catch (error) {
-
-      showAlert("Error", "Failed to set expiration date");
+      showAlert('Error', 'Failed to set expiration date')
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
-
+  }
 
   const clearManualExpiration = async () => {
-    if (!selectedEvent) return;
+    if (!selectedEvent) return
 
     try {
-      const eventRef = doc(db, 'events', selectedEvent.id);
+      const eventRef = doc(db, 'events', selectedEvent.id)
       await updateDoc(eventRef, {
-        qrExpiration: null
-      });
+        qrExpiration: null,
+      })
 
-      showAlert("Success", "Expiration date cleared!");
+      showAlert('Success', 'Expiration date cleared!')
 
-      const updatedEvent = { ...selectedEvent, qrExpiration: null };
-      setSelectedEvent(updatedEvent as Event);
+      const updatedEvent = { ...selectedEvent, qrExpiration: null }
+      setSelectedEvent(updatedEvent as Event)
 
-      setEvents(prev => prev.map(e =>
-        e.id === selectedEvent.id ? updatedEvent : e
-      ));
-
+      setEvents((prev) =>
+        prev.map((e) => (e.id === selectedEvent.id ? updatedEvent : e))
+      )
     } catch (error) {
-
-      showAlert("Error", "Failed to clear expiration date");
+      showAlert('Error', 'Failed to clear expiration date')
     }
-  };
+  }
 
   const fetchAttendanceRecords = async (eventId: string) => {
     try {
-      const eventRef = doc(db, 'events', eventId);
-      const eventDoc = await getDoc(eventRef);
+      const eventRef = doc(db, 'events', eventId)
+      const eventDoc = await getDoc(eventRef)
 
       if (eventDoc.exists()) {
-        const eventData = eventDoc.data();
+        const eventData = eventDoc.data()
 
-        if (eventData.attendees && Array.isArray(eventData.attendees) && eventData.attendees.length > 0) {
+        if (
+          eventData.attendees &&
+          Array.isArray(eventData.attendees) &&
+          eventData.attendees.length > 0
+        ) {
           const validAttendees = eventData.attendees
             .filter((a: any) => a && (a.studentID || a.studentId))
             .map((a: any) => ({
@@ -925,54 +1018,50 @@ export default function MainAdminAttendance() {
               studentID: String(a.studentID || a.studentId),
               yearLevel: a.yearLevel || a.year || 'Unknown',
               block: a.block || 'No Block',
-              studentName: a.studentName || a.name || 'Unknown'
-            }));
+              studentName: a.studentName || a.name || 'Unknown',
+            }))
 
-          setAttendanceRecords(validAttendees);
-          setCurrentPage(1);
+          setAttendanceRecords(validAttendees)
+          setCurrentPage(1)
         } else {
-
-          setAttendanceRecords([]);
+          setAttendanceRecords([])
         }
       } else {
-
-        setAttendanceRecords([]);
+        setAttendanceRecords([])
       }
     } catch (error) {
-
-      setAttendanceRecords([]);
+      setAttendanceRecords([])
     }
-  };
+  }
 
   const clearSelection = () => {
-    setSelectedEvent(null);
-    setQrValue('');
-    setAttendanceRecords([]);
-    setSelectedYearLevel('all');
-    setSelectedBlock('all');
-    setTimeLeft('');
-    setCurrentPage(1);
-    setSearchQuery('');
-    setMissingPage(1);
-  };
-
+    setSelectedEvent(null)
+    setQrValue('')
+    setAttendanceRecords([])
+    setSelectedYearLevel('all')
+    setSelectedBlock('all')
+    setTimeLeft('')
+    setCurrentPage(1)
+    setSearchQuery('')
+    setMissingPage(1)
+  }
 
   const hasStudentPaid = (studentId: string): boolean => {
-    return paidStudentIds.has(studentId);
-  };
+    return paidStudentIds.has(studentId)
+  }
 
   const hasStudentCompleted = (studentId: string): boolean => {
-    return completedStudentIds.has(studentId);
-  };
+    return completedStudentIds.has(studentId)
+  }
 
   const handleMarkAsPaid = async (student: Student) => {
-    if (!selectedEvent || !user) return;
+    if (!selectedEvent || !user) return
 
     try {
-      setProcessingPayment(student.id);
+      setProcessingPayment(student.id)
 
-      const penaltyId = `${selectedEvent.id}_${student.id}`;
-      const penaltyRef = doc(db, 'penalties', penaltyId);
+      const penaltyId = `${selectedEvent.id}_${student.id}`
+      const penaltyRef = doc(db, 'penalties', penaltyId)
 
       const penaltyData = {
         eventId: selectedEvent.id,
@@ -984,34 +1073,34 @@ export default function MainAdminAttendance() {
         paidAt: new Date().toISOString(),
         paidBy: user.uid,
         createdAt: new Date().toISOString(),
-      };
+      }
 
       // Create/update the penalty record
-      await setDoc(penaltyRef, penaltyData);
+      await setDoc(penaltyRef, penaltyData)
 
       // Also update the user's profile penalties array
-      const userRef = doc(db, 'users', student.id);
-      const userDoc = await getDoc(userRef);
+      const userRef = doc(db, 'users', student.id)
+      const userDoc = await getDoc(userRef)
 
       if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const existingPenalties = userData.penalties || [];
+        const userData = userDoc.data()
+        const existingPenalties = userData.penalties || []
 
         // Check if penalty for this event already exists
         const penaltyIndex = existingPenalties.findIndex(
           (p: any) => p.eventId === selectedEvent.id
-        );
+        )
 
-        let updatedPenalties;
+        let updatedPenalties
         if (penaltyIndex >= 0) {
           // Update existing penalty to paid
-          updatedPenalties = [...existingPenalties];
+          updatedPenalties = [...existingPenalties]
           updatedPenalties[penaltyIndex] = {
             ...updatedPenalties[penaltyIndex],
             status: 'paid',
             paidAt: new Date().toISOString(),
             paidBy: user.uid,
-          };
+          }
         } else {
           // Add new penalty record as paid
           updatedPenalties = [
@@ -1024,148 +1113,138 @@ export default function MainAdminAttendance() {
               createdAt: new Date().toISOString(),
               paidAt: new Date().toISOString(),
               paidBy: user.uid,
-            }
-          ];
+            },
+          ]
         }
 
-        await updateDoc(userRef, { penalties: updatedPenalties });
+        await updateDoc(userRef, { penalties: updatedPenalties })
       }
 
-      showAlert('Success', `${student.name} has been marked as paid for ${selectedEvent.title}.`);
+      showAlert(
+        'Success',
+        `${student.name} has been marked as paid for ${selectedEvent.title}.`
+      )
 
       // Optimistically update local state
-      setPaidStudentIds(prev => new Set([...prev, student.id]));
-
+      setPaidStudentIds((prev) => new Set([...prev, student.id]))
     } catch (error) {
-
-      showAlert('Error', 'Failed to mark as paid. Please try again.');
+      showAlert('Error', 'Failed to mark as paid. Please try again.')
     } finally {
-      setProcessingPayment(null);
+      setProcessingPayment(null)
     }
-  };
+  }
 
   const handleCompletePenalty = async (student: Student, event: Event) => {
     // Fallback: try auth.currentUser if context user is null
-    let currentUser = user;
+    let currentUser = user
     if (!currentUser && auth.currentUser) {
-
-      currentUser = auth.currentUser;
+      currentUser = auth.currentUser
     }
     if (!currentUser) {
-
-      showAlert('Error', 'You must be logged in to perform this action.');
-      return;
+      showAlert('Error', 'You must be logged in to perform this action.')
+      return
     }
 
-
-
-
-
-
     try {
-      setProcessingAction(student.id);
-
+      setProcessingAction(student.id)
 
       // Query for the penalty document using studentId and eventId
       const penaltiesQuery = query(
         collection(db, 'penalties'),
         where('studentId', '==', student.id),
         where('eventId', '==', event.id)
-      );
+      )
 
-      const snapshot = await getDocs(penaltiesQuery);
-
+      const snapshot = await getDocs(penaltiesQuery)
 
       if (snapshot.empty) {
-
-        showAlert('Error', 'Penalty record not found. Please ensure a penalty was sent for this student.');
-        setProcessingAction(null);
-        setShowCompleteConfirmModal(false);
-        setSelectedStudentForAction(null);
-        setSelectedEventForAction(null);
-        return;
+        showAlert(
+          'Error',
+          'Penalty record not found. Please ensure a penalty was sent for this student.'
+        )
+        setProcessingAction(null)
+        setShowCompleteConfirmModal(false)
+        setSelectedStudentForAction(null)
+        setSelectedEventForAction(null)
+        return
       }
 
-      const penaltyDoc = snapshot.docs[0];
+      const penaltyDoc = snapshot.docs[0]
 
-      const penaltyRef = doc(db, 'penalties', penaltyDoc.id);
-
+      const penaltyRef = doc(db, 'penalties', penaltyDoc.id)
 
       await updateDoc(penaltyRef, {
         status: 'completed',
         completedAt: new Date().toISOString(),
         completedBy: currentUser.uid,
-        updatedAt: serverTimestamp()
-      });
-
+        updatedAt: serverTimestamp(),
+      })
 
       // Also update user's penalties array
-      const userRef = doc(db, 'users', student.id);
-      const userDoc = await getDoc(userRef);
+      const userRef = doc(db, 'users', student.id)
+      const userDoc = await getDoc(userRef)
 
       if (userDoc.exists()) {
-
-        const userData = userDoc.data();
-        const existingPenalties = userData.penalties || [];
+        const userData = userDoc.data()
+        const existingPenalties = userData.penalties || []
 
         const updatedPenalties = existingPenalties.map((p: any) =>
           p.eventId === event.id
-            ? { ...p, status: 'completed', completedAt: new Date().toISOString() }
+            ? {
+                ...p,
+                status: 'completed',
+                completedAt: new Date().toISOString(),
+              }
             : p
-        );
+        )
 
-        await updateDoc(userRef, { penalties: updatedPenalties });
-
+        await updateDoc(userRef, { penalties: updatedPenalties })
       }
 
       // Update local state
-      setCompletedStudentIds(prev => new Set([...prev, student.id]));
+      setCompletedStudentIds((prev) => new Set([...prev, student.id]))
 
-
-      showAlert('Success', `${student.name}'s penalty has been marked as completed.`);
-
-
+      showAlert(
+        'Success',
+        `${student.name}'s penalty has been marked as completed.`
+      )
     } catch (error) {
-
-      showAlert('Error', 'Failed to complete penalty. Please try again.');
+      showAlert('Error', 'Failed to complete penalty. Please try again.')
     } finally {
-      setProcessingAction(null);
-      setShowCompleteConfirmModal(false);
-      setSelectedStudentForAction(null);
-      setSelectedEventForAction(null);
+      setProcessingAction(null)
+      setShowCompleteConfirmModal(false)
+      setSelectedStudentForAction(null)
+      setSelectedEventForAction(null)
     }
-  };
+  }
 
   const handleCancelCompletion = async (student: Student, event: Event) => {
-    let currentUser = user;
+    let currentUser = user
     if (!currentUser && auth.currentUser) {
-
-      currentUser = auth.currentUser;
+      currentUser = auth.currentUser
     }
     if (!currentUser) {
-
-      showAlert('Error', 'You must be logged in.');
-      return;
+      showAlert('Error', 'You must be logged in.')
+      return
     }
 
     try {
-      setProcessingAction(student.id);
+      setProcessingAction(student.id)
 
       const penaltiesQuery = query(
         collection(db, 'penalties'),
         where('studentId', '==', student.id),
         where('eventId', '==', event.id)
-      );
-      const snapshot = await getDocs(penaltiesQuery);
+      )
+      const snapshot = await getDocs(penaltiesQuery)
 
       if (snapshot.empty) {
-
-        showAlert('Error', 'Penalty record not found.');
-        return;
+        showAlert('Error', 'Penalty record not found.')
+        return
       }
 
-      const penaltyDoc = snapshot.docs[0];
-      const penaltyRef = doc(db, 'penalties', penaltyDoc.id);
+      const penaltyDoc = snapshot.docs[0]
+      const penaltyRef = doc(db, 'penalties', penaltyDoc.id)
 
       await updateDoc(penaltyRef, {
         status: 'pending',
@@ -1173,47 +1252,46 @@ export default function MainAdminAttendance() {
         cancelledBy: currentUser.uid,
         completedAt: null,
         completedBy: null,
-        updatedAt: serverTimestamp()
-      });
+        updatedAt: serverTimestamp(),
+      })
 
-      const userRef = doc(db, 'users', student.id);
-      const userDoc = await getDoc(userRef);
+      const userRef = doc(db, 'users', student.id)
+      const userDoc = await getDoc(userRef)
 
       if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const existingPenalties = userData.penalties || [];
+        const userData = userDoc.data()
+        const existingPenalties = userData.penalties || []
 
         const updatedPenalties = existingPenalties.map((p: any) =>
           p.eventId === event.id
             ? { ...p, status: 'pending', cancelledAt: new Date().toISOString() }
             : p
-        );
+        )
 
-        await updateDoc(userRef, { penalties: updatedPenalties });
+        await updateDoc(userRef, { penalties: updatedPenalties })
       }
 
-      setCompletedStudentIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(student.id);
-        return newSet;
-      });
+      setCompletedStudentIds((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(student.id)
+        return newSet
+      })
 
-      showAlert('Success', `${student.name}'s completion has been cancelled.`);
+      showAlert('Success', `${student.name}'s completion has been cancelled.`)
     } catch (error) {
-
-      showAlert('Error', 'Failed to cancel completion. Please try again.');
+      showAlert('Error', 'Failed to cancel completion. Please try again.')
     } finally {
-      setProcessingAction(null);
-      setShowCancelConfirmModal(false);
-      setSelectedStudentForAction(null);
-      setSelectedEventForAction(null);
+      setProcessingAction(null)
+      setShowCancelConfirmModal(false)
+      setSelectedStudentForAction(null)
+      setSelectedEventForAction(null)
     }
-  };
+  }
 
   const captureAndSaveQR = async () => {
     if (!qrCodeRef.current) {
-      showAlert('Error', 'QR code reference not found');
-      return;
+      showAlert('Error', 'QR code reference not found')
+      return
     }
 
     try {
@@ -1221,616 +1299,819 @@ export default function MainAdminAttendance() {
         qrCodeRef.current.toDataURL(async (dataUrl: string) => {
           try {
             // ✅ Direct download as PNG
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `QR_${selectedEvent?.title?.replace(/\s+/g, '_') || 'event'}_${Date.now()}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            showAlert('Downloaded', 'QR code saved as PNG!');
+            const link = document.createElement('a')
+            link.href = dataUrl
+            link.download = `QR_${selectedEvent?.title?.replace(/\s+/g, '_') || 'event'}_${Date.now()}.png`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            showAlert('Downloaded', 'QR code saved as PNG!')
           } catch (err) {
-
-            showAlert('Error', 'Failed to download QR code.');
+            showAlert('Error', 'Failed to download QR code.')
           }
-        });
+        })
       } else {
         // Native (unchanged)
         if (Platform.OS === 'ios') {
-          const { status } = await MediaLibrary.requestPermissionsAsync();
+          const { status } = await MediaLibrary.requestPermissionsAsync()
           if (status !== 'granted') {
-            showAlert('Permission Denied', 'We need permission to save images to your device.');
-            return;
+            showAlert(
+              'Permission Denied',
+              'We need permission to save images to your device.'
+            )
+            return
           }
         }
-        const dataUrl = await qrCodeRef.current.toDataURL();
-        const base64Data = dataUrl.split(',')[1];
-        const fileUri = (FileSystem as any).documentDirectory + `qr_${selectedEvent?.id}_${Date.now()}.png`;
+        const dataUrl = await qrCodeRef.current.toDataURL()
+        const base64Data = dataUrl.split(',')[1]
+        const fileUri =
+          (FileSystem as any).documentDirectory +
+          `qr_${selectedEvent?.id}_${Date.now()}.png`
         await (FileSystem as any).writeAsStringAsync(fileUri, base64Data, {
           encoding: (FileSystem as any).EncodingType.Base64,
-        });
-        const asset = await MediaLibrary.createAssetAsync(fileUri);
-        await MediaLibrary.createAlbumAsync('Event QR Codes', asset, false);
-        showAlert('Success', 'QR code saved to your gallery!');
+        })
+        const asset = await MediaLibrary.createAssetAsync(fileUri)
+        await MediaLibrary.createAlbumAsync('Event QR Codes', asset, false)
+        showAlert('Success', 'QR code saved to your gallery!')
       }
     } catch (error) {
-
-      showAlert('Error', 'Failed to save QR code. Please try again.');
+      showAlert('Error', 'Failed to save QR code. Please try again.')
     }
-  };
-  const formatDate = (dateValue: string | { seconds: number; nanoseconds: number } | any) => {
-    if (!dateValue) return null;
+  }
+  const formatDate = (
+    dateValue: string | { seconds: number; nanoseconds: number } | any
+  ) => {
+    if (!dateValue) return null
 
     try {
-      let date: Date;
+      let date: Date
 
       if (typeof dateValue === 'object' && dateValue.seconds) {
-        date = new Date(dateValue.seconds * 1000);
+        date = new Date(dateValue.seconds * 1000)
       } else if (typeof dateValue === 'string') {
-        if (!isValidDate(dateValue)) return null;
-        date = new Date(dateValue);
+        if (!isValidDate(dateValue)) return null
+        date = new Date(dateValue)
       } else {
-        return null;
+        return null
       }
 
-      if (isNaN(date.getTime())) return null;
+      if (isNaN(date.getTime())) return null
 
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
-      });
+        minute: '2-digit',
+      })
     } catch (error) {
-      return null;
+      return null
     }
-  };
+  }
 
   const getEventStatusBadge = (eventDate: any) => {
-    if (!eventDate) return null;
+    if (!eventDate) return null
 
-    let date: Date;
+    let date: Date
     try {
       if (typeof eventDate === 'object' && eventDate?.seconds) {
-        date = new Date(eventDate.seconds * 1000);
+        date = new Date(eventDate.seconds * 1000)
       } else if (typeof eventDate === 'string') {
-        date = new Date(eventDate);
+        date = new Date(eventDate)
       } else {
-        return null;
+        return null
       }
-      if (isNaN(date.getTime())) return null;
+      if (isNaN(date.getTime())) return null
     } catch {
-      return null;
+      return null
     }
 
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const eventDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const eventDay = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    )
 
-    const diffTime = eventDay.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffTime = eventDay.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-    if (diffDays === 0) return { text: 'TODAY', color: '#16a34a' };
-    if (diffDays === 1) return { text: 'TOMORROW', color: '#2563eb' };
-    if (diffDays > 1) return { text: 'UPCOMING', color: '#8b5cf6' };
-    return { text: 'PAST', color: '#64748b' };
-  };
+    if (diffDays === 0) return { text: 'TODAY', color: '#16a34a' }
+    if (diffDays === 1) return { text: 'TOMORROW', color: '#2563eb' }
+    if (diffDays > 1) return { text: 'UPCOMING', color: '#8b5cf6' }
+    return { text: 'PAST', color: '#64748b' }
+  }
 
-  const formatShortDate = (dateValue: string | { seconds: number; nanoseconds: number } | any) => {
-    if (!dateValue) return null;
+  const formatShortDate = (
+    dateValue: string | { seconds: number; nanoseconds: number } | any
+  ) => {
+    if (!dateValue) return null
 
     try {
-      let date: Date;
+      let date: Date
 
       if (typeof dateValue === 'object' && dateValue.seconds) {
-        date = new Date(dateValue.seconds * 1000);
+        date = new Date(dateValue.seconds * 1000)
       } else if (typeof dateValue === 'string') {
-        if (!isValidDate(dateValue)) return null;
-        date = new Date(dateValue);
+        if (!isValidDate(dateValue)) return null
+        date = new Date(dateValue)
       } else {
-        return null;
+        return null
       }
 
-      if (isNaN(date.getTime())) return null;
+      if (isNaN(date.getTime())) return null
 
       return date.toLocaleDateString('en-US', {
         month: 'long',
         day: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
-      });
+        minute: '2-digit',
+      })
     } catch (error) {
-      return null;
+      return null
     }
-  };
+  }
 
-  const formatTime = (timestamp: string | { seconds: number; nanoseconds: number } | undefined) => {
-    if (!timestamp) return 'N/A';
+  const formatTime = (
+    timestamp: string | { seconds: number; nanoseconds: number } | undefined
+  ) => {
+    if (!timestamp) return 'N/A'
 
     try {
-      let date: Date;
+      let date: Date
 
       if (typeof timestamp === 'object' && timestamp.seconds) {
-        date = new Date(timestamp.seconds * 1000);
+        date = new Date(timestamp.seconds * 1000)
       } else if (typeof timestamp === 'string') {
-        date = new Date(timestamp);
+        date = new Date(timestamp)
       } else {
-        return 'N/A';
+        return 'N/A'
       }
 
-      if (isNaN(date.getTime())) return 'N/A';
+      if (isNaN(date.getTime())) return 'N/A'
 
       return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-        hour12: true
-      });
+        hour12: true,
+      })
     } catch (error) {
-      return 'N/A';
+      return 'N/A'
     }
-  };
+  }
 
   const formatDateForWebInput = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    return `${year}-${month}-${day}T${hours}:${minutes}`
+  }
 
   const handleWebDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const localDateString = event.target.value;
-    if (!localDateString) return;
+    const localDateString = event.target.value
+    if (!localDateString) return
 
     try {
-      const [datePart, timePart] = localDateString.split('T');
-      if (!datePart || !timePart) return;
+      const [datePart, timePart] = localDateString.split('T')
+      if (!datePart || !timePart) return
 
-      const [year, month, day] = datePart.split('-').map(Number);
-      const [hours, minutes] = timePart.split(':').map(Number);
+      const [year, month, day] = datePart.split('-').map(Number)
+      const [hours, minutes] = timePart.split(':').map(Number)
 
-      if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) return;
+      if (
+        isNaN(year) ||
+        isNaN(month) ||
+        isNaN(day) ||
+        isNaN(hours) ||
+        isNaN(minutes)
+      )
+        return
 
-      const selectedDate = new Date(year, month - 1, day, hours, minutes);
-      if (isNaN(selectedDate.getTime())) return;
+      const selectedDate = new Date(year, month - 1, day, hours, minutes)
+      if (isNaN(selectedDate.getTime())) return
 
-      setCustomExpirationDate(selectedDate);
-      setCustomExpiration(selectedDate.toISOString());
-    } catch (error) {
-
+      setCustomExpirationDate(selectedDate)
+      setCustomExpiration(selectedDate.toISOString())
+    } catch (error) {}
+  }
+  const formatStudentName = (student: { name: string; surname?: string }) => {
+    if (student.surname?.trim()) {
+      return `${student.surname}, ${student.name}`
     }
-  };
+    return student.name
+  }
+
+  const formatAttendanceName = (record: AttendanceRecord) => {
+    if ((record as any).surname) {
+      return `${(record as any).surname}, ${record.studentName}`
+    }
+    const parts = record.studentName.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      const lastName = parts.pop()
+      return `${lastName}, ${parts.join(' ')}`
+    }
+    return record.studentName
+  }
 
   const studentAttendanceRecords = useMemo(() => {
-    return attendanceRecords.filter(record => {
+    return attendanceRecords.filter((record) => {
       if (record.role) {
-        return record.role.toString().toLowerCase().trim() === 'student';
+        return record.role.toString().toLowerCase().trim() === 'student'
       }
-      const studentId = String(record.studentID).trim().toLowerCase();
-      return students.some(s => String(s.studentID).trim().toLowerCase() === studentId);
-    });
-  }, [attendanceRecords, students]);
+      const studentId = String(record.studentID).trim().toLowerCase()
+      return students.some(
+        (s) => String(s.studentID).trim().toLowerCase() === studentId
+      )
+    })
+  }, [attendanceRecords, students])
 
   const getFilteredAttendanceRecords = useMemo(() => {
-    let filtered = studentAttendanceRecords;
+    let filtered = studentAttendanceRecords
     if (selectedYearLevel !== 'all') {
-      filtered = filtered.filter(record =>
-        record.yearLevel?.toString() === selectedYearLevel.toString()
-      );
+      filtered = filtered.filter(
+        (record) =>
+          record.yearLevel?.toString() === selectedYearLevel.toString()
+      )
     }
     if (selectedBlock !== 'all') {
-      filtered = filtered.filter(record =>
-        record.block?.toString() === selectedBlock.toString()
-      );
+      filtered = filtered.filter(
+        (record) => record.block?.toString() === selectedBlock.toString()
+      )
     }
-    return filtered;
-  }, [studentAttendanceRecords, selectedYearLevel, selectedBlock]);
+    return filtered
+  }, [studentAttendanceRecords, selectedYearLevel, selectedBlock])
 
   const missingAttendees = useMemo(() => {
-    if (!students.length) return [];
-    if (!studentAttendanceRecords.length) return students;
+    if (!students.length) return []
+    if (!studentAttendanceRecords.length) return students
 
-    const attendedIds = new Set(studentAttendanceRecords.map(r => String(r.studentID).trim().toLowerCase()));
-    return students.filter(s => {
-      const studentId = String(s.studentID).trim().toLowerCase();
-      return !attendedIds.has(studentId);
-    });
-  }, [studentAttendanceRecords, students]);
+    const attendedIds = new Set(
+      studentAttendanceRecords.map((r) =>
+        String(r.studentID).trim().toLowerCase()
+      )
+    )
+    return students.filter((s) => {
+      const studentId = String(s.studentID).trim().toLowerCase()
+      return !attendedIds.has(studentId)
+    })
+  }, [studentAttendanceRecords, students])
 
   const getFilteredMissing = useMemo(() => {
-    let filtered = missingAttendees;
+    let filtered = missingAttendees
     if (selectedYearLevel !== 'all') {
-      filtered = filtered.filter(s => {
-        const studentYear = String(s.yearLevel || '');
-        return studentYear.includes(selectedYearLevel);
-      });
+      filtered = filtered.filter((s) => {
+        const studentYear = String(s.yearLevel || '')
+        return studentYear.includes(selectedYearLevel)
+      })
     }
     if (selectedBlock !== 'all') {
-      filtered = filtered.filter(s => s.block?.toString() === selectedBlock.toString());
+      filtered = filtered.filter(
+        (s) => s.block?.toString() === selectedBlock.toString()
+      )
     }
-    return filtered;
-  }, [missingAttendees, selectedYearLevel, selectedBlock]);
+    return filtered
+  }, [missingAttendees, selectedYearLevel, selectedBlock])
 
-  useEffect(() => {
-
-
-
-
-
-
-
-  }, [attendanceRecords, students, missingAttendees]);
+  useEffect(() => {}, [attendanceRecords, students, missingAttendees])
 
   const filteredAttendedBySearch = useMemo(() => {
-    if (!searchQuery.trim()) return getFilteredAttendanceRecords;
-    const query = searchQuery.toLowerCase();
-    return getFilteredAttendanceRecords.filter(record =>
-      record.studentName.toLowerCase().includes(query) ||
-      record.studentID.toLowerCase().includes(query)
-    );
-  }, [getFilteredAttendanceRecords, searchQuery]);
+    if (!searchQuery.trim()) return getFilteredAttendanceRecords
+    const query = searchQuery.toLowerCase()
+    return getFilteredAttendanceRecords.filter(
+      (record) =>
+        record.studentName.toLowerCase().includes(query) ||
+        record.studentID.toLowerCase().includes(query)
+    )
+  }, [getFilteredAttendanceRecords, searchQuery])
 
   const filteredMissingBySearch = useMemo(() => {
-    if (!searchQuery.trim()) return getFilteredMissing;
-    const query = searchQuery.toLowerCase();
-    return getFilteredMissing.filter(student =>
-      student.name.toLowerCase().includes(query) ||
-      student.studentID.toLowerCase().includes(query)
-    );
-  }, [getFilteredMissing, searchQuery]);
+    if (!searchQuery.trim()) return getFilteredMissing
+    const query = searchQuery.toLowerCase()
+    return getFilteredMissing.filter(
+      (student) =>
+        student.name.toLowerCase().includes(query) ||
+        student.studentID.toLowerCase().includes(query)
+    )
+  }, [getFilteredMissing, searchQuery])
 
   const allYearLevels = useMemo(() => {
-    const levels = students.map(s => s.yearLevel).filter(Boolean);
-    const normalizedLevels = levels.map(level => {
-      const match = String(level).match(/\d+/);
-      return match ? match[0] : level;
-    });
-    return [...new Set(normalizedLevels)];
-  }, [students]);
+    const levels = students.map((s) => s.yearLevel).filter(Boolean)
+    const normalizedLevels = levels.map((level) => {
+      const match = String(level).match(/\d+/)
+      return match ? match[0] : level
+    })
+    const uniqueLevels = [...new Set(normalizedLevels)]
+    return uniqueLevels.sort((a, b) => {
+      const numA = parseInt(a)
+      const numB = parseInt(b)
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB
+      if (!isNaN(numA)) return -1
+      if (!isNaN(numB)) return 1
+      return String(a).localeCompare(String(b))
+    })
+  }, [students])
 
   const allBlocks = useMemo(() => {
-    return [...new Set(students.map(s => s.block).filter(Boolean))];
-  }, [students]);
+    const blocks = [...new Set(students.map((s) => s.block).filter(Boolean))]
+    return blocks.sort((a, b) => {
+      const numA = parseInt(a)
+      const numB = parseInt(b)
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB
+      if (!isNaN(numA)) return -1
+      if (!isNaN(numB)) return 1
+      return String(a).localeCompare(String(b))
+    })
+  }, [students])
 
   const getStudentsByBlock = useMemo(() => {
-    const blocks: { [key: string]: AttendanceRecord[] } = {};
-    filteredAttendedBySearch.forEach(record => {
-      const block = record.block || 'No Block';
-      if (!blocks[block]) blocks[block] = [];
-      blocks[block].push(record);
-    });
-    Object.keys(blocks).forEach(block => {
-      blocks[block].sort((a, b) => a.studentName.localeCompare(b.studentName));
-    });
-    const sortedBlocks: { [key: string]: AttendanceRecord[] } = {};
+    const blocks: { [key: string]: AttendanceRecord[] } = {}
+    filteredAttendedBySearch.forEach((record) => {
+      const block = record.block || 'No Block'
+      if (!blocks[block]) blocks[block] = []
+      blocks[block].push(record)
+    })
+    Object.keys(blocks).forEach((block) => {
+      blocks[block].sort((a, b) => {
+        const getSortKey = (record: AttendanceRecord) => {
+          if ((record as any).surname) {
+            return (record as any).surname.toLowerCase()
+          }
+          const parts = record.studentName.trim().split(/\s+/)
+          return parts.length > 1
+            ? parts[parts.length - 1].toLowerCase()
+            : record.studentName.toLowerCase()
+        }
+        return getSortKey(a).localeCompare(getSortKey(b))
+      })
+    })
+    const sortedBlocks: { [key: string]: AttendanceRecord[] } = {}
     Object.keys(blocks)
       .sort((a, b) => {
-        if (a === 'No Block') return 1;
-        if (b === 'No Block') return -1;
-        return parseInt(a) - parseInt(b);
+        if (a === 'No Block') return 1
+        if (b === 'No Block') return -1
+        return parseInt(a) - parseInt(b)
       })
-      .forEach(key => {
-        sortedBlocks[key] = blocks[key];
-      });
-    return sortedBlocks;
-  }, [filteredAttendedBySearch]);
+      .forEach((key) => {
+        sortedBlocks[key] = blocks[key]
+      })
+    return sortedBlocks
+  }, [filteredAttendedBySearch])
 
   useEffect(() => {
-    const blocksArray = Object.entries(getStudentsByBlock);
-    const total = Math.ceil(blocksArray.length / itemsPerPage);
-    setTotalPages(total || 1);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    setPaginatedBlocks(blocksArray.slice(startIndex, endIndex));
-  }, [getStudentsByBlock, currentPage, itemsPerPage]);
+    const blocksArray = Object.entries(getStudentsByBlock)
+    const total = Math.ceil(blocksArray.length / itemsPerPage)
+    setTotalPages(total || 1)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    setPaginatedBlocks(blocksArray.slice(startIndex, endIndex))
+  }, [getStudentsByBlock, currentPage, itemsPerPage])
 
-  const totalMissingPages = Math.ceil(filteredMissingBySearch.length / missingItemsPerPage);
+  const totalMissingPages = Math.ceil(
+    filteredMissingBySearch.length / missingItemsPerPage
+  )
+
   const paginatedMissing = useMemo(() => {
-    const start = (missingPage - 1) * missingItemsPerPage;
-    return filteredMissingBySearch.slice(start, start + missingItemsPerPage);
-  }, [filteredMissingBySearch, missingPage]);
+    const sorted = [...filteredMissingBySearch].sort((a, b) => {
+      const surnameA = (
+        a.surname ||
+        a.name.split(' ').pop() ||
+        ''
+      ).toLowerCase()
+      const surnameB = (
+        b.surname ||
+        b.name.split(' ').pop() ||
+        ''
+      ).toLowerCase()
+      return surnameA.localeCompare(surnameB)
+    })
+    const start = (missingPage - 1) * missingItemsPerPage
+    return sorted.slice(start, start + missingItemsPerPage)
+  }, [filteredMissingBySearch, missingPage])
 
   useEffect(() => {
-    setMissingPage(1);
-  }, [selectedYearLevel, selectedBlock, searchQuery]);
+    setMissingPage(1)
+  }, [selectedYearLevel, selectedBlock, searchQuery])
 
   const getStatusBadgeStyle = (status?: string) => {
     switch (status) {
-      case 'pending': return { backgroundColor: '#f59e0b' };
-      case 'approved': return { backgroundColor: '#10b981' };
-      case 'rejected': return { backgroundColor: '#ef4444' };
-      default: return { backgroundColor: '#64748b' };
+      case 'pending':
+        return { backgroundColor: '#f59e0b' }
+      case 'approved':
+        return { backgroundColor: '#10b981' }
+      case 'rejected':
+        return { backgroundColor: '#ef4444' }
+      default:
+        return { backgroundColor: '#64748b' }
     }
-  };
+  }
 
   const availableBlocks = useMemo(() => {
-    const uniqueBlocks = [...new Set(studentAttendanceRecords.map(record => record.block).filter(Boolean))];
+    const uniqueBlocks = [
+      ...new Set(
+        studentAttendanceRecords.map((record) => record.block).filter(Boolean)
+      ),
+    ]
     return uniqueBlocks.sort((a, b) => {
-      if (a === 'No Block') return 1;
-      if (b === 'No Block') return -1;
-      return parseInt(a) - parseInt(b);
-    });
-  }, [studentAttendanceRecords]);
+      if (a === 'No Block') return 1
+      if (b === 'No Block') return -1
+      return parseInt(a) - parseInt(b)
+    })
+  }, [studentAttendanceRecords])
 
   const availableYearLevels = useMemo(() => {
-    const levels = [...new Set(studentAttendanceRecords.map(record => record.yearLevel).filter(Boolean))];
-    return levels.sort((a, b) => parseInt(a) - parseInt(b));
-  }, [studentAttendanceRecords]);
+    const levels = [
+      ...new Set(
+        studentAttendanceRecords
+          .map((record) => record.yearLevel)
+          .filter(Boolean)
+      ),
+    ]
+    return levels.sort((a, b) => parseInt(a) - parseInt(b))
+  }, [studentAttendanceRecords])
 
-  const isCurrentQRExpired = selectedEvent ? isQRCodeExpired(selectedEvent) : false;
+  const isCurrentQRExpired = selectedEvent
+    ? isQRCodeExpired(selectedEvent)
+    : false
 
-  const stats = useMemo(() => ({
-    total: getFilteredAttendanceRecords.length,
-    verified: getFilteredAttendanceRecords.filter(r => r.location?.isWithinRadius).length,
-    blocksCount: availableBlocks.length,
-    totalStudents: students.length,
-    totalAttended: studentAttendanceRecords.length
-  }), [getFilteredAttendanceRecords, availableBlocks, students.length, studentAttendanceRecords.length]);
+  const stats = useMemo(
+    () => ({
+      total: getFilteredAttendanceRecords.length,
+      verified: getFilteredAttendanceRecords.filter(
+        (r) => r.location?.isWithinRadius
+      ).length,
+      blocksCount: availableBlocks.length,
+      totalStudents: students.length,
+      totalAttended: studentAttendanceRecords.length,
+    }),
+    [
+      getFilteredAttendanceRecords,
+      availableBlocks,
+      students.length,
+      studentAttendanceRecords.length,
+    ]
+  )
 
   const eventStatusStats = useMemo(() => {
-    const total = events.length;
-    const pending = events.filter(e => e.status === 'pending').length;
-    const approved = events.filter(e => e.status === 'approved').length;
-    const rejected = events.filter(e => e.status === 'rejected').length;
-    return { total, pending, approved, rejected };
-  }, [events]);
+    const total = events.length
+    const pending = events.filter((e) => e.status === 'pending').length
+    const approved = events.filter((e) => e.status === 'approved').length
+    const rejected = events.filter((e) => e.status === 'rejected').length
+    return { total, pending, approved, rejected }
+  }, [events])
 
   const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-  };
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1)
+  }
 
   const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
-  };
+    if (currentPage > 1) setCurrentPage(currentPage - 1)
+  }
 
   const renderPagination = () => {
-    if (totalPages <= 1) return null;
+    if (totalPages <= 1) return null
     return (
-      <View style={[styles.paginationContainer, isMobile && styles.paginationContainerMobile]}>
+      <View
+        style={[
+          styles.paginationContainer,
+          isMobile && styles.paginationContainerMobile,
+        ]}
+      >
         <TouchableOpacity
-          style={[styles.paginationButton, currentPage === 1 && styles.paginationButtonDisabled]}
+          style={[
+            styles.paginationButton,
+            currentPage === 1 && styles.paginationButtonDisabled,
+          ]}
           onPress={handlePrevPage}
           disabled={currentPage === 1}
         >
-          <Feather name="chevron-left" size={16} color={currentPage === 1 ? colors.sidebar.text.muted : colors.accent.primary} />
-          <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>Prev</Text>
+          <Feather
+            name='chevron-left'
+            size={16}
+            color={
+              currentPage === 1
+                ? colors.sidebar.text.muted
+                : colors.accent.primary
+            }
+          />
+          <Text
+            style={[
+              styles.paginationButtonText,
+              currentPage === 1 && styles.paginationButtonTextDisabled,
+            ]}
+          >
+            Prev
+          </Text>
         </TouchableOpacity>
         <View style={styles.pageInfo}>
-          <Text style={styles.pageInfoText}>{currentPage}/{totalPages}</Text>
+          <Text style={styles.pageInfoText}>
+            {currentPage}/{totalPages}
+          </Text>
         </View>
         <TouchableOpacity
-          style={[styles.paginationButton, currentPage === totalPages && styles.paginationButtonDisabled]}
+          style={[
+            styles.paginationButton,
+            currentPage === totalPages && styles.paginationButtonDisabled,
+          ]}
           onPress={handleNextPage}
           disabled={currentPage === totalPages}
         >
-          <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>Next</Text>
-          <Feather name="chevron-right" size={16} color={currentPage === totalPages ? colors.sidebar.text.muted : colors.accent.primary} />
+          <Text
+            style={[
+              styles.paginationButtonText,
+              currentPage === totalPages && styles.paginationButtonTextDisabled,
+            ]}
+          >
+            Next
+          </Text>
+          <Feather
+            name='chevron-right'
+            size={16}
+            color={
+              currentPage === totalPages
+                ? colors.sidebar.text.muted
+                : colors.accent.primary
+            }
+          />
         </TouchableOpacity>
       </View>
-    );
-  };
+    )
+  }
 
-  const generateMissingReceipt = () => {
+  const generateMissingReceipt = async () => {
     if (!selectedEvent) {
-      showAlert('No Event', 'Please select an event first.');
-      return;
+      showAlert('No Event', 'Please select an event first.')
+      return
     }
+    if (isGeneratingPDF) return
+    setIsGeneratingPDF(true)
 
-    // Use the filtered missing list and sort it
-    const unsortedList = getFilteredMissing;  // this is already computed in useMemo
-    const sortedList = sortMissingStudents(unsortedList);
+    try {
+      const attendedIds = new Set(
+        attendanceRecords.map((r) => String(r.studentID).trim().toLowerCase())
+      )
 
-    if (sortedList.length === 0) {
-      showAlert('No Data', 'There are no missing students to generate a receipt for.');
-      return;
-    }
+      const allStudents = students.map((student) => ({
+        ...student,
+        attended: attendedIds.has(
+          String(student.studentID).trim().toLowerCase()
+        ),
+      }))
 
-    if (Platform.OS === 'web') {
-      const html = generateReceiptHTML(selectedEvent, sortedList);
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(html);
-        printWindow.document.close();
-      } else {
-        showAlert('Popup Blocked', 'Please allow popups to generate the receipt.');
-      }
-    } else {
-      // Native: show a sorted summary (can be enhanced later)
-      const summary = sortedList.map(s => `${s.name} (${s.studentID})`).join('\n');
-      showAlert(
-        'Missing Students (Sorted by Year & Name)',
-        `Total: ${sortedList.length}\n\n${summary.substring(0, 1000)}`
-      );
-    }
-  };
-  const generateReceiptHTML = (event: Event, missingList: Student[]) => {
-    const rows = missingList.map((s, idx) => {
-      const isCompleted = completedStudentIds.has(s.id);
-      const isPaid = paidStudentIds.has(s.id);
+      const sortedStudents = [...allStudents].sort((a, b) => {
+        const blockA = a.block?.toString() || ''
+        const blockB = b.block?.toString() || ''
+        const numA = parseInt(blockA)
+        const numB = parseInt(blockB)
+        if (!isNaN(numA) && !isNaN(numB)) return numA - numB
+        if (!isNaN(numA)) return -1
+        if (!isNaN(numB)) return 1
+        return blockA.localeCompare(blockB)
+      })
 
-      const statusBadge = isCompleted
-        ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;">✔ Completed</span>`
-        : isPaid
-          ? `<span style="display:inline-flex;align-items:center;gap:4px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;">💳 Paid</span>`
-          : `<span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:700;">⏳ Pending</span>`;
+      const studentRows = sortedStudents
+        .map((s) => {
+          const displayName = s.surname ? `${s.surname}, ${s.name}` : s.name
+          const remarkCell = s.attended
+            ? `<span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background-color: #10b98120; color: #10b981;">✓ Attended</span>`
+            : ''
+          return `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${displayName}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${s.studentID}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${s.yearLevel || 'N/A'}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">Block ${s.block || 'N/A'}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${remarkCell}</td>
+        </tr>
+      `
+        })
+        .join('')
 
-      return `
-      <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;color:#64748b;">${idx + 1}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-weight:500;color:#0f172a;">${s.name}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#475569;font-family:monospace;">${s.studentID}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#475569;text-align:center;">Year ${s.yearLevel || 'N/A'}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#475569;text-align:center;">Block ${s.block || 'N/A'}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;">${statusBadge}</td>
-      </tr>
-    `;
-    }).join('');
+      const attendedCount = attendanceRecords.length
+      const absentCount = students.length - attendedCount
 
-    const completedCount = missingList.filter(s => completedStudentIds.has(s.id)).length;
-    const paidCount = missingList.filter(s => paidStudentIds.has(s.id)).length;
-    const pendingCount = missingList.length - completedCount - paidCount;
-
-    return `
-    <html>
-      <head>
-        <title>Penalty Receipt — ${event.title}</title>
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f1f5f9; color: #0f172a; }
-          .page { max-width: 860px; margin: 32px auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.10); overflow: hidden; }
-          .header { background: linear-gradient(135deg, #1e40af, #3b82f6); color: #fff; padding: 28px 32px 22px; }
-          .header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
-          .header .meta { font-size: 13px; opacity: 0.85; margin-top: 6px; }
-          .summary { display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; }
-          .summary-card { flex: 1; padding: 16px 20px; border-right: 1px solid #e2e8f0; }
-          .summary-card:last-child { border-right: none; }
-          .summary-card .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
-          .summary-card .value { font-size: 24px; font-weight: 700; color: #0f172a; }
-          .summary-card .value.green { color: #059669; }
-          .summary-card .value.yellow { color: #d97706; }
-          table { width: 100%; border-collapse: collapse; }
-          thead tr { background: #f8fafc; }
-          thead th { padding: 11px 14px; font-size: 12px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e2e8f0; text-align:left; }
-          thead th:first-child, thead th:nth-child(4), thead th:nth-child(5), thead th:last-child { text-align:center; }
-          .footer { padding: 16px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; display:flex; justify-content:space-between; }
-          @media print {
-            body { background: white; }
-            .page { box-shadow: none; margin: 0; border-radius: 0; }
-            .no-print { display: none !important; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="page">
-          <div class="header">
-            <h1>📋 Penalty Receipt</h1>
-            <div class="meta">Event: <strong>${event.title}</strong></div>
-            <div class="meta">Date: ${formatDate(event.date) || 'N/A'} &nbsp;|&nbsp; Location: ${event.location || 'N/A'}</div>
-            <div class="meta">Generated: ${new Date().toLocaleString()}</div>
+      const html = `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: 'Helvetica', sans-serif; padding: 24px; }
+            h1 { color: #1e40af; margin-bottom: 8px; }
+            .subtitle { color: #64748b; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+            .stats { display: flex; gap: 16px; margin-bottom: 24px; }
+            .stat-box { background: #f8fafc; padding: 16px; border-radius: 12px; text-align: center; flex: 1; }
+            .stat-number { font-size: 28px; font-weight: bold; color: #1e293b; }
+            .stat-label { color: #64748b; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { text-align: left; padding: 12px 8px; background: #f1f5f9; color: #334155; font-weight: 600; }
+            .footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 12px; }
+            @media print {
+              body { padding: 12px; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${selectedEvent.title}</h1>
+          <div class="subtitle">
+            ${formatDate(selectedEvent.date) || 'Date not set'} • ${selectedEvent.location}
           </div>
-
-          <div class="summary">
-            <div class="summary-card">
-              <div class="label">Total Missing</div>
-              <div class="value">${missingList.length}</div>
-            </div>
-            <div class="summary-card">
-              <div class="label">Completed</div>
-              <div class="value green">${completedCount}</div>
-            </div>
-            <div class="summary-card">
-              <div class="label">Pending</div>
-              <div class="value yellow">${pendingCount}</div>
-            </div>
+          <div class="stats">
+            <div class="stat-box"><div class="stat-number">${students.length}</div><div class="stat-label">Total Students</div></div>
+            <div class="stat-box"><div class="stat-number" style="color: #10b981;">${attendedCount}</div><div class="stat-label">Attended</div></div>
+            <div class="stat-box"><div class="stat-number" style="color: #ef4444;">${absentCount}</div><div class="stat-label">Absent</div></div>
           </div>
-
+          <h3 style="color: #334155; margin-bottom: 12px;">Attendance Report</h3>
           <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Student Name</th>
-                <th>Student ID</th>
-                <th>Year</th>
-                <th>Block</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
+            <thead><tr><th>Name</th><th>Student ID</th><th>Year</th><th>Block</th><th style="text-align: center;">Remark</th></tr></thead>
+            <tbody>${studentRows}</tbody>
           </table>
-
           <div class="footer">
-            <span>Attendance Penalty Report</span>
-            <span class="no-print"><button onclick="window.print()" style="background:#1e40af;color:#fff;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;">🖨 Print / Save PDF</button></span>
+            <p>Generated by ${userData?.name || 'Admin'} on ${new Date().toLocaleString()}</p>
+            <p>Official attendance receipt — campus event system.</p>
           </div>
-        </div>
-        <script>window.onload = () => setTimeout(() => window.print(), 600);</script>
-      </body>
-    </html>
-  `;
-  };
-  const totalEventPages = Math.ceil(events.length / eventItemsPerPage);
+        </body>
+      </html>
+    `
+
+      // 🌐 WEB: Open new window and print
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank')
+        if (printWindow) {
+          printWindow.document.write(html)
+          printWindow.document.close()
+          printWindow.focus()
+          printWindow.print()
+          printWindow.onafterprint = () => printWindow.close()
+        } else {
+          showAlert(
+            'Popup Blocked',
+            'Please allow popups to generate the receipt.'
+          )
+        }
+        setIsGeneratingPDF(false)
+        return
+      }
+
+      const canShare = await Sharing.isAvailableAsync()
+      if (canShare) {
+        const { uri } = await Print.printToFileAsync({ html })
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Save attendance receipt',
+          UTI: 'com.adobe.pdf',
+        })
+      } else {
+        showAlert('Error', 'Sharing is not available on this device')
+      }
+    } catch (error) {
+      console.error('PDF generation error:', error)
+      showAlert('Error', 'Could not generate receipt. Please try again.')
+    } finally {
+      setIsGeneratingPDF(false)
+    }
+  }
+
+  const totalEventPages = Math.ceil(events.length / eventItemsPerPage)
   const paginatedEvents = useMemo(() => {
-    const start = (eventPage - 1) * eventItemsPerPage;
-    const end = start + eventItemsPerPage;
-    return events.slice(start, end);
-  }, [events, eventPage, eventItemsPerPage]);
+    const start = (eventPage - 1) * eventItemsPerPage
+    const end = start + eventItemsPerPage
+    return events.slice(start, end)
+  }, [events, eventPage, eventItemsPerPage])
 
   const renderEventItem = ({ item }: { item: Event }) => {
-    const isExpired = isQRCodeExpired(item);
-    const isActive = item.isActive !== false && !isExpired;
-    const isApproved = item.status === 'approved';
+    const isExpired = isQRCodeExpired(item)
+    const isActive = item.isActive !== false && !isExpired
+    const isApproved = item.status === 'approved'
 
     return (
       <TouchableOpacity
-        style={[styles.eventItem, isMobile && styles.eventItemMobile, !isApproved && { opacity: 0.5 }]}
+        style={[
+          styles.eventItem,
+          isMobile && styles.eventItemMobile,
+          !isApproved && { opacity: 0.5 },
+        ]}
         onPress={() => {
           if (!isApproved) {
-            showAlert('Event Not Approved', `This event is ${item.status}. Only approved events can be used for attendance.`);
-            return;
+            showAlert(
+              'Event Not Approved',
+              `This event is ${item.status}. Only approved events can be used for attendance.`
+            )
+            return
           }
-          generateEventQRCode(item);
+          generateEventQRCode(item)
         }}
         activeOpacity={isApproved ? 0.7 : 1}
       >
         <View style={styles.eventItemContent}>
-          <Text style={[styles.eventItemName, isMobile && styles.eventItemNameMobile]} numberOfLines={1}>
+          <Text
+            style={[
+              styles.eventItemName,
+              isMobile && styles.eventItemNameMobile,
+            ]}
+            numberOfLines={1}
+          >
             {item.title}
           </Text>
           <View style={styles.eventItemBadges}>
             {(() => {
-              const dateBadge = getEventStatusBadge(item.date);
+              const dateBadge = getEventStatusBadge(item.date)
               if (dateBadge) {
                 return (
-                  <View style={[styles.eventItemExpBadge, { backgroundColor: dateBadge.color }]}>
-                    <Text style={[styles.eventItemExpText, { color: '#ffffff' }]}>{dateBadge.text}</Text>
+                  <View
+                    style={[
+                      styles.eventItemExpBadge,
+                      { backgroundColor: dateBadge.color },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.eventItemExpText, { color: '#ffffff' }]}
+                    >
+                      {dateBadge.text}
+                    </Text>
                   </View>
-                );
+                )
               }
-              return null;
+              return null
             })()}
-            <View style={[styles.eventItemStatusBadge, getStatusBadgeStyle(item.status)]}>
-              <Text style={styles.eventItemStatusText}>{item.status?.toUpperCase() || 'APPROVED'}</Text>
+            <View
+              style={[
+                styles.eventItemStatusBadge,
+                getStatusBadgeStyle(item.status),
+              ]}
+            >
+              <Text style={styles.eventItemStatusText}>
+                {item.status?.toUpperCase() || 'APPROVED'}
+              </Text>
             </View>
             {item.qrExpiration && isValidDate(item.qrExpiration) && (
-              <View style={[styles.eventItemExpBadge, isExpired && styles.eventItemExpBadgeExpired]}>
-                <Feather name="clock" size={10} color={isExpired ? "#dc2626" : "#d97706"} />
-                <Text style={[styles.eventItemExpText, isExpired && styles.eventItemExpTextExpired]}>
+              <View
+                style={[
+                  styles.eventItemExpBadge,
+                  isExpired && styles.eventItemExpBadgeExpired,
+                ]}
+              >
+                <Feather
+                  name='clock'
+                  size={10}
+                  color={isExpired ? '#dc2626' : '#d97706'}
+                />
+                <Text
+                  style={[
+                    styles.eventItemExpText,
+                    isExpired && styles.eventItemExpTextExpired,
+                  ]}
+                >
                   {isExpired ? 'Expired' : 'QR'}
                 </Text>
               </View>
             )}
             {isActive && isApproved && (
               <View style={styles.eventItemActiveBadge}>
-                <Feather name="check-circle" size={10} color="#16a34a" />
+                <Feather name='check-circle' size={10} color='#16a34a' />
                 <Text style={styles.eventItemActiveText}>Active</Text>
               </View>
             )}
           </View>
         </View>
         {formatShortDate(item.date) && (
-          <Text style={styles.eventItemDate} numberOfLines={1}>{formatShortDate(item.date)}</Text>
+          <Text style={styles.eventItemDate} numberOfLines={1}>
+            {formatShortDate(item.date)}
+          </Text>
         )}
         <View style={styles.eventItemFooter}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Feather name="map-pin" size={10} color={colors.sidebar.text.secondary} />
-            <Text style={[styles.eventItemLocation, { marginLeft: 4 }]} numberOfLines={1}>
+            <Feather
+              name='map-pin'
+              size={10}
+              color={colors.sidebar.text.secondary}
+            />
+            <Text
+              style={[styles.eventItemLocation, { marginLeft: 4 }]}
+              numberOfLines={1}
+            >
               {item.location}
             </Text>
           </View>
           {item.coordinates && (
             <View style={styles.eventItemLocBadge}>
-              <Feather name="shield" size={10} color="#16a34a" />
+              <Feather name='shield' size={10} color='#16a34a' />
             </View>
           )}
         </View>
       </TouchableOpacity>
-    );
-  };
+    )
+  }
 
-  const renderBlockSection = ({ item }: { item: [string, AttendanceRecord[]] }) => {
-    const [block, students] = item;
+  const renderBlockSection = ({
+    item,
+  }: {
+    item: [string, AttendanceRecord[]]
+  }) => {
+    const [block, students] = item
     return (
       <View style={styles.blockSection}>
         <View style={styles.blockHeader}>
@@ -1838,26 +2119,51 @@ export default function MainAdminAttendance() {
           <Text style={styles.blockCount}>{students.length}</Text>
         </View>
         {students.map((record, index) => (
-          <View key={index} style={[styles.attendanceItem, isMobile && styles.attendanceItemMobile]}>
+          <View
+            key={index}
+            style={[
+              styles.attendanceItem,
+              isMobile && styles.attendanceItemMobile,
+            ]}
+          >
             <View style={styles.studentRow}>
               <View style={styles.studentInfo}>
-                <Text style={[styles.studentName, isMobile && styles.studentNameMobile]} numberOfLines={1}>
-                  {record.studentName}
+                <Text
+                  style={[
+                    styles.studentName,
+                    isMobile && styles.studentNameMobile,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {formatAttendanceName(record)}
                 </Text>
                 <Text style={styles.studentId}>{record.studentID}</Text>
               </View>
               <View style={styles.attendanceMeta}>
                 {record.location && (
-                  <View style={[
-                    styles.locationBadge,
-                    record.location.isWithinRadius ? styles.locationBadgeValid : styles.locationBadgeInvalid
-                  ]}>
-                    <Feather name={record.location.isWithinRadius ? "check" : "x"} size={10}
-                      color={record.location.isWithinRadius ? "#16a34a" : "#dc2626"} />
-                    <Text style={[
-                      styles.locationBadgeText,
-                      record.location.isWithinRadius ? styles.locationBadgeTextValid : styles.locationBadgeTextInvalid
-                    ]}>
+                  <View
+                    style={[
+                      styles.locationBadge,
+                      record.location.isWithinRadius
+                        ? styles.locationBadgeValid
+                        : styles.locationBadgeInvalid,
+                    ]}
+                  >
+                    <Feather
+                      name={record.location.isWithinRadius ? 'check' : 'x'}
+                      size={10}
+                      color={
+                        record.location.isWithinRadius ? '#16a34a' : '#dc2626'
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.locationBadgeText,
+                        record.location.isWithinRadius
+                          ? styles.locationBadgeTextValid
+                          : styles.locationBadgeTextInvalid,
+                      ]}
+                    >
                       {record.location.isWithinRadius ? 'Verified' : 'Too Far'}
                     </Text>
                   </View>
@@ -1868,7 +2174,11 @@ export default function MainAdminAttendance() {
               {record.course} • Year {record.yearLevel}
             </Text>
             <View style={styles.attendanceTimeContainer}>
-              <Feather name="clock" size={12} color={colors.sidebar.text.muted} />
+              <Feather
+                name='clock'
+                size={12}
+                color={colors.sidebar.text.muted}
+              />
               <Text style={styles.attendanceTimeText}>
                 Attended at: {formatTime(record.timestamp)}
               </Text>
@@ -1876,12 +2186,12 @@ export default function MainAdminAttendance() {
           </View>
         ))}
       </View>
-    );
-  };
+    )
+  }
 
   const headerGradientColors = isDark
-    ? ['#0f172a', '#1e293b'] as const
-    : ['#1e40af', '#3b82f6'] as const;
+    ? (['#0f172a', '#1e293b'] as const)
+    : (['#1e40af', '#3b82f6'] as const)
 
   return (
     <View style={styles.container}>
@@ -1892,28 +2202,51 @@ export default function MainAdminAttendance() {
         end={{ x: 1, y: 1 }}
         style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
       >
-        <View style={[styles.headerContent, isMobile && styles.headerContentMobile]}>
+        <View
+          style={[styles.headerContent, isMobile && styles.headerContentMobile]}
+        >
           <View>
-            <Text style={[styles.greetingText, { color: isDark ? colors.sidebar.text.secondary : '#ffffff' }]}>
-              Welcome back,
+            <Text
+              style={[
+                styles.greetingText,
+                { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+              ]}
+            >
+              Attendance Dashboard,
             </Text>
             <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
               {userData?.name || 'Admin'}
             </Text>
-            <Text style={[styles.roleText, { color: isDark ? colors.sidebar.text.secondary : '#ffffff' }]}>
+            <Text
+              style={[
+                styles.roleText,
+                { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+              ]}
+            >
               Attendance Manager
             </Text>
           </View>
 
           <TouchableOpacity
-            style={[styles.profileButton, isMobile && styles.profileButtonMobile]}
+            style={[
+              styles.profileButton,
+              isMobile && styles.profileButtonMobile,
+            ]}
             onPress={() => router.push('/main_admin/profile')}
           >
             {userData?.photoURL ? (
-              <Image source={{ uri: userData.photoURL }} style={styles.profileImage} />
+              <Image
+                source={{ uri: userData.photoURL }}
+                style={styles.profileImage}
+              />
             ) : (
               <View style={[styles.profileImage, styles.profileFallback]}>
-                <Text style={[styles.profileInitials, isMobile && styles.profileInitialsMobile]}>
+                <Text
+                  style={[
+                    styles.profileInitials,
+                    isMobile && styles.profileInitialsMobile,
+                  ]}
+                >
                   {userData?.name ? userData.name.charAt(0).toUpperCase() : 'A'}
                 </Text>
               </View>
@@ -1921,14 +2254,21 @@ export default function MainAdminAttendance() {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.dateSection, isMobile && styles.dateSectionMobile]}>
-          <View style={[styles.dateContainer, isMobile && styles.dateContainerMobile]}>
+        <View
+          style={[styles.dateSection, isMobile && styles.dateSectionMobile]}
+        >
+          <View
+            style={[
+              styles.dateContainer,
+              isMobile && styles.dateContainerMobile,
+            ]}
+          >
             <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
                 year: 'numeric',
                 month: isMobile ? 'short' : 'long',
-                day: 'numeric'
+                day: 'numeric',
               })}
             </Text>
           </View>
@@ -1937,61 +2277,157 @@ export default function MainAdminAttendance() {
       </LinearGradient>
 
       {/* Main Content */}
-      <ScrollView style={styles.mainScrollView} contentContainerStyle={styles.mainScrollContent} showsVerticalScrollIndicator={false}>
-        <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
+      <ScrollView
+        style={styles.mainScrollView}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          style={[styles.mainContent, isMobile && styles.mainContentMobile]}
+        >
           {/* Left Grid */}
           <View style={[styles.leftGrid, isMobile && styles.leftGridMobile]}>
-            <View style={[styles.leftHeader, isMobile && styles.leftHeaderMobile]}>
-              <Text style={[styles.leftTitle, isMobile && styles.leftTitleMobile]}>
+            <View
+              style={[styles.leftHeader, isMobile && styles.leftHeaderMobile]}
+            >
+              <Text
+                style={[styles.leftTitle, isMobile && styles.leftTitleMobile]}
+              >
                 {mode === 'qr' ? 'QR Code Generator' : 'Receipt Generator'}
               </Text>
             </View>
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, isMobile && styles.sectionTitleMobile]}>Select Event</Text>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  isMobile && styles.sectionTitleMobile,
+                ]}
+              >
+                Select Event
+              </Text>
               <TouchableOpacity
-                style={[styles.eventSelector, isMobile && styles.eventSelectorMobile]}
-                onPress={() => { setShowEventModal(true); setEventPage(1); }}
+                style={[
+                  styles.eventSelector,
+                  isMobile && styles.eventSelectorMobile,
+                ]}
+                onPress={() => {
+                  setShowEventModal(true)
+                  setEventPage(1)
+                }}
               >
                 {selectedEvent ? (
-                  <Text style={[styles.eventSelectorText, isMobile && styles.eventSelectorTextMobile]} numberOfLines={1}>
+                  <Text
+                    style={[
+                      styles.eventSelectorText,
+                      isMobile && styles.eventSelectorTextMobile,
+                    ]}
+                    numberOfLines={1}
+                  >
                     {selectedEvent.title}
                   </Text>
                 ) : (
-                  <Text style={styles.eventSelectorPlaceholder}>Tap to select an event</Text>
+                  <Text style={styles.eventSelectorPlaceholder}>
+                    Tap to select an event
+                  </Text>
                 )}
-                <Feather name="chevron-down" size={20} color={colors.sidebar.text.secondary} style={styles.eventSelectorIcon} />
+                <Feather
+                  name='chevron-down'
+                  size={20}
+                  color={colors.sidebar.text.secondary}
+                  style={styles.eventSelectorIcon}
+                />
               </TouchableOpacity>
             </View>
             <View style={styles.modeToggleContainer}>
-              <TouchableOpacity style={[styles.modeButton, mode === 'qr' && styles.modeButtonActive]} onPress={() => setMode('qr')}>
-                <Feather name="grid" size={16} color={mode === 'qr' ? '#ffffff' : colors.sidebar.text.secondary} />
-                <Text style={[styles.modeButtonText, mode === 'qr' && styles.modeButtonTextActive]}>QR</Text>
+              <TouchableOpacity
+                style={[
+                  styles.modeButton,
+                  mode === 'qr' && styles.modeButtonActive,
+                ]}
+                onPress={() => setMode('qr')}
+              >
+                <Feather
+                  name='grid'
+                  size={16}
+                  color={
+                    mode === 'qr' ? '#ffffff' : colors.sidebar.text.secondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.modeButtonText,
+                    mode === 'qr' && styles.modeButtonTextActive,
+                  ]}
+                >
+                  QR
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modeButton, mode === 'receipt' && styles.modeButtonActive]} onPress={() => setMode('receipt')}>
-                <Feather name="file-text" size={16} color={mode === 'receipt' ? '#ffffff' : colors.sidebar.text.secondary} />
-                <Text style={[styles.modeButtonText, mode === 'receipt' && styles.modeButtonTextActive]}>Receipt</Text>
+              <TouchableOpacity
+                style={[
+                  styles.modeButton,
+                  mode === 'receipt' && styles.modeButtonActive,
+                ]}
+                onPress={() => setMode('receipt')}
+              >
+                <Feather
+                  name='file-text'
+                  size={16}
+                  color={
+                    mode === 'receipt'
+                      ? '#ffffff'
+                      : colors.sidebar.text.secondary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.modeButtonText,
+                    mode === 'receipt' && styles.modeButtonTextActive,
+                  ]}
+                >
+                  Receipt
+                </Text>
               </TouchableOpacity>
             </View>
 
             {selectedEvent && mode === 'qr' && (
               <>
-                <View style={[styles.qrContainer, isMobile && styles.qrContainerMobile]}>
+                <View
+                  style={[
+                    styles.qrContainer,
+                    isMobile && styles.qrContainerMobile,
+                  ]}
+                >
                   {/* Event Header */}
                   <View style={styles.eventInfo}>
-                    <Text style={[styles.eventName, isMobile && styles.eventNameMobile]} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.eventName,
+                        isMobile && styles.eventNameMobile,
+                      ]}
+                      numberOfLines={1}
+                    >
                       {selectedEvent.title}
                     </Text>
                     <View style={styles.eventDetailsRow}>
-
-                      <Text style={styles.eventDetailText}>{formatDate(selectedEvent.date)}</Text>
+                      <Text style={styles.eventDetailText}>
+                        {formatDate(selectedEvent.date)}
+                      </Text>
                       <View style={styles.bullet} />
-                      <Feather name="map-pin" size={12} color={colors.sidebar.text.secondary} />
-                      <Text style={styles.eventDetailText}>{selectedEvent.location}</Text>
+                      <Feather
+                        name='map-pin'
+                        size={12}
+                        color={colors.sidebar.text.secondary}
+                      />
+                      <Text style={styles.eventDetailText}>
+                        {selectedEvent.location}
+                      </Text>
                     </View>
                     {selectedEvent.coordinates && (
                       <View style={styles.locationVerificationBadge}>
-                        <Feather name="shield" size={12} color="#16a34a" />
-                        <Text style={styles.locationVerificationText}>Location Verification Enabled</Text>
+                        <Feather name='shield' size={12} color='#16a34a' />
+                        <Text style={styles.locationVerificationText}>
+                          Location Verification Enabled
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -2009,15 +2445,25 @@ export default function MainAdminAttendance() {
                             backgroundColor={colors.card}
                           />
                           <View style={styles.qrLabel}>
-                            <Feather name="camera" size={12} color={colors.sidebar.text.muted} />
-                            <Text style={styles.qrLabelText}>Scan to verify attendance</Text>
+                            <Feather
+                              name='camera'
+                              size={12}
+                              color={colors.sidebar.text.muted}
+                            />
+                            <Text style={styles.qrLabelText}>
+                              Scan to verify attendance
+                            </Text>
                           </View>
                         </>
                       ) : (
                         <View style={styles.expiredOverlay}>
-                          <Feather name="x-circle" size={48} color="#dc2626" />
-                          <Text style={styles.expiredText}>QR Code Expired</Text>
-                          <Text style={styles.expiredSubtext}>Generate a new code to continue</Text>
+                          <Feather name='x-circle' size={48} color='#dc2626' />
+                          <Text style={styles.expiredText}>
+                            QR Code Expired
+                          </Text>
+                          <Text style={styles.expiredSubtext}>
+                            Generate a new code to continue
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -2025,16 +2471,39 @@ export default function MainAdminAttendance() {
 
                   {/* Status Badge */}
                   <View style={styles.qrStatus}>
-                    <View style={[styles.statusBadge, isCurrentQRExpired ? styles.statusBadgeExpired : styles.statusBadgeActive]}>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        isCurrentQRExpired
+                          ? styles.statusBadgeExpired
+                          : styles.statusBadgeActive,
+                      ]}
+                    >
                       {isCurrentQRExpired ? (
                         <>
-                          <Feather name="x-circle" size={12} color="#dc2626" />
-                          <Text style={[styles.statusBadgeText, styles.statusBadgeTextExpired]}>QR Expired</Text>
+                          <Feather name='x-circle' size={12} color='#dc2626' />
+                          <Text
+                            style={[
+                              styles.statusBadgeText,
+                              styles.statusBadgeTextExpired,
+                            ]}
+                          >
+                            QR Expired
+                          </Text>
                         </>
                       ) : (
                         <>
-                          <Feather name="check-circle" size={12} color="#16a34a" />
-                          <Text style={[styles.statusBadgeText, styles.statusBadgeTextActive]}>
+                          <Feather
+                            name='check-circle'
+                            size={12}
+                            color='#16a34a'
+                          />
+                          <Text
+                            style={[
+                              styles.statusBadgeText,
+                              styles.statusBadgeTextActive,
+                            ]}
+                          >
                             {timeLeft ? `Valid for ${timeLeft}` : 'Active'}
                           </Text>
                         </>
@@ -2050,7 +2519,7 @@ export default function MainAdminAttendance() {
                         onPress={captureAndSaveQR}
                         activeOpacity={0.7}
                       >
-                        <Feather name="download" size={16} color="#ffffff" />
+                        <Feather name='download' size={16} color='#ffffff' />
                         <Text style={styles.downloadButtonText}>Save QR</Text>
                       </TouchableOpacity>
                     </View>
@@ -2059,22 +2528,77 @@ export default function MainAdminAttendance() {
                   {/* Expiration hint */}
                   {selectedEvent.qrExpiration && !isCurrentQRExpired && (
                     <Text style={styles.expirationHint}>
-                      Expires: {new Date(selectedEvent.qrExpiration).toLocaleString()}
+                      Expires:{' '}
+                      {new Date(selectedEvent.qrExpiration).toLocaleString()}
                     </Text>
                   )}
                 </View>
-                <View style={[styles.actionButtons, isMobile && styles.actionButtonsMobile]}>
-                  <TouchableOpacity style={[styles.actionButton, styles.actionButtonPrimary, isMobile && styles.actionButtonMobile]} onPress={() => setShowExpirationModal(true)}>
-                    <Feather name="clock" size={16} color="#ffffff" />
-                    <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary, isMobile && styles.actionButtonTextMobile]}>Set Expiration</Text>
+                <View
+                  style={[
+                    styles.actionButtons,
+                    isMobile && styles.actionButtonsMobile,
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      styles.actionButtonPrimary,
+                      isMobile && styles.actionButtonMobile,
+                    ]}
+                    onPress={() => setShowExpirationModal(true)}
+                  >
+                    <Feather name='clock' size={16} color='#ffffff' />
+                    <Text
+                      style={[
+                        styles.actionButtonText,
+                        styles.actionButtonTextPrimary,
+                        isMobile && styles.actionButtonTextMobile,
+                      ]}
+                    >
+                      Set Expiration
+                    </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actionButton, styles.actionButtonDanger, isMobile && styles.actionButtonMobile]} onPress={stopAttendance}>
-                    <Feather name="stop-circle" size={16} color="#ffffff" />
-                    <Text style={[styles.actionButtonText, styles.actionButtonTextPrimary, isMobile && styles.actionButtonTextMobile]}>Stop Attendance</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      styles.actionButtonDanger,
+                      isMobile && styles.actionButtonMobile,
+                    ]}
+                    onPress={stopAttendance}
+                  >
+                    <Feather name='stop-circle' size={16} color='#ffffff' />
+                    <Text
+                      style={[
+                        styles.actionButtonText,
+                        styles.actionButtonTextPrimary,
+                        isMobile && styles.actionButtonTextMobile,
+                      ]}
+                    >
+                      Stop Attendance
+                    </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actionButton, styles.actionButtonSecondary, isMobile && styles.actionButtonMobile]} onPress={clearSelection}>
-                    <Feather name="refresh-cw" size={16} color={colors.sidebar.text.secondary} />
-                    <Text style={[styles.actionButtonText, styles.actionButtonTextSecondary, isMobile && styles.actionButtonTextMobile]}>Change Event</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      styles.actionButtonSecondary,
+                      isMobile && styles.actionButtonMobile,
+                    ]}
+                    onPress={clearSelection}
+                  >
+                    <Feather
+                      name='refresh-cw'
+                      size={16}
+                      color={colors.sidebar.text.secondary}
+                    />
+                    <Text
+                      style={[
+                        styles.actionButtonText,
+                        styles.actionButtonTextSecondary,
+                        isMobile && styles.actionButtonTextMobile,
+                      ]}
+                    >
+                      Change Event
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -2084,20 +2608,28 @@ export default function MainAdminAttendance() {
               <View style={styles.receiptContainer}>
                 <View style={styles.receiptHeader}>
                   <Text style={styles.receiptTitle}>{selectedEvent.title}</Text>
-                  <Text style={styles.receiptDate}>{formatDate(selectedEvent.date)}</Text>
+                  <Text style={styles.receiptDate}>
+                    {formatDate(selectedEvent.date)}
+                  </Text>
                 </View>
                 <View style={styles.receiptStats}>
                   <View style={styles.receiptStatItem}>
                     <Text style={styles.receiptStatLabel}>Total Students</Text>
-                    <Text style={styles.receiptStatValue}>{students.length}</Text>
+                    <Text style={styles.receiptStatValue}>
+                      {students.length}
+                    </Text>
                   </View>
                   <View style={styles.receiptStatItem}>
                     <Text style={styles.receiptStatLabel}>Attended</Text>
-                    <Text style={styles.receiptStatValue}>{attendanceRecords.length}</Text>
+                    <Text style={styles.receiptStatValue}>
+                      {attendanceRecords.length}
+                    </Text>
                   </View>
                   <View style={styles.receiptStatItem}>
                     <Text style={styles.receiptStatLabel}>Missing</Text>
-                    <Text style={styles.receiptStatValue}>{missingAttendees.length}</Text>
+                    <Text style={styles.receiptStatValue}>
+                      {missingAttendees.length}
+                    </Text>
                   </View>
                 </View>
 
@@ -2106,24 +2638,37 @@ export default function MainAdminAttendance() {
                   style={[
                     styles.generateReceiptButton,
                     {
-                      backgroundColor: hasPenaltyBeenSent(selectedEvent.id) ? '#10b981' : '#ef4444',
-                      marginBottom: 12
+                      backgroundColor: hasPenaltyBeenSent(selectedEvent.id)
+                        ? '#10b981'
+                        : '#ef4444',
+                      marginBottom: 12,
                     },
-                    (missingAttendees.length === 0 || hasPenaltyBeenSent(selectedEvent.id)) && { opacity: 0.5 }
+                    (missingAttendees.length === 0 ||
+                      hasPenaltyBeenSent(selectedEvent.id)) && { opacity: 0.5 },
                   ]}
                   onPress={() => {
                     if (hasPenaltyBeenSent(selectedEvent.id)) {
-                      showAlert('Already Sent', 'Penalties have already been sent for this event.');
-                      return;
+                      showAlert(
+                        'Already Sent',
+                        'Penalties have already been sent for this event.'
+                      )
+                      return
                     }
-                    setShowPenaltyModal(true);
+                    setShowPenaltyModal(true)
                   }}
-                  disabled={missingAttendees.length === 0 || hasPenaltyBeenSent(selectedEvent.id)}
+                  disabled={
+                    missingAttendees.length === 0 ||
+                    hasPenaltyBeenSent(selectedEvent.id)
+                  }
                 >
                   <Feather
-                    name={hasPenaltyBeenSent(selectedEvent.id) ? "check-circle" : "alert-triangle"}
+                    name={
+                      hasPenaltyBeenSent(selectedEvent.id)
+                        ? 'check-circle'
+                        : 'alert-triangle'
+                    }
                     size={18}
-                    color="#ffffff"
+                    color='#ffffff'
                   />
                   <Text style={styles.generateReceiptText}>
                     {missingAttendees.length === 0
@@ -2135,26 +2680,38 @@ export default function MainAdminAttendance() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.generateReceiptButton}
+                  style={[
+                    styles.generateReceiptButton,
+                    isGeneratingPDF && { opacity: 0.7 },
+                  ]}
                   onPress={generateMissingReceipt}
+                  disabled={isGeneratingPDF}
                 >
-                  <Feather name="file-text" size={18} color="#ffffff" />
-                  <Text style={styles.generateReceiptText}>Generate PDF Receipt</Text>
+                  {isGeneratingPDF ? (
+                    <ActivityIndicator size='small' color='#ffffff' />
+                  ) : (
+                    <>
+                      <Feather name='file-text' size={18} color='#ffffff' />
+                      <Text style={styles.generateReceiptText}>
+                        Generate PDF Receipt
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
 
                 <PenaltyAnnouncementModal
                   visible={showPenaltyModal}
                   onClose={() => {
-                    setShowPenaltyModal(false);
+                    setShowPenaltyModal(false)
                     if (selectedEvent) {
-                      fetchAttendanceRecords(selectedEvent.id);
+                      fetchAttendanceRecords(selectedEvent.id)
                     }
                   }}
                   onSendPenalty={handleSendPenalty}
                   eventId={selectedEvent.id}
                   eventTitle={selectedEvent.title}
                   eventDate={selectedEvent.date}
-                  missingStudents={missingAttendees.map(s => ({
+                  missingStudents={missingAttendees.map((s) => ({
                     id: s.id,
                     name: s.name,
                     studentID: s.studentID,
@@ -2165,9 +2722,14 @@ export default function MainAdminAttendance() {
 
             {!selectedEvent && (
               <View style={styles.noEventMessage}>
-                <Feather name="info" size={24} color={colors.sidebar.text.muted} />
+                <Feather
+                  name='info'
+                  size={24}
+                  color={colors.sidebar.text.muted}
+                />
                 <Text style={styles.noEventText}>
-                  Select an event to {mode === 'qr' ? 'generate QR code' : 'view receipt options'}
+                  Select an event to{' '}
+                  {mode === 'qr' ? 'generate QR code' : 'view receipt options'}
                 </Text>
               </View>
             )}
@@ -2175,76 +2737,207 @@ export default function MainAdminAttendance() {
 
           {/* Right Grid */}
           {selectedEvent && (
-            <View style={[styles.rightGrid, isMobile && styles.rightGridMobile]}>
+            <View
+              style={[styles.rightGrid, isMobile && styles.rightGridMobile]}
+            >
               {mode === 'qr' ? (
                 // Attended view
                 <>
-                  <View style={[styles.rightHeader, isMobile && styles.rightHeaderMobile]}>
+                  <View
+                    style={[
+                      styles.rightHeader,
+                      isMobile && styles.rightHeaderMobile,
+                    ]}
+                  >
                     <View>
-                      <Text style={[styles.rightTitle, isMobile && styles.rightTitleMobile]}>Attendance Records</Text>
+                      <Text
+                        style={[
+                          styles.rightTitle,
+                          isMobile && styles.rightTitleMobile,
+                        ]}
+                      >
+                        Attendance Records
+                      </Text>
                       <Text style={styles.recordCount}>
                         {filteredAttendedBySearch.length} attendees
-                        {filteredAttendedBySearch.length > itemsPerPage && ` (Page ${currentPage}/${totalPages})`}
+                        {filteredAttendedBySearch.length > itemsPerPage &&
+                          ` (Page ${currentPage}/${totalPages})`}
                       </Text>
                     </View>
-                    <TouchableOpacity style={styles.refreshButton} onPress={refreshAttendance} disabled={refreshing}>
-                      <Feather name="refresh-cw" size={18} color={refreshing ? colors.sidebar.text.muted : colors.accent.primary} />
+                    <TouchableOpacity
+                      style={styles.refreshButton}
+                      onPress={refreshAttendance}
+                      disabled={refreshing}
+                    >
+                      <Feather
+                        name='refresh-cw'
+                        size={18}
+                        color={
+                          refreshing
+                            ? colors.sidebar.text.muted
+                            : colors.accent.primary
+                        }
+                      />
                     </TouchableOpacity>
                   </View>
 
                   {/* Search Bar */}
-                  <View style={[styles.searchContainer, isMobile && styles.searchContainerMobile]}>
-                    <Feather name="search" size={isMobile ? 14 : 16} color={colors.sidebar.text.secondary} />
+                  <View
+                    style={[
+                      styles.searchContainer,
+                      isMobile && styles.searchContainerMobile,
+                    ]}
+                  >
+                    <Feather
+                      name='search'
+                      size={isMobile ? 14 : 16}
+                      color={colors.sidebar.text.secondary}
+                    />
                     <FormTextInput
                       inputStyle={styles.searchInput}
-                      placeholder="Search by name or ID..."
+                      placeholder='Search by name or ID...'
                       value={searchQuery}
                       onChangeText={setSearchQuery}
                       placeholderTextColor={colors.sidebar.text.muted}
                     />
                     {searchQuery.length > 0 && (
-                      <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClearButton}>
-                        <Feather name="x" size={isMobile ? 14 : 16} color={colors.sidebar.text.secondary} />
+                      <TouchableOpacity
+                        onPress={() => setSearchQuery('')}
+                        style={styles.searchClearButton}
+                      >
+                        <Feather
+                          name='x'
+                          size={isMobile ? 14 : 16}
+                          color={colors.sidebar.text.secondary}
+                        />
                       </TouchableOpacity>
                     )}
                   </View>
 
                   {/* Filters */}
                   <View style={styles.filtersContainer}>
-                    <Text style={[styles.filterLabel, isMobile && styles.filterLabelMobile]}>Year Level</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                    <Text
+                      style={[
+                        styles.filterLabel,
+                        isMobile && styles.filterLabelMobile,
+                      ]}
+                    >
+                      Year Level
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.filterRow}
+                    >
                       <TouchableOpacity
-                        style={[styles.filterChip, selectedYearLevel === 'all' && styles.filterChipActive, isMobile && styles.filterChipMobile]}
-                        onPress={() => { setSelectedYearLevel('all'); setCurrentPage(1); }}
+                        style={[
+                          styles.filterChip,
+                          selectedYearLevel === 'all' &&
+                            styles.filterChipActive,
+                          isMobile && styles.filterChipMobile,
+                        ]}
+                        onPress={() => {
+                          setSelectedYearLevel('all')
+                          setCurrentPage(1)
+                        }}
                       >
-                        <Text style={[styles.filterChipText, selectedYearLevel === 'all' && styles.filterChipTextActive, isMobile && styles.filterChipTextMobile]}>All</Text>
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            selectedYearLevel === 'all' &&
+                              styles.filterChipTextActive,
+                            isMobile && styles.filterChipTextMobile,
+                          ]}
+                        >
+                          All
+                        </Text>
                       </TouchableOpacity>
-                      {availableYearLevels.map(yearLevel => (
+                      {availableYearLevels.map((yearLevel) => (
                         <TouchableOpacity
                           key={yearLevel}
-                          style={[styles.filterChip, selectedYearLevel === yearLevel && styles.filterChipActive, isMobile && styles.filterChipMobile]}
-                          onPress={() => { setSelectedYearLevel(yearLevel); setCurrentPage(1); }}
+                          style={[
+                            styles.filterChip,
+                            selectedYearLevel === yearLevel &&
+                              styles.filterChipActive,
+                            isMobile && styles.filterChipMobile,
+                          ]}
+                          onPress={() => {
+                            setSelectedYearLevel(yearLevel)
+                            setCurrentPage(1)
+                          }}
                         >
-                          <Text style={[styles.filterChipText, selectedYearLevel === yearLevel && styles.filterChipTextActive, isMobile && styles.filterChipTextMobile]}>Year {yearLevel}</Text>
+                          <Text
+                            style={[
+                              styles.filterChipText,
+                              selectedYearLevel === yearLevel &&
+                                styles.filterChipTextActive,
+                              isMobile && styles.filterChipTextMobile,
+                            ]}
+                          >
+                            Year {yearLevel}
+                          </Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
 
-                    <Text style={[styles.filterLabel, isMobile && styles.filterLabelMobile]}>Block</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                    <Text
+                      style={[
+                        styles.filterLabel,
+                        isMobile && styles.filterLabelMobile,
+                      ]}
+                    >
+                      Block
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.filterRow}
+                    >
                       <TouchableOpacity
-                        style={[styles.filterChip, selectedBlock === 'all' && styles.filterChipActive, isMobile && styles.filterChipMobile]}
-                        onPress={() => { setSelectedBlock('all'); setCurrentPage(1); }}
+                        style={[
+                          styles.filterChip,
+                          selectedBlock === 'all' && styles.filterChipActive,
+                          isMobile && styles.filterChipMobile,
+                        ]}
+                        onPress={() => {
+                          setSelectedBlock('all')
+                          setCurrentPage(1)
+                        }}
                       >
-                        <Text style={[styles.filterChipText, selectedBlock === 'all' && styles.filterChipTextActive, isMobile && styles.filterChipTextMobile]}>All Blocks</Text>
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            selectedBlock === 'all' &&
+                              styles.filterChipTextActive,
+                            isMobile && styles.filterChipTextMobile,
+                          ]}
+                        >
+                          All Blocks
+                        </Text>
                       </TouchableOpacity>
-                      {availableBlocks.map(block => (
+                      {availableBlocks.map((block) => (
                         <TouchableOpacity
                           key={block}
-                          style={[styles.filterChip, selectedBlock === block && styles.filterChipActive, isMobile && styles.filterChipMobile]}
-                          onPress={() => { setSelectedBlock(block); setCurrentPage(1); }}
+                          style={[
+                            styles.filterChip,
+                            selectedBlock === block && styles.filterChipActive,
+                            isMobile && styles.filterChipMobile,
+                          ]}
+                          onPress={() => {
+                            setSelectedBlock(block)
+                            setCurrentPage(1)
+                          }}
                         >
-                          <Text style={[styles.filterChipText, selectedBlock === block && styles.filterChipTextActive, isMobile && styles.filterChipTextMobile]}>Block {block}</Text>
+                          <Text
+                            style={[
+                              styles.filterChipText,
+                              selectedBlock === block &&
+                                styles.filterChipTextActive,
+                              isMobile && styles.filterChipTextMobile,
+                            ]}
+                          >
+                            Block {block}
+                          </Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -2274,12 +2967,33 @@ export default function MainAdminAttendance() {
                         {renderPagination()}
                       </>
                     ) : (
-                      <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
-                        <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
-                          <Feather name="users" size={isMobile ? 32 : 40} color={colors.sidebar.text.muted} />
+                      <View
+                        style={[
+                          styles.emptyState,
+                          isMobile && styles.emptyStateMobile,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.emptyStateIcon,
+                            isMobile && styles.emptyStateIconMobile,
+                          ]}
+                        >
+                          <Feather
+                            name='users'
+                            size={isMobile ? 32 : 40}
+                            color={colors.sidebar.text.muted}
+                          />
                         </View>
-                        <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>
-                          {attendanceRecords.length === 0 ? 'No attendance records yet' : 'No students match the filters/search'}
+                        <Text
+                          style={[
+                            styles.emptyStateTitle,
+                            isMobile && styles.emptyStateTitleMobile,
+                          ]}
+                        >
+                          {attendanceRecords.length === 0
+                            ? 'No attendance records yet'
+                            : 'No students match the filters/search'}
                         </Text>
                       </View>
                     )}
@@ -2288,72 +3002,210 @@ export default function MainAdminAttendance() {
               ) : (
                 // Missing view
                 <>
-                  <View style={[styles.rightHeader, isMobile && styles.rightHeaderMobile]}>
-                    <Text style={[styles.rightTitle, isMobile && styles.rightTitleMobile]}>Missing Students</Text>
+                  <View
+                    style={[
+                      styles.rightHeader,
+                      isMobile && styles.rightHeaderMobile,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.rightTitle,
+                        isMobile && styles.rightTitleMobile,
+                      ]}
+                    >
+                      Missing Students
+                    </Text>
                     <Text style={styles.recordCount}>
                       {filteredMissingBySearch.length} students
-                      {filteredMissingBySearch.length > missingItemsPerPage && ` (Page ${missingPage}/${totalMissingPages})`}
+                      {filteredMissingBySearch.length > missingItemsPerPage &&
+                        ` (Page ${missingPage}/${totalMissingPages})`}
                     </Text>
                   </View>
 
                   {/* Search Bar */}
-                  <View style={[styles.searchContainer, isMobile && styles.searchContainerMobile]}>
-                    <Feather name="search" size={isMobile ? 14 : 16} color={colors.sidebar.text.secondary} />
+                  <View
+                    style={[
+                      styles.searchContainer,
+                      isMobile && styles.searchContainerMobile,
+                    ]}
+                  >
+                    <Feather
+                      name='search'
+                      size={isMobile ? 14 : 16}
+                      color={colors.sidebar.text.secondary}
+                    />
                     <FormTextInput
                       inputStyle={styles.searchInput}
-                      placeholder="Search by name or ID..."
+                      placeholder='Search by name or ID...'
                       value={searchQuery}
                       onChangeText={setSearchQuery}
                       placeholderTextColor={colors.sidebar.text.muted}
                     />
                     {searchQuery.length > 0 && (
-                      <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.searchClearButton}>
-                        <Feather name="x" size={isMobile ? 14 : 16} color={colors.sidebar.text.secondary} />
+                      <TouchableOpacity
+                        onPress={() => setSearchQuery('')}
+                        style={styles.searchClearButton}
+                      >
+                        <Feather
+                          name='x'
+                          size={isMobile ? 14 : 16}
+                          color={colors.sidebar.text.secondary}
+                        />
                       </TouchableOpacity>
                     )}
                   </View>
 
                   {/* Filters */}
                   <View style={styles.filtersContainer}>
-                    <Text style={[styles.filterLabel, isMobile && styles.filterLabelMobile]}>Year Level</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                    <Text
+                      style={[
+                        styles.filterLabel,
+                        isMobile && styles.filterLabelMobile,
+                      ]}
+                    >
+                      Year Level
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.filterRow}
+                    >
                       <TouchableOpacity
-                        style={[styles.filterChip, selectedYearLevel === 'all' && styles.filterChipActive, isMobile && styles.filterChipMobile]}
-                        onPress={() => { setSelectedYearLevel('all'); setMissingPage(1); }}
+                        style={[
+                          styles.filterChip,
+                          selectedYearLevel === 'all' &&
+                            styles.filterChipActive,
+                          isMobile && styles.filterChipMobile,
+                        ]}
+                        onPress={() => {
+                          setSelectedYearLevel('all')
+                          setMissingPage(1)
+                        }}
                       >
-                        <Text style={[styles.filterChipText, selectedYearLevel === 'all' && styles.filterChipTextActive, isMobile && styles.filterChipTextMobile]}>All</Text>
-                      </TouchableOpacity>
-                      {allYearLevels.length > 0 ? allYearLevels.map(yearLevel => (
-                        <TouchableOpacity
-                          key={yearLevel}
-                          style={[styles.filterChip, selectedYearLevel === yearLevel && styles.filterChipActive, isMobile && styles.filterChipMobile]}
-                          onPress={() => { setSelectedYearLevel(yearLevel); setMissingPage(1); }}
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            selectedYearLevel === 'all' &&
+                              styles.filterChipTextActive,
+                            isMobile && styles.filterChipTextMobile,
+                          ]}
                         >
-                          <Text style={[styles.filterChipText, selectedYearLevel === yearLevel && styles.filterChipTextActive, isMobile && styles.filterChipTextMobile]}>Year {yearLevel}</Text>
-                        </TouchableOpacity>
-                      )) : (
-                        <Text style={{ color: colors.sidebar.text.muted, fontSize: 12, paddingVertical: 8 }}>No year levels available</Text>
+                          All
+                        </Text>
+                      </TouchableOpacity>
+                      {allYearLevels.length > 0 ? (
+                        allYearLevels.map((yearLevel) => (
+                          <TouchableOpacity
+                            key={yearLevel}
+                            style={[
+                              styles.filterChip,
+                              selectedYearLevel === yearLevel &&
+                                styles.filterChipActive,
+                              isMobile && styles.filterChipMobile,
+                            ]}
+                            onPress={() => {
+                              setSelectedYearLevel(yearLevel)
+                              setMissingPage(1)
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.filterChipText,
+                                selectedYearLevel === yearLevel &&
+                                  styles.filterChipTextActive,
+                                isMobile && styles.filterChipTextMobile,
+                              ]}
+                            >
+                              Year {yearLevel}
+                            </Text>
+                          </TouchableOpacity>
+                        ))
+                      ) : (
+                        <Text
+                          style={{
+                            color: colors.sidebar.text.muted,
+                            fontSize: 12,
+                            paddingVertical: 8,
+                          }}
+                        >
+                          No year levels available
+                        </Text>
                       )}
                     </ScrollView>
 
-                    <Text style={[styles.filterLabel, isMobile && styles.filterLabelMobile]}>Block</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+                    <Text
+                      style={[
+                        styles.filterLabel,
+                        isMobile && styles.filterLabelMobile,
+                      ]}
+                    >
+                      Block
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.filterRow}
+                    >
                       <TouchableOpacity
-                        style={[styles.filterChip, selectedBlock === 'all' && styles.filterChipActive, isMobile && styles.filterChipMobile]}
-                        onPress={() => { setSelectedBlock('all'); setMissingPage(1); }}
+                        style={[
+                          styles.filterChip,
+                          selectedBlock === 'all' && styles.filterChipActive,
+                          isMobile && styles.filterChipMobile,
+                        ]}
+                        onPress={() => {
+                          setSelectedBlock('all')
+                          setMissingPage(1)
+                        }}
                       >
-                        <Text style={[styles.filterChipText, selectedBlock === 'all' && styles.filterChipTextActive, isMobile && styles.filterChipTextMobile]}>All Blocks</Text>
-                      </TouchableOpacity>
-                      {allBlocks.length > 0 ? allBlocks.map(block => (
-                        <TouchableOpacity
-                          key={block}
-                          style={[styles.filterChip, selectedBlock === block && styles.filterChipActive, isMobile && styles.filterChipMobile]}
-                          onPress={() => { setSelectedBlock(block); setMissingPage(1); }}
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            selectedBlock === 'all' &&
+                              styles.filterChipTextActive,
+                            isMobile && styles.filterChipTextMobile,
+                          ]}
                         >
-                          <Text style={[styles.filterChipText, selectedBlock === block && styles.filterChipTextActive, isMobile && styles.filterChipTextMobile]}>Block {block}</Text>
-                        </TouchableOpacity>
-                      )) : (
-                        <Text style={{ color: colors.sidebar.text.muted, fontSize: 12, paddingVertical: 8 }}>No blocks available</Text>
+                          All Blocks
+                        </Text>
+                      </TouchableOpacity>
+                      {allBlocks.length > 0 ? (
+                        allBlocks.map((block) => (
+                          <TouchableOpacity
+                            key={block}
+                            style={[
+                              styles.filterChip,
+                              selectedBlock === block &&
+                                styles.filterChipActive,
+                              isMobile && styles.filterChipMobile,
+                            ]}
+                            onPress={() => {
+                              setSelectedBlock(block)
+                              setMissingPage(1)
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.filterChipText,
+                                selectedBlock === block &&
+                                  styles.filterChipTextActive,
+                                isMobile && styles.filterChipTextMobile,
+                              ]}
+                            >
+                              Block {block}
+                            </Text>
+                          </TouchableOpacity>
+                        ))
+                      ) : (
+                        <Text
+                          style={{
+                            color: colors.sidebar.text.muted,
+                            fontSize: 12,
+                            paddingVertical: 8,
+                          }}
+                        >
+                          No blocks available
+                        </Text>
                       )}
                     </ScrollView>
                   </View>
@@ -2363,68 +3215,162 @@ export default function MainAdminAttendance() {
                     data={paginatedMissing}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }: { item: Student }) => {
-                      const isPaid = hasStudentPaid(item.id);
-                      const isCompleted = hasStudentCompleted(item.id);
-                      const isProcessing = processingAction === item.id;
-                      const penaltySent = hasPenaltyBeenSent(selectedEvent?.id || '');
+                      const isPaid = hasStudentPaid(item.id)
+                      const isCompleted = hasStudentCompleted(item.id)
+                      const isProcessing = processingAction === item.id
+                      const penaltySent = hasPenaltyBeenSent(
+                        selectedEvent?.id || ''
+                      )
 
                       // Determine button visibility
-                      const showCompleteButton = penaltySent && !isCompleted && !isPaid;
-                      const showCancelButton = isCompleted;
-                      const showPaidButton = isCompleted && !isPaid;
+                      const showCompleteButton =
+                        penaltySent && !isCompleted && !isPaid
+                      const showCancelButton = isCompleted
+                      const showPaidButton = isCompleted && !isPaid
 
                       return (
-                        <View style={[
-                          styles.missingStudentItem,
-                          isCompleted && { backgroundColor: isDark ? '#064e3b20' : '#d1fae520' },
-                          isPaid && { backgroundColor: isDark ? '#1e3a8a20' : '#dbeafe20' }
-                        ]}>
-                          <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View
+                          style={[
+                            styles.missingStudentItem,
+                            isCompleted && {
+                              backgroundColor: isDark
+                                ? '#064e3b20'
+                                : '#d1fae520',
+                            },
+                            isPaid && {
+                              backgroundColor: isDark
+                                ? '#1e3a8a20'
+                                : '#dbeafe20',
+                            },
+                          ]}
+                        >
+                          <View
+                            style={{
+                              flex: 1,
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
                             <View style={{ flex: 1 }}>
                               <View style={{ flex: 1, marginRight: 8 }}>
                                 <Text
                                   numberOfLines={1}
-                                  ellipsizeMode="tail"
+                                  ellipsizeMode='tail'
                                   style={[
                                     styles.studentName,
                                     (isCompleted || isPaid) && {
                                       textDecorationLine: 'line-through',
-                                      color: colors.sidebar.text.muted
-                                    }
+                                      color: colors.sidebar.text.muted,
+                                    },
                                   ]}
                                 >
-                                  {item.name}
+                                  {item.surname
+                                    ? `${item.surname}, ${item.name}`
+                                    : item.name}
                                 </Text>
                               </View>
-                              <Text style={styles.studentId}>{item.studentID}</Text>
+                              <Text style={styles.studentId}>
+                                {item.studentID}
+                              </Text>
 
                               {/* Status badges */}
-                              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                              <View
+                                style={{
+                                  flexDirection: 'row',
+                                  gap: 8,
+                                  marginTop: 4,
+                                  flexWrap: 'wrap',
+                                }}
+                              >
                                 {isCompleted && (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <Feather name="check-circle" size={12} color="#10b981" />
-                                    <Text style={{ fontSize: 11, color: '#10b981', fontWeight: '600' }}>Completed</Text>
+                                  <View
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                    }}
+                                  >
+                                    <Feather
+                                      name='check-circle'
+                                      size={12}
+                                      color='#10b981'
+                                    />
+                                    <Text
+                                      style={{
+                                        fontSize: 11,
+                                        color: '#10b981',
+                                        fontWeight: '600',
+                                      }}
+                                    >
+                                      Completed
+                                    </Text>
                                   </View>
                                 )}
                                 {isPaid && (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <Feather name="credit-card" size={12} color="#3b82f6" />
-                                    <Text style={{ fontSize: 11, color: '#3b82f6', fontWeight: '600' }}>Paid</Text>
+                                  <View
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                    }}
+                                  >
+                                    <Feather
+                                      name='credit-card'
+                                      size={12}
+                                      color='#3b82f6'
+                                    />
+                                    <Text
+                                      style={{
+                                        fontSize: 11,
+                                        color: '#3b82f6',
+                                        fontWeight: '600',
+                                      }}
+                                    >
+                                      Paid
+                                    </Text>
                                   </View>
                                 )}
                                 {penaltySent && !isCompleted && !isPaid && (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                    <Feather name="alert-circle" size={12} color="#f59e0b" />
-                                    <Text style={{ fontSize: 11, color: '#f59e0b', fontWeight: '600' }}>Penalty Sent</Text>
+                                  <View
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                    }}
+                                  >
+                                    <Feather
+                                      name='alert-circle'
+                                      size={12}
+                                      color='#f59e0b'
+                                    />
+                                    <Text
+                                      style={{
+                                        fontSize: 11,
+                                        color: '#f59e0b',
+                                        fontWeight: '600',
+                                      }}
+                                    >
+                                      Penalty Sent
+                                    </Text>
                                   </View>
                                 )}
                               </View>
                             </View>
-                            <Text style={styles.studentBlock}>Block {item.block}</Text>
+                            <Text style={styles.studentBlock}>
+                              Block {item.block}
+                            </Text>
                           </View>
 
                           {/* Action Buttons Container */}
-                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              gap: 8,
+                              marginTop: 12,
+                              flexWrap: 'wrap',
+                            }}
+                          >
                             {/* Complete Button */}
                             {showCompleteButton && (
                               <TouchableOpacity
@@ -2440,19 +3386,32 @@ export default function MainAdminAttendance() {
                                   minWidth: 100,
                                 }}
                                 onPress={() => {
-
-                                  setSelectedStudentForAction(item);
-                                  setSelectedEventForAction(selectedEvent);
-                                  setShowCompleteConfirmModal(true);
+                                  setSelectedStudentForAction(item)
+                                  setSelectedEventForAction(selectedEvent)
+                                  setShowCompleteConfirmModal(true)
                                 }}
                                 disabled={isProcessing}
                               >
                                 {isProcessing ? (
-                                  <ActivityIndicator size="small" color="#ffffff" />
+                                  <ActivityIndicator
+                                    size='small'
+                                    color='#ffffff'
+                                  />
                                 ) : (
                                   <>
-                                    <Feather name="check-circle" size={16} color="#ffffff" />
-                                    <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '600', marginLeft: 8 }}>
+                                    <Feather
+                                      name='check-circle'
+                                      size={16}
+                                      color='#ffffff'
+                                    />
+                                    <Text
+                                      style={{
+                                        color: '#ffffff',
+                                        fontSize: 13,
+                                        fontWeight: '600',
+                                        marginLeft: 8,
+                                      }}
+                                    >
                                       Complete
                                     </Text>
                                   </>
@@ -2476,38 +3435,69 @@ export default function MainAdminAttendance() {
                                   minWidth: 100,
                                 }}
                                 onPress={() => {
-
-                                  setSelectedStudentForAction(item);
-                                  setSelectedEventForAction(selectedEvent);
-                                  setShowCancelConfirmModal(true);
+                                  setSelectedStudentForAction(item)
+                                  setSelectedEventForAction(selectedEvent)
+                                  setShowCancelConfirmModal(true)
                                 }}
                                 disabled={isProcessing}
                               >
                                 {isProcessing ? (
-                                  <ActivityIndicator size="small" color="#ffffff" />
+                                  <ActivityIndicator
+                                    size='small'
+                                    color='#ffffff'
+                                  />
                                 ) : (
                                   <>
-                                    <Feather name="x-circle" size={16} color="#ffffff" />
-                                    <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '600', marginLeft: 8 }}>
+                                    <Feather
+                                      name='x-circle'
+                                      size={16}
+                                      color='#ffffff'
+                                    />
+                                    <Text
+                                      style={{
+                                        color: '#ffffff',
+                                        fontSize: 13,
+                                        fontWeight: '600',
+                                        marginLeft: 8,
+                                      }}
+                                    >
                                       Cancel
                                     </Text>
                                   </>
                                 )}
                               </TouchableOpacity>
                             )}
-
                           </View>
                         </View>
-                      );
+                      )
                     }}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.missingListContent}
                     ListEmptyComponent={
-                      <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
-                        <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
-                          <Feather name="users" size={isMobile ? 32 : 40} color={colors.sidebar.text.muted} />
+                      <View
+                        style={[
+                          styles.emptyState,
+                          isMobile && styles.emptyStateMobile,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.emptyStateIcon,
+                            isMobile && styles.emptyStateIconMobile,
+                          ]}
+                        >
+                          <Feather
+                            name='users'
+                            size={isMobile ? 32 : 40}
+                            color={colors.sidebar.text.muted}
+                          />
                         </View>
-                        <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>
+                        <Text
+                          style={[
+                            styles.emptyStateTitle,
+                            isMobile && styles.emptyStateTitleMobile,
+                          ]}
+                        >
                           No missing students match the filters/search
                         </Text>
                       </View>
@@ -2516,25 +3506,78 @@ export default function MainAdminAttendance() {
 
                   {/* Pagination for missing list */}
                   {totalMissingPages > 1 && (
-                    <View style={[styles.paginationContainer, isMobile && styles.paginationContainerMobile, { marginTop: 16 }]}>
+                    <View
+                      style={[
+                        styles.paginationContainer,
+                        isMobile && styles.paginationContainerMobile,
+                        { marginTop: 16 },
+                      ]}
+                    >
                       <TouchableOpacity
-                        style={[styles.paginationButton, missingPage === 1 && styles.paginationButtonDisabled]}
-                        onPress={() => setMissingPage(p => Math.max(1, p - 1))}
+                        style={[
+                          styles.paginationButton,
+                          missingPage === 1 && styles.paginationButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          setMissingPage((p) => Math.max(1, p - 1))
+                        }
                         disabled={missingPage === 1}
                       >
-                        <Feather name="chevron-left" size={16} color={missingPage === 1 ? colors.sidebar.text.muted : colors.accent.primary} />
-                        <Text style={[styles.paginationButtonText, missingPage === 1 && styles.paginationButtonTextDisabled]}>Prev</Text>
+                        <Feather
+                          name='chevron-left'
+                          size={16}
+                          color={
+                            missingPage === 1
+                              ? colors.sidebar.text.muted
+                              : colors.accent.primary
+                          }
+                        />
+                        <Text
+                          style={[
+                            styles.paginationButtonText,
+                            missingPage === 1 &&
+                              styles.paginationButtonTextDisabled,
+                          ]}
+                        >
+                          Prev
+                        </Text>
                       </TouchableOpacity>
                       <View style={styles.pageInfo}>
-                        <Text style={styles.pageInfoText}>{missingPage}/{totalMissingPages}</Text>
+                        <Text style={styles.pageInfoText}>
+                          {missingPage}/{totalMissingPages}
+                        </Text>
                       </View>
                       <TouchableOpacity
-                        style={[styles.paginationButton, missingPage === totalMissingPages && styles.paginationButtonDisabled]}
-                        onPress={() => setMissingPage(p => Math.min(totalMissingPages, p + 1))}
+                        style={[
+                          styles.paginationButton,
+                          missingPage === totalMissingPages &&
+                            styles.paginationButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          setMissingPage((p) =>
+                            Math.min(totalMissingPages, p + 1)
+                          )
+                        }
                         disabled={missingPage === totalMissingPages}
                       >
-                        <Text style={[styles.paginationButtonText, missingPage === totalMissingPages && styles.paginationButtonTextDisabled]}>Next</Text>
-                        <Feather name="chevron-right" size={16} color={missingPage === totalMissingPages ? colors.sidebar.text.muted : colors.accent.primary} />
+                        <Text
+                          style={[
+                            styles.paginationButtonText,
+                            missingPage === totalMissingPages &&
+                              styles.paginationButtonTextDisabled,
+                          ]}
+                        >
+                          Next
+                        </Text>
+                        <Feather
+                          name='chevron-right'
+                          size={16}
+                          color={
+                            missingPage === totalMissingPages
+                              ? colors.sidebar.text.muted
+                              : colors.accent.primary
+                          }
+                        />
                       </TouchableOpacity>
                     </View>
                   )}
@@ -2549,7 +3592,7 @@ export default function MainAdminAttendance() {
       <Modal
         visible={showEventModal}
         transparent={true}
-        animationType="fade"
+        animationType='fade'
         onRequestClose={() => setShowEventModal(false)}
       >
         <BlurView
@@ -2565,7 +3608,12 @@ export default function MainAdminAttendance() {
         </BlurView>
 
         <View style={styles.glassModalCentered}>
-          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)' }]}>
+          <View
+            style={[
+              styles.glassModalContainer,
+              { borderColor: 'rgba(255,255,255,0.3)' },
+            ]}
+          >
             <LinearGradient
               colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
               start={{ x: 0, y: 0 }}
@@ -2574,18 +3622,43 @@ export default function MainAdminAttendance() {
             >
               <View style={styles.glassModalHeader}>
                 <View style={styles.glassModalHeaderLeft}>
-                  <View style={[styles.glassModalIconContainer, isMobile && styles.glassModalIconContainerMobile]}>
-                    <Feather name="calendar" size={isMobile ? 16 : 20} color={colors.accent.primary} />
+                  <View
+                    style={[
+                      styles.glassModalIconContainer,
+                      isMobile && styles.glassModalIconContainerMobile,
+                    ]}
+                  >
+                    <Feather
+                      name='calendar'
+                      size={isMobile ? 16 : 20}
+                      color={colors.accent.primary}
+                    />
                   </View>
                   <View>
-                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>Select Event</Text>
-                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>
+                    <Text
+                      style={[styles.glassModalTitle, { color: colors.text }]}
+                    >
+                      Select Event
+                    </Text>
+                    <Text
+                      style={[
+                        styles.glassModalSubtitle,
+                        { color: colors.sidebar.text.secondary },
+                      ]}
+                    >
                       Choose an event to generate QR code
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setShowEventModal(false)} style={styles.glassModalCloseButton}>
-                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                <TouchableOpacity
+                  onPress={() => setShowEventModal(false)}
+                  style={styles.glassModalCloseButton}
+                >
+                  <Ionicons
+                    name='close-circle'
+                    size={28}
+                    color={colors.accent.primary}
+                  />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -2593,20 +3666,60 @@ export default function MainAdminAttendance() {
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.glassModalScrollContent}
-              style={{ backgroundColor: isDark ? 'rgba(15, 25, 35, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}
+              style={{
+                backgroundColor: isDark
+                  ? 'rgba(15, 25, 35, 0.7)'
+                  : 'rgba(255, 255, 255, 0.7)',
+              }}
             >
-              <View style={[styles.glassModalFormSection, { borderColor: 'rgba(255,255,255,0.2)' }]}>
+              <View
+                style={[
+                  styles.glassModalFormSection,
+                  { borderColor: 'rgba(255,255,255,0.2)' },
+                ]}
+              >
                 {loading ? (
                   <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={colors.accent.primary} />
-                    <Text style={[styles.loadingText, isMobile && styles.loadingTextMobile]}>Loading events...</Text>
+                    <ActivityIndicator
+                      size='large'
+                      color={colors.accent.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.loadingText,
+                        isMobile && styles.loadingTextMobile,
+                      ]}
+                    >
+                      Loading events...
+                    </Text>
                   </View>
                 ) : events.length === 0 ? (
-                  <View style={[styles.emptyState, isMobile && styles.emptyStateMobile]}>
-                    <View style={[styles.emptyStateIcon, isMobile && styles.emptyStateIconMobile]}>
-                      <Feather name="calendar" size={isMobile ? 32 : 40} color={colors.sidebar.text.muted} />
+                  <View
+                    style={[
+                      styles.emptyState,
+                      isMobile && styles.emptyStateMobile,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.emptyStateIcon,
+                        isMobile && styles.emptyStateIconMobile,
+                      ]}
+                    >
+                      <Feather
+                        name='calendar'
+                        size={isMobile ? 32 : 40}
+                        color={colors.sidebar.text.muted}
+                      />
                     </View>
-                    <Text style={[styles.emptyStateTitle, isMobile && styles.emptyStateTitleMobile]}>No events available</Text>
+                    <Text
+                      style={[
+                        styles.emptyStateTitle,
+                        isMobile && styles.emptyStateTitleMobile,
+                      ]}
+                    >
+                      No events available
+                    </Text>
                   </View>
                 ) : (
                   <>
@@ -2616,25 +3729,78 @@ export default function MainAdminAttendance() {
                       </React.Fragment>
                     ))}
                     {totalEventPages > 1 && (
-                      <View style={[styles.paginationContainer, isMobile && styles.paginationContainerMobile, { marginTop: 16 }]}>
+                      <View
+                        style={[
+                          styles.paginationContainer,
+                          isMobile && styles.paginationContainerMobile,
+                          { marginTop: 16 },
+                        ]}
+                      >
                         <TouchableOpacity
-                          style={[styles.paginationButton, eventPage === 1 && styles.paginationButtonDisabled]}
-                          onPress={() => setEventPage(prev => Math.max(1, prev - 1))}
+                          style={[
+                            styles.paginationButton,
+                            eventPage === 1 && styles.paginationButtonDisabled,
+                          ]}
+                          onPress={() =>
+                            setEventPage((prev) => Math.max(1, prev - 1))
+                          }
                           disabled={eventPage === 1}
                         >
-                          <Feather name="chevron-left" size={16} color={eventPage === 1 ? colors.sidebar.text.muted : colors.accent.primary} />
-                          <Text style={[styles.paginationButtonText, eventPage === 1 && styles.paginationButtonTextDisabled]}>Prev</Text>
+                          <Feather
+                            name='chevron-left'
+                            size={16}
+                            color={
+                              eventPage === 1
+                                ? colors.sidebar.text.muted
+                                : colors.accent.primary
+                            }
+                          />
+                          <Text
+                            style={[
+                              styles.paginationButtonText,
+                              eventPage === 1 &&
+                                styles.paginationButtonTextDisabled,
+                            ]}
+                          >
+                            Prev
+                          </Text>
                         </TouchableOpacity>
                         <View style={styles.pageInfo}>
-                          <Text style={styles.pageInfoText}>{eventPage}/{totalEventPages}</Text>
+                          <Text style={styles.pageInfoText}>
+                            {eventPage}/{totalEventPages}
+                          </Text>
                         </View>
                         <TouchableOpacity
-                          style={[styles.paginationButton, eventPage === totalEventPages && styles.paginationButtonDisabled]}
-                          onPress={() => setEventPage(prev => Math.min(totalEventPages, prev + 1))}
+                          style={[
+                            styles.paginationButton,
+                            eventPage === totalEventPages &&
+                              styles.paginationButtonDisabled,
+                          ]}
+                          onPress={() =>
+                            setEventPage((prev) =>
+                              Math.min(totalEventPages, prev + 1)
+                            )
+                          }
                           disabled={eventPage === totalEventPages}
                         >
-                          <Text style={[styles.paginationButtonText, eventPage === totalEventPages && styles.paginationButtonTextDisabled]}>Next</Text>
-                          <Feather name="chevron-right" size={16} color={eventPage === totalEventPages ? colors.sidebar.text.muted : colors.accent.primary} />
+                          <Text
+                            style={[
+                              styles.paginationButtonText,
+                              eventPage === totalEventPages &&
+                                styles.paginationButtonTextDisabled,
+                            ]}
+                          >
+                            Next
+                          </Text>
+                          <Feather
+                            name='chevron-right'
+                            size={16}
+                            color={
+                              eventPage === totalEventPages
+                                ? colors.sidebar.text.muted
+                                : colors.accent.primary
+                            }
+                          />
                         </TouchableOpacity>
                       </View>
                     )}
@@ -2649,7 +3815,7 @@ export default function MainAdminAttendance() {
       <Modal
         visible={showStopConfirmModal}
         transparent={true}
-        animationType="fade"
+        animationType='fade'
         onRequestClose={() => setShowStopConfirmModal(false)}
       >
         <BlurView
@@ -2665,7 +3831,12 @@ export default function MainAdminAttendance() {
         </BlurView>
 
         <View style={styles.glassModalCentered}>
-          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 }]}>
+          <View
+            style={[
+              styles.glassModalContainer,
+              { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 },
+            ]}
+          >
             <LinearGradient
               colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
               start={{ x: 0, y: 0 }}
@@ -2674,39 +3845,90 @@ export default function MainAdminAttendance() {
             >
               <View style={styles.glassModalHeader}>
                 <View style={styles.glassModalHeaderLeft}>
-                  <View style={[styles.glassModalIconContainer, { backgroundColor: '#ef444415' }]}>
-                    <Feather name="alert-triangle" size={20} color="#ef4444" />
+                  <View
+                    style={[
+                      styles.glassModalIconContainer,
+                      { backgroundColor: '#ef444415' },
+                    ]}
+                  >
+                    <Feather name='alert-triangle' size={20} color='#ef4444' />
                   </View>
                   <View>
-                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>Stop Attendance?</Text>
-                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>This action cannot be undone</Text>
+                    <Text
+                      style={[styles.glassModalTitle, { color: colors.text }]}
+                    >
+                      Stop Attendance?
+                    </Text>
+                    <Text
+                      style={[
+                        styles.glassModalSubtitle,
+                        { color: colors.sidebar.text.secondary },
+                      ]}
+                    >
+                      This action cannot be undone
+                    </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setShowStopConfirmModal(false)} style={styles.glassModalCloseButton}>
-                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                <TouchableOpacity
+                  onPress={() => setShowStopConfirmModal(false)}
+                  style={styles.glassModalCloseButton}
+                >
+                  <Ionicons
+                    name='close-circle'
+                    size={28}
+                    color={colors.accent.primary}
+                  />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
 
             <View style={[styles.glassModalScrollContent, { padding: 20 }]}>
-              <Text style={{ fontSize: 14, color: colors.sidebar.text.secondary, marginBottom: 20, lineHeight: 20 }}>
-                This will immediately expire the QR code. Students will no longer be able to mark their attendance for this event.
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: colors.sidebar.text.secondary,
+                  marginBottom: 20,
+                  lineHeight: 20,
+                }}
+              >
+                This will immediately expire the QR code. Students will no
+                longer be able to mark their attendance for this event.
               </Text>
-              <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
-                <TouchableOpacity style={styles.glassCancelButton} onPress={() => setShowStopConfirmModal(false)}>
-                  <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>Cancel</Text>
+              <View
+                style={[
+                  styles.glassFormActions,
+                  isMobile && styles.glassFormActionsMobile,
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.glassCancelButton}
+                  onPress={() => setShowStopConfirmModal(false)}
+                >
+                  <Text
+                    style={[
+                      styles.glassCancelButtonText,
+                      isMobile && styles.glassCancelButtonTextMobile,
+                    ]}
+                  >
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.glassSubmitButton, { backgroundColor: '#ef4444' }]}
+                  style={[
+                    styles.glassSubmitButton,
+                    { backgroundColor: '#ef4444' },
+                  ]}
                   onPress={confirmStopAttendance}
                   disabled={isSaving}
                 >
                   {isSaving ? (
-                    <ActivityIndicator size="small" color="#ffffff" />
+                    <ActivityIndicator size='small' color='#ffffff' />
                   ) : (
                     <>
-                      <Feather name="stop-circle" size={18} color="#ffffff" />
-                      <Text style={styles.glassSubmitButtonText}>Stop Attendance</Text>
+                      <Feather name='stop-circle' size={18} color='#ffffff' />
+                      <Text style={styles.glassSubmitButtonText}>
+                        Stop Attendance
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -2719,7 +3941,7 @@ export default function MainAdminAttendance() {
       <Modal
         visible={showExpirationModal}
         transparent={true}
-        animationType="fade"
+        animationType='fade'
         onRequestClose={() => setShowExpirationModal(false)}
       >
         <BlurView
@@ -2735,7 +3957,12 @@ export default function MainAdminAttendance() {
         </BlurView>
 
         <View style={styles.glassModalCentered}>
-          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)', maxHeight: '85%' }]}>
+          <View
+            style={[
+              styles.glassModalContainer,
+              { borderColor: 'rgba(255,255,255,0.3)', maxHeight: '85%' },
+            ]}
+          >
             <LinearGradient
               colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
               start={{ x: 0, y: 0 }}
@@ -2744,18 +3971,43 @@ export default function MainAdminAttendance() {
             >
               <View style={styles.glassModalHeader}>
                 <View style={styles.glassModalHeaderLeft}>
-                  <View style={[styles.glassModalIconContainer, isMobile && styles.glassModalIconContainerMobile]}>
-                    <Feather name="clock" size={isMobile ? 16 : 20} color="#f59e0b" />
+                  <View
+                    style={[
+                      styles.glassModalIconContainer,
+                      isMobile && styles.glassModalIconContainerMobile,
+                    ]}
+                  >
+                    <Feather
+                      name='clock'
+                      size={isMobile ? 16 : 20}
+                      color='#f59e0b'
+                    />
                   </View>
                   <View>
-                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>Set QR Expiration</Text>
-                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>
+                    <Text
+                      style={[styles.glassModalTitle, { color: colors.text }]}
+                    >
+                      Set QR Expiration
+                    </Text>
+                    <Text
+                      style={[
+                        styles.glassModalSubtitle,
+                        { color: colors.sidebar.text.secondary },
+                      ]}
+                    >
                       For: {selectedEvent?.title}
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setShowExpirationModal(false)} style={styles.glassModalCloseButton}>
-                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                <TouchableOpacity
+                  onPress={() => setShowExpirationModal(false)}
+                  style={styles.glassModalCloseButton}
+                >
+                  <Ionicons
+                    name='close-circle'
+                    size={28}
+                    color={colors.accent.primary}
+                  />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
@@ -2763,27 +4015,50 @@ export default function MainAdminAttendance() {
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.glassModalScrollContent}
-              style={{ backgroundColor: isDark ? 'rgba(15, 25, 35, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}
+              style={{
+                backgroundColor: isDark
+                  ? 'rgba(15, 25, 35, 0.7)'
+                  : 'rgba(255, 255, 255, 0.7)',
+              }}
             >
-              <View style={[styles.glassModalFormSection, { borderColor: 'rgba(255,255,255,0.2)' }]}>
+              <View
+                style={[
+                  styles.glassModalFormSection,
+                  { borderColor: 'rgba(255,255,255,0.2)' },
+                ]}
+              >
                 {/* Quick options */}
                 <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>Quick Options</Text>
+                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                    Quick Options
+                  </Text>
                   <View style={styles.expirationOptions}>
                     {quickOptions.map((option, index) => {
-                      const isSelected = customExpiration === option.value;
+                      const isSelected = customExpiration === option.value
                       return (
                         <TouchableOpacity
                           key={index}
-                          style={[styles.expirationOption, isMobile && styles.expirationOptionMobile, isSelected && styles.expirationOptionActive]}
+                          style={[
+                            styles.expirationOption,
+                            isMobile && styles.expirationOptionMobile,
+                            isSelected && styles.expirationOptionActive,
+                          ]}
                           onPress={() => setCustomExpiration(option.value)}
                         >
-                          <Text style={[styles.expirationOptionText, isMobile && styles.expirationOptionTextMobile, isSelected && styles.expirationOptionTextActive]}>
+                          <Text
+                            style={[
+                              styles.expirationOptionText,
+                              isMobile && styles.expirationOptionTextMobile,
+                              isSelected && styles.expirationOptionTextActive,
+                            ]}
+                          >
                             {option.label}
                           </Text>
-                          {isSelected && <Feather name="check" size={16} color="#ffffff" />}
+                          {isSelected && (
+                            <Feather name='check' size={16} color='#ffffff' />
+                          )}
                         </TouchableOpacity>
-                      );
+                      )
                     })}
                   </View>
                 </View>
@@ -2798,7 +4073,7 @@ export default function MainAdminAttendance() {
                   {/* Web: datetime-local input */}
                   {Platform.OS === 'web' ? (
                     <input
-                      type="datetime-local"
+                      type='datetime-local'
                       value={
                         customExpirationDate
                           ? formatDateForWebInput(customExpirationDate)
@@ -2826,12 +4101,12 @@ export default function MainAdminAttendance() {
                       <Text style={{ color: colors.text }}>
                         {customExpirationDate
                           ? customExpirationDate.toLocaleString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })
                           : 'Select custom date & time'}
                       </Text>
                       <Text
@@ -2841,23 +4116,54 @@ export default function MainAdminAttendance() {
                           marginTop: 2,
                         }}
                       >
-                        {customExpirationDate ? 'Tap to change' : 'Choose expiration date'}
+                        {customExpirationDate
+                          ? 'Tap to change'
+                          : 'Choose expiration date'}
                       </Text>
                     </TouchableOpacity>
                   )}
                 </View>
                 {/* Actions */}
-                <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
-                  <TouchableOpacity style={styles.glassCancelButton} onPress={() => setShowExpirationModal(false)}>
-                    <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>Cancel</Text>
+                <View
+                  style={[
+                    styles.glassFormActions,
+                    isMobile && styles.glassFormActionsMobile,
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.glassCancelButton}
+                    onPress={() => setShowExpirationModal(false)}
+                  >
+                    <Text
+                      style={[
+                        styles.glassCancelButtonText,
+                        isMobile && styles.glassCancelButtonTextMobile,
+                      ]}
+                    >
+                      Cancel
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.glassSubmitButton, !customExpiration && styles.glassSubmitButtonDisabled]}
+                    style={[
+                      styles.glassSubmitButton,
+                      !customExpiration && styles.glassSubmitButtonDisabled,
+                    ]}
                     onPress={setManualExpiration}
                     disabled={!customExpiration || isSaving}
                   >
-                    <Feather name="check" size={isMobile ? 16 : 18} color="#ffffff" />
-                    <Text style={[styles.glassSubmitButtonText, isMobile && styles.glassSubmitButtonTextMobile]}>Set Expiration</Text>
+                    <Feather
+                      name='check'
+                      size={isMobile ? 16 : 18}
+                      color='#ffffff'
+                    />
+                    <Text
+                      style={[
+                        styles.glassSubmitButtonText,
+                        isMobile && styles.glassSubmitButtonTextMobile,
+                      ]}
+                    >
+                      Set Expiration
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2870,7 +4176,7 @@ export default function MainAdminAttendance() {
       <Modal
         visible={showCompleteConfirmModal}
         transparent={true}
-        animationType="fade"
+        animationType='fade'
         onRequestClose={() => setShowCompleteConfirmModal(false)}
       >
         <BlurView
@@ -2886,7 +4192,12 @@ export default function MainAdminAttendance() {
         </BlurView>
 
         <View style={styles.glassModalCentered}>
-          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 }]}>
+          <View
+            style={[
+              styles.glassModalContainer,
+              { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 },
+            ]}
+          >
             <LinearGradient
               colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
               start={{ x: 0, y: 0 }}
@@ -2895,42 +4206,99 @@ export default function MainAdminAttendance() {
             >
               <View style={styles.glassModalHeader}>
                 <View style={styles.glassModalHeaderLeft}>
-                  <View style={[styles.glassModalIconContainer, { backgroundColor: '#10b98115' }]}>
-                    <Feather name="check-circle" size={20} color="#10b981" />
+                  <View
+                    style={[
+                      styles.glassModalIconContainer,
+                      { backgroundColor: '#10b98115' },
+                    ]}
+                  >
+                    <Feather name='check-circle' size={20} color='#10b981' />
                   </View>
                   <View>
-                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>Complete Penalty?</Text>
-                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>This will mark the penalty as resolved</Text>
+                    <Text
+                      style={[styles.glassModalTitle, { color: colors.text }]}
+                    >
+                      Complete Penalty?
+                    </Text>
+                    <Text
+                      style={[
+                        styles.glassModalSubtitle,
+                        { color: colors.sidebar.text.secondary },
+                      ]}
+                    >
+                      This will mark the penalty as resolved
+                    </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setShowCompleteConfirmModal(false)} style={styles.glassModalCloseButton}>
-                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                <TouchableOpacity
+                  onPress={() => setShowCompleteConfirmModal(false)}
+                  style={styles.glassModalCloseButton}
+                >
+                  <Ionicons
+                    name='close-circle'
+                    size={28}
+                    color={colors.accent.primary}
+                  />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
 
             <View style={[styles.glassModalScrollContent, { padding: 20 }]}>
-              <Text style={{ fontSize: 14, color: colors.sidebar.text.secondary, marginBottom: 20, lineHeight: 20 }}>
-                Are you sure you want to mark <Text style={{ fontWeight: '600', color: colors.text }}>{selectedStudentForAction?.name}</Text>'s penalty as completed?
-                This will remove the penalty from their profile.
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: colors.sidebar.text.secondary,
+                  marginBottom: 20,
+                  lineHeight: 20,
+                }}
+              >
+                Are you sure you want to mark{' '}
+                <Text style={{ fontWeight: '600', color: colors.text }}>
+                  {selectedStudentForAction?.name}
+                </Text>
+                's penalty as completed? This will remove the penalty from their
+                profile.
               </Text>
-              <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
-                <TouchableOpacity style={styles.glassCancelButton} onPress={() => setShowCompleteConfirmModal(false)}>
-                  <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>Cancel</Text>
+              <View
+                style={[
+                  styles.glassFormActions,
+                  isMobile && styles.glassFormActionsMobile,
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.glassCancelButton}
+                  onPress={() => setShowCompleteConfirmModal(false)}
+                >
+                  <Text
+                    style={[
+                      styles.glassCancelButtonText,
+                      isMobile && styles.glassCancelButtonTextMobile,
+                    ]}
+                  >
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.glassSubmitButton, { backgroundColor: '#10b981' }]}
+                  style={[
+                    styles.glassSubmitButton,
+                    { backgroundColor: '#10b981' },
+                  ]}
                   onPress={() => {
                     if (selectedStudentForAction && selectedEventForAction) {
-                      handleCompletePenalty(selectedStudentForAction, selectedEventForAction);
+                      handleCompletePenalty(
+                        selectedStudentForAction,
+                        selectedEventForAction
+                      )
                     } else {
-                      showAlert('Error', 'Missing data. Please try again.');
-                      setShowCompleteConfirmModal(false);
+                      showAlert('Error', 'Missing data. Please try again.')
+                      setShowCompleteConfirmModal(false)
                     }
                   }}
                 >
-                  <Feather name="check-circle" size={18} color="#ffffff" />
-                  <Text style={styles.glassSubmitButtonText}>Confirm Complete</Text>
+                  <Feather name='check-circle' size={18} color='#ffffff' />
+                  <Text style={styles.glassSubmitButtonText}>
+                    Confirm Complete
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -2941,7 +4309,7 @@ export default function MainAdminAttendance() {
       <Modal
         visible={showCancelConfirmModal}
         transparent={true}
-        animationType="fade"
+        animationType='fade'
         onRequestClose={() => setShowCancelConfirmModal(false)}
       >
         <BlurView
@@ -2957,7 +4325,12 @@ export default function MainAdminAttendance() {
         </BlurView>
 
         <View style={styles.glassModalCentered}>
-          <View style={[styles.glassModalContainer, { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 }]}>
+          <View
+            style={[
+              styles.glassModalContainer,
+              { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 },
+            ]}
+          >
             <LinearGradient
               colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
               start={{ x: 0, y: 0 }}
@@ -2966,42 +4339,98 @@ export default function MainAdminAttendance() {
             >
               <View style={styles.glassModalHeader}>
                 <View style={styles.glassModalHeaderLeft}>
-                  <View style={[styles.glassModalIconContainer, { backgroundColor: '#ef444415' }]}>
-                    <Feather name="x-circle" size={20} color="#ef4444" />
+                  <View
+                    style={[
+                      styles.glassModalIconContainer,
+                      { backgroundColor: '#ef444415' },
+                    ]}
+                  >
+                    <Feather name='x-circle' size={20} color='#ef4444' />
                   </View>
                   <View>
-                    <Text style={[styles.glassModalTitle, { color: colors.text }]}>Cancel Completion?</Text>
-                    <Text style={[styles.glassModalSubtitle, { color: colors.sidebar.text.secondary }]}>This will revert the penalty to pending</Text>
+                    <Text
+                      style={[styles.glassModalTitle, { color: colors.text }]}
+                    >
+                      Cancel Completion?
+                    </Text>
+                    <Text
+                      style={[
+                        styles.glassModalSubtitle,
+                        { color: colors.sidebar.text.secondary },
+                      ]}
+                    >
+                      This will revert the penalty to pending
+                    </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setShowCancelConfirmModal(false)} style={styles.glassModalCloseButton}>
-                  <Ionicons name="close-circle" size={28} color={colors.accent.primary} />
+                <TouchableOpacity
+                  onPress={() => setShowCancelConfirmModal(false)}
+                  style={styles.glassModalCloseButton}
+                >
+                  <Ionicons
+                    name='close-circle'
+                    size={28}
+                    color={colors.accent.primary}
+                  />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
 
             <View style={[styles.glassModalScrollContent, { padding: 20 }]}>
-              <Text style={{ fontSize: 14, color: colors.sidebar.text.secondary, marginBottom: 20, lineHeight: 20 }}>
-                Are you sure you want to cancel the completion for <Text style={{ fontWeight: '600', color: colors.text }}>{selectedStudentForAction?.name}</Text>?
-                The penalty will reappear on their profile as pending.
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: colors.sidebar.text.secondary,
+                  marginBottom: 20,
+                  lineHeight: 20,
+                }}
+              >
+                Are you sure you want to cancel the completion for{' '}
+                <Text style={{ fontWeight: '600', color: colors.text }}>
+                  {selectedStudentForAction?.name}
+                </Text>
+                ? The penalty will reappear on their profile as pending.
               </Text>
-              <View style={[styles.glassFormActions, isMobile && styles.glassFormActionsMobile]}>
-                <TouchableOpacity style={styles.glassCancelButton} onPress={() => setShowCancelConfirmModal(false)}>
-                  <Text style={[styles.glassCancelButtonText, isMobile && styles.glassCancelButtonTextMobile]}>Keep Completed</Text>
+              <View
+                style={[
+                  styles.glassFormActions,
+                  isMobile && styles.glassFormActionsMobile,
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.glassCancelButton}
+                  onPress={() => setShowCancelConfirmModal(false)}
+                >
+                  <Text
+                    style={[
+                      styles.glassCancelButtonText,
+                      isMobile && styles.glassCancelButtonTextMobile,
+                    ]}
+                  >
+                    Keep Completed
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.glassSubmitButton, { backgroundColor: '#ef4444' }]}
+                  style={[
+                    styles.glassSubmitButton,
+                    { backgroundColor: '#ef4444' },
+                  ]}
                   onPress={() => {
                     if (selectedStudentForAction && selectedEventForAction) {
-                      handleCancelCompletion(selectedStudentForAction, selectedEventForAction);
+                      handleCancelCompletion(
+                        selectedStudentForAction,
+                        selectedEventForAction
+                      )
                     } else {
-                      showAlert('Error', 'Missing data. Please try again.');
-                      setShowCancelConfirmModal(false);
+                      showAlert('Error', 'Missing data. Please try again.')
+                      setShowCancelConfirmModal(false)
                     }
                   }}
                 >
-                  <Feather name="x-circle" size={18} color="#ffffff" />
-                  <Text style={styles.glassSubmitButtonText}>Confirm Cancel</Text>
+                  <Feather name='x-circle' size={18} color='#ffffff' />
+                  <Text style={styles.glassSubmitButtonText}>
+                    Confirm Cancel
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -3009,5 +4438,5 @@ export default function MainAdminAttendance() {
         </View>
       </Modal>
     </View>
-  );
+  )
 }

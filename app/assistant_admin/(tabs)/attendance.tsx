@@ -1,7 +1,9 @@
 import { Feather } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as MediaLibrary from 'expo-media-library'
+import * as Print from 'expo-print'
 import { useRouter } from 'expo-router'
+import * as Sharing from 'expo-sharing'
 import {
   collection,
   doc,
@@ -124,6 +126,7 @@ interface PenaltyRecord {
 interface Student {
   id: string
   name: string
+  surname?: string
   studentID: string
   yearLevel: string
   block: string
@@ -208,6 +211,7 @@ export default function MainAdminAttendance() {
   const [processingAction, setProcessingAction] = useState<string | null>(null)
   const [selectedEventForAction, setSelectedEventForAction] =
     useState<Event | null>(null)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
 
   // Pagination for missing list
   const [missingPage, setMissingPage] = useState(1)
@@ -223,7 +227,6 @@ export default function MainAdminAttendance() {
     }
   }
 
-  // Fetch students
   useEffect(() => {
     const fetchStudents = async () => {
       try {
@@ -248,14 +251,6 @@ export default function MainAdminAttendance() {
           'Filtered students list (students only):',
           studentsList.length
         )
-        console.log(
-          'Students docs:',
-          studentsList.map((s) => ({
-            name: s.name,
-            role: s.role,
-            studentID: s.studentID,
-          }))
-        )
         setStudents(studentsList)
       } catch (error) {
         console.error('Error fetching students:', error)
@@ -264,7 +259,6 @@ export default function MainAdminAttendance() {
     fetchStudents()
   }, [])
 
-  // Fetch events
   useEffect(() => {
     const fetchEvents = async () => {
       try {
@@ -316,7 +310,6 @@ export default function MainAdminAttendance() {
     return () => unsubscribe()
   }, [])
 
-  // QR expiration helpers
   const isQRCodeExpired = (event: Event | null): boolean => {
     if (!event) return false
     if (event.isActive === false) return true
@@ -375,7 +368,7 @@ export default function MainAdminAttendance() {
 
         const paidIds = new Set<string>()
         const completedIds = new Set<string>()
-        const pendingIds = new Set<string>() // Track pending penalties
+        const pendingIds = new Set<string>()
 
         penaltiesSnapshot.docs.forEach((doc) => {
           const data = doc.data()
@@ -391,7 +384,6 @@ export default function MainAdminAttendance() {
         setPaidStudentIds(paidIds)
         setCompletedStudentIds(completedIds)
 
-        // Check if any penalties have been sent (pending or paid or completed)
         const hasAnyPenalties = penaltiesSnapshot.size > 0
         if (hasAnyPenalties && !sentPenaltyEvents.has(selectedEvent.id)) {
           setSentPenaltyEvents((prev) => new Set([...prev, selectedEvent.id]))
@@ -443,7 +435,6 @@ export default function MainAdminAttendance() {
 
     const fetchSentPenalties = async () => {
       try {
-        // Query penaltyAnnouncements collection to track what was sent
         const announcementsQuery = query(
           collection(db, 'penaltyAnnouncements'),
           where('sentBy', '==', user.uid)
@@ -475,7 +466,6 @@ export default function MainAdminAttendance() {
 
     fetchSentPenalties()
 
-    // Real-time listener
     const announcementsQuery = query(
       collection(db, 'penaltyAnnouncements'),
       where('sentBy', '==', user.uid)
@@ -505,14 +495,12 @@ export default function MainAdminAttendance() {
     return () => unsubscribe()
   }, [user?.uid])
 
-  // Check if penalty was sent for this event
   const hasPenaltyBeenSent = (eventId: string): boolean => {
     return sentPenaltyEvents.has(eventId)
   }
 
   const hasStudentReceivedPenalty = (studentId: string): boolean => {
     if (!selectedEvent) return false
-    // Check by looking at the penalty status sets
     return (
       paidStudentIds.has(studentId) ||
       completedStudentIds.has(studentId) ||
@@ -521,7 +509,6 @@ export default function MainAdminAttendance() {
     )
   }
 
-  // Record that penalties were sent (call this when sending penalty)
   const recordPenaltySent = async (eventId: string, studentIds: string[]) => {
     if (!user?.uid) return
 
@@ -538,7 +525,6 @@ export default function MainAdminAttendance() {
         count: studentIds.length,
       })
 
-      // Also update the event document to track that penalties were sent
       const eventRef = doc(db, 'events', eventId)
       await updateDoc(eventRef, {
         penaltiesSent: true,
@@ -1541,11 +1527,27 @@ export default function MainAdminAttendance() {
       const match = String(level).match(/\d+/)
       return match ? match[0] : level
     })
-    return [...new Set(normalizedLevels)]
+    const uniqueLevels = [...new Set(normalizedLevels)]
+    return uniqueLevels.sort((a, b) => {
+      const numA = parseInt(a)
+      const numB = parseInt(b)
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB
+      if (!isNaN(numA)) return -1
+      if (!isNaN(numB)) return 1
+      return String(a).localeCompare(String(b))
+    })
   }, [students])
 
   const allBlocks = useMemo(() => {
-    return [...new Set(students.map((s) => s.block).filter(Boolean))]
+    const blocks = [...new Set(students.map((s) => s.block).filter(Boolean))]
+    return blocks.sort((a, b) => {
+      const numA = parseInt(a)
+      const numB = parseInt(b)
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB
+      if (!isNaN(numA)) return -1
+      if (!isNaN(numB)) return 1
+      return String(a).localeCompare(String(b))
+    })
   }, [students])
 
   const getStudentsByBlock = useMemo(() => {
@@ -1556,7 +1558,20 @@ export default function MainAdminAttendance() {
       blocks[block].push(record)
     })
     Object.keys(blocks).forEach((block) => {
-      blocks[block].sort((a, b) => a.studentName.localeCompare(b.studentName))
+      blocks[block].sort((a, b) => {
+        const getSortKey = (record: AttendanceRecord) => {
+          if ((record as any).surname) {
+            return (record as any).surname.toLowerCase()
+          }
+          const parts = record.studentName.trim().split(/\s+/)
+          return parts.length > 1
+            ? parts[parts.length - 1].toLowerCase()
+            : record.studentName.toLowerCase()
+        }
+        const keyA = getSortKey(a)
+        const keyB = getSortKey(b)
+        return keyA.localeCompare(keyB)
+      })
     })
     const sortedBlocks: { [key: string]: AttendanceRecord[] } = {}
     Object.keys(blocks)
@@ -1584,8 +1599,21 @@ export default function MainAdminAttendance() {
     filteredMissingBySearch.length / missingItemsPerPage
   )
   const paginatedMissing = useMemo(() => {
+    const sorted = [...filteredMissingBySearch].sort((a, b) => {
+      const surnameA = (
+        a.surname ||
+        a.name.split(' ').pop() ||
+        ''
+      ).toLowerCase()
+      const surnameB = (
+        b.surname ||
+        b.name.split(' ').pop() ||
+        ''
+      ).toLowerCase()
+      return surnameA.localeCompare(surnameB)
+    })
     const start = (missingPage - 1) * missingItemsPerPage
-    return filteredMissingBySearch.slice(start, start + missingItemsPerPage)
+    return sorted.slice(start, start + missingItemsPerPage)
   }, [filteredMissingBySearch, missingPage])
 
   useEffect(() => {
@@ -1737,41 +1765,158 @@ export default function MainAdminAttendance() {
     )
   }
 
-  const generateMissingReceipt = () => {
+  const generateMissingReceipt = async () => {
     if (!selectedEvent) {
       showAlert('No Event', 'Please select an event first.')
       return
     }
-    const list = getFilteredMissing
-    if (list.length === 0) {
-      showAlert(
-        'No Data',
-        'There are no missing students to generate a receipt for.'
+    if (isGeneratingPDF) return
+    setIsGeneratingPDF(true)
+
+    try {
+      // Build a set of attended student IDs
+      const attendedIds = new Set(
+        attendanceRecords.map((r) => String(r.studentID).trim().toLowerCase())
       )
-      return
-    }
-    showAlert(
-      'Receipt Generated',
-      `Event: ${selectedEvent.title}\nMissing students: ${list.length}\nIn a real implementation, a PDF would be created and saved.`
-    )
-    if (Platform.OS === 'web') {
-      const printWindow = window.open('', '_blank')
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head><title>Missing Students Receipt</title></head>
-            <body>
-              <h1>${selectedEvent.title}</h1>
-              <p>Date: ${formatDate(selectedEvent.date) || 'N/A'}</p>
-              <h2>Missing Students</h2>
-              <ul>
-                ${list.map((s) => `<li>${s.name} (${s.studentID})</li>`).join('')}
-              </ul>
-            </body>
-          </html>
-        `)
-        printWindow.print()
+
+      // Prepare data for all students with attendance status
+      const allStudents = students.map((student) => {
+        const attended = attendedIds.has(
+          String(student.studentID).trim().toLowerCase()
+        )
+        return {
+          ...student,
+          attended,
+        }
+      })
+
+      // Sort by block number (numeric), with non‑numeric blocks at the end
+      const sortedStudents = [...allStudents].sort((a, b) => {
+        const blockA = a.block?.toString() || ''
+        const blockB = b.block?.toString() || ''
+        const numA = parseInt(blockA)
+        const numB = parseInt(blockB)
+        const isNumA = !isNaN(numA)
+        const isNumB = !isNaN(numB)
+
+        if (isNumA && isNumB) return numA - numB
+        if (isNumA && !isNumB) return -1
+        if (!isNumA && isNumB) return 1
+        return blockA.localeCompare(blockB)
+      })
+
+      // Build table rows
+      const studentRows = sortedStudents
+        .map((s) => {
+          const remarkCell = s.attended
+            ? `<span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background-color: #10b98120; color: #10b981;">✓ Attended</span>`
+            : '' // empty for absent
+
+          return `
+          <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${s.surname ? `${s.surname}, ${s.name}` : s.name}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${s.studentID}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${s.yearLevel || 'N/A'}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">Block ${s.block || 'N/A'}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">
+              ${remarkCell}
+            </td>
+          </tr>
+        `
+        })
+        .join('')
+
+      const attendedCount = attendanceRecords.length
+      const absentCount = students.length - attendedCount
+
+      const html = `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { font-family: 'Helvetica', sans-serif; padding: 24px; }
+            h1 { color: #1e40af; margin-bottom: 8px; }
+            .subtitle { color: #64748b; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+            .stats { display: flex; gap: 16px; margin-bottom: 24px; }
+            .stat-box { background: #f8fafc; padding: 16px; border-radius: 12px; text-align: center; flex: 1; }
+            .stat-number { font-size: 28px; font-weight: bold; color: #1e293b; }
+            .stat-label { color: #64748b; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { text-align: left; padding: 12px 8px; background: #f1f5f9; color: #334155; font-weight: 600; }
+            .footer { margin-top: 30px; text-align: center; color: #94a3b8; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>${selectedEvent.title}</h1>
+          <div class="subtitle">
+            ${formatDate(selectedEvent.date) || 'Date not set'} • ${selectedEvent.location}
+          </div>
+          
+          <div class="stats">
+            <div class="stat-box">
+              <div class="stat-number">${students.length}</div>
+              <div class="stat-label">Total Students</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number" style="color: #10b981;">${attendedCount}</div>
+              <div class="stat-label">Attended</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number" style="color: #ef4444;">${absentCount}</div>
+              <div class="stat-label">Absent</div>
+            </div>
+          </div>
+
+          <h3 style="color: #334155; margin-bottom: 12px;">Attendance Report</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Student ID</th>
+                <th>Year</th>
+                <th>Block</th>
+                <th style="text-align: center;">Remark</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${studentRows}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <p>Generated by ${userData?.name || 'Assistant Admin'} on ${new Date().toLocaleString()}</p>
+            <p>This is an official attendance receipt from the campus event system.</p>
+          </div>
+        </body>
+      </html>
+    `
+
+      const canShare = await Sharing.isAvailableAsync()
+      if (!canShare) {
+        if (Platform.OS === 'web') {
+          const printWindow = window.open('', '_blank')
+          if (printWindow) {
+            printWindow.document.write(html)
+            printWindow.document.close()
+            printWindow.print()
+          }
+        } else {
+          showAlert('Error', 'Sharing is not available on this device')
+        }
+        return
       }
+
+      const { uri } = await Print.printToFileAsync({ html })
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Save attendance receipt',
+        UTI: 'com.adobe.pdf',
+      })
+    } catch (error) {
+      console.error('PDF generation error:', error)
+      showAlert('Error', 'Could not generate PDF. Please try again.')
+    } finally {
+      setIsGeneratingPDF(false)
     }
   }
 
@@ -1906,6 +2051,19 @@ export default function MainAdminAttendance() {
     )
   }
 
+  const formatAttendanceName = (record: AttendanceRecord) => {
+    if ((record as any).surname) {
+      return `${(record as any).surname}, ${record.studentName}`
+    }
+    const parts = record.studentName.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      const lastName = parts.pop()
+      const firstName = parts.join(' ')
+      return `${lastName}, ${firstName}`
+    }
+    return record.studentName
+  }
+
   const renderBlockSection = ({
     item,
   }: {
@@ -1935,8 +2093,9 @@ export default function MainAdminAttendance() {
                   ]}
                   numberOfLines={1}
                 >
-                  {record.studentName}
+                  {formatAttendanceName(record)}
                 </Text>
+
                 <Text style={styles.studentId}>{record.studentID}</Text>
               </View>
               <View style={styles.attendanceMeta}>
@@ -2445,13 +2604,23 @@ export default function MainAdminAttendance() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.generateReceiptButton}
+                  style={[
+                    styles.generateReceiptButton,
+                    isGeneratingPDF && { opacity: 0.7 },
+                  ]}
                   onPress={generateMissingReceipt}
+                  disabled={isGeneratingPDF}
                 >
-                  <Feather name='file-text' size={18} color='#ffffff' />
-                  <Text style={styles.generateReceiptText}>
-                    Generate PDF Receipt
-                  </Text>
+                  {isGeneratingPDF ? (
+                    <ActivityIndicator size='small' color='#ffffff' />
+                  ) : (
+                    <>
+                      <Feather name='file-text' size={18} color='#ffffff' />
+                      <Text style={styles.generateReceiptText}>
+                        Generate PDF Receipt
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
 
                 <PenaltyAnnouncementModal
@@ -2698,7 +2867,6 @@ export default function MainAdminAttendance() {
                     </ScrollView>
                   </View>
 
-                  {/* Attended List */}
                   <View style={styles.attendanceListContainer}>
                     {paginatedBlocks.length > 0 ? (
                       <>
@@ -3011,7 +3179,9 @@ export default function MainAdminAttendance() {
                                     },
                                   ]}
                                 >
-                                  {item.name}
+                                  {item.surname
+                                    ? `${item.surname}, ${item.name}`
+                                    : item.name}
                                 </Text>
                               </View>
                               <Text style={styles.studentId}>

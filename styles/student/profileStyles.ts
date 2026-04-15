@@ -1,5 +1,5 @@
-import { StyleSheet } from 'react-native';
-import { ThemeColors } from '../../context/ThemeContext';
+import { StyleSheet } from 'react-native'
+import { ThemeColors } from '../../context/ThemeContext'
 
 export const createProfileStyles = (
   colors: ThemeColors,
@@ -12,8 +12,6 @@ export const createProfileStyles = (
     container: {
       flex: 1,
       backgroundColor: colors.background,
-      paddingTop: isMobile ? 40 : 48,
-      paddingHorizontal: isMobile ? 16 : 24,
     },
     profileCard: {
       backgroundColor: colors.card,
@@ -38,11 +36,6 @@ export const createProfileStyles = (
       backgroundColor: colors.accent.primary,
       justifyContent: 'center',
       alignItems: 'center',
-    },
-    avatarImage: {
-      width: isMobile ? 80 : 100,
-      height: isMobile ? 80 : 100,
-      borderRadius: isMobile ? 40 : 50,
     },
     avatarText: {
       fontSize: isMobile ? 32 : 40,
@@ -93,12 +86,6 @@ export const createProfileStyles = (
       shadowOpacity: isDark ? 0.3 : 0.05,
       shadowRadius: 4,
       elevation: 2,
-    },
-    sectionTitle: {
-      fontSize: isMobile ? 15 : 16,
-      fontWeight: '600',
-      color: colors.text,
-      marginRight: 8,
     },
     eventsCount: {
       fontSize: isMobile ? 12 : 14,
@@ -177,40 +164,11 @@ export const createProfileStyles = (
     menu: {
       marginTop: 4,
     },
-    menuItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
     menuText: {
       flex: 1,
       fontSize: isMobile ? 14 : 15,
       color: colors.text,
       marginLeft: 12,
-    },
-    logoutButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 14,
-      marginBottom: 150,
-      borderWidth: 1,
-      borderColor: '#fee2e2',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: isDark ? 0.3 : 0.05,
-      shadowRadius: 4,
-      elevation: 2,
-    },
-    logoutText: {
-      fontSize: isMobile ? 14 : 15,
-      fontWeight: '600',
-      color: '#dc2626',
-      marginLeft: 8,
     },
     modalOverlay: {
       flex: 1,
@@ -456,29 +414,11 @@ export const createProfileStyles = (
     menuIconContainer: {
       position: 'relative',
     },
-    menuBadge: {
-      position: 'absolute',
-      top: -6,
-      right: -6,
-      backgroundColor: '#ef4444',
-      width: 18,
-      height: 18,
-      borderRadius: 9,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    menuBadgeText: {
-      color: '#ffffff',
-      fontSize: 10,
-      fontWeight: 'bold',
-    },
     penaltyCard: {
       backgroundColor: colors.border,
       borderRadius: 12,
       padding: 16,
       marginBottom: 12,
-      borderLeftWidth: 4,
-      borderLeftColor: colors.accent.primary,
     },
     penaltyCardOverdue: {
       borderLeftColor: '#dc2626',
@@ -507,8 +447,7 @@ export const createProfileStyles = (
       fontSize: isMobile ? 9 : 10,
       fontWeight: '600',
     },
-    // keep these for consistency, but they are not directly used in the component's styles (they use inline)
-    // we can keep them as is or remove; for safety we include them but they may be unused
+
     settingsSection: {
       paddingHorizontal: 20,
       paddingTop: 8,
@@ -536,7 +475,7 @@ export const createProfileStyles = (
       fontSize: isMobile ? 14 : 16,
       color: colors.text,
     },
-    // additional styles from original that were not fully covered
+
     penaltyType: {
       fontSize: isMobile ? 12 : 13,
       color: colors.sidebar.text.secondary,
@@ -645,8 +584,6 @@ export const createProfileStyles = (
       paddingVertical: 10,
       backgroundColor: 'transparent',
     },
-
-
 
     summaryCard: {
       shadowColor: '#000',
@@ -797,7 +734,7 @@ export const createProfileStyles = (
       fontSize: 11,
       marginTop: 4,
     },
- 
+
     pieLegendItem: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -835,5 +772,335 @@ export const createProfileStyles = (
       fontSize: 13,
       fontWeight: '500',
     },
-  });
-};
+    // Header styles
+    header: {
+      paddingTop: isMobile ? 40 : 48,
+      paddingBottom: isMobile ? 20 : 24,
+      paddingHorizontal: isMobile ? 16 : 24,
+      borderBottomLeftRadius: isMobile ? 24 : 32,
+      borderBottomRightRadius: isMobile ? 24 : 32,
+    },
+    headerTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: isMobile ? 16 : 20,
+    },
+    greeting: {
+      fontSize: isMobile ? 12 : 14,
+      color: colors.sidebar.text.muted,
+      marginBottom: 2,
+    },
+    userName: {
+      fontSize: isMobile ? 20 : 24,
+      fontWeight: '700',
+      color: '#ffffff',
+      marginBottom: 2,
+    },
+    role: {
+      fontSize: isMobile ? 12 : 14,
+      color: colors.sidebar.text.muted,
+      fontWeight: '500',
+    },
+    profileButton: {
+      width: isMobile ? 44 : 48,
+      height: isMobile ? 44 : 48,
+      borderRadius: isMobile ? 22 : 24,
+      borderWidth: 2,
+      borderColor: '#ffffff',
+      overflow: 'hidden',
+    },
+    profileImage: {
+      width: '100%',
+      height: '100%',
+    },
+    profileFallback: {
+      backgroundColor: colors.accent.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    profileInitials: {
+      color: '#ffffff',
+      fontSize: isMobile ? 16 : 18,
+      fontWeight: '600',
+    },
+    headerBottom: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    dateContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: isMobile ? 8 : 10,
+      paddingVertical: isMobile ? 4 : 6,
+      marginTop: -20,
+      marginLeft: -6,
+    },
+    dateText: {
+      fontSize: isMobile ? 10 : 12,
+      color: '#ffffff',
+      fontWeight: '500',
+    },
+    logoutButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: 'rgba(239,68,68,0.15)',
+      borderColor: 'rgba(239,68,68,0.3)',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      marginTop: -20,
+    },
+    logoutButtonText: {
+      color: '#ef4444',
+      fontSize: isMobile ? 12 : 13,
+      fontWeight: '600',
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: 12,
+      paddingTop: 12,
+      paddingBottom: 24,
+      gap: 12,
+    },
+    // Hero Card
+    heroCard: {
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    heroContent: {
+      flexDirection: isMobile ? 'column' : 'row',
+      alignItems: isMobile ? 'center' : 'flex-start',
+      padding: 16,
+      gap: 12,
+    },
+    avatarSection: {
+      alignItems: 'center',
+    },
+    avatarButton: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    avatarImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 40,
+    },
+    avatarFallback: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: isDark ? 'rgba(14,165,233,0.2)' : '#e0f2fe',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderRadius: 40,
+      borderWidth: 2,
+      borderColor: '#0ea5e9',
+    },
+    avatarInitials: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: '#0ea5e9',
+    },
+    avatarEditBadge: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: '#0ea5e9',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: colors.card,
+    },
+    avatarLabel: {
+      marginTop: 6,
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.sidebar.text.secondary,
+      textTransform: 'uppercase',
+    },
+    identitySection: {
+      flex: 1,
+      alignItems: isMobile ? 'center' : 'flex-start',
+    },
+    identityName: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: -0.3,
+      marginBottom: 2,
+    },
+    identityEmail: {
+      fontSize: 13,
+      color: colors.sidebar.text.secondary,
+      marginBottom: 8,
+    },
+    memberSinceRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 4,
+    },
+    memberSinceText: {
+      fontSize: 11,
+      color: colors.sidebar.text.secondary,
+    },
+    courseInfo: {
+      fontSize: 13,
+      color: colors.sidebar.text.secondary,
+      marginTop: 4,
+    },
+    statsGrid: {
+      flexDirection: 'row',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc',
+    },
+    statItem: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderRightWidth: 1,
+      borderRightColor: colors.border,
+    },
+    statItemLast: {
+      borderRightWidth: 0,
+    },
+    statIconBox: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    statValue: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    statLabel: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: colors.sidebar.text.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    // Section Card
+    sectionCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    sectionHeader: {
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    menuList: {
+      paddingVertical: 4,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    menuItemLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    menuItemText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    menuBadge: {
+      backgroundColor: '#ef4444',
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 8,
+    },
+    menuBadgeText: {
+      color: '#ffffff',
+      fontSize: 11,
+      fontWeight: 'bold',
+    },
+    logoutCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? 'rgba(239,68,68,0.08)' : '#fef2f2',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)',
+      paddingVertical: 14,
+      gap: 10,
+    },
+    logoutText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#ef4444',
+    },
+    footer: {
+      alignItems: 'center',
+      paddingVertical: 20,
+      gap: 4,
+    },
+    footerText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    footerSub: {
+      fontSize: 10,
+      color: colors.sidebar.text.secondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    viewAllButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      marginTop: 8,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.border,
+      borderRadius: 12,
+    },
+    viewAllButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.accent.primary,
+      marginRight: 4,
+    },
+  })
+}

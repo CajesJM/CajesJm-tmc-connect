@@ -589,7 +589,7 @@ export default function StudentAnnouncements() {
         >
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.greeting}>Welcome back,</Text>
+              <Text style={styles.greeting}>Announcement Dashboard,</Text>
               <Text style={styles.userName}>{userData?.name || 'Student'}</Text>
               <Text style={styles.role}>Student</Text>
             </View>
@@ -615,7 +615,6 @@ export default function StudentAnnouncements() {
           </View>
           <View style={styles.headerBottom}>
             <View style={styles.dateContainer}>
-              <Feather name='calendar' size={12} color='#94a3b8' />
               <Text style={styles.dateText}>
                 {new Date().toLocaleDateString('en-US', {
                   weekday: 'long',
@@ -646,7 +645,7 @@ export default function StudentAnnouncements() {
       >
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.greeting}>Welcome back,</Text>
+            <Text style={styles.greeting}>Announcement Dashboard,</Text>
             <Text style={styles.userName}>{userData?.name || 'Student'}</Text>
             <Text style={styles.role}>Student</Text>
           </View>
@@ -670,7 +669,6 @@ export default function StudentAnnouncements() {
         </View>
         <View style={styles.headerBottom}>
           <View style={styles.dateContainer}>
-            <Feather name='calendar' size={12} color='#94a3b8' />
             <Text style={styles.dateText}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: 'long',

@@ -1,7 +1,7 @@
-import { Dimensions, Platform, StyleSheet } from 'react-native';
+import { Dimensions, Platform, StyleSheet } from 'react-native'
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const isMobile = Platform.OS === 'ios' || Platform.OS === 'android';
+const { width: SCREEN_WIDTH } = Dimensions.get('window')
+const isMobile = Platform.OS === 'ios' || Platform.OS === 'android'
 
 export const styles = StyleSheet.create({
   container: {
@@ -41,15 +41,15 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
   },
-    roleBadge: {
-      marginTop: 8,
-      alignSelf: 'flex-start',
-    },
+  roleBadge: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
   roleText: {
-      fontSize: isMobile ? 12 : 13,
-      color: '#ffffff',
-      fontWeight: '600',
-    },
+    fontSize: isMobile ? 12 : 13,
+    color: '#ffffff',
+    fontWeight: '600',
+  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -355,7 +355,7 @@ export const styles = StyleSheet.create({
   column: {
     flex: 1,
     minWidth: 300,
-    marginBottom:100,
+    marginBottom: 100,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -548,8 +548,8 @@ export const styles = StyleSheet.create({
     height: 40,
   },
   emptyChartPlaceholder: {
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingVertical: 40,
-}
-});
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+})

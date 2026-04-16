@@ -31,12 +31,15 @@ import {
 } from 'react-native'
 import { PieChart } from 'react-native-gifted-charts'
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
-import { useAuth } from '../../../context/AuthContext'
-import { useNotifications } from '../../../context/NotificationContext'
-import { useTheme } from '../../../context/ThemeContext'
-import { auth, db } from '../../../lib/firebaseConfig'
-import type { AttendanceRecord, MissedEvent } from '../../../lib/types'
-import { createProfileStyles } from '../../../styles/student/profileStyles'
+import { useAuth } from '../../../src/Controller/context/AuthContext'
+import { useNotifications } from '../../../src/Controller/context/NotificationContext'
+import { useTheme } from '../../../src/Controller/context/ThemeContext'
+import { auth, db } from '../../../src/Model/lib/firebaseConfig'
+import type {
+  AttendanceRecord,
+  MissedEvent,
+} from '../../../src/Model/lib/types'
+import { createProfileStyles } from '../../../src/View/styles/student/profileStyles'
 
 interface Penalty {
   id: string
@@ -1005,10 +1008,7 @@ export default function StudentProfile() {
       setChartLoading(true)
       const studentID = (userData as any)?.studentID
 
-      console.log('Calculating monthly attendance for student:', studentID)
-
       if (!studentID) {
-        console.log('No student ID found')
         setChartLoading(false)
         return
       }
@@ -1048,20 +1048,15 @@ export default function StudentProfile() {
       let totalAttended = 0
       let totalMissed = 0
 
-      console.log('Total events to process:', querySnapshot.docs.length)
-
-      // Process each event
       querySnapshot.docs.forEach((docSnapshot) => {
         const eventData = docSnapshot.data()
 
-        // Check if event is approved
         const hasStatus = 'status' in eventData
         const isApproved = hasStatus && eventData.status === 'approved'
         const isAdminEvent = !hasStatus
 
         if (!isApproved && !isAdminEvent) return
 
-        // Get event date
         let eventDate: Date
         if (
           typeof eventData.date === 'object' &&
@@ -1096,10 +1091,6 @@ export default function StudentProfile() {
           monthlyData[eventMonthIndex].total++
         }
       })
-
-      console.log('Monthly attendance data calculated:', monthlyData)
-      console.log('Totals - Attended:', totalAttended, 'Missed:', totalMissed)
-
       setMonthlyAttendanceData(monthlyData)
       setAttendedCount(totalAttended)
       setMissedCount(totalMissed)
@@ -1115,18 +1106,13 @@ export default function StudentProfile() {
       setLoading(true)
       const studentID = (userData as any)?.studentID
 
-      console.log('Student ID:', studentID)
-
       if (!studentID) {
-        console.log('No student ID found')
         setLoading(false)
         return
       }
 
       const eventsRef = collection(db, 'events')
       const querySnapshot = await getDocs(eventsRef)
-
-      console.log('Total events found:', querySnapshot.docs.length)
 
       const missed: StudentEvent[] = []
       const attended: StudentEvent[] = []
@@ -1139,14 +1125,8 @@ export default function StudentProfile() {
         const isAdminEvent = !hasStatus
 
         if (!isApproved && !isAdminEvent) {
-          console.log(
-            'Skipping event (not approved and not admin):',
-            eventData.title
-          )
           continue
         }
-
-        console.log('Event:', eventData.title, 'Date:', eventData.date)
 
         const eventDate =
           typeof eventData.date === 'object' && (eventData.date as any)?.toDate
@@ -1156,16 +1136,12 @@ export default function StudentProfile() {
         const now = new Date()
 
         if (eventDate > now) {
-          console.log('Event is in future, skipping:', eventData.title)
           continue
         }
 
         const attendees = eventData.attendees || []
 
-        console.log('Attendees:', attendees.length)
-
         if (!eventData.title || !eventData.location) {
-          console.log('Missing required fields, skipping')
           continue
         }
 
@@ -1173,8 +1149,6 @@ export default function StudentProfile() {
           (attendee: AttendanceRecord) =>
             attendee.studentID === studentID.toString()
         )
-
-        console.log('Student attendance found:', !!studentAttendance)
 
         const eventInfo: StudentEvent = {
           id: docSnapshot.id,
@@ -1188,20 +1162,10 @@ export default function StudentProfile() {
 
         if (studentAttendance) {
           attended.push(eventInfo)
-          console.log('Added to attended:', eventData.title)
         } else {
           missed.push(eventInfo)
-          console.log('Added to missed:', eventData.title)
         }
       }
-
-      console.log(
-        'Final counts - Attended:',
-        attended.length,
-        'Missed:',
-        missed.length
-      )
-
       missed.sort(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       )
@@ -1212,7 +1176,6 @@ export default function StudentProfile() {
       setMissedEvents(missed)
       setAttendedEvents(attended)
 
-      // Calculate chart data after fetching events
       await calculateMonthlyAttendance()
     } catch (error) {
       console.error('Error fetching events:', error)

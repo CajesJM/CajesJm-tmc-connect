@@ -23,12 +23,12 @@ import {
   View,
 } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
-import { CAMPUS_LOCATIONS } from '../../../constants/campusLocations'
-import { useAuth } from '../../../context/AuthContext'
-import { useNotifications } from '../../../context/NotificationContext'
-import { useTheme } from '../../../context/ThemeContext' // <-- NEW
-import { db } from '../../../lib/firebaseConfig'
-import { createEventStyles } from '../../../styles/student/eventStyles' // <-- NEW
+import { useAuth } from '../../../src/Controller/context/AuthContext'
+import { useNotifications } from '../../../src/Controller/context/NotificationContext'
+import { useTheme } from '../../../src/Controller/context/ThemeContext'
+import { CAMPUS_LOCATIONS } from '../../../src/Model/constants/campusLocations'
+import { db } from '../../../src/Model/lib/firebaseConfig'
+import { createEventStyles } from '../../../src/View/styles/student/eventStyles'
 
 dayjs.extend(relativeTime)
 
@@ -131,7 +131,6 @@ export default function StudentEventsScreen() {
     setTimeout(() => {
       setRefreshing((prev) => {
         if (prev) {
-          console.log('Refresh timeout - forcing refresh end')
           return false
         }
         return prev

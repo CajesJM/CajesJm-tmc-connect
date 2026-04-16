@@ -26,11 +26,11 @@ import {
   View,
 } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
-import { useAuth } from '../../../context/AuthContext'
-import { useNotifications } from '../../../context/NotificationContext'
-import { useTheme } from '../../../context/ThemeContext'
-import { auth, db } from '../../../lib/firebaseConfig'
-import { createStudentAnnouncementStyles } from '../../../styles/student/announcementStyle'
+import { useAuth } from '../../../src/Controller/context/AuthContext'
+import { useNotifications } from '../../../src/Controller/context/NotificationContext'
+import { useTheme } from '../../../src/Controller/context/ThemeContext'
+import { auth, db } from '../../../src/Model/lib/firebaseConfig'
+import { createStudentAnnouncementStyles } from '../../../src/View/styles/student/announcementStyle'
 
 dayjs.extend(relativeTime)
 
@@ -306,7 +306,6 @@ export default function StudentAnnouncements() {
     setTimeout(() => {
       setRefreshing((prev) => {
         if (prev) {
-          console.log('Refresh timeout – forcing refresh end')
           return false
         }
         return prev

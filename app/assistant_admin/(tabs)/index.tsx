@@ -33,13 +33,19 @@ import {
 import { LineChart } from 'react-native-chart-kit'
 import { PieChart } from 'react-native-gifted-charts'
 
-import { NotificationModal } from '../../../components/NotificationModal'
-import { useAuth } from '../../../context/AuthContext'
-import { useTheme } from '../../../context/ThemeContext'
-import { db } from '../../../lib/firebaseConfig'
-import { styles } from '../../../styles/assistant-admin/dashboardStyles'
-import { Notification, notificationService } from '../../../utils/notifications'
-import { generateDashboardPDF, sharePDF } from '../../../utils/pdfGenerator'
+import { useAuth } from '../../../src/Controller/context/AuthContext'
+import { useTheme } from '../../../src/Controller/context/ThemeContext'
+import {
+  Notification,
+  notificationService,
+} from '../../../src/Controller/utils/notifications'
+import {
+  generateDashboardPDF,
+  sharePDF,
+} from '../../../src/Controller/utils/pdfGenerator'
+import { db } from '../../../src/Model/lib/firebaseConfig'
+import { NotificationModal } from '../../../src/View/components/NotificationModal'
+import { styles } from '../../../src/View/styles/assistant-admin/dashboardStyles'
 
 interface Activity {
   id: string

@@ -1,10 +1,10 @@
-import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { getAuth, sendPasswordResetEmail } from 'firebase/auth';
-import { collection, getDocs, query, where } from "firebase/firestore";
-import React, { useEffect, useRef, useState } from "react";
+import { Ionicons } from '@expo/vector-icons'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useRouter } from 'expo-router'
+import { getAuth, sendPasswordResetEmail } from 'firebase/auth'
+import { collection, getDocs, query, where } from 'firebase/firestore'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -18,332 +18,455 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
-import LoadingScreen from "../components/LoadingScreen";
-import { useAuth } from "../context/AuthContext";
-import { db } from "../lib/firebaseConfig";
-import { COLORS, LoginStyles } from "../styles/LoginStyles";
+} from 'react-native'
+import { useAuth } from '../src/Controller/context/AuthContext'
+import { db } from '../src/Model/lib/firebaseConfig'
+import LoadingScreen from '../src/View/components/LoadingScreen'
+import { COLORS, LoginStyles } from '../src/View/styles/LoginStyles'
 
 export default function Login() {
-  const router = useRouter();
-  const { login, loading } = useAuth();
+  const router = useRouter()
+  const { login, loading } = useAuth()
 
-  const [username, setUsername]             = useState("");
-  const [password, setPassword]             = useState("");
-  const [busy, setBusy]                     = useState(false);
-  const [error, setError]                   = useState<string | null>(null);
-  const [showPassword, setShowPassword]     = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState<string>("");
-  const [usernameFocused, setUsernameFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [loadingMessage, setLoadingMessage] = useState<string>('')
+  const [usernameFocused, setUsernameFocused] = useState(false)
+  const [passwordFocused, setPasswordFocused] = useState(false)
 
   // Lockout state
-  const [failedAttempts, setFailedAttempts] = useState(0);
-  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
-  const [remainingLockoutSeconds, setRemainingLockoutSeconds] = useState(0);
+  const [failedAttempts, setFailedAttempts] = useState(0)
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(null)
+  const [remainingLockoutSeconds, setRemainingLockoutSeconds] = useState(0)
 
   // Forgot password state
-  const [forgotModalVisible, setForgotModalVisible] = useState(false);
-  const [forgotUsername, setForgotUsername] = useState("");
-  const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+  const [forgotModalVisible, setForgotModalVisible] = useState(false)
+  const [forgotUsername, setForgotUsername] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const [forgotMessage, setForgotMessage] = useState<string | null>(null)
 
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null)
 
-  const isLoading = busy || loading;
-  const isLockedOut = lockoutUntil && lockoutUntil > Date.now();
+  const isLoading = busy || loading
+  const isLockedOut = lockoutUntil && lockoutUntil > Date.now()
 
   const isValidEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/;
-    return emailRegex.test(email);
-  };
+    const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/
+    return emailRegex.test(email)
+  }
 
-  const saveLockoutState = async (attempts: number, lockoutTime: number | null) => {
+  const saveLockoutState = async (
+    attempts: number,
+    lockoutTime: number | null
+  ) => {
     try {
-      await AsyncStorage.setItem('studentLoginAttempts', JSON.stringify({
-        failedAttempts: attempts,
-        lockoutUntil: lockoutTime,
-      }));
+      await AsyncStorage.setItem(
+        'studentLoginAttempts',
+        JSON.stringify({
+          failedAttempts: attempts,
+          lockoutUntil: lockoutTime,
+        })
+      )
     } catch (e) {
       // Silently fail to avoid disrupting login flow
     }
-  };
+  }
 
   const restoreLockoutState = async () => {
     try {
-      const stored = await AsyncStorage.getItem('studentLoginAttempts');
+      const stored = await AsyncStorage.getItem('studentLoginAttempts')
       if (stored) {
-        const { failedAttempts: storedAttempts, lockoutUntil: storedLockout } = JSON.parse(stored);
+        const { failedAttempts: storedAttempts, lockoutUntil: storedLockout } =
+          JSON.parse(stored)
         if (storedLockout && storedLockout > Date.now()) {
-          setFailedAttempts(storedAttempts);
-          setLockoutUntil(storedLockout);
+          setFailedAttempts(storedAttempts)
+          setLockoutUntil(storedLockout)
         } else {
-          await AsyncStorage.removeItem('studentLoginAttempts');
-          setFailedAttempts(0);
-          setLockoutUntil(null);
+          await AsyncStorage.removeItem('studentLoginAttempts')
+          setFailedAttempts(0)
+          setLockoutUntil(null)
         }
       }
     } catch (e) {
       try {
-        await AsyncStorage.removeItem('studentLoginAttempts');
+        await AsyncStorage.removeItem('studentLoginAttempts')
       } catch (err) {
         // Silently fail
       }
     }
-  };
+  }
 
   useEffect(() => {
-    restoreLockoutState();
-  }, []);
+    restoreLockoutState()
+  }, [])
 
   // Countdown effect for lockout
   useEffect(() => {
-    let interval: number;
+    let interval: number
     if (lockoutUntil && lockoutUntil > Date.now()) {
       const updateRemaining = () => {
-        const remaining = Math.max(0, Math.ceil((lockoutUntil - Date.now()) / 1000));
-        setRemainingLockoutSeconds(remaining);
+        const remaining = Math.max(
+          0,
+          Math.ceil((lockoutUntil - Date.now()) / 1000)
+        )
+        setRemainingLockoutSeconds(remaining)
         if (remaining === 0) {
-          setLockoutUntil(null);
-          setFailedAttempts(0);
-          setRemainingLockoutSeconds(0);
-          AsyncStorage.removeItem('studentLoginAttempts').catch(() => {});
-          setError(null);
+          setLockoutUntil(null)
+          setFailedAttempts(0)
+          setRemainingLockoutSeconds(0)
+          AsyncStorage.removeItem('studentLoginAttempts').catch(() => {})
+          setError(null)
         }
-      };
-      updateRemaining();
-      interval = setInterval(updateRemaining, 1000);
-      return () => clearInterval(interval);
+      }
+      updateRemaining()
+      interval = setInterval(updateRemaining, 1000)
+      return () => clearInterval(interval)
     } else if (lockoutUntil && lockoutUntil <= Date.now()) {
-      setLockoutUntil(null);
-      setFailedAttempts(0);
-      setRemainingLockoutSeconds(0);
-      AsyncStorage.removeItem('studentLoginAttempts').catch(() => {});
-      setError(null);
+      setLockoutUntil(null)
+      setFailedAttempts(0)
+      setRemainingLockoutSeconds(0)
+      AsyncStorage.removeItem('studentLoginAttempts').catch(() => {})
+      setError(null)
     }
-  }, [lockoutUntil]);
+  }, [lockoutUntil])
 
   useEffect(() => {
-    if (lockoutUntil && lockoutUntil > Date.now() && remainingLockoutSeconds > 0) {
-      setError(`Too many failed attempts. Please wait ${remainingLockoutSeconds} second${remainingLockoutSeconds !== 1 ? 's' : ''} before trying again.`);
+    if (
+      lockoutUntil &&
+      lockoutUntil > Date.now() &&
+      remainingLockoutSeconds > 0
+    ) {
+      setError(
+        `Too many failed attempts. Please wait ${remainingLockoutSeconds} second${remainingLockoutSeconds !== 1 ? 's' : ''} before trying again.`
+      )
     }
-  }, [remainingLockoutSeconds, lockoutUntil]);
+  }, [remainingLockoutSeconds, lockoutUntil])
 
   const handleFailedAttempt = (errorMessage: string) => {
-    const newAttempts = failedAttempts + 1;
-    setFailedAttempts(newAttempts);
+    const newAttempts = failedAttempts + 1
+    setFailedAttempts(newAttempts)
 
     if (newAttempts >= 3) {
-      const lockoutTime = Date.now() + 60 * 1000;
-      setLockoutUntil(lockoutTime);
-      setRemainingLockoutSeconds(60);
-      saveLockoutState(newAttempts, lockoutTime).catch(() => {});
-      setError(`Too many failed attempts. Please wait 60 seconds before trying again.`);
+      const lockoutTime = Date.now() + 60 * 1000
+      setLockoutUntil(lockoutTime)
+      setRemainingLockoutSeconds(60)
+      saveLockoutState(newAttempts, lockoutTime).catch(() => {})
+      setError(
+        `Too many failed attempts. Please wait 60 seconds before trying again.`
+      )
     } else {
-      setError(`${errorMessage} ${3 - newAttempts} attempt(s) remaining.`);
+      setError(`${errorMessage} ${3 - newAttempts} attempt(s) remaining.`)
     }
-    Alert.alert("Login Failed", errorMessage);
-  };
+    Alert.alert('Login Failed', errorMessage)
+  }
 
   const handleForgotPassword = async () => {
     if (!forgotUsername.trim()) {
-      setForgotMessage("Please enter your username");
-      return;
+      setForgotMessage('Please enter your username')
+      return
     }
 
-    setForgotLoading(true);
-    setForgotMessage(null);
+    setForgotLoading(true)
+    setForgotMessage(null)
 
     try {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('username', '==', forgotUsername.trim()));
-      const querySnapshot = await getDocs(q);
+      const usersRef = collection(db, 'users')
+      const q = query(usersRef, where('username', '==', forgotUsername.trim()))
+      const querySnapshot = await getDocs(q)
 
       if (querySnapshot.empty) {
-        setForgotMessage("Username not found");
-        setForgotLoading(false);
-        return;
+        setForgotMessage('Username not found')
+        setForgotLoading(false)
+        return
       }
 
-      const userDoc = querySnapshot.docs[0];
-      const userData = userDoc.data();
-      const email = userData.email;
+      const userDoc = querySnapshot.docs[0]
+      const userData = userDoc.data()
+      const email = userData.email
 
       if (!email) {
-        setForgotMessage("No email address associated with this account. Please contact support.");
-        setForgotLoading(false);
-        return;
+        setForgotMessage(
+          'No email address associated with this account. Please contact support.'
+        )
+        setForgotLoading(false)
+        return
       }
 
       if (!isValidEmail(email)) {
-        setForgotMessage("The email address on file is invalid. Please contact support.");
-        setForgotLoading(false);
-        return;
+        setForgotMessage(
+          'The email address on file is invalid. Please contact support.'
+        )
+        setForgotLoading(false)
+        return
       }
 
-      const auth = getAuth();
-      await sendPasswordResetEmail(auth, email);
+      const auth = getAuth()
+      await sendPasswordResetEmail(auth, email)
 
-      setForgotMessage("✓ Password reset email sent! Check your inbox.");
-      setForgotLoading(false);
+      setForgotMessage('✓ Password reset email sent! Check your inbox.')
+      setForgotLoading(false)
 
       setTimeout(() => {
-        setForgotModalVisible(false);
-        setForgotUsername("");
-        setForgotMessage(null);
-      }, 2000);
-
+        setForgotModalVisible(false)
+        setForgotUsername('')
+        setForgotMessage(null)
+      }, 2000)
     } catch (error: any) {
-      let errorMessage = "Failed to send reset email. Please try again later.";
+      let errorMessage = 'Failed to send reset email. Please try again later.'
       if (error.code === 'auth/user-not-found') {
-        errorMessage = "No account found with that email. Please contact support.";
+        errorMessage =
+          'No account found with that email. Please contact support.'
       } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "Invalid email address. Please contact support.";
+        errorMessage = 'Invalid email address. Please contact support.'
       } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = "Too many requests. Please try again later.";
+        errorMessage = 'Too many requests. Please try again later.'
       }
-      setForgotMessage(errorMessage);
-      setForgotLoading(false);
+      setForgotMessage(errorMessage)
+      setForgotLoading(false)
     }
-  };
+  }
 
   const handleLogin = async () => {
-    if (busy || isLockedOut) return;
-    setError(null);
+    if (busy || isLockedOut) return
+    setError(null)
 
     // Check lockout
     if (lockoutUntil && lockoutUntil > Date.now()) {
-      return;
+      return
     } else if (lockoutUntil && lockoutUntil <= Date.now()) {
       // Reset lockout if expired
-      setLockoutUntil(null);
-      setFailedAttempts(0);
-      setRemainingLockoutSeconds(0);
-      AsyncStorage.removeItem('studentLoginAttempts').catch(() => {});
+      setLockoutUntil(null)
+      setFailedAttempts(0)
+      setRemainingLockoutSeconds(0)
+      AsyncStorage.removeItem('studentLoginAttempts').catch(() => {})
     }
 
     if (!username || !password) {
-      setError("Please enter username and password");
-      return;
+      setError('Please enter username and password')
+      return
     }
 
-    setBusy(true);
-    setLoadingMessage("Verifying credentials");
+    setBusy(true)
+    setLoadingMessage('Verifying credentials')
 
     try {
-      setLoadingMessage("Checking user account");
-      const usersCollection = collection(db, "users");
-      const q = query(usersCollection, where("username", "==", username));
-      const querySnapshot = await getDocs(q);
+      setLoadingMessage('Checking user account')
+      const usersCollection = collection(db, 'users')
+      const q = query(usersCollection, where('username', '==', username))
+      const querySnapshot = await getDocs(q)
 
       if (querySnapshot.empty) {
-        setBusy(false);
-        handleFailedAttempt("Invalid username or password");
-        return;
+        setBusy(false)
+        handleFailedAttempt('Invalid username or password')
+        return
       }
 
-      const userDoc  = querySnapshot.docs[0];
-      const userData = userDoc.data();
+      const userDoc = querySnapshot.docs[0]
+      const userData = userDoc.data()
 
-      if (userData.role === "main_admin") {
-        setBusy(false);
-        setError("Main administrators must use the Admin Portal");
+      if (userData.role === 'main_admin') {
+        setBusy(false)
+        setError('Main administrators must use the Admin Portal')
         Alert.alert(
-          "Access Denied",
-          "Main administrators must login through the Admin Portal.\n\nPlease visit: /super-admin-login"
-        );
-        return;
+          'Access Denied',
+          'Main administrators must login through the Admin Portal.\n\nPlease visit: /super-admin-login'
+        )
+        return
       }
 
-      setLoadingMessage("Authenticating");
-      const loggedInUser = await login(userData.email, password);
+      setLoadingMessage('Authenticating')
+      const loggedInUser = await login(userData.email, password)
 
-      let targetRoute = "/student";
-      if (loggedInUser.role === "assistant_admin") targetRoute = "/assistant_admin";
+      let targetRoute = '/student'
+      if (loggedInUser.role === 'assistant_admin')
+        targetRoute = '/assistant_admin'
 
-      setFailedAttempts(0);
-      setLockoutUntil(null);
-      setRemainingLockoutSeconds(0);
-      setError(null);
-      AsyncStorage.removeItem('studentLoginAttempts').catch(() => {});
-      setLoadingMessage("Redirecting to dashboard...");
+      setFailedAttempts(0)
+      setLockoutUntil(null)
+      setRemainingLockoutSeconds(0)
+      setError(null)
+      AsyncStorage.removeItem('studentLoginAttempts').catch(() => {})
+      setLoadingMessage('Redirecting to dashboard...')
       setTimeout(() => {
-        router.replace(targetRoute as any);
-      }, 300);
-
+        router.replace(targetRoute as any)
+      }, 300)
     } catch (err: any) {
-      setBusy(false);
-      
-      let errorMessage = "Invalid username or password. Please try again.";
+      setBusy(false)
+
+      let errorMessage = 'Invalid username or password. Please try again.'
 
       if (
-        err.code === "auth/invalid-credential" ||
-        err.code === "auth/wrong-password"     ||
-        err.code === "auth/user-not-found"
+        err.code === 'auth/invalid-credential' ||
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/user-not-found'
       ) {
-        errorMessage = "Invalid username or password";
-      } else if (err.code === "auth/too-many-requests") {
-        errorMessage = "Too many failed attempts. Please try again later.";
-      } else if (err.code === "auth/network-request-failed") {
-        errorMessage = "Network error. Please check your connection.";
+        errorMessage = 'Invalid username or password'
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later.'
+      } else if (err.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection.'
       }
 
-      handleFailedAttempt(errorMessage);
+      handleFailedAttempt(errorMessage)
     }
-  };
+  }
 
   return (
     <>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar
+        barStyle='light-content'
+        translucent
+        backgroundColor='transparent'
+      />
 
       {/* Forgot Password Modal */}
       <Modal
         transparent
         visible={forgotModalVisible}
-        animationType="fade"
+        animationType='fade'
         onRequestClose={() => setForgotModalVisible(false)}
       >
-        <View style={[{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }]}>
-          <View style={[{ width: '80%', maxWidth: 400, backgroundColor: '#fff', borderRadius: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 5 }]}>
-            <Text style={[{ fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 8, textAlign: 'center' }]}>Reset Password</Text>
-            <Text style={[{ fontSize: 14, color: '#64748b', marginBottom: 20, textAlign: 'center' }]}>
+        <View
+          style={[
+            {
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            },
+          ]}
+        >
+          <View
+            style={[
+              {
+                width: '80%',
+                maxWidth: 400,
+                backgroundColor: '#fff',
+                borderRadius: 20,
+                padding: 20,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 4,
+                elevation: 5,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                {
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                  color: '#1e293b',
+                  marginBottom: 8,
+                  textAlign: 'center',
+                },
+              ]}
+            >
+              Reset Password
+            </Text>
+            <Text
+              style={[
+                {
+                  fontSize: 14,
+                  color: '#64748b',
+                  marginBottom: 20,
+                  textAlign: 'center',
+                },
+              ]}
+            >
               Enter your username to receive a password reset email.
             </Text>
             <TextInput
-              style={[{ borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16, color: '#1e293b', backgroundColor: '#f8fafc', marginBottom: 12 }]}
-              placeholder="Username"
-              placeholderTextColor="#94a3b8"
+              style={[
+                {
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                  borderRadius: 12,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  fontSize: 16,
+                  color: '#1e293b',
+                  backgroundColor: '#f8fafc',
+                  marginBottom: 12,
+                },
+              ]}
+              placeholder='Username'
+              placeholderTextColor='#94a3b8'
               value={forgotUsername}
               onChangeText={setForgotUsername}
-              autoCapitalize="none"
+              autoCapitalize='none'
               editable={!forgotLoading}
             />
             {forgotMessage && (
-              <Text style={[{ color: forgotMessage.startsWith('✓') ? '#10b981' : '#ef4444', fontSize: 12, marginBottom: 16, textAlign: 'center' }]}>
+              <Text
+                style={[
+                  {
+                    color: forgotMessage.startsWith('✓')
+                      ? '#10b981'
+                      : '#ef4444',
+                    fontSize: 12,
+                    marginBottom: 16,
+                    textAlign: 'center',
+                  },
+                ]}
+              >
                 {forgotMessage}
               </Text>
             )}
-            <View style={[{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }]}>
+            <View
+              style={[
+                {
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                },
+              ]}
+            >
               <TouchableOpacity
-                style={[{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: '#f1f5f9' }]}
+                style={[
+                  {
+                    flex: 1,
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    backgroundColor: '#f1f5f9',
+                  },
+                ]}
                 onPress={() => {
-                  setForgotModalVisible(false);
-                  setForgotMessage(null);
-                  setForgotUsername("");
+                  setForgotModalVisible(false)
+                  setForgotMessage(null)
+                  setForgotUsername('')
                 }}
                 disabled={forgotLoading}
               >
-                <Text style={[{ color: '#64748b', fontWeight: '600' }]}>Cancel</Text>
+                <Text style={[{ color: '#64748b', fontWeight: '600' }]}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: '#0ea5e9', opacity: forgotLoading ? 0.6 : 1 }]}
+                style={[
+                  {
+                    flex: 1,
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    backgroundColor: '#0ea5e9',
+                    opacity: forgotLoading ? 0.6 : 1,
+                  },
+                ]}
                 onPress={handleForgotPassword}
                 disabled={forgotLoading}
               >
                 {forgotLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size='small' color='#fff' />
                 ) : (
-                  <Text style={[{ color: '#fff', fontWeight: '600' }]}>Send Email</Text>
+                  <Text style={[{ color: '#fff', fontWeight: '600' }]}>
+                    Send Email
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -352,9 +475,12 @@ export default function Login() {
       </Modal>
 
       <View style={LoginStyles.root}>
-
         <LinearGradient
-          colors={[COLORS.gradientStart, COLORS.gradientMid, COLORS.gradientEnd]}
+          colors={[
+            COLORS.gradientStart,
+            COLORS.gradientMid,
+            COLORS.gradientEnd,
+          ]}
           start={{ x: 0.1, y: 0 }}
           end={{ x: 0.9, y: 1 }}
           style={LoginStyles.header}
@@ -364,9 +490,9 @@ export default function Login() {
           <View style={LoginStyles.logoWrapper}>
             <View style={LoginStyles.logoGlow}>
               <Image
-                source={require("../assets/images/Logo/TMC_Connect.png")}
+                source={require('../assets/images/Logo/TMC_Connect.png')}
                 style={LoginStyles.logo}
-                resizeMode="contain"
+                resizeMode='contain'
               />
             </View>
             <Text style={LoginStyles.appName}>TMC Connect</Text>
@@ -376,13 +502,13 @@ export default function Login() {
         {/* ── Form area ─────────────────────────────────────────── */}
         <KeyboardAvoidingView
           style={LoginStyles.keyboardView}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <ScrollView
             contentContainerStyle={LoginStyles.scrollContent}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+            keyboardShouldPersistTaps='handled'
           >
             {/* Title */}
             <View style={LoginStyles.titleRow}>
@@ -404,30 +530,34 @@ export default function Login() {
               ]}
             >
               <Ionicons
-                name="person-outline"
+                name='person-outline'
                 size={20}
                 color={usernameFocused ? COLORS.gradientStart : COLORS.iconTint}
                 style={LoginStyles.inputIcon}
               />
               <TextInput
-                placeholder="Username"
+                placeholder='Username'
                 placeholderTextColor={COLORS.placeholderGray}
                 value={username}
                 onChangeText={(t) => {
-                  setUsername(t);
-                  if (error) setError(null);
+                  setUsername(t)
+                  if (error) setError(null)
                 }}
                 style={LoginStyles.input}
-                autoCapitalize="none"
+                autoCapitalize='none'
                 autoCorrect={false}
-                returnKeyType="next"
+                returnKeyType='next'
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 onFocus={() => setUsernameFocused(true)}
                 onBlur={() => setUsernameFocused(false)}
                 editable={!isLoading && !isLockedOut}
               />
               {username.length > 0 && (
-                <Ionicons name="checkmark-circle" size={18} color={COLORS.gradientStart} />
+                <Ionicons
+                  name='checkmark-circle'
+                  size={18}
+                  color={COLORS.gradientStart}
+                />
               )}
             </View>
 
@@ -439,25 +569,25 @@ export default function Login() {
               ]}
             >
               <Ionicons
-                name="lock-closed-outline"
+                name='lock-closed-outline'
                 size={20}
                 color={passwordFocused ? COLORS.gradientStart : COLORS.iconTint}
                 style={LoginStyles.inputIcon}
               />
               <TextInput
                 ref={passwordRef}
-                placeholder="Password"
+                placeholder='Password'
                 placeholderTextColor={COLORS.placeholderGray}
                 value={password}
                 onChangeText={(t) => {
-                  setPassword(t);
-                  if (error) setError(null);
+                  setPassword(t)
+                  if (error) setError(null)
                 }}
                 style={[LoginStyles.input, { flex: 1 }]}
                 secureTextEntry={!showPassword}
-                autoCapitalize="none"
+                autoCapitalize='none'
                 autoCorrect={false}
-                returnKeyType="done"
+                returnKeyType='done'
                 onSubmitEditing={handleLogin}
                 onFocus={() => setPasswordFocused(true)}
                 onBlur={() => setPasswordFocused(false)}
@@ -469,9 +599,11 @@ export default function Login() {
                 disabled={isLoading || !!isLockedOut}
               >
                 <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={22}
-                  color={passwordFocused ? COLORS.gradientStart : COLORS.iconTint}
+                  color={
+                    passwordFocused ? COLORS.gradientStart : COLORS.iconTint
+                  }
                 />
               </TouchableOpacity>
             </View>
@@ -479,14 +611,22 @@ export default function Login() {
             {/* Error banner */}
             {error ? (
               <View style={LoginStyles.errorBanner}>
-                <Ionicons name="alert-circle-outline" size={18} color={COLORS.errorRed} />
+                <Ionicons
+                  name='alert-circle-outline'
+                  size={18}
+                  color={COLORS.errorRed}
+                />
                 <Text style={LoginStyles.errorText}>{error}</Text>
               </View>
             ) : null}
 
             {/* Sign In button */}
             <LinearGradient
-              colors={[COLORS.gradientStart, COLORS.gradientMid, COLORS.gradientEnd]}
+              colors={[
+                COLORS.gradientStart,
+                COLORS.gradientMid,
+                COLORS.gradientEnd,
+              ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[
@@ -501,7 +641,7 @@ export default function Login() {
                 activeOpacity={0.85}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <ActivityIndicator color='#FFFFFF' size='small' />
                 ) : (
                   <Text style={LoginStyles.buttonText}>Sign In</Text>
                 )}
@@ -526,12 +666,12 @@ export default function Login() {
         </KeyboardAvoidingView>
       </View>
 
-      <Modal transparent visible={isLoading} animationType="fade">
+      <Modal transparent visible={isLoading} animationType='fade'>
         <LoadingScreen
-          message={loadingMessage || "Signing you in..."}
-          subMessage="Please wait while we prepare your dashboard"
+          message={loadingMessage || 'Signing you in...'}
+          subMessage='Please wait while we prepare your dashboard'
         />
       </Modal>
     </>
-  );
+  )
 }

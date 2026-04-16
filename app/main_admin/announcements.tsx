@@ -33,11 +33,11 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
-import { useAuth } from '../../context/AuthContext'
-import { useTheme } from '../../context/ThemeContext'
-import { db } from '../../lib/firebaseConfig'
-import { createAnnouncementStyles } from '../../styles/main-admin/announcementStyles'
-import { notificationService } from '../../utils/notifications'
+import { useAuth } from '../../src/Controller/context/AuthContext'
+import { useTheme } from '../../src/Controller/context/ThemeContext'
+import { notificationService } from '../../src/Controller/utils/notifications'
+import { db } from '../../src/Model/lib/firebaseConfig'
+import { createAnnouncementStyles } from '../../src/View/styles/main-admin/announcementStyles'
 
 const showAlert = (title: string, message?: string) => {
   if (Platform.OS === 'web') {

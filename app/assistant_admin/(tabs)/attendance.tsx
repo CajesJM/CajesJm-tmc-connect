@@ -36,11 +36,11 @@ import {
 import DateTimePickerModal from 'react-native-modal-datetime-picker'
 import QRCode from 'react-native-qrcode-svg'
 import { captureRef } from 'react-native-view-shot'
-import PenaltyAnnouncementModal from '../../../components/PenaltyAnnouncementModal'
-import { useAuth } from '../../../context/AuthContext'
-import { useTheme } from '../../../context/ThemeContext'
-import { auth, db } from '../../../lib/firebaseConfig'
-import { createAttendanceStyles } from '../../../styles/assistant-admin/attendanceStyles'
+import { useAuth } from '../../../src/Controller/context/AuthContext'
+import { useTheme } from '../../../src/Controller/context/ThemeContext'
+import { auth, db } from '../../../src/Model/lib/firebaseConfig'
+import PenaltyAnnouncementModal from '../../../src/View/components/PenaltyAnnouncementModal'
+import { createAttendanceStyles } from '../../../src/View/styles/assistant-admin/attendanceStyles'
 
 const showAlert = (title: string, message?: string) => {
   if (Platform.OS === 'web') {
@@ -230,9 +230,7 @@ export default function MainAdminAttendance() {
   useEffect(() => {
     const fetchStudents = async () => {
       try {
-        console.log('Fetching students from Firestore...')
         const snapshot = await getDocs(collection(db, 'users'))
-        console.log('Students snapshot size:', snapshot.size)
 
         const studentsList = snapshot.docs
           .map((doc) => ({
@@ -246,11 +244,6 @@ export default function MainAdminAttendance() {
               .trim()
             return role === 'student'
           }) as Student[]
-
-        console.log(
-          'Filtered students list (students only):',
-          studentsList.length
-        )
         setStudents(studentsList)
       } catch (error) {
         console.error('Error fetching students:', error)
@@ -856,12 +849,6 @@ export default function MainAdminAttendance() {
 
       if (eventDoc.exists()) {
         const eventData = eventDoc.data()
-        console.log('Fetched event:', eventId)
-        console.log('Full event data:', JSON.stringify(eventData, null, 2))
-        console.log('Attendees array:', eventData.attendees)
-        console.log('Attendees type:', typeof eventData.attendees)
-        console.log('Is array?', Array.isArray(eventData.attendees))
-
         if (
           eventData.attendees &&
           Array.isArray(eventData.attendees) &&
@@ -880,11 +867,9 @@ export default function MainAdminAttendance() {
           setAttendanceRecords(validAttendees)
           setCurrentPage(1)
         } else {
-          console.log('No attendees found for event:', eventId)
           setAttendanceRecords([])
         }
       } else {
-        console.log('Event not found:', eventId)
         setAttendanceRecords([])
       }
     } catch (error) {
@@ -995,10 +980,8 @@ export default function MainAdminAttendance() {
   }
 
   const handleCompletePenalty = async (student: Student, event: Event) => {
-    // Fallback: try auth.currentUser if context user is null
     let currentUser = user
     if (!currentUser && auth.currentUser) {
-      console.log('Using auth.currentUser as fallback')
       currentUser = auth.currentUser
     }
     if (!currentUser) {
@@ -1007,25 +990,14 @@ export default function MainAdminAttendance() {
       return
     }
 
-    console.log('=== Starting handleCompletePenalty ===')
-    console.log('Student:', student.name, student.id)
-    console.log('Event:', event.id, event.title)
-    console.log('User:', currentUser.uid)
-
     try {
       setProcessingAction(student.id)
-      console.log('Processing action set for', student.id)
-
-      // Query for the penalty document using studentId and eventId
       const penaltiesQuery = query(
         collection(db, 'penalties'),
         where('studentId', '==', student.id),
         where('eventId', '==', event.id)
       )
-      console.log('Executing query...')
       const snapshot = await getDocs(penaltiesQuery)
-      console.log('Query snapshot size:', snapshot.size)
-
       if (snapshot.empty) {
         console.error('No penalty found for this student and event')
         showAlert(
@@ -1054,7 +1026,6 @@ export default function MainAdminAttendance() {
       })
       console.log('Penalty document updated successfully')
 
-      // Also update user's penalties array
       const userRef = doc(db, 'users', student.id)
       const userDoc = await getDoc(userRef)
 
@@ -1076,8 +1047,6 @@ export default function MainAdminAttendance() {
         await updateDoc(userRef, { penalties: updatedPenalties })
         console.log('User penalties updated')
       }
-
-      // Update local state
       setCompletedStudentIds((prev) => new Set([...prev, student.id]))
       console.log('Local state updated')
 
@@ -1100,7 +1069,6 @@ export default function MainAdminAttendance() {
   const handleCancelCompletion = async (student: Student, event: Event) => {
     let currentUser = user
     if (!currentUser && auth.currentUser) {
-      console.log('Using auth.currentUser as fallback for cancel')
       currentUser = auth.currentUser
     }
     if (!currentUser) {
@@ -1184,7 +1152,6 @@ export default function MainAdminAttendance() {
 
     try {
       if (Platform.OS === 'web') {
-        // Web: use toDataURL as before
         const getDataURL = (): Promise<string> => {
           return new Promise((resolve, reject) => {
             try {
@@ -1237,7 +1204,6 @@ export default function MainAdminAttendance() {
           'Use the print dialog to save as PDF or print.'
         )
       } else {
-        // Native: capture view with react-native-view-shot
         if (Platform.OS === 'ios') {
           const { status } = await MediaLibrary.requestPermissionsAsync()
           if (status !== 'granted') {
@@ -1245,15 +1211,11 @@ export default function MainAdminAttendance() {
             return
           }
         }
-
-        // Capture the QR wrapper view as a PNG
         const uri = await captureRef(qrWrapperRef, {
           format: 'png',
           quality: 1,
           result: 'tmpfile',
         })
-
-        // Save to media library
         const asset = await MediaLibrary.createAssetAsync(uri)
         await MediaLibrary.createAlbumAsync('Event QR Codes', asset, false)
         showAlert('Success', 'QR code saved to your gallery!')
@@ -1491,15 +1453,7 @@ export default function MainAdminAttendance() {
     return filtered
   }, [missingAttendees, selectedYearLevel, selectedBlock])
 
-  useEffect(() => {
-    console.log('=== DEBUG ATTENDANCE ===')
-    console.log('Total attendance records:', attendanceRecords.length)
-    console.log('Total students in system:', students.length)
-    console.log('Missing attendees count:', missingAttendees.length)
-    console.log('Sample attendance record:', attendanceRecords[0])
-    console.log('Sample student:', students[0])
-    console.log('========================')
-  }, [attendanceRecords, students, missingAttendees])
+  useEffect(() => {}, [attendanceRecords, students, missingAttendees])
 
   const filteredAttendedBySearch = useMemo(() => {
     if (!searchQuery.trim()) return getFilteredAttendanceRecords
@@ -3300,12 +3254,6 @@ export default function MainAdminAttendance() {
                                   minWidth: 100,
                                 }}
                                 onPress={() => {
-                                  console.log(
-                                    'Complete button pressed - storing event:',
-                                    selectedEvent?.id,
-                                    'student:',
-                                    item.id
-                                  )
                                   setSelectedStudentForAction(item)
                                   setSelectedEventForAction(selectedEvent)
                                   setShowCompleteConfirmModal(true)
@@ -3355,12 +3303,6 @@ export default function MainAdminAttendance() {
                                   minWidth: 100,
                                 }}
                                 onPress={() => {
-                                  console.log(
-                                    'Cancel button pressed - storing event:',
-                                    selectedEvent?.id,
-                                    'student:',
-                                    item.id
-                                  )
                                   setSelectedStudentForAction(item)
                                   setSelectedEventForAction(selectedEvent)
                                   setShowCancelConfirmModal(true)

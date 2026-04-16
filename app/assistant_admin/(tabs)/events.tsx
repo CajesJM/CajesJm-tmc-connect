@@ -36,14 +36,14 @@ import {
 } from 'react-native'
 import DateTimePickerModal from 'react-native-modal-datetime-picker'
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
+import { useAuth } from '../../../src/Controller/context/AuthContext'
+import { useTheme } from '../../../src/Controller/context/ThemeContext'
 import {
   CAMPUS_LOCATIONS,
   CampusLocation,
-} from '../../../constants/campusLocations'
-import { useAuth } from '../../../context/AuthContext'
-import { useTheme } from '../../../context/ThemeContext'
-import { db } from '../../../lib/firebaseConfig'
-import { createAssistantEventsStyles } from '../../../styles/assistant-admin/eventStyles'
+} from '../../../src/Model/constants/campusLocations'
+import { db } from '../../../src/Model/lib/firebaseConfig'
+import { createAssistantEventsStyles } from '../../../src/View/styles/assistant-admin/eventStyles'
 
 dayjs.extend(relativeTime)
 

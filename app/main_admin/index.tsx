@@ -43,14 +43,20 @@ import {
 import { LineChart } from 'react-native-chart-kit'
 import { PieChart } from 'react-native-gifted-charts'
 import Svg, { Line, Polyline } from 'react-native-svg'
-import { AnimatedStatCard } from '../../components/AnimatedStatCard'
-import { NotificationModal } from '../../components/NotificationModal'
-import { useAuth } from '../../context/AuthContext'
-import { useTheme } from '../../context/ThemeContext'
-import { db } from '../../lib/firebaseConfig'
-import { createDashboardStyles } from '../../styles/main-admin/dashboardStyles'
-import { Notification, notificationService } from '../../utils/notifications'
-import { generateDashboardPDF, sharePDF } from '../../utils/pdfGenerator'
+import { useAuth } from '../../src/Controller/context/AuthContext'
+import { useTheme } from '../../src/Controller/context/ThemeContext'
+import {
+  Notification,
+  notificationService,
+} from '../../src/Controller/utils/notifications'
+import {
+  generateDashboardPDF,
+  sharePDF,
+} from '../../src/Controller/utils/pdfGenerator'
+import { db } from '../../src/Model/lib/firebaseConfig'
+import { AnimatedStatCard } from '../../src/View/components/AnimatedStatCard'
+import { NotificationModal } from '../../src/View/components/NotificationModal'
+import { createDashboardStyles } from '../../src/View/styles/main-admin/dashboardStyles'
 import MainAdminAnnouncements from './announcements'
 import MainAdminAttendance from './attendance'
 import MainAdminEvents from './events'

@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Tabs } from 'expo-router';
-import React, { useEffect, useMemo, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
+import { Tabs } from 'expo-router'
+import React, { useEffect, useMemo, useRef } from 'react'
 import {
   Animated,
   Dimensions,
@@ -10,11 +10,14 @@ import {
   TouchableOpacity,
   View,
   ViewStyle,
-} from 'react-native';
-import { NotificationProvider, useNotifications } from '../../../context/NotificationContext';
-import { useTheme } from '../../../context/ThemeContext';
+} from 'react-native'
+import {
+  NotificationProvider,
+  useNotifications,
+} from '../../../src/Controller/context/NotificationContext'
+import { useTheme } from '../../../src/Controller/context/ThemeContext'
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get('window')
 
 const TabIconWithBadge = ({
   name,
@@ -22,19 +25,22 @@ const TabIconWithBadge = ({
   badgeCount,
   colors,
 }: {
-  name: keyof typeof Ionicons.glyphMap;
-  focused: boolean;
-  badgeCount?: number;
-  colors: any; // ThemeColors
+  name: keyof typeof Ionicons.glyphMap
+  focused: boolean
+  badgeCount?: number
+  colors: any
 }) => {
-  const iconName = focused ? name : `${name}-outline`;
-  const validIconName = iconName as keyof typeof Ionicons.glyphMap;
+  const iconName = focused ? name : `${name}-outline`
+  const validIconName = iconName as keyof typeof Ionicons.glyphMap
 
   return (
     <Animated.View
       style={[
         styles.iconContainer,
-        focused && [styles.activeIconContainer, { backgroundColor: `${colors.accent.primary}15` }],
+        focused && [
+          styles.activeIconContainer,
+          { backgroundColor: `${colors.accent.primary}15` },
+        ],
         { transform: [{ scale: focused ? 1.1 : 1 }] },
       ]}
     >
@@ -43,26 +49,34 @@ const TabIconWithBadge = ({
         size={22}
         color={focused ? colors.accent.primary : colors.sidebar.text.secondary}
       />
-      {focused && <View style={[styles.activeIndicator, { backgroundColor: colors.accent.primary }]} />}
+      {focused && (
+        <View
+          style={[
+            styles.activeIndicator,
+            { backgroundColor: colors.accent.primary },
+          ]}
+        />
+      )}
       {badgeCount !== undefined && badgeCount > 0 && (
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+          <Text style={styles.badgeText}>
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </Text>
         </View>
       )}
     </Animated.View>
-  );
-};
+  )
+}
 
 // Inner component that uses the notification context and theme
 function TabsContent() {
-  const { unreadCounts } = useNotifications();
-  const { colors, isDark } = useTheme();
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const qrScaleAnim = useRef(new Animated.Value(1)).current;
+  const { unreadCounts } = useNotifications()
+  const { colors, isDark } = useTheme()
+  const pulseAnim = useRef(new Animated.Value(1)).current
+  const rotateAnim = useRef(new Animated.Value(0)).current
+  const qrScaleAnim = useRef(new Animated.Value(1)).current
 
   useEffect(() => {
-   
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -76,10 +90,10 @@ function TabsContent() {
           useNativeDriver: true,
         }),
       ])
-    );
-    pulse.start();
-    return () => pulse.stop();
-  }, []);
+    )
+    pulse.start()
+    return () => pulse.stop()
+  }, [])
 
   useEffect(() => {
     const rotate = Animated.loop(
@@ -88,31 +102,31 @@ function TabsContent() {
         duration: 3000,
         useNativeDriver: true,
       })
-    );
-    rotate.start();
-    return () => rotate.stop();
-  }, []);
+    )
+    rotate.start()
+    return () => rotate.stop()
+  }, [])
 
   const rotate = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
-  });
+  })
 
   const handleQrPressIn = () => {
     Animated.spring(qrScaleAnim, {
       toValue: 0.9,
       useNativeDriver: true,
       speed: 50,
-    }).start();
-  };
+    }).start()
+  }
 
   const handleQrPressOut = () => {
     Animated.spring(qrScaleAnim, {
       toValue: 1,
       useNativeDriver: true,
       speed: 50,
-    }).start();
-  };
+    }).start()
+  }
 
   const tabBarStyle = useMemo<ViewStyle>(
     () => ({
@@ -134,13 +148,13 @@ function TabsContent() {
       paddingBottom: 12,
     }),
     [colors.card, colors.accent.primary, isDark]
-  );
+  )
 
   // Gradient colors for the QR button
   const qrGradientColors = useMemo(
     () => [colors.accent.primary, '#0284c7'] as const,
     [colors.accent.primary]
-  );
+  )
 
   return (
     <View style={{ flex: 1 }}>
@@ -160,12 +174,12 @@ function TabsContent() {
       >
         {/* Dashboard Tab */}
         <Tabs.Screen
-          name="index"
+          name='index'
           options={{
             title: 'Dashboard',
             tabBarIcon: ({ focused }) => (
               <TabIconWithBadge
-                name="home"
+                name='home'
                 focused={focused}
                 badgeCount={unreadCounts.home}
                 colors={colors}
@@ -176,12 +190,12 @@ function TabsContent() {
 
         {/* Announcements Tab */}
         <Tabs.Screen
-          name="announcements"
+          name='announcements'
           options={{
             title: 'Announcements',
             tabBarIcon: ({ focused }) => (
               <TabIconWithBadge
-                name="megaphone"
+                name='megaphone'
                 focused={focused}
                 badgeCount={unreadCounts.announcements}
                 colors={colors}
@@ -192,14 +206,14 @@ function TabsContent() {
 
         {/* QR Code Generation – Center Floating Button */}
         <Tabs.Screen
-          name="attendance"
+          name='attendance'
           options={{
             title: '',
             tabBarIcon: () => null,
             tabBarLabel: () => null,
             tabBarButton: (props) => {
-              const { onPress, accessibilityState } = props;
-              const isSelected = accessibilityState?.selected;
+              const { onPress, accessibilityState } = props
+              const isSelected = accessibilityState?.selected
 
               return (
                 <View style={styles.qrButtonContainer}>
@@ -214,7 +228,11 @@ function TabsContent() {
                       style={[
                         styles.qrButtonOuter,
                         {
-                          transform: [{ scale: Animated.multiply(pulseAnim, qrScaleAnim) }],
+                          transform: [
+                            {
+                              scale: Animated.multiply(pulseAnim, qrScaleAnim),
+                            },
+                          ],
                           backgroundColor: colors.card,
                           shadowColor: colors.accent.primary,
                         },
@@ -227,7 +245,11 @@ function TabsContent() {
                         style={styles.qrButtonGradient}
                       >
                         <Animated.View style={{ transform: [{ rotate }] }}>
-                          <Ionicons name="qr-code-outline" size={28} color="#ffffff" />
+                          <Ionicons
+                            name='qr-code-outline'
+                            size={28}
+                            color='#ffffff'
+                          />
                         </Animated.View>
                       </LinearGradient>
                     </Animated.View>
@@ -238,23 +260,28 @@ function TabsContent() {
                       ]}
                     />
                   </TouchableOpacity>
-                  <Text style={[styles.qrButtonLabel, { color: colors.accent.primary }]}>
+                  <Text
+                    style={[
+                      styles.qrButtonLabel,
+                      { color: colors.accent.primary },
+                    ]}
+                  >
                     Generate
                   </Text>
                 </View>
-              );
+              )
             },
           }}
         />
 
         {/* Events Tab */}
         <Tabs.Screen
-          name="events"
+          name='events'
           options={{
             title: 'Events',
             tabBarIcon: ({ focused }) => (
               <TabIconWithBadge
-                name="calendar"
+                name='calendar'
                 focused={focused}
                 badgeCount={unreadCounts.events}
                 colors={colors}
@@ -265,12 +292,12 @@ function TabsContent() {
 
         {/* Profile Tab */}
         <Tabs.Screen
-          name="profile"
+          name='profile'
           options={{
             title: 'Profile',
             tabBarIcon: ({ focused }) => (
               <TabIconWithBadge
-                name="person"
+                name='person'
                 focused={focused}
                 badgeCount={unreadCounts.profile}
                 colors={colors}
@@ -280,7 +307,7 @@ function TabsContent() {
         />
       </Tabs>
     </View>
-  );
+  )
 }
 
 // Main layout – wraps everything with the NotificationProvider and ThemeProvider
@@ -289,7 +316,7 @@ export default function AdminTabsLayout() {
     <NotificationProvider>
       <TabsContent />
     </NotificationProvider>
-  );
+  )
 }
 
 // Styles – reused from student tabs
@@ -372,4 +399,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 4,
   },
-});
+})

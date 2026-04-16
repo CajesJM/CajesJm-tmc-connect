@@ -36,12 +36,12 @@ import {
   View,
 } from 'react-native'
 import QRCode from 'react-native-qrcode-svg'
-import PenaltyAnnouncementModal from '../../components/PenaltyAnnouncementModal'
-import { useAuth } from '../../context/AuthContext'
-import { useTheme } from '../../context/ThemeContext'
-import { auth, db } from '../../lib/firebaseConfig'
-import { createAttendanceStyles } from '../../styles/main-admin/attendanceStyles'
-import { notificationService } from '../../utils/notifications'
+import { useAuth } from '../../src/Controller/context/AuthContext'
+import { useTheme } from '../../src/Controller/context/ThemeContext'
+import { notificationService } from '../../src/Controller/utils/notifications'
+import { auth, db } from '../../src/Model/lib/firebaseConfig'
+import PenaltyAnnouncementModal from '../../src/View/components/PenaltyAnnouncementModal'
+import { createAttendanceStyles } from '../../src/View/styles/main-admin/attendanceStyles'
 
 const showAlert = (title: string, message?: string) => {
   if (Platform.OS === 'web') {

@@ -29,13 +29,16 @@ import {
   View,
 } from 'react-native'
 import { PieChart } from 'react-native-gifted-charts'
-import { NotificationModal } from '../../../components/NotificationModal'
-import { StudentActivityModal } from '../../../components/StudentActivityModal'
-import { useAuth } from '../../../context/AuthContext'
-import { useTheme } from '../../../context/ThemeContext'
-import { auth, db } from '../../../lib/firebaseConfig'
-import { createStudentDashboardStyles } from '../../../styles/student/dashboardStyles'
-import { Notification, notificationService } from '../../../utils/notifications'
+import { useAuth } from '../../../src/Controller/context/AuthContext'
+import { useTheme } from '../../../src/Controller/context/ThemeContext'
+import {
+  Notification,
+  notificationService,
+} from '../../../src/Controller/utils/notifications'
+import { auth, db } from '../../../src/Model/lib/firebaseConfig'
+import { NotificationModal } from '../../../src/View/components/NotificationModal'
+import { StudentActivityModal } from '../../../src/View/components/StudentActivityModal'
+import { createStudentDashboardStyles } from '../../../src/View/styles/student/dashboardStyles'
 
 interface Event {
   id: string

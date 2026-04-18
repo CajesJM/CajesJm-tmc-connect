@@ -1009,7 +1009,11 @@ export default function StudentEventsScreen() {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>Events Dashboard,</Text>
-            <Text style={styles.userName}>{userData?.name || 'Student'}</Text>
+            <Text style={styles.userName}>
+              {userData?.surname
+                ? `${userData.name} ${userData.surname}`
+                : userData?.name || 'Student'}
+            </Text>
             <Text style={styles.role}>Student</Text>
           </View>
           <TouchableOpacity
@@ -1024,7 +1028,11 @@ export default function StudentEventsScreen() {
             ) : (
               <View style={[styles.profileImage, styles.profileFallback]}>
                 <Text style={styles.profileInitials}>
-                  {userData?.name ? userData.name.charAt(0).toUpperCase() : 'S'}
+                  {userData?.name
+                    ? userData.surname
+                      ? `${userData.name.charAt(0)}${userData.surname.charAt(0)}`.toUpperCase()
+                      : userData.name.charAt(0).toUpperCase()
+                    : 'S'}
                 </Text>
               </View>
             )}
@@ -1044,41 +1052,6 @@ export default function StudentEventsScreen() {
         </View>
       </LinearGradient>
 
-      {/* Stats Section */}
-      {/*
-      <View style={styles.statsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: `${colors.accent.primary}15` }]}>
-              <Feather name="calendar" size={18} color={colors.accent.primary} />
-            </View>
-            <Text style={styles.statNumber}>{stats.total}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#f59e0b15' }]}>
-              <Feather name="clock" size={18} color="#f59e0b" />
-            </View>
-            <Text style={styles.statNumber}>{stats.upcoming}</Text>
-            <Text style={styles.statLabel}>Upcoming</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#64748b15' }]}>
-              <Feather name="check-circle" size={18} color="#64748b" />
-            </View>
-            <Text style={styles.statNumber}>{stats.past}</Text>
-            <Text style={styles.statLabel}>Past</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#10b98115' }]}>
-              <Feather name="sun" size={18} color="#10b981" />
-            </View>
-            <Text style={styles.statNumber}>{todayEventsCount}</Text>
-            <Text style={styles.statLabel}>Today</Text>
-          </View>
-        </ScrollView>
-      </View>
-        */}
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <View style={styles.searchBar}>

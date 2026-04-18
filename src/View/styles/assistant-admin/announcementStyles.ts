@@ -533,6 +533,7 @@ export const createAssistantAnnouncementStyles = (
     },
     detailMeta: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 16,
       marginBottom: 20,
       paddingBottom: 16,
@@ -543,10 +544,12 @@ export const createAssistantAnnouncementStyles = (
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+      flexShrink: 1,
     },
     detailMetaText: {
       fontSize: 13,
       color: colors.sidebar.text.secondary,
+      flexShrink: 1,
     },
     detailMessageContainer: {
       backgroundColor: colors.border,

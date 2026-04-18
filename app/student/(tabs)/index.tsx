@@ -36,6 +36,7 @@ import {
   notificationService,
 } from '../../../src/Controller/utils/notifications'
 import { auth, db } from '../../../src/Model/lib/firebaseConfig'
+import AutoSlidingStats from '../../../src/View/components/AutoSlidingStats-Stu'
 import { NotificationModal } from '../../../src/View/components/NotificationModal'
 import { StudentActivityModal } from '../../../src/View/components/StudentActivityModal'
 import { createStudentDashboardStyles } from '../../../src/View/styles/student/dashboardStyles'
@@ -1118,6 +1119,9 @@ export default function StudentDashboard() {
                 style={[
                   styles.shape1,
                   {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.05)'
+                      : 'rgba(255,255,255,0.25)',
                     transform: [{ scale: pulseAnim }, { rotate: spin }],
                   },
                 ]}
@@ -1126,6 +1130,9 @@ export default function StudentDashboard() {
                 style={[
                   styles.shape2,
                   {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.08)'
+                      : 'rgba(255,255,255,0.3)',
                     transform: [
                       {
                         scale: pulseAnim.interpolate({
@@ -1162,7 +1169,9 @@ export default function StudentDashboard() {
                     },
                   ]}
                 >
-                  {userData?.name || 'Student'}
+                  {userData?.surname
+                    ? `${userData.name} ${userData.surname}`
+                    : userData?.name || 'Student'}
                 </Animated.Text>
                 <View style={styles.roleBadge}>
                   <LinearGradient
@@ -1197,7 +1206,9 @@ export default function StudentDashboard() {
                   <View style={[styles.profileImage, styles.profileFallback]}>
                     <Text style={styles.profileInitials}>
                       {userData?.name
-                        ? userData.name.charAt(0).toUpperCase()
+                        ? userData.surname
+                          ? `${userData.name.charAt(0)}${userData.surname.charAt(0)}`.toUpperCase()
+                          : userData.name.charAt(0).toUpperCase()
                         : 'S'}
                     </Text>
                   </View>
@@ -1251,6 +1262,7 @@ export default function StudentDashboard() {
         </Animated.View>
 
         <InteractiveDonutChart />
+        <AutoSlidingStats />
 
         {/* Two Column Layout with Animations */}
         <Animated.View

@@ -2,6 +2,11 @@ import { Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+} from 'firebase/auth'
 import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage'
 import React, { useEffect, useMemo, useState } from 'react'
@@ -13,6 +18,7 @@ import {
   Platform,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -20,7 +26,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons'
 import { useAuth } from '../../../src/Controller/context/AuthContext'
 import { useTheme } from '../../../src/Controller/context/ThemeContext'
-import { db } from '../../../src/Model/lib/firebaseConfig'
+import { auth, db } from '../../../src/Model/lib/firebaseConfig'
 import { createAssistantProfileStyles } from '../../../src/View/styles/assistant-admin/profileStyles'
 
 const showAlert = (title: string, message?: string) => {
@@ -33,12 +39,15 @@ const showAlert = (title: string, message?: string) => {
 
 function getInitials(name?: string, email?: string): string {
   if (name) {
+    const commaIndex = name.indexOf(',')
+    if (commaIndex !== -1) {
+      return name.charAt(0).toUpperCase()
+    }
     return name.charAt(0).toUpperCase()
   }
   if (email) return email[0].toUpperCase()
   return 'A'
 }
-
 export default function AssistantAdminProfile() {
   const { logout, userData, user } = useAuth()
   const router = useRouter()
@@ -60,6 +69,22 @@ export default function AssistantAdminProfile() {
   const [showAboutModal, setShowAboutModal] = useState(false)
   const [showHelpModal, setShowHelpModal] = useState(false)
 
+  // Change Password State
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordStrength, setPasswordStrength] = useState<{
+    score: number
+    label: string
+    color: string
+  }>({ score: 0, label: 'Weak', color: '#EF4444' })
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
   const [eventsData, setEventsData] = useState<any[]>([])
   const [usersData, setUsersData] = useState<any[]>([])
   const [penaltiesData, setPenaltiesData] = useState<any[]>([])
@@ -68,6 +93,101 @@ export default function AssistantAdminProfile() {
   useEffect(() => {
     if (userData?.photoURL) setPhotoURL(userData.photoURL)
   }, [userData?.photoURL])
+
+  const calculatePasswordStrength = (password: string) => {
+    let score = 0
+    if (password.length >= 8) score++
+    if (/[A-Z]/.test(password)) score++
+    if (/[a-z]/.test(password)) score++
+    if (/[0-9]/.test(password)) score++
+    if (/[^A-Za-z0-9]/.test(password)) score++
+
+    let label = 'Weak'
+    let color = '#EF4444'
+    if (score >= 4) {
+      label = 'Strong'
+      color = '#10B981'
+    } else if (score >= 3) {
+      label = 'Good'
+      color = '#3B82F6'
+    } else if (score >= 2) {
+      label = 'Fair'
+      color = '#F59E0B'
+    }
+
+    setPasswordStrength({ score, label, color })
+  }
+
+  const isChangePasswordFormValid = () => {
+    if (!currentPassword.trim()) return false
+    if (!newPassword.trim() || passwordStrength.score < 3) return false
+    if (newPassword !== confirmPassword) return false
+    return true
+  }
+
+  const resetChangePasswordForm = () => {
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setPasswordError(null)
+    setPasswordStrength({ score: 0, label: 'Weak', color: '#EF4444' })
+    setShowCurrentPassword(false)
+    setShowNewPassword(false)
+    setShowConfirmPassword(false)
+  }
+
+  const handleChangePassword = async () => {
+    setPasswordError(null)
+
+    if (!isChangePasswordFormValid()) {
+      setPasswordError('Please fill all fields correctly.')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirmation do not match.')
+      return
+    }
+
+    const currentUser = auth.currentUser
+    if (!currentUser || !currentUser.email) {
+      setPasswordError('User not authenticated.')
+      return
+    }
+
+    setIsUpdatingPassword(true)
+
+    try {
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
+      )
+      await reauthenticateWithCredential(currentUser, credential)
+      await updatePassword(currentUser, newPassword)
+
+      Alert.alert('Success', 'Your password has been updated successfully.')
+      setShowChangePasswordModal(false)
+      resetChangePasswordForm()
+    } catch (error: any) {
+      console.error('Password change error:', error)
+      if (
+        error.code === 'auth/wrong-password' ||
+        error.code === 'auth/invalid-credential'
+      ) {
+        setPasswordError('Current password is incorrect.')
+      } else if (error.code === 'auth/weak-password') {
+        setPasswordError(
+          'New password is too weak. Please choose a stronger password.'
+        )
+      } else if (error.code === 'auth/too-many-requests') {
+        setPasswordError('Too many attempts. Please try again later.')
+      } else {
+        setPasswordError('Failed to update password. Please try again.')
+      }
+    } finally {
+      setIsUpdatingPassword(false)
+    }
+  }
 
   useEffect(() => {
     setLoadingStats(true)
@@ -307,9 +427,16 @@ export default function AssistantAdminProfile() {
     }
   }
 
-  const displayName =
-    userData?.name || userData?.email?.split('@')[0] || 'Assistant Admin'
-  const initials = getInitials(userData?.name, userData?.email)
+  const fullName =
+    userData?.surname && userData?.name
+      ? `${userData.surname}, ${userData.name}`
+      : userData?.name || userData?.email?.split('@')[0] || 'Assistant Admin'
+
+  const displayName = fullName
+
+  const nameInitial = userData?.name
+    ? userData.name.charAt(0).toUpperCase()
+    : 'A'
   const memberSince = userData?.createdAt
     ? new Date(
         typeof userData.createdAt === 'object' && userData.createdAt.seconds
@@ -576,26 +703,29 @@ export default function AssistantAdminProfile() {
         id: '1',
         question: 'How do I create an event?',
         answer:
-          'Go to Events and tap "+". Fill in details and set attendance deadline.',
+          'Go to Events tab and tap "+ New". Fill in details and set attendance deadline.',
         icon: 'calendar-plus',
       },
       {
         id: '2',
-        question: 'How do I scan attendance?',
-        answer: 'Select an active event and tap "Scan QR Code".',
-        icon: 'qrcode-scan',
+        question: 'How do I manage attendance?',
+        answer:
+          'Select an event and view the student who attended and missed the events.',
+        icon: 'account-check',
       },
       {
         id: '3',
-        question: 'How do I manage penalties?',
-        answer: 'Go to Penalties to view and update penalty status.',
-        icon: 'alert-circle',
+        question: 'How do I create announcements?',
+        answer:
+          'Go to Announcement tab and tap "+ New" and fill the needed information.',
+        icon: 'bullhorn',
       },
       {
         id: '4',
-        question: 'How do I view reports?',
-        answer: 'Navigate to Reports for analytics and trends.',
-        icon: 'chart-line',
+        question: 'How do I generate PDF file?',
+        answer:
+          'Go to the main dashboard and tap the download button icon at the top.',
+        icon: 'file-pdf-box',
       },
     ]
 
@@ -681,6 +811,229 @@ export default function AssistantAdminProfile() {
     )
   }
 
+  const renderChangePasswordModal = () => (
+    <Modal
+      visible={showChangePasswordModal}
+      transparent
+      animationType='slide'
+      onRequestClose={() => {
+        setShowChangePasswordModal(false)
+        resetChangePasswordForm()
+      }}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Change Password</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShowChangePasswordModal(false)
+                resetChangePasswordForm()
+              }}
+            >
+              <Icon name='close' size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={{ padding: 16 }}>
+              {/* Current Password */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  Current Password *
+                </Text>
+                <View
+                  style={[
+                    styles.passwordInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.passwordInput, { color: colors.text }]}
+                    placeholder='Enter current password'
+                    placeholderTextColor={colors.textSecondary}
+                    secureTextEntry={!showCurrentPassword}
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    editable={!isUpdatingPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                  >
+                    <Icon
+                      name={showCurrentPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* New Password */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  New Password *
+                </Text>
+                <View
+                  style={[
+                    styles.passwordInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.passwordInput, { color: colors.text }]}
+                    placeholder='Enter new password'
+                    placeholderTextColor={colors.textSecondary}
+                    secureTextEntry={!showNewPassword}
+                    value={newPassword}
+                    onChangeText={(text) => {
+                      setNewPassword(text)
+                      calculatePasswordStrength(text)
+                    }}
+                    editable={!isUpdatingPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    <Icon
+                      name={showNewPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {newPassword.length > 0 && (
+                  <View style={{ marginTop: 8 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 4,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontSize: 12,
+                          marginRight: 8,
+                        }}
+                      >
+                        Strength:
+                      </Text>
+                      <Text
+                        style={{
+                          color: passwordStrength.color,
+                          fontSize: 12,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {passwordStrength.label}
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        height: 4,
+                        backgroundColor: colors.border,
+                        borderRadius: 2,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: `${(passwordStrength.score / 5) * 100}%`,
+                          height: '100%',
+                          backgroundColor: passwordStrength.color,
+                          borderRadius: 2,
+                        }}
+                      />
+                    </View>
+                    <Text
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: 10,
+                        marginTop: 4,
+                      }}
+                    >
+                      Use at least 8 characters with uppercase, lowercase,
+                      number, and symbol.
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Confirm Password */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  Confirm New Password *
+                </Text>
+                <View
+                  style={[
+                    styles.passwordInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.passwordInput, { color: colors.text }]}
+                    placeholder='Confirm new password'
+                    placeholderTextColor={colors.textSecondary}
+                    secureTextEntry={!showConfirmPassword}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    editable={!isUpdatingPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    <Icon
+                      name={showConfirmPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {confirmPassword.length > 0 &&
+                  newPassword !== confirmPassword && (
+                    <Text
+                      style={{ color: '#EF4444', fontSize: 12, marginTop: 4 }}
+                    >
+                      Passwords do not match.
+                    </Text>
+                  )}
+              </View>
+
+              {passwordError && (
+                <View style={styles.errorBanner}>
+                  <Icon name='alert-circle' size={16} color='#EF4444' />
+                  <Text style={styles.errorText}>{passwordError}</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  {
+                    backgroundColor:
+                      isChangePasswordFormValid() && !isUpdatingPassword
+                        ? colors.accent.primary
+                        : colors.border,
+                    marginTop: 24,
+                  },
+                ]}
+                onPress={handleChangePassword}
+                disabled={!isChangePasswordFormValid() || isUpdatingPassword}
+              >
+                {isUpdatingPassword ? (
+                  <ActivityIndicator size='small' color='#FFFFFF' />
+                ) : (
+                  <Text style={styles.submitButtonText}>Update Password</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  )
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -710,7 +1063,7 @@ export default function AssistantAdminProfile() {
               <Image source={{ uri: photoURL }} style={styles.profileImage} />
             ) : (
               <View style={[styles.profileImage, styles.profileFallback]}>
-                <Text style={styles.profileInitials}>{initials}</Text>
+                <Text style={styles.profileInitials}>{nameInitial}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -760,7 +1113,7 @@ export default function AssistantAdminProfile() {
                   />
                 ) : (
                   <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarInitials}>{initials}</Text>
+                    <Text style={styles.avatarInitials}>{nameInitial}</Text>
                   </View>
                 )}
                 <View style={styles.avatarEditBadge}>
@@ -860,6 +1213,21 @@ export default function AssistantAdminProfile() {
 
             <TouchableOpacity
               style={styles.menuItem}
+              onPress={() => setShowChangePasswordModal(true)}
+            >
+              <View style={styles.menuItemLeft}>
+                <Icon name='lock-reset' size={18} color='#8B5CF6' />
+                <Text style={styles.menuItemText}>Change Password</Text>
+              </View>
+              <Icon
+                name='chevron-right'
+                size={18}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => setShowAboutModal(true)}
             >
               <View style={styles.menuItemLeft}>
@@ -945,8 +1313,8 @@ export default function AssistantAdminProfile() {
               <View style={styles.rateInfo}>
                 <Text style={styles.rateTitle}>Attendance Rate</Text>
                 <Text style={styles.rateSub}>
-                  {computedStats.personalStats.approvedEvents > 0
-                    ? `${Math.round((computedStats.personalStats.totalAttendance / (computedStats.personalStats.approvedEvents * 30)) * 100)}% avg`
+                  {computedStats.stats.approvedEvents > 0
+                    ? `${Math.round((computedStats.stats.totalAttendance / (computedStats.stats.approvedEvents * 30)) * 100)}% avg`
                     : 'No events yet'}
                 </Text>
               </View>
@@ -957,8 +1325,8 @@ export default function AssistantAdminProfile() {
                       styles.rateBarFill,
                       {
                         width:
-                          computedStats.personalStats.approvedEvents > 0
-                            ? `${Math.min(100, Math.round((computedStats.personalStats.totalAttendance / (computedStats.personalStats.approvedEvents * 30)) * 100))}%`
+                          computedStats.stats.approvedEvents > 0
+                            ? `${Math.min(100, Math.round((computedStats.stats.totalAttendance / (computedStats.stats.approvedEvents * 30)) * 100))}%`
                             : '0%',
                         backgroundColor: '#10b981',
                       },
@@ -983,6 +1351,7 @@ export default function AssistantAdminProfile() {
       </ScrollView>
 
       {renderSettingsModal()}
+      {renderChangePasswordModal()}
       {renderAboutModal()}
       {renderHelpModal()}
     </View>

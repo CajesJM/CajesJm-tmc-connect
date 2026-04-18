@@ -517,7 +517,6 @@ export default function AssistantAdminAnnouncements() {
     </View>
   )
 
-  // Header gradient colors based on theme
   const headerGradientColors = isDark
     ? (['#0f172a', '#1e293b'] as const)
     : (['#1e40af', '#3b82f6'] as const)
@@ -533,8 +532,12 @@ export default function AssistantAdminAnnouncements() {
       >
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.greeting}>My Announcements,</Text>
-            <Text style={styles.userName}>{userData?.name || 'Assistant'}</Text>
+            <Text style={styles.greeting}>Announcements Dashboard,</Text>
+            <Text style={styles.userName}>
+              {userData?.surname
+                ? `${userData.surname}, ${userData.name}`
+                : userData?.name || 'Assistant'}
+            </Text>
             <Text style={styles.role}>Assistant Admin</Text>
           </View>
           <TouchableOpacity

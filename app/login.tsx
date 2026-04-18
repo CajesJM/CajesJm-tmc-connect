@@ -48,6 +48,11 @@ export default function Login() {
   const [forgotLoading, setForgotLoading] = useState(false)
   const [forgotMessage, setForgotMessage] = useState<string | null>(null)
 
+  const [forgotCooldownUntil, setForgotCooldownUntil] = useState<number | null>(
+    null
+  )
+  const [forgotCooldownSeconds, setForgotCooldownSeconds] = useState(0)
+
   const passwordRef = useRef<TextInput>(null)
 
   const isLoading = busy || loading
@@ -99,8 +104,37 @@ export default function Login() {
     }
   }
 
+  const saveForgotCooldown = async (cooldownTime: number | null) => {
+    try {
+      await AsyncStorage.setItem(
+        'forgotPasswordCooldown',
+        JSON.stringify({ cooldownUntil: cooldownTime })
+      )
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
+  const restoreForgotCooldown = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('forgotPasswordCooldown')
+      if (stored) {
+        const { cooldownUntil } = JSON.parse(stored)
+        if (cooldownUntil && cooldownUntil > Date.now()) {
+          setForgotCooldownUntil(cooldownUntil)
+        } else {
+          await AsyncStorage.removeItem('forgotPasswordCooldown')
+          setForgotCooldownUntil(null)
+        }
+      }
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
   useEffect(() => {
     restoreLockoutState()
+    restoreForgotCooldown()
   }, [])
 
   // Countdown effect for lockout
@@ -132,6 +166,31 @@ export default function Login() {
       setError(null)
     }
   }, [lockoutUntil])
+
+  useEffect(() => {
+    let interval: number
+    if (forgotCooldownUntil && forgotCooldownUntil > Date.now()) {
+      const updateRemaining = () => {
+        const remaining = Math.max(
+          0,
+          Math.ceil((forgotCooldownUntil - Date.now()) / 1000)
+        )
+        setForgotCooldownSeconds(remaining)
+        if (remaining === 0) {
+          setForgotCooldownUntil(null)
+          setForgotCooldownSeconds(0)
+          AsyncStorage.removeItem('forgotPasswordCooldown').catch(() => {})
+        }
+      }
+      updateRemaining()
+      interval = setInterval(updateRemaining, 1000)
+      return () => clearInterval(interval)
+    } else if (forgotCooldownUntil && forgotCooldownUntil <= Date.now()) {
+      setForgotCooldownUntil(null)
+      setForgotCooldownSeconds(0)
+      AsyncStorage.removeItem('forgotPasswordCooldown').catch(() => {})
+    }
+  }, [forgotCooldownUntil])
 
   useEffect(() => {
     if (
@@ -169,6 +228,13 @@ export default function Login() {
       return
     }
 
+    if (forgotCooldownUntil && forgotCooldownUntil > Date.now()) {
+      setForgotMessage(
+        `Please wait ${forgotCooldownSeconds} seconds before requesting again.`
+      )
+      return
+    }
+
     setForgotLoading(true)
     setForgotMessage(null)
 
@@ -185,6 +251,11 @@ export default function Login() {
 
       const userDoc = querySnapshot.docs[0]
       const userData = userDoc.data()
+      if (userData.role !== 'student' && userData.role !== 'assistant_admin') {
+        setForgotMessage('Account type not supported for password reset here.')
+        setForgotLoading(false)
+        return
+      }
       const email = userData.email
 
       if (!email) {
@@ -206,14 +277,15 @@ export default function Login() {
       const auth = getAuth()
       await sendPasswordResetEmail(auth, email)
 
-      setForgotMessage('✓ Password reset email sent! Check your inbox.')
-      setForgotLoading(false)
+      const cooldownTime = Date.now() + 60 * 1000
+      setForgotCooldownUntil(cooldownTime)
+      setForgotCooldownSeconds(60)
+      saveForgotCooldown(cooldownTime).catch(() => {})
 
-      setTimeout(() => {
-        setForgotModalVisible(false)
-        setForgotUsername('')
-        setForgotMessage(null)
-      }, 2000)
+      setForgotMessage(
+        '✓ Reset email sent! The link expires in 1 hour. Check your inbox.'
+      )
+      setForgotLoading(false)
     } catch (error: any) {
       let errorMessage = 'Failed to send reset email. Please try again later.'
       if (error.code === 'auth/user-not-found') {
@@ -228,7 +300,6 @@ export default function Login() {
       setForgotLoading(false)
     }
   }
-
   const handleLogin = async () => {
     if (busy || isLockedOut) return
     setError(null)
@@ -378,7 +449,8 @@ export default function Login() {
                 },
               ]}
             >
-              Enter your username to receive a password reset email.
+              Enter your username to receive a password reset email. The link
+              will expire in 1 hour.
             </Text>
             <TextInput
               style={[
@@ -454,17 +526,30 @@ export default function Login() {
                     paddingVertical: 12,
                     borderRadius: 12,
                     alignItems: 'center',
-                    backgroundColor: '#0ea5e9',
+                    backgroundColor:
+                      forgotCooldownUntil !== null &&
+                      forgotCooldownUntil > Date.now()
+                        ? '#94a3b8'
+                        : '#0ea5e9',
                     opacity: forgotLoading ? 0.6 : 1,
                   },
                 ]}
                 onPress={handleForgotPassword}
-                disabled={forgotLoading}
+                disabled={
+                  forgotLoading ||
+                  (forgotCooldownUntil !== null &&
+                    forgotCooldownUntil > Date.now())
+                }
               >
                 {forgotLoading ? (
                   <ActivityIndicator size='small' color='#fff' />
+                ) : forgotCooldownUntil !== null &&
+                  forgotCooldownUntil > Date.now() ? (
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>
+                    Wait {forgotCooldownSeconds}s
+                  </Text>
                 ) : (
-                  <Text style={[{ color: '#fff', fontWeight: '600' }]}>
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>
                     Send Email
                   </Text>
                 )}
@@ -499,7 +584,6 @@ export default function Login() {
           </View>
         </LinearGradient>
 
-        {/* ── Form area ─────────────────────────────────────────── */}
         <KeyboardAvoidingView
           style={LoginStyles.keyboardView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

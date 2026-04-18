@@ -465,6 +465,7 @@ export const createStudentDashboardStyles = (
     column: {
       flex: 1,
       minWidth: isMobile ? '100%' : 260,
+      marginTop: 0,
     },
     upcomingColumn: {
       flex: 1,
@@ -489,6 +490,7 @@ export const createStudentDashboardStyles = (
       shadowOpacity: isDark ? 0.2 : 0.05,
       shadowRadius: 8,
       elevation: 3,
+      marginTop: -20,
     },
     cardGradient: {
       padding: isMobile ? 12 : 16,

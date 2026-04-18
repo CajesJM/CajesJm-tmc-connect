@@ -175,16 +175,17 @@ export default function LoadingScreen({
 }
 
 const loadingTips = [
-  'Did you know? You can customize your dashboard layout',
-  'Pro tip: Use keyboard shortcuts for faster navigation',
+  'Did you know? You know you can change your theme in the profile tabs and in the "Settings" option',
+  'Pro tip: Use use "Check my location" or "View on map" to verify the location of the events',
   'New: Analytics dashboard now shows real-time data',
   'Your data is encrypted and secure',
-  'You can export reports in multiple formats',
+  'Did you know? You can change your password in your profile tabs',
   'Manage user permissions from the settings panel',
-  'Schedule announcements for specific dates',
-  'Track attendance with QR codes',
-  'Create custom event templates',
+  'View your "Attended" and "Missed" events in the profile tabs',
+  'You must within the range to confirm your attendance',
+  'Check announcements for new updates',
   'Monitor system performance in real-time',
+  'Turn on your "Location" and "Camera" permission to open your scanner',
 ]
 
 const getRandomTip = () => {

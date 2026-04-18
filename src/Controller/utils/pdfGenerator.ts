@@ -13,64 +13,82 @@ interface PDFData {
     activeUsers: number
     totalAttendance: number
   }
-  monthlyStats: Array<{
+  monthlyStats?: Array<{
     month: string
     events: number
     attendance: number
     announcements: number
-  }>
-  recentActivities: Array<{
+  }> | null
+  recentActivities?: Array<{
     title: string
     description: string
     timestamp: Date
     type: string
-  }>
-  upcomingEvents: Array<{
+  }> | null
+  upcomingEvents?: Array<{
     title: string
     date: Date
     location?: string
     attendees?: any[]
-  }>
-  pastEvents: Array<{
+  }> | null
+  pastEvents?: Array<{
     title: string
     date: Date
     location?: string
     attendees?: any[]
-  }>
+  }> | null
 }
 
 export const generateDashboardPDF = async (
   data: PDFData,
   options?: { isAssistantAdmin?: boolean }
 ): Promise<string> => {
-  if (Platform.OS === 'web') {
-    downloadHTMLReport(data, options)
-    return 'web-download-started'
+  try {
+    if (Platform.OS === 'web') {
+      downloadHTMLReport(data, options)
+      return 'web-download-started'
+    }
+
+    const htmlContent = generateFullHTMLReport(data, options)
+
+    const { uri } = await Print.printToFileAsync({
+      html: htmlContent,
+      base64: false,
+    })
+
+    console.log('PDF generated at:', uri)
+    return uri
+  } catch (error) {
+    let message = 'Failed to generate PDF.'
+    if (error instanceof Error) {
+      message = error.message
+    } else if (typeof error === 'string') {
+      message = error
+    }
+    if (message.includes('print')) {
+      message = 'Print service unavailable. Please try again.'
+    }
+    throw new Error(`PDF generation failed: ${message}`)
   }
-  const htmlContent = generateFullHTMLReport(data, options)
-  const { uri } = await Print.printToFileAsync({
-    html: htmlContent,
-    base64: false,
-  })
-  console.log('PDF generated at:', uri)
-  return uri
 }
 
-// --------------------------------------------------------------
-// Share PDF (mobile only)
-// --------------------------------------------------------------
 export const sharePDF = async (fileUri: string) => {
   if (Platform.OS === 'web') return
   if (!fileUri || fileUri === 'web-download-started') return
 
-  const isAvailable = await Sharing.isAvailableAsync()
-  if (isAvailable) {
+  try {
+    const isAvailable = await Sharing.isAvailableAsync()
+    if (!isAvailable) {
+      throw new Error('Sharing is not available on this device.')
+    }
     await Sharing.shareAsync(fileUri, {
       mimeType: 'application/pdf',
       dialogTitle: 'Share Dashboard Report',
     })
-  } else {
-    throw new Error('Sharing not available on this device')
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Could not share PDF.'
+    throw new Error(`Sharing failed: ${message}`)
   }
 }
 
@@ -78,21 +96,47 @@ const downloadHTMLReport = (
   data: PDFData,
   options?: { isAssistantAdmin?: boolean }
 ) => {
-  const content = generateFullHTMLReport(data, options)
-  const blob = new Blob([content], { type: 'text/html' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `dashboard-report-${new Date().toISOString().split('T')[0]}.html`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  try {
+    const content = generateFullHTMLReport(data, options)
+    const blob = new Blob([content], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dashboard-report-${new Date().toISOString().split('T')[0]}.html`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Web download error:', error)
+    throw new Error('Could not generate report on web. Please try again.')
+  }
 }
 
 const safeValue = (value: any, defaultValue: number = 0): number => {
   const num = Number(value)
   return isNaN(num) ? defaultValue : num
+}
+
+const safeArray = <T>(arr: T[] | null | undefined): T[] => {
+  return Array.isArray(arr) ? arr : []
+}
+
+const formatDateSafe = (date: Date | null | undefined): string => {
+  if (!date) return '—'
+  try {
+    const d = new Date(date)
+    if (isNaN(d.getTime())) return 'Invalid date'
+    return d.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return 'Invalid date'
+  }
 }
 
 const generateFullHTMLReport = (
@@ -101,40 +145,42 @@ const generateFullHTMLReport = (
 ): string => {
   const isAssistant = options?.isAssistantAdmin ?? false
 
-  const activeUserRate =
-    data.stats.totalUsers > 0
-      ? ((data.stats.activeUsers / data.stats.totalUsers) * 100).toFixed(1)
-      : '0.0'
-  const avgAttendees =
-    data.stats.totalEvents > 0
-      ? (data.stats.totalAttendance / data.stats.totalEvents).toFixed(1)
-      : '0.0'
-
-  const formatDate = (date: Date): string => {
-    try {
-      return new Date(date).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return 'Invalid date'
-    }
+  const stats = data.stats || {
+    totalUsers: 0,
+    totalEvents: 0,
+    totalAnnouncements: 0,
+    activeAttendees: 0,
+    upcomingEvents: 0,
+    pendingVerifications: 0,
+    activeUsers: 0,
+    totalAttendance: 0,
   }
 
+  const activeUserRate =
+    stats.totalUsers > 0
+      ? ((stats.activeUsers / stats.totalUsers) * 100).toFixed(1)
+      : '0.0'
+  const avgAttendees =
+    stats.totalEvents > 0
+      ? (stats.totalAttendance / stats.totalEvents).toFixed(1)
+      : '0.0'
+
+  const monthlyStats = safeArray(data.monthlyStats)
+  const upcomingEvents = safeArray(data.upcomingEvents)
+  const pastEvents = safeArray(data.pastEvents)
+  const recentActivities = safeArray(data.recentActivities)
+
   let monthlyBarsHtml = ''
-  if (data.monthlyStats && data.monthlyStats.length > 0) {
+  if (monthlyStats.length > 0) {
     const maxEvents = Math.max(
-      ...data.monthlyStats.map((s) => safeValue(s.events)),
+      ...monthlyStats.map((s) => safeValue(s.events)),
       1
     )
     const maxAttendance = Math.max(
-      ...data.monthlyStats.map((s) => safeValue(s.attendance)),
+      ...monthlyStats.map((s) => safeValue(s.attendance)),
       1
     )
-    for (const stat of data.monthlyStats) {
+    for (const stat of monthlyStats) {
       let eventHeight =
         maxEvents > 0 ? (safeValue(stat.events) / maxEvents) * 100 : 0
       let attendanceHeight =
@@ -146,8 +192,8 @@ const generateFullHTMLReport = (
       monthlyBarsHtml += `
         <div class="bar-group">
           <div class="bars">
-            <div class="event-bar" style="height: ${Math.max(eventHeight, 5)}%;"></div>
-            <div class="attendance-bar" style="height: ${Math.max(attendanceHeight, 5)}%;"></div>
+            <div class="event-bar" style="height: ${eventHeight}%;"></div>
+            <div class="attendance-bar" style="height: ${attendanceHeight}%;"></div>
           </div>
           <div class="bar-label">${stat.month || ''}</div>
           <div class="bar-values">E:${safeValue(stat.events)} | A:${safeValue(stat.attendance)}</div>
@@ -158,14 +204,13 @@ const generateFullHTMLReport = (
     monthlyBarsHtml = '<div class="empty-state">No monthly data available</div>'
   }
 
-  // Build upcoming events rows
   let upcomingRowsHtml = ''
-  if (data.upcomingEvents && data.upcomingEvents.length > 0) {
-    for (const event of data.upcomingEvents) {
+  if (upcomingEvents.length > 0) {
+    for (const event of upcomingEvents) {
       upcomingRowsHtml += `
         <tr>
           <td><strong>${event.title || 'Untitled Event'}</strong></td>
-          <td>${formatDate(event.date)}</td>
+          <td>${formatDateSafe(event.date)}</td>
           <td>${event.location || 'TBA'}</td>
         </tr>
       `
@@ -176,13 +221,13 @@ const generateFullHTMLReport = (
   }
 
   let pastEventsRowsHtml = ''
-  if (data.pastEvents && data.pastEvents.length > 0) {
-    const lastFive = data.pastEvents.slice(0, 5)
+  if (pastEvents.length > 0) {
+    const lastFive = pastEvents.slice(0, 5)
     for (const event of lastFive) {
       pastEventsRowsHtml += `
       <tr>
         <td><strong>${event.title || 'Untitled Event'}</strong></td>
-        <td>${formatDate(event.date)}</td>
+        <td>${formatDateSafe(event.date)}</td>
         <td>${event.location || 'TBA'}</td>
         <td><span class="badge">${safeValue(event.attendees?.length)}</span></td>
       </tr>
@@ -193,15 +238,14 @@ const generateFullHTMLReport = (
       '<tr><td colspan="4" class="empty-state">No past events found</td></tr>'
   }
 
-  // Build recent activities rows
   let activitiesRowsHtml = ''
-  if (data.recentActivities && data.recentActivities.length > 0) {
-    for (const activity of data.recentActivities.slice(0, 10)) {
+  if (recentActivities.length > 0) {
+    for (const activity of recentActivities.slice(0, 10)) {
       activitiesRowsHtml += `
         <tr>
           <td><strong>${activity.title || 'Activity'}</strong></td>
           <td>${activity.description || '—'}</td>
-          <td>${formatDate(activity.timestamp)}</td>
+          <td>${formatDateSafe(activity.timestamp)}</td>
         </tr>
       `
     }
@@ -333,8 +377,8 @@ const generateFullHTMLReport = (
       <h1> TMC Connect </h1>
       <div class="subtitle">Administrative Dashboard Report</div>
       <div class="meta">
-        <div class="meta-item">📅 ${new Date().toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
-        <div class="meta-item">⏰ ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+        <div class="meta-item"> ${new Date().toLocaleString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+        <div class="meta-item"> ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
       </div>
     </div>
   </div>
@@ -347,26 +391,26 @@ const generateFullHTMLReport = (
           ? `
         <div class="stat-card">
           <div class="stat-label">Total Users</div>
-          <div class="stat-value">${safeValue(data.stats.totalUsers)}</div>
-          <div class="stat-subtitle">${safeValue(data.stats.activeUsers)} active</div>
+          <div class="stat-value">${safeValue(stats.totalUsers)}</div>
+          <div class="stat-subtitle">${safeValue(stats.activeUsers)} active</div>
         </div>
       `
           : ''
       }
       <div class="stat-card">
         <div class="stat-label">Total Events</div>
-        <div class="stat-value">${safeValue(data.stats.totalEvents)}</div>
-        <div class="stat-subtitle">${safeValue(data.stats.upcomingEvents)} upcoming</div>
+        <div class="stat-value">${safeValue(stats.totalEvents)}</div>
+        <div class="stat-subtitle">${safeValue(stats.upcomingEvents)} upcoming</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Announcements</div>
-        <div class="stat-value">${safeValue(data.stats.totalAnnouncements)}</div>
+        <div class="stat-value">${safeValue(stats.totalAnnouncements)}</div>
         <div class="stat-subtitle">Active</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Total Attendance</div>
-        <div class="stat-value">${safeValue(data.stats.totalAttendance)}</div>
-        <div class="stat-subtitle">${safeValue(data.stats.pendingVerifications)} pending</div>
+        <div class="stat-value">${safeValue(stats.totalAttendance)}</div>
+        <div class="stat-subtitle">${safeValue(stats.pendingVerifications)} pending</div>
       </div>
     </div>
   </div>
@@ -405,7 +449,7 @@ const generateFullHTMLReport = (
       </tr>
     </thead>
     <tbody>${pastEventsRowsHtml}</tbody>
-  </table>
+  </table> 
 </div>
 
   <div class="section">
@@ -431,7 +475,7 @@ const generateFullHTMLReport = (
         <div class="summary-label">Avg Attendees/Event</div>
       </div>
       <div class="summary-item">
-        <div class="summary-value">${safeValue(data.stats.pendingVerifications)}</div>
+        <div class="summary-value">${safeValue(stats.pendingVerifications)}</div>
         <div class="summary-label">Pending Verifications</div>
       </div>
     </div>

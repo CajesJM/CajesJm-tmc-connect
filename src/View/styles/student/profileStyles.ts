@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { ThemeColors } from '../../../Controller/context/ThemeContext'
 
 export const createProfileStyles = (
@@ -626,7 +626,6 @@ export const createProfileStyles = (
       fontSize: 12,
     },
 
-    // Add these styles to your createProfileStyles function
     supportBanner: {
       borderRadius: 16,
       padding: 20,
@@ -835,7 +834,7 @@ export const createProfileStyles = (
       gap: 4,
       paddingHorizontal: isMobile ? 8 : 10,
       paddingVertical: isMobile ? 4 : 6,
-      marginTop: -20,
+      marginTop: -45,
       marginLeft: -6,
     },
     dateText: {
@@ -852,7 +851,7 @@ export const createProfileStyles = (
       paddingHorizontal: 14,
       paddingVertical: 8,
       borderRadius: 20,
-      marginTop: -20,
+      marginTop: -10,
     },
     logoutButtonText: {
       color: '#ef4444',
@@ -1101,6 +1100,54 @@ export const createProfileStyles = (
       fontWeight: '600',
       color: colors.accent.primary,
       marginRight: 4,
+    },
+    inputGroup: {
+      marginBottom: 20,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: '500',
+      marginBottom: 8,
+    },
+    passwordInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+    },
+    passwordInput: {
+      flex: 1,
+      fontSize: 16,
+      paddingVertical: 4,
+    },
+    submitButton: {
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+    },
+    submitButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    errorBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#EF444420',
+      padding: 12,
+      borderRadius: 8,
+      marginTop: 8,
+    },
+    errorText: {
+      color: '#EF4444',
+      fontSize: 14,
+      marginLeft: 8,
+      flex: 1,
     },
   })
 }

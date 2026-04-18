@@ -90,6 +90,11 @@ export default function AssistantAdminEvents() {
   const { user, userData } = useAuth()
   const router = useRouter()
 
+  const displayName =
+    userData?.surname && userData?.name
+      ? `${userData.surname}, ${userData.name}`
+      : userData?.name || 'Assistant'
+
   // Data state
   const [events, setEvents] = useState<Event[]>([])
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
@@ -830,8 +835,8 @@ export default function AssistantAdminEvents() {
       >
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.greeting}>My Events,</Text>
-            <Text style={styles.userName}>{userData?.name || 'Assistant'}</Text>
+            <Text style={styles.greeting}>Events Dashboard,</Text>
+            <Text style={styles.userName}>{displayName}</Text>
             <Text style={styles.role}>Assistant Admin</Text>
           </View>
           <TouchableOpacity
@@ -1034,7 +1039,7 @@ export default function AssistantAdminEvents() {
             >
               {/* Campus Image Picker */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Campus Image (optional)</Text>
+                <Text style={styles.formLabel}>Campus Image *</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}

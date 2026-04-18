@@ -125,6 +125,10 @@ export default function SuperAdminLogin() {
   const [forgotUsername, setForgotUsername] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
   const [forgotMessage, setForgotMessage] = useState<string | null>(null)
+  const [forgotCooldownUntil, setForgotCooldownUntil] = useState<number | null>(
+    null
+  )
+  const [forgotCooldownSeconds, setForgotCooldownSeconds] = useState(0)
 
   // Lockout state
   const [failedAttempts, setFailedAttempts] = useState(0)
@@ -174,9 +178,37 @@ export default function SuperAdminLogin() {
       }
     }
   }
+  const saveForgotCooldown = (cooldownTime: number | null) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(
+        'superAdminForgotCooldown',
+        JSON.stringify({ cooldownUntil: cooldownTime })
+      )
+    }
+  }
+
+  const restoreForgotCooldown = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('superAdminForgotCooldown')
+      if (stored) {
+        try {
+          const { cooldownUntil } = JSON.parse(stored)
+          if (cooldownUntil && cooldownUntil > Date.now()) {
+            setForgotCooldownUntil(cooldownUntil)
+          } else {
+            localStorage.removeItem('superAdminForgotCooldown')
+            setForgotCooldownUntil(null)
+          }
+        } catch (e) {
+          localStorage.removeItem('superAdminForgotCooldown')
+        }
+      }
+    }
+  }
 
   useEffect(() => {
     restoreLockoutState()
+    restoreForgotCooldown()
   }, [])
 
   const animateLabel = (animValue: Animated.Value, toValue: number) => {
@@ -210,7 +242,6 @@ export default function SuperAdminLogin() {
     ]).start()
   }, [])
 
-  // Countdown effect for lockout
   useEffect(() => {
     let interval: number
     if (lockoutUntil && lockoutUntil > Date.now()) {
@@ -241,6 +272,31 @@ export default function SuperAdminLogin() {
   }, [lockoutUntil])
 
   useEffect(() => {
+    let interval: number
+    if (forgotCooldownUntil && forgotCooldownUntil > Date.now()) {
+      const updateRemaining = () => {
+        const remaining = Math.max(
+          0,
+          Math.ceil((forgotCooldownUntil - Date.now()) / 1000)
+        )
+        setForgotCooldownSeconds(remaining)
+        if (remaining === 0) {
+          setForgotCooldownUntil(null)
+          setForgotCooldownSeconds(0)
+          localStorage.removeItem('superAdminForgotCooldown')
+        }
+      }
+      updateRemaining()
+      interval = window.setInterval(updateRemaining, 1000)
+      return () => clearInterval(interval)
+    } else if (forgotCooldownUntil && forgotCooldownUntil <= Date.now()) {
+      setForgotCooldownUntil(null)
+      setForgotCooldownSeconds(0)
+      localStorage.removeItem('superAdminForgotCooldown')
+    }
+  }, [forgotCooldownUntil])
+
+  useEffect(() => {
     if (
       lockoutUntil &&
       lockoutUntil > Date.now() &&
@@ -262,11 +318,9 @@ export default function SuperAdminLogin() {
     if (busy || authLoading) return
     setError(null)
 
-    // Check lockout
     if (lockoutUntil && lockoutUntil > Date.now()) {
       return
     } else if (lockoutUntil && lockoutUntil <= Date.now()) {
-      // Reset lockout if expired
       setLockoutUntil(null)
       setFailedAttempts(0)
       setRemainingLockoutSeconds(0)
@@ -282,7 +336,6 @@ export default function SuperAdminLogin() {
     setLoadingMessage('Verifying credentials')
 
     try {
-      // 1. Check username in Firestore
       const usersCollection = collection(db, 'users')
       const q = query(usersCollection, where('username', '==', username))
       const querySnapshot = await getDocs(q)
@@ -300,10 +353,8 @@ export default function SuperAdminLogin() {
         )
       }
 
-      // 2. Attempt Firebase login
       await login(userData.email, password)
 
-      // 3. Success: reset attempts & lockout, navigate
       setFailedAttempts(0)
       setLockoutUntil(null)
       setRemainingLockoutSeconds(0)
@@ -350,6 +401,13 @@ export default function SuperAdminLogin() {
       return
     }
 
+    if (forgotCooldownUntil && forgotCooldownUntil > Date.now()) {
+      setForgotMessage(
+        `Please wait ${forgotCooldownSeconds} seconds before requesting again.`
+      )
+      return
+    }
+
     setForgotLoading(true)
     setForgotMessage(null)
 
@@ -393,14 +451,15 @@ export default function SuperAdminLogin() {
       const auth = getAuth()
       await sendPasswordResetEmail(auth, email)
 
-      setForgotMessage('✓ Password reset email sent! Check your inbox.')
-      setForgotLoading(false)
+      const cooldownTime = Date.now() + 60 * 1000
+      setForgotCooldownUntil(cooldownTime)
+      setForgotCooldownSeconds(60)
+      saveForgotCooldown(cooldownTime)
 
-      setTimeout(() => {
-        setForgotModalVisible(false)
-        setForgotUsername('')
-        setForgotMessage(null)
-      }, 2000)
+      setForgotMessage(
+        '✓ Reset email sent! The link expires in 1 hour. Check your inbox.'
+      )
+      setForgotLoading(false)
     } catch (error: any) {
       console.error('Forgot password error:', error)
       let errorMessage = 'Failed to send reset email. Please try again later.'
@@ -523,13 +582,26 @@ export default function SuperAdminLogin() {
                 style={[
                   modalStyles.button,
                   modalStyles.submitButton,
-                  forgotLoading && modalStyles.disabled,
+                  forgotLoading ||
+                  (forgotCooldownUntil !== null &&
+                    forgotCooldownUntil > Date.now())
+                    ? modalStyles.disabled
+                    : {},
                 ]}
                 onPress={handleForgotPassword}
-                disabled={forgotLoading}
+                disabled={
+                  forgotLoading ||
+                  (forgotCooldownUntil !== null &&
+                    forgotCooldownUntil > Date.now())
+                }
               >
                 {forgotLoading ? (
                   <ActivityIndicator size='small' color='#fff' />
+                ) : forgotCooldownUntil !== null &&
+                  forgotCooldownUntil > Date.now() ? (
+                  <Text style={modalStyles.submitText}>
+                    Wait {forgotCooldownSeconds}s
+                  </Text>
                 ) : (
                   <Text style={modalStyles.submitText}>Send Email</Text>
                 )}

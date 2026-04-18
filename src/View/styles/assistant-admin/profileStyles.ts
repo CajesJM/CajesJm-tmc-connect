@@ -334,6 +334,54 @@ export const createAssistantProfileStyles = (colors: any, isDark: boolean) =>
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
+    inputGroup: {
+      marginBottom: 20,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: '500',
+      marginBottom: 8,
+    },
+    passwordInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+    },
+    passwordInput: {
+      flex: 1,
+      fontSize: 16,
+      paddingVertical: 4,
+    },
+    submitButton: {
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+    },
+    submitButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    errorBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#EF444420',
+      padding: 12,
+      borderRadius: 8,
+      marginTop: 8,
+    },
+    errorText: {
+      color: '#EF4444',
+      fontSize: 14,
+      marginLeft: 8,
+      flex: 1,
+    },
 
     // Modal styles (compact)
     modalOverlay: {

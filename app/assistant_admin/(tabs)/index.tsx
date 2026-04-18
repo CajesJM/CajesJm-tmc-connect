@@ -20,7 +20,6 @@ import {
   Alert,
   Animated,
   Easing,
-  Image,
   Platform,
   Pressable,
   RefreshControl,
@@ -44,6 +43,7 @@ import {
   sharePDF,
 } from '../../../src/Controller/utils/pdfGenerator'
 import { db } from '../../../src/Model/lib/firebaseConfig'
+import AutoSlidingStats from '../../../src/View/components/AutoSlidingStats-AssAd'
 import { NotificationModal } from '../../../src/View/components/NotificationModal'
 import { styles } from '../../../src/View/styles/assistant-admin/dashboardStyles'
 
@@ -902,6 +902,7 @@ const InteractiveChart = ({
           </Text>
         </View>
       </View>
+      <AutoSlidingStats />
     </Animated.View>
   )
 }
@@ -1111,8 +1112,10 @@ export default function AssistantAdminDashboard() {
 
   const headerAnim = useRef(new Animated.Value(0)).current
   const statsAnim = useRef(new Animated.Value(0)).current
+  const pulseAnim = useRef(new Animated.Value(1)).current
+  const rotateAnim = useRef(new Animated.Value(0)).current
+  const scaleAnim = useRef(new Animated.Value(0.9)).current
 
-  // ── State ──
   const [dashboardStats, setDashboardStats] = useState({
     myEvents: 0,
     myAnnouncements: 0,
@@ -1121,7 +1124,7 @@ export default function AssistantAdminDashboard() {
     pendingMyEvents: 0,
     pendingMyAnnouncements: 0,
   })
-  // FIX 2: donut data includes pending + rejected
+
   const [adminDonutData, setAdminDonutData] = useState({
     upcoming: 0,
     past: 0,
@@ -1169,7 +1172,34 @@ export default function AssistantAdminDashboard() {
     ]).start()
   }, [])
 
-  // ── Data fetching ──
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.2,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start()
+
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 8000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start()
+  }, [])
+
   const fetchDashboardStats = async () => {
     try {
       if (!userData?.email) return
@@ -1528,44 +1558,85 @@ export default function AssistantAdminDashboard() {
   }, [])
 
   const handleDownloadReport = async () => {
+    // Prevent double clicks
+    if (downloadLoading) return
+
+    setDownloadLoading(true)
+
     try {
-      setDownloadLoading(true)
-
-      const freshMonthlyStats = await calculateMonthlyStats()
-
-      // Use donut data for accurate totals (all events/announcements)
-      const totalEvents =
-        adminDonutData.upcoming +
-        adminDonutData.past +
-        adminDonutData.pending +
-        adminDonutData.rejected
-      const totalAnnouncements = adminDonutData.announcements
-
-      const pdfData = {
-        stats: {
-          totalUsers: 0,
-          totalEvents: totalEvents,
-          totalAnnouncements: totalAnnouncements,
-          activeAttendees: dashboardStats.totalAttendance,
-          upcomingEvents: adminDonutData.upcoming,
-          pendingVerifications: adminDonutData.pending,
-          activeUsers: 0,
-          totalAttendance: dashboardStats.totalAttendance,
-        },
-        monthlyStats: freshMonthlyStats,
-        recentActivities: recentActivities.slice(0, 10),
-        upcomingEvents: upcomingEvents,
-        pastEvents: pastEvents,
+      // Validate essential data
+      if (!userData?.email) {
+        throw new Error('User session expired. Please log in again.')
       }
 
-      const fileUri = await generateDashboardPDF(pdfData, {
-        isAssistantAdmin: true,
-      })
-      await sharePDF(fileUri)
-      Alert.alert('Success', 'Report generated successfully!')
-    } catch (error) {
-      console.error('Report error:', error)
-      Alert.alert('Error', 'Failed to generate report.')
+      // Race against a 15-second timeout
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () =>
+            reject(new Error('PDF generation timed out. Please try again.')),
+          15000
+        )
+      )
+
+      const generatePromise = (async () => {
+        const freshMonthlyStats = await calculateMonthlyStats()
+
+        // Ensure we have at least some data – optional check
+        const totalEvents =
+          adminDonutData.upcoming +
+          adminDonutData.past +
+          adminDonutData.pending +
+          adminDonutData.rejected
+        if (totalEvents === 0 && adminDonutData.announcements === 0) {
+          // Warn but still allow PDF (it will show zeros)
+          console.warn('Generating PDF with zero events/announcements')
+        }
+
+        const pdfData = {
+          stats: {
+            totalUsers: 0,
+            totalEvents: totalEvents,
+            totalAnnouncements: adminDonutData.announcements,
+            activeAttendees: dashboardStats.totalAttendance,
+            upcomingEvents: adminDonutData.upcoming,
+            pendingVerifications: adminDonutData.pending,
+            activeUsers: 0,
+            totalAttendance: dashboardStats.totalAttendance,
+          },
+          monthlyStats: freshMonthlyStats,
+          recentActivities: recentActivities.slice(0, 10),
+          upcomingEvents: upcomingEvents,
+          pastEvents: pastEvents,
+        }
+
+        const fileUri = await generateDashboardPDF(pdfData, {
+          isAssistantAdmin: true,
+        })
+        await sharePDF(fileUri)
+        return true
+      })()
+
+      await Promise.race([generatePromise, timeoutPromise])
+
+      Alert.alert('Success', 'Report generated and ready to share!')
+    } catch (error: unknown) {
+      // Extract a useful error message
+      let errorMessage = 'An unexpected error occurred.'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      }
+
+      console.error('PDF Report Error:', error)
+      Alert.alert('Report Failed', errorMessage, [
+        { text: 'OK' },
+        {
+          text: 'Retry',
+          onPress: () => handleDownloadReport(),
+          style: 'cancel',
+        },
+      ])
     } finally {
       setDownloadLoading(false)
     }
@@ -1688,7 +1759,6 @@ export default function AssistantAdminDashboard() {
     outputRange: [-100, 0],
   })
 
-  // ── FIX 3: Header background + text adapts to light/dark correctly ──
   const headerGradient: readonly [string, string, string] = isDark
     ? ['#0f172a', '#1e293b', '#334155']
     : ['#1e40af', '#3b82f6', '#60a5fa']
@@ -1712,7 +1782,7 @@ export default function AssistantAdminDashboard() {
           />
         }
       >
-        {/* ── FIX 3: Animated Header with proper dark/light theming ── */}
+        {/* Replace the entire header block with this */}
         <Animated.View
           style={[
             styles.headerContainer,
@@ -1728,6 +1798,53 @@ export default function AssistantAdminDashboard() {
             end={{ x: 1, y: 1 }}
             style={styles.headerGradient}
           >
+            {/* Animated Background Shapes */}
+            <View style={styles.headerBackgroundShapes}>
+              <Animated.View
+                style={[
+                  styles.shape1,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.05)'
+                      : 'rgba(255,255,255,0.25)',
+                    transform: [
+                      { scale: pulseAnim },
+                      {
+                        rotate: rotateAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '360deg'],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
+              <Animated.View
+                style={[
+                  styles.shape2,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.08)'
+                      : 'rgba(255,255,255,0.3)',
+                    transform: [
+                      {
+                        scale: pulseAnim.interpolate({
+                          inputRange: [1, 1.2],
+                          outputRange: [1.2, 1],
+                        }),
+                      },
+                      {
+                        rotate: rotateAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '-360deg'],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
+            </View>
+
             <View style={styles.headerContent}>
               <View style={styles.headerLeft}>
                 <View style={styles.greetingContainer}>
@@ -1739,194 +1856,131 @@ export default function AssistantAdminDashboard() {
                   >
                     Welcome back,
                   </Text>
-                  <Text style={[styles.userName, { color: '#ffffff' }]}>
-                    {userData?.name || 'Assistant'}
+                  <Text style={styles.userName}>
+                    {userData?.surname
+                      ? `${userData.surname}, ${userData.name}`
+                      : userData?.name || 'Assistant'}
                   </Text>
-                  <View
-                    style={[
-                      styles.roleBadge,
-                      {
-                        backgroundColor: 'rgba(255,255,255,0.18)',
-                        borderRadius: 20,
-                        paddingHorizontal: 10,
-                        paddingVertical: 4,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.roleText, { color: '#ffffff' }]}>
-                      {' '}
-                      <Ionicons
-                        name='shield-checkmark-outline'
-                        size={12}
-                        color='#ffffff'
-                      />{' '}
-                      Assistant Admin
-                    </Text>
+                  <View style={styles.roleBadge}>
+                    <Ionicons
+                      name='shield-checkmark-outline'
+                      size={12}
+                      color='#ffffff'
+                    />
+                    <Text style={styles.roleText}>Assistant Admin</Text>
                   </View>
                 </View>
               </View>
 
               <View style={styles.headerRight}>
-                {/* FIX 5: Notification bell — opens modal, badge shows unreadCount */}
+                {/* Notification Bell */}
                 <TouchableOpacity
-                  style={[styles.iconButton, { position: 'relative' }]}
+                  style={styles.iconButton}
                   onPress={() => setNotificationModalVisible(true)}
                   activeOpacity={0.75}
                 >
-                  <View
-                    style={[
-                      styles.iconButtonInner,
-                      {
-                        backgroundColor: 'rgba(255,255,255,0.15)',
-                        borderRadius: 12,
-                        padding: 8,
-                      },
-                    ]}
+                  <Animated.View
+                    style={{
+                      transform: [{ scale: unreadCount > 0 ? pulseAnim : 1 }],
+                    }}
                   >
                     <Feather name='bell' size={20} color='#ffffff' />
-                    {unreadCount > 0 && (
-                      <View
-                        style={[
-                          styles.notificationBadge,
-                          {
-                            position: 'absolute',
-                            top: -4,
-                            right: -4,
-                            backgroundColor: '#ef4444',
-                            borderRadius: 10,
-                            minWidth: 18,
-                            height: 18,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderWidth: 2,
-                            borderColor: '#1e40af',
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.notificationBadgeText,
-                            { color: '#fff', fontSize: 10, fontWeight: '700' },
-                          ]}
-                        >
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+                  </Animated.View>
+                  {unreadCount > 0 && (
+                    <View style={styles.notificationBadge}>
+                      <Text style={styles.notificationBadgeText}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
 
-                {/* FIX 4: Download with loading state and proper styling */}
+                {/* Download Report Button */}
                 <TouchableOpacity
                   style={styles.iconButton}
                   onPress={handleDownloadReport}
                   disabled={downloadLoading}
                   activeOpacity={0.75}
                 >
-                  <View
-                    style={[
-                      styles.iconButtonInner,
-                      {
-                        backgroundColor: downloadLoading
-                          ? 'rgba(255,255,255,0.1)'
-                          : 'rgba(255,255,255,0.15)',
-                        borderRadius: 12,
-                        padding: 8,
-                      },
-                    ]}
-                  >
-                    {downloadLoading ? (
-                      <ActivityIndicator size='small' color='#ffffff' />
-                    ) : (
-                      <Feather name='download' size={20} color='#ffffff' />
-                    )}
-                  </View>
+                  {downloadLoading ? (
+                    <ActivityIndicator size='small' color='#ffffff' />
+                  ) : (
+                    <Feather name='download' size={20} color='#ffffff' />
+                  )}
                 </TouchableOpacity>
 
+                {/* Profile Image with Edit Overlay */}
                 <TouchableOpacity
                   style={styles.profileButton}
                   onPress={handleProfileImagePress}
                   disabled={uploadingImage}
+                  activeOpacity={0.8}
                 >
                   {uploadingImage ? (
-                    <View
-                      style={[
-                        styles.profileFallback,
-                        { backgroundColor: 'rgba(255,255,255,0.2)' },
-                      ]}
-                    >
+                    <View style={[styles.profileImage, styles.profileFallback]}>
                       <ActivityIndicator size='small' color='#ffffff' />
                     </View>
                   ) : userData?.photoURL ? (
-                    <Image
+                    <Animated.Image
                       source={{ uri: userData.photoURL }}
-                      style={styles.profileImage}
+                      style={[
+                        styles.profileImage,
+                        { transform: [{ scale: scaleAnim }] },
+                      ]}
                     />
                   ) : (
-                    <View
-                      style={[
-                        styles.profileFallback,
-                        { backgroundColor: 'rgba(255,255,255,0.2)' },
-                      ]}
-                    >
-                      <Text
-                        style={[styles.profileInitials, { color: '#ffffff' }]}
-                      >
+                    <View style={[styles.profileImage, styles.profileFallback]}>
+                      <Text style={styles.profileInitials}>
                         {userData?.name
                           ? userData.name.charAt(0).toUpperCase()
                           : 'A'}
                       </Text>
                     </View>
                   )}
+                  <View style={styles.editIconContainer}>
+                    <Feather name='camera' size={10} color='#ffffff' />
+                  </View>
                 </TouchableOpacity>
               </View>
             </View>
 
-            <View
-              style={[
-                styles.dateContainer,
-                {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  marginTop: 8,
-                },
-              ]}
-            >
-              <Feather
-                name='calendar'
-                size={13}
-                color='rgba(255,255,255,0.7)'
-              />
-              <Text
-                style={[styles.dateText, { color: 'rgba(255,255,255,0.7)' }]}
-              >
-                {new Date().toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </Text>
+            {/* Date Section */}
+            <View style={styles.dateSection}>
+              <View style={styles.dateContainer}>
+                <Feather
+                  name='calendar'
+                  size={14}
+                  color='rgba(255,255,255,0.7)'
+                />
+                <Text style={styles.dateText}>
+                  {new Date().toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </Text>
+              </View>
             </View>
           </LinearGradient>
         </Animated.View>
-
-        <AdminContentDistribution
-          donutData={adminDonutData}
-          isDark={isDark}
-          colors={colors}
-        />
-
-        {monthlyStats.length > 0 && (
-          <InteractiveChart
-            monthlyStats={monthlyStats}
-            colors={colors}
+        <View style={{ marginTop: -16 }}>
+          <AdminContentDistribution
+            donutData={adminDonutData}
             isDark={isDark}
-            chartWidth={chartWidth}
+            colors={colors}
           />
-        )}
-
+        </View>
+        <View style={{ marginTop: -16 }}>
+          {monthlyStats.length > 0 && (
+            <InteractiveChart
+              monthlyStats={monthlyStats}
+              colors={colors}
+              isDark={isDark}
+              chartWidth={chartWidth}
+            />
+          )}
+        </View>
         <View style={styles.twoColumnLayout}>
           <View style={styles.column}>
             <View style={styles.sectionHeader}>

@@ -3,6 +3,11 @@ import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useFocusEffect, useRouter } from 'expo-router'
 import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+} from 'firebase/auth'
+import {
   collection,
   doc,
   getDoc,
@@ -20,10 +25,12 @@ import {
   Animated,
   Easing,
   Image,
+  Linking,
   Modal,
   Platform,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -210,7 +217,6 @@ const BarChartSection = ({
   )
 }
 
-// Individual bar chart item with its own animation
 const BarChartItem = ({ data, index, maxValue, colors, isDark }: any) => {
   const maxHeight = 140
   const attendedHeight = (data.attended / maxValue) * maxHeight
@@ -362,6 +368,21 @@ export default function StudentProfile() {
   const [missedCount, setMissedCount] = useState(0)
   const [showFullAttendedModal, setShowFullAttendedModal] = useState(false)
   const [showFullMissedModal, setShowFullMissedModal] = useState(false)
+  // Change Password State
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordStrength, setPasswordStrength] = useState<{
+    score: number
+    label: string
+    color: string
+  }>({ score: 0, label: 'Weak', color: '#EF4444' })
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const styles = useMemo(
     () => createProfileStyles(colors, isDark, isMobile, isTablet, isDesktop),
@@ -420,13 +441,47 @@ export default function StudentProfile() {
       'TMC Connect - A comprehensive solution for managing campus events, attendance tracking, and student engagement.',
   })
 
+  const SUPPORT_EMAIL = 'developertmcconnect@gmail.com'
+
+  const handleContactSupport = () => {
+    const subject = encodeURIComponent('Support Request - TMC Connect')
+    const body = encodeURIComponent(
+      `Hello TMC Support Team,\n\nI need assistance with the following:\n\n[Please describe your issue here]\n\n---\nUser: ${userData?.name || 'Student'} (${userData?.email || ''})\nApp Version: 2.0.0\nPlatform: ${Platform.OS}`
+    )
+    const mailtoUrl = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`
+
+    Linking.openURL(mailtoUrl).catch((err) => {
+      Alert.alert(
+        'Email Not Configured',
+        'Unable to open email client. Please manually email us at ' +
+          SUPPORT_EMAIL
+      )
+    })
+  }
+
+  const handleReportIssue = () => {
+    const subject = encodeURIComponent('Bug Report - TMC Connect')
+    const body = encodeURIComponent(
+      `**Describe the bug**\n[Please provide a clear description]\n\n**Steps to reproduce**\n1. \n2. \n3. \n\n**Expected behavior**\n[What did you expect to happen?]\n\n**Actual behavior**\n[What actually happened?]\n\n**Device info**\nPlatform: ${Platform.OS}\nVersion: ${Platform.Version}\nApp Version: 2.0.0\nUser: ${userData?.email || ''}`
+    )
+    const mailtoUrl = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`
+
+    Linking.openURL(mailtoUrl).catch((err) => {
+      Alert.alert(
+        'Email Not Configured',
+        'Unable to open email client. Please manually report to ' +
+          SUPPORT_EMAIL
+      )
+    })
+  }
+
   const renderHelpModal = () => {
     const faqs = [
       {
         id: '1',
         question: 'How do I scan my attendance?',
         answer:
-          'Go to the Events section, find the current event, and tap the "Scan QR Code" button. Point your camera at the QR code displayed at the event venue to mark your attendance.',
+          'Go to the Scan tab, and tap the "Scan QR Code" button. Point your camera at the QR code displayed at the event venue to mark your attendance.',
         icon: 'qrcode-scan',
       },
       {
@@ -440,7 +495,7 @@ export default function StudentProfile() {
         id: '3',
         question: 'How do I view my attendance history?',
         answer:
-          'Go to your Profile and check the "Attended" tab to see all events you\'ve successfully attended. You can also generate an Attendance Report for detailed monthly statistics.',
+          'Go to your Profile and check the "Attended" tab to see all events you\'ve successfully attended. You can also check your "Missed" events.',
         icon: 'chart-line',
       },
       {
@@ -485,7 +540,7 @@ export default function StudentProfile() {
         id: '1',
         title: 'Email Support',
         description: 'Get help via email',
-        contact: 'support@tmcconnect.com',
+        contact: 'developertmcconnect@gmail.com',
         icon: 'email',
         color: '#3B82F6',
       },
@@ -607,31 +662,7 @@ export default function StudentProfile() {
                       gap: 8,
                     },
                   ]}
-                  onPress={() => {
-                    Alert.alert(
-                      'Contact Support',
-                      'Choose your preferred contact method:',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Email',
-                          onPress: () =>
-                            Alert.alert(
-                              'Email Support',
-                              'Send an email to support@tmcconnect.com'
-                            ),
-                        },
-                        {
-                          text: 'Chat',
-                          onPress: () =>
-                            Alert.alert(
-                              'Live Chat',
-                              'Our live chat support is currently offline. Please try again during business hours.'
-                            ),
-                        },
-                      ]
-                    )
-                  }}
+                  onPress={handleContactSupport}
                 >
                   <Icon name='headset' size={20} color='#FFFFFF' />
                   <Text
@@ -669,7 +700,7 @@ export default function StudentProfile() {
                 }}
               >
                 {supportChannels.map((channel) => (
-                  <TouchableOpacity
+                  <View
                     key={channel.id}
                     style={[
                       styles.supportCard,
@@ -683,23 +714,6 @@ export default function StudentProfile() {
                         borderColor: colors.border,
                       },
                     ]}
-                    onPress={() => {
-                      Alert.alert(channel.title, channel.contact, [
-                        { text: 'OK' },
-                        ...(channel.id === '1'
-                          ? [
-                              {
-                                text: 'Send Email',
-                                onPress: () =>
-                                  Alert.alert(
-                                    'Email',
-                                    `Opening email app to ${channel.contact}`
-                                  ),
-                              },
-                            ]
-                          : []),
-                      ])
-                    }}
                   >
                     <View
                       style={[
@@ -716,7 +730,7 @@ export default function StudentProfile() {
                       ]}
                     >
                       <Icon
-                        name={channel.icon}
+                        name={channel.icon as any}
                         size={24}
                         color={channel.color}
                       />
@@ -742,10 +756,9 @@ export default function StudentProfile() {
                     >
                       {channel.contact}
                     </Text>
-                  </TouchableOpacity>
+                  </View>
                 ))}
               </View>
-
               {/* FAQ Section */}
               <Text
                 style={[
@@ -931,23 +944,7 @@ export default function StudentProfile() {
                       gap: 8,
                     },
                   ]}
-                  onPress={() => {
-                    Alert.alert(
-                      'Report an Issue',
-                      "Please describe the issue you're experiencing:",
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Submit',
-                          onPress: () =>
-                            Alert.alert(
-                              'Thank You!',
-                              "Your report has been submitted. We'll look into it promptly."
-                            ),
-                        },
-                      ]
-                    )
-                  }}
+                  onPress={handleReportIssue}
                 >
                   <Icon name='email' size={18} color='#FFFFFF' />
                   <Text
@@ -981,7 +978,7 @@ export default function StudentProfile() {
                     { color: colors.sidebar.text.muted, fontSize: 12 },
                   ]}
                 >
-                  TMC Connect v1.0.1
+                  TMC Connect v2.0.0
                 </Text>
                 <Text
                   style={[
@@ -993,7 +990,7 @@ export default function StudentProfile() {
                     },
                   ]}
                 >
-                  © 2024 TMC Connect. All rights reserved.
+                  © 2026 TMC Connect. jmx9f2a.
                 </Text>
               </View>
             </ScrollView>
@@ -1002,6 +999,231 @@ export default function StudentProfile() {
       </Modal>
     )
   }
+
+  const renderChangePasswordModal = () => (
+    <Modal
+      visible={showChangePasswordModal}
+      transparent={true}
+      animationType='slide'
+      onRequestClose={() => {
+        setShowChangePasswordModal(false)
+        resetChangePasswordForm()
+      }}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.aboutModal, { backgroundColor: colors.card }]}>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Change Password
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShowChangePasswordModal(false)
+                resetChangePasswordForm()
+              }}
+            >
+              <Icon name='close' size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={{ padding: 16 }}>
+              {/* Current Password */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  Current Password *
+                </Text>
+                <View
+                  style={[
+                    styles.passwordInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.passwordInput, { color: colors.text }]}
+                    placeholder='Enter current password'
+                    placeholderTextColor={colors.sidebar.text.muted}
+                    secureTextEntry={!showCurrentPassword}
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    editable={!isUpdatingPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                  >
+                    <Icon
+                      name={showCurrentPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.sidebar.text.secondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* New Password */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  New Password *
+                </Text>
+                <View
+                  style={[
+                    styles.passwordInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.passwordInput, { color: colors.text }]}
+                    placeholder='Enter new password'
+                    placeholderTextColor={colors.sidebar.text.muted}
+                    secureTextEntry={!showNewPassword}
+                    value={newPassword}
+                    onChangeText={(text) => {
+                      setNewPassword(text)
+                      calculatePasswordStrength(text)
+                    }}
+                    editable={!isUpdatingPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    <Icon
+                      name={showNewPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.sidebar.text.secondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {newPassword.length > 0 && (
+                  <View style={{ marginTop: 8 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 4,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: colors.sidebar.text.secondary,
+                          fontSize: 12,
+                          marginRight: 8,
+                        }}
+                      >
+                        Strength:
+                      </Text>
+                      <Text
+                        style={{
+                          color: passwordStrength.color,
+                          fontSize: 12,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {passwordStrength.label}
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        height: 4,
+                        backgroundColor: colors.border,
+                        borderRadius: 2,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: `${(passwordStrength.score / 5) * 100}%`,
+                          height: '100%',
+                          backgroundColor: passwordStrength.color,
+                          borderRadius: 2,
+                        }}
+                      />
+                    </View>
+                    <Text
+                      style={{
+                        color: colors.sidebar.text.muted,
+                        fontSize: 10,
+                        marginTop: 4,
+                      }}
+                    >
+                      Use at least 8 characters with uppercase, lowercase,
+                      number, and symbol.
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Confirm Password */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  Confirm New Password *
+                </Text>
+                <View
+                  style={[
+                    styles.passwordInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.passwordInput, { color: colors.text }]}
+                    placeholder='Confirm new password'
+                    placeholderTextColor={colors.sidebar.text.muted}
+                    secureTextEntry={!showConfirmPassword}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    editable={!isUpdatingPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    <Icon
+                      name={showConfirmPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.sidebar.text.secondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {confirmPassword.length > 0 &&
+                  newPassword !== confirmPassword && (
+                    <Text
+                      style={{ color: '#EF4444', fontSize: 12, marginTop: 4 }}
+                    >
+                      Passwords do not match.
+                    </Text>
+                  )}
+              </View>
+
+              {passwordError && (
+                <View style={styles.errorBanner}>
+                  <Icon name='alert-circle' size={16} color='#EF4444' />
+                  <Text style={styles.errorText}>{passwordError}</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  {
+                    backgroundColor:
+                      isChangePasswordFormValid() && !isUpdatingPassword
+                        ? colors.accent.primary
+                        : colors.border,
+                    marginTop: 24,
+                  },
+                ]}
+                onPress={handleChangePassword}
+                disabled={!isChangePasswordFormValid() || isUpdatingPassword}
+              >
+                {isUpdatingPassword ? (
+                  <ActivityIndicator size='small' color='#FFFFFF' />
+                ) : (
+                  <Text style={styles.submitButtonText}>Update Password</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  )
 
   const calculateMonthlyAttendance = useCallback(async () => {
     try {
@@ -1100,6 +1322,101 @@ export default function StudentProfile() {
       setChartLoading(false)
     }
   }, [userData])
+
+  const calculatePasswordStrength = (password: string) => {
+    let score = 0
+    if (password.length >= 8) score++
+    if (/[A-Z]/.test(password)) score++
+    if (/[a-z]/.test(password)) score++
+    if (/[0-9]/.test(password)) score++
+    if (/[^A-Za-z0-9]/.test(password)) score++
+
+    let label = 'Weak'
+    let color = '#EF4444'
+    if (score >= 4) {
+      label = 'Strong'
+      color = '#10B981'
+    } else if (score >= 3) {
+      label = 'Good'
+      color = '#3B82F6'
+    } else if (score >= 2) {
+      label = 'Fair'
+      color = '#F59E0B'
+    }
+
+    setPasswordStrength({ score, label, color })
+  }
+
+  const isChangePasswordFormValid = () => {
+    if (!currentPassword.trim()) return false
+    if (!newPassword.trim() || passwordStrength.score < 3) return false
+    if (newPassword !== confirmPassword) return false
+    return true
+  }
+
+  const resetChangePasswordForm = () => {
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setPasswordError(null)
+    setPasswordStrength({ score: 0, label: 'Weak', color: '#EF4444' })
+    setShowCurrentPassword(false)
+    setShowNewPassword(false)
+    setShowConfirmPassword(false)
+  }
+
+  const handleChangePassword = async () => {
+    setPasswordError(null)
+
+    if (!isChangePasswordFormValid()) {
+      setPasswordError('Please fill all fields correctly.')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirmation do not match.')
+      return
+    }
+
+    const user = auth.currentUser
+    if (!user || !user.email) {
+      setPasswordError('User not authenticated.')
+      return
+    }
+
+    setIsUpdatingPassword(true)
+
+    try {
+      const credential = EmailAuthProvider.credential(
+        user.email,
+        currentPassword
+      )
+      await reauthenticateWithCredential(user, credential)
+      await updatePassword(user, newPassword)
+
+      Alert.alert('Success', 'Your password has been updated successfully.')
+      setShowChangePasswordModal(false)
+      resetChangePasswordForm()
+    } catch (error: any) {
+      console.error('Password change error:', error)
+      if (
+        error.code === 'auth/wrong-password' ||
+        error.code === 'auth/invalid-credential'
+      ) {
+        setPasswordError('Current password is incorrect.')
+      } else if (error.code === 'auth/weak-password') {
+        setPasswordError(
+          'New password is too weak. Please choose a stronger password.'
+        )
+      } else if (error.code === 'auth/too-many-requests') {
+        setPasswordError('Too many attempts. Please try again later.')
+      } else {
+        setPasswordError('Failed to update password. Please try again.')
+      }
+    } finally {
+      setIsUpdatingPassword(false)
+    }
+  }
 
   const fetchEvents = async () => {
     try {
@@ -1872,8 +2189,13 @@ export default function StudentProfile() {
                       setShowEventDetailModal(true)
                     }}
                   >
-                    <View style={styles.eventIcon}>
-                      <Icon name='calendar-alert' size={20} color='#DC2626' />
+                    <View
+                      style={[
+                        styles.eventIcon,
+                        { backgroundColor: '#DC262615' },
+                      ]}
+                    >
+                      <Icon name='close' size={20} color='#DC2626' />
                     </View>
                     <View style={styles.eventDetails}>
                       <View
@@ -2027,8 +2349,10 @@ export default function StudentProfile() {
       </View>
     </Modal>
   )
+  const progressBarRef = useRef<View>(null)
+  const [progressBarWidth, setProgressBarWidth] = useState(0)
 
-  // Attendance Report Modal with Enhanced Interactive Charts
+  // Attendance Report Modal
   const renderAttendanceReportModal = () => {
     const totalEvents = attendedCount + missedCount
     const attendedPercentage =
@@ -2036,13 +2360,11 @@ export default function StudentProfile() {
     const missedPercentage =
       totalEvents > 0 ? Math.round((missedCount / totalEvents) * 100) : 0
 
-    // Animation values for stats
     const statAnim1 = useRef(new Animated.Value(0)).current
     const statAnim2 = useRef(new Animated.Value(0)).current
     const chartAnim = useRef(new Animated.Value(0)).current
     const [selectedSlice, setSelectedSlice] = useState<number | null>(null)
 
-    // Animate stats on mount
     useEffect(() => {
       if (showAttendanceReportModal) {
         Animated.stagger(200, [
@@ -2076,7 +2398,7 @@ export default function StudentProfile() {
         text: `${attendedPercentage}%`,
         label: 'Attended',
         icon: 'check-circle',
-        description: 'Events you successfully attended',
+        description: 'Events you attended',
       },
       {
         value: missedCount,
@@ -2258,11 +2580,7 @@ export default function StudentProfile() {
                           ],
                         }}
                       >
-                        <Icon
-                          name='calendar-remove'
-                          size={28}
-                          color='#EF4444'
-                        />
+                        <Icon name='close' size={28} color='#EF4444' />
                       </Animated.View>
                       <Text
                         style={[
@@ -2554,7 +2872,7 @@ export default function StudentProfile() {
                             color: colors.text,
                             fontSize: 16,
                             fontWeight: '600',
-                            marginBottom: 12,
+                            marginBottom: 30,
                             textAlign: 'center',
                           },
                         ]}
@@ -2562,39 +2880,118 @@ export default function StudentProfile() {
                         Performance Insight
                       </Text>
 
-                      {/* Progress Bar */}
+                      {/* Progress Bar Container */}
                       <View
-                        style={{
-                          width: '100%',
-                          backgroundColor: isDark ? '#334155' : '#e2e8f0',
-                          borderRadius: 10,
-                          height: 12,
-                          overflow: 'hidden',
-                          marginBottom: 12,
-                        }}
+                        ref={progressBarRef}
+                        onLayout={(e) =>
+                          setProgressBarWidth(e.nativeEvent.layout.width)
+                        }
+                        style={{ marginBottom: 8 }}
                       >
-                        <Animated.View
+                        {/* Background Bar */}
+                        <View
                           style={{
-                            width: `${attendedPercentage}%`,
-                            backgroundColor:
-                              attendedPercentage >= 80
-                                ? '#10B981'
-                                : attendedPercentage >= 60
-                                  ? '#F59E0B'
-                                  : '#EF4444',
-                            height: '100%',
+                            width: '100%',
+                            backgroundColor: isDark ? '#334155' : '#e2e8f0',
                             borderRadius: 10,
-                            opacity: chartAnim,
-                            transform: [
-                              {
-                                scaleX: chartAnim.interpolate({
-                                  inputRange: [0, 1],
-                                  outputRange: [0, 1],
-                                }),
-                              },
-                            ],
+                            height: 12,
+                            overflow: 'hidden',
                           }}
-                        />
+                        >
+                          {/* Animated Fill using scaleX */}
+                          <Animated.View
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              backgroundColor:
+                                attendedPercentage >= 80
+                                  ? '#10B981'
+                                  : attendedPercentage >= 60
+                                    ? '#F59E0B'
+                                    : '#EF4444',
+                              borderRadius: 10,
+                              transform: [
+                                {
+                                  scaleX: chartAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0, attendedPercentage / 100],
+                                  }),
+                                },
+                              ],
+                              transformOrigin: 'left',
+                            }}
+                          />
+                        </View>
+
+                        {/* Floating Percentage Bubble */}
+                        {progressBarWidth > 0 && (
+                          <Animated.View
+                            style={{
+                              position: 'absolute',
+                              bottom: 20,
+                              left: 0,
+                              transform: [
+                                {
+                                  translateX: chartAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [
+                                      0,
+                                      progressBarWidth *
+                                        (attendedPercentage / 100) -
+                                        30,
+                                    ],
+                                  }),
+                                },
+                              ],
+                              backgroundColor:
+                                attendedPercentage >= 80
+                                  ? '#10B981'
+                                  : attendedPercentage >= 60
+                                    ? '#F59E0B'
+                                    : '#EF4444',
+                              paddingHorizontal: 10,
+                              paddingVertical: 4,
+                              borderRadius: 20,
+                              minWidth: 60,
+                              alignItems: 'center',
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.15,
+                              shadowRadius: 4,
+                              elevation: 3,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: '#FFFFFF',
+                                fontSize: 14,
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              {attendedPercentage}%
+                            </Text>
+                            {/* Pointer */}
+                            <View
+                              style={{
+                                position: 'absolute',
+                                bottom: -6,
+                                width: 0,
+                                height: 0,
+                                borderLeftWidth: 6,
+                                borderRightWidth: 6,
+                                borderTopWidth: 6,
+                                borderLeftColor: 'transparent',
+                                borderRightColor: 'transparent',
+                                borderTopColor:
+                                  attendedPercentage >= 80
+                                    ? '#10B981'
+                                    : attendedPercentage >= 60
+                                      ? '#F59E0B'
+                                      : '#EF4444',
+                              }}
+                            />
+                          </Animated.View>
+                        )}
                       </View>
 
                       {/* Rating Scale */}
@@ -2602,6 +2999,7 @@ export default function StudentProfile() {
                         style={{
                           flexDirection: 'row',
                           justifyContent: 'space-between',
+                          marginTop: 24,
                           marginBottom: 12,
                         }}
                       >
@@ -2643,6 +3041,7 @@ export default function StudentProfile() {
                           padding: 12,
                           borderRadius: 12,
                           alignItems: 'center',
+                          marginTop: 8,
                         }}
                       >
                         <Text
@@ -2658,10 +3057,10 @@ export default function StudentProfile() {
                           }}
                         >
                           {attendedPercentage >= 80
-                            ? '🎉 Excellent'
+                            ? 'Excellent'
                             : attendedPercentage >= 60
-                              ? '👍 Good'
-                              : '⚠️ Needs Improvement'}
+                              ? 'Good'
+                              : 'Needs Improvement'}
                         </Text>
                         <Text
                           style={{
@@ -2717,16 +3116,78 @@ export default function StudentProfile() {
         <View style={styles.modalOverlay}>
           <View style={[styles.aboutModal, { maxHeight: '80%' }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                Event Details
-              </Text>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                <Text style={[styles.modalTitle, { color: colors.text }]}>
+                  Event Details
+                </Text>
+                {isAttended ? (
+                  <View
+                    style={{
+                      backgroundColor: '#10B98120',
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#10B981',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Icon name='check-circle' size={14} color='#10B981' />
+                    <Text
+                      style={{
+                        color: '#10B981',
+                        fontSize: 12,
+                        fontWeight: '600',
+                      }}
+                    >
+                      Attended
+                    </Text>
+                  </View>
+                ) : (
+                  <View
+                    style={{
+                      backgroundColor: '#DC262620',
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: '#DC2626',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <Icon name='close-circle' size={14} color='#DC2626' />
+                    <Text
+                      style={{
+                        color: '#DC2626',
+                        fontSize: 12,
+                        fontWeight: '600',
+                      }}
+                    >
+                      Missed
+                    </Text>
+                  </View>
+                )}
+              </View>
               <TouchableOpacity onPress={() => setShowEventDetailModal(false)}>
                 <Icon name='close' size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={{ padding: 16 }}>
+              <View
+                style={{
+                  padding: 16,
+                  borderLeftWidth: 4,
+                  borderLeftColor: isAttended ? '#10B981' : '#DC2626',
+                  backgroundColor: isAttended ? '#10B98108' : '#DC262608',
+                }}
+              >
                 <Text
                   style={[styles.eventTitle, { fontSize: 20, marginBottom: 8 }]}
                 >
@@ -2850,7 +3311,11 @@ export default function StudentProfile() {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>My Profile</Text>
-            <Text style={styles.userName}>{getDisplayName()}</Text>
+            <Text style={styles.userName}>
+              {userData?.surname
+                ? `${userData.name} ${userData.surname}`
+                : userData?.name || 'Student'}
+            </Text>
             <Text style={styles.role}>Student</Text>
           </View>
 
@@ -2872,7 +3337,11 @@ export default function StudentProfile() {
             ) : (
               <View style={[styles.profileImage, styles.profileFallback]}>
                 <Text style={styles.profileInitials}>
-                  {getDisplayName().charAt(0).toUpperCase()}
+                  {userData?.name
+                    ? userData.surname
+                      ? `${userData.name.charAt(0)}${userData.surname.charAt(0)}`.toUpperCase()
+                      : userData.name.charAt(0).toUpperCase()
+                    : 'S'}
                 </Text>
               </View>
             )}
@@ -2924,7 +3393,11 @@ export default function StudentProfile() {
                 ) : (
                   <View style={styles.avatarFallback}>
                     <Text style={styles.avatarInitials}>
-                      {getDisplayName().charAt(0).toUpperCase()}
+                      {userData?.name
+                        ? userData.surname
+                          ? `${userData.name.charAt(0)}${userData.surname.charAt(0)}`.toUpperCase()
+                          : userData.name.charAt(0).toUpperCase()
+                        : 'S'}
                     </Text>
                   </View>
                 )}
@@ -2936,7 +3409,12 @@ export default function StudentProfile() {
             </View>
 
             <View style={styles.identitySection}>
-              <Text style={styles.identityName}>{getDisplayName()}</Text>
+              <Text style={styles.identityName}>
+                {' '}
+                {userData?.surname
+                  ? `${userData.name} ${userData.surname}`
+                  : userData?.name || 'Student'}
+              </Text>
               <Text style={styles.identityEmail}>{userData?.email || '—'}</Text>
               <View style={styles.memberSinceRow}>
                 <Text style={styles.memberSinceText}>ID: {userStudentID}</Text>
@@ -2959,7 +3437,7 @@ export default function StudentProfile() {
               {
                 value: missedCount,
                 label: 'Missed',
-                icon: 'calendar-remove',
+                icon: 'x-circle',
                 color: '#ef4444',
               },
               {
@@ -3149,15 +3627,23 @@ export default function StudentProfile() {
                 return (
                   <TouchableOpacity
                     key={event.id}
-                    style={styles.eventItem}
+                    style={[
+                      styles.eventItem,
+                      { borderLeftWidth: 3, borderLeftColor: '#DC2626' },
+                    ]}
                     onPress={() => {
                       setSelectedEventDetail(event)
                       setShowEventDetailModal(true)
                     }}
                     activeOpacity={0.7}
                   >
-                    <View style={styles.eventIcon}>
-                      <Icon name='calendar-alert' size={20} color='#DC2626' />
+                    <View
+                      style={[
+                        styles.eventIcon,
+                        { backgroundColor: '#DC262615' },
+                      ]}
+                    >
+                      <Icon name='close' size={20} color='#DC2626' />
                     </View>
                     <View style={styles.eventDetails}>
                       <View
@@ -3306,6 +3792,20 @@ export default function StudentProfile() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.menuItem}
+              onPress={() => setShowChangePasswordModal(true)}
+            >
+              <View style={styles.menuItemLeft}>
+                <Icon name='lock-reset' size={18} color='#8B5CF6' />
+                <Text style={styles.menuItemText}>Change Password</Text>
+              </View>
+              <Icon
+                name='chevron-right'
+                size={18}
+                color={colors.sidebar.text.secondary}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => setShowHelpModal(true)}
             >
               <View style={styles.menuItemLeft}>
@@ -3392,6 +3892,7 @@ export default function StudentProfile() {
       {renderCourseModal()}
       {renderHelpModal()}
       {renderAttendanceReportModal()}
+      {renderChangePasswordModal()}
       {renderEventDetailModal()}
       {renderFullAttendedModal()}
       {renderFullMissedModal()}

@@ -12,6 +12,7 @@ interface UserData {
   email: string
   role: Role
   name: string
+  surname?: string
   studentID?: number
   active?: boolean
   deactivatedAt?: string
@@ -128,6 +129,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const completeUserData = {
         ...userDataFromDB,
         email: firebaseUser.email || userDataFromDB.email,
+        surname: userDataFromDB.surname || '',
       }
 
       setUser(firebaseUser)
@@ -137,12 +139,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       return completeUserData
     } catch (error: any) {
-      // Ensure user is cleared on any error
       setUser(null)
       setUserData(null)
       await storeUserData(null)
 
-      // Better error messages
+      // Error messages
       if (error.code === 'auth/invalid-credential') {
         throw new Error('Invalid email or password.')
       } else if (error.code === 'auth/user-not-found') {

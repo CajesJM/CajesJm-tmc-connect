@@ -88,14 +88,16 @@ export default function StudentAttendance() {
     ? (['#0f172a', '#1e293b'] as const)
     : (['#1e40af', '#3b82f6'] as const)
 
-  // Animation values
   const [pulseAnim] = useState(new Animated.Value(1))
   const [slideAnim] = useState(new Animated.Value(0))
 
   const formattedStudentInfo = useMemo(() => {
     if (!currentStudent) return null
+    const fullName = currentStudent.surname
+      ? `${currentStudent.name} ${currentStudent.surname}`
+      : currentStudent.name
     return {
-      name: currentStudent.name,
+      name: fullName,
       studentID: currentStudent.studentID,
       course: currentStudent.course,
       yearLevel: currentStudent.yearLevel,
@@ -104,7 +106,6 @@ export default function StudentAttendance() {
     }
   }, [currentStudent])
 
-  // Check permissions on mount and when app returns to foreground
   useEffect(() => {
     checkAllPermissions()
 
@@ -577,7 +578,9 @@ export default function StudentAttendance() {
         // Record attendance
         const attendanceData: AttendanceRecord = {
           studentID: currentStudent.studentID,
-          studentName: currentStudent.name,
+          studentName: currentStudent.surname
+            ? `${currentStudent.name} ${currentStudent.surname}`
+            : currentStudent.name,
           course: currentStudent.course,
           yearLevel: currentStudent.yearLevel,
           block: currentStudent.block || 'Not assigned',
@@ -948,7 +951,7 @@ export default function StudentAttendance() {
                 <View style={styles.infoItem}>
                   <Text style={styles.infoLabel}>Year</Text>
                   <Text style={styles.infoValue}>
-                    Year {formattedStudentInfo.yearLevel}
+                    {formattedStudentInfo.yearLevel}
                   </Text>
                 </View>
               </View>

@@ -2116,8 +2116,12 @@ export default function MainAdminAttendance() {
       >
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.greetingText}>Welcome back,</Text>
-            <Text style={styles.userName}>{userData?.name || 'Assistant'}</Text>
+            <Text style={styles.greetingText}>Attendance Dashboard,</Text>
+            <Text style={styles.userName}>
+              {userData?.surname
+                ? `${userData.surname}, ${userData.name}`
+                : userData?.name || 'Assistant'}
+            </Text>
             <Text style={styles.role}>Assistant Admin</Text>
           </View>
           <TouchableOpacity
@@ -2141,7 +2145,6 @@ export default function MainAdminAttendance() {
 
         <View style={styles.headerBottom}>
           <View style={styles.dateContainer}>
-            <Feather name='calendar' size={12} color='#94a3b8' />
             <Text style={styles.dateText}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: 'long',
@@ -2163,7 +2166,6 @@ export default function MainAdminAttendance() {
         <View
           style={[styles.mainContent, isMobile && styles.mainContentMobile]}
         >
-          {/* Left Grid */}
           <View style={[styles.leftGrid, isMobile && styles.leftGridMobile]}>
             <View
               style={[styles.leftHeader, isMobile && styles.leftHeaderMobile]}

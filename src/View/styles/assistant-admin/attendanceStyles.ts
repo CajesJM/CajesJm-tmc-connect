@@ -48,7 +48,7 @@ export const createAttendanceStyles = (
       fontSize: isMobile ? 20 : 22,
       fontWeight: '700',
       color: '#ffffff',
-      marginBottom: 2,
+      marginBottom: 0,
     },
     role: {
       fontSize: isMobile ? 11 : 12,

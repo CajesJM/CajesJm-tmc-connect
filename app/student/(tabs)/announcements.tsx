@@ -589,7 +589,11 @@ export default function StudentAnnouncements() {
           <View style={styles.headerTop}>
             <View>
               <Text style={styles.greeting}>Announcement Dashboard,</Text>
-              <Text style={styles.userName}>{userData?.name || 'Student'}</Text>
+              <Text style={styles.userName}>
+                {userData?.surname
+                  ? `${userData.name} ${userData.surname}`
+                  : userData?.name || 'Student'}
+              </Text>
               <Text style={styles.role}>Student</Text>
             </View>
             <TouchableOpacity
@@ -605,7 +609,9 @@ export default function StudentAnnouncements() {
                 <View style={[styles.profileImage, styles.profileFallback]}>
                   <Text style={styles.profileInitials}>
                     {userData?.name
-                      ? userData.name.charAt(0).toUpperCase()
+                      ? userData.surname
+                        ? `${userData.name.charAt(0)}${userData.surname.charAt(0)}`.toUpperCase()
+                        : userData.name.charAt(0).toUpperCase()
                       : 'S'}
                   </Text>
                 </View>
@@ -645,7 +651,11 @@ export default function StudentAnnouncements() {
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.greeting}>Announcement Dashboard,</Text>
-            <Text style={styles.userName}>{userData?.name || 'Student'}</Text>
+            <Text style={styles.userName}>
+              {userData?.surname
+                ? `${userData.name} ${userData.surname}`
+                : userData?.name || 'Student'}
+            </Text>
             <Text style={styles.role}>Student</Text>
           </View>
           <TouchableOpacity
@@ -660,7 +670,11 @@ export default function StudentAnnouncements() {
             ) : (
               <View style={[styles.profileImage, styles.profileFallback]}>
                 <Text style={styles.profileInitials}>
-                  {userData?.name ? userData.name.charAt(0).toUpperCase() : 'S'}
+                  {userData?.name
+                    ? userData.surname
+                      ? `${userData.name.charAt(0)}${userData.surname.charAt(0)}`.toUpperCase()
+                      : userData.name.charAt(0).toUpperCase()
+                    : 'S'}
                 </Text>
               </View>
             )}

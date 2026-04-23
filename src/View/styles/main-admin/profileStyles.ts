@@ -6,7 +6,6 @@ const isTablet = screenWidth >= 768 && screenWidth < 1024
 
 export const createProfileStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
-    // ─── Root & Container ───────────────────────────────────────────────────
     container: {
       flex: 1,
       backgroundColor: colors.background,
@@ -16,57 +15,53 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
     },
     scrollContent: {
       paddingHorizontal: isMobile ? 12 : 20,
-      paddingTop: 12,
       paddingBottom: 24,
       gap: 12,
     },
 
-    // ─── Header (PRESERVED - UNCHANGED) ────────────────────────────────────
     headerGradient: {
-      paddingTop: 20,
-      paddingBottom: 12,
-      paddingHorizontal: 24,
-      borderBottomLeftRadius: 0,
-      borderBottomRightRadius: 0,
+      paddingTop: 28,
+      paddingBottom: 20,
+      paddingHorizontal: 28,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
     },
     headerContent: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16,
+      alignItems: 'flex-start',
+      marginBottom: 20,
     },
     greetingText: {
-      fontSize: 13,
-      fontWeight: '500',
-      letterSpacing: 0.3,
-      opacity: 0.85,
-      marginBottom: 2,
+      fontSize: 10.5,
+      fontWeight: '600',
+      letterSpacing: 1.8,
+      textTransform: 'uppercase',
+      opacity: 0.75,
+      marginBottom: 4,
+      marginLeft: 5,
     },
     userName: {
-      fontSize: 26,
+      fontSize: 34,
       fontWeight: '800',
       color: '#ffffff',
-      marginBottom: 2,
-      letterSpacing: -0.8,
+      letterSpacing: -1.2,
+      lineHeight: 37,
+      marginBottom: 8,
     },
     roleText: {
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: '600',
-      textTransform: 'uppercase',
-      letterSpacing: 1,
+      letterSpacing: 0.4,
+      color: 'rgba(200,225,255,0.9)',
     },
     profileButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      borderWidth: 2.5,
-      borderColor: 'rgba(255,255,255,0.7)',
+      width: 52,
+      height: 52,
+      borderRadius: 16,
+      borderWidth: 2,
+      borderColor: 'rgba(255,255,255,0.35)',
       overflow: 'hidden',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 8,
-      elevation: 6,
     },
     profileImage: {
       width: '100%',
@@ -86,6 +81,10 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255,255,255,0.08)',
+      paddingTop: 16,
+      gap: 12,
     },
     dateContainer: {
       flexDirection: 'row',
@@ -100,6 +99,7 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       fontWeight: '500',
       letterSpacing: 0.2,
       marginLeft: -8,
+      color: '#ffffff',
     },
     headerActions: {
       flexDirection: 'row',
@@ -108,12 +108,12 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
     headerAction: {
       width: 40,
       height: 40,
-      borderRadius: 20,
-      backgroundColor: 'rgba(255,255,255,0.15)',
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.10)',
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.2)',
+      borderColor: 'rgba(255,255,255,0.18)',
     },
     logoutHeaderButton: {
       backgroundColor: 'rgba(239,68,68,0.15)',
@@ -122,10 +122,12 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
 
     // ─── Hero Card (Compact) ────────────────────────────────────────────────
     heroCard: {
-      backgroundColor: colors.card,
+      backgroundColor: isDark
+        ? 'rgba(135, 206, 235, 0.12)'
+        : 'rgba(240, 249, 255, 0.85)',
       borderRadius: 18,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)',
       overflow: 'hidden',
       shadowColor: isDark ? '#000' : '#0f172a',
       shadowOffset: { width: 0, height: 4 },
@@ -267,8 +269,8 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       borderTopWidth: 1,
       borderTopColor: colors.border,
       backgroundColor: isDark
-        ? 'rgba(255,255,255,0.02)'
-        : 'rgba(248,250,252,0.8)',
+        ? 'rgba(135, 206, 235, 0.12)'
+        : 'rgba(240, 249, 255, 0.85)',
     },
     statItem: {
       flex: 1,
@@ -308,7 +310,7 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
 
     // ─── Section Container (Compact) ────────────────────────────────────────
     section: {
-      backgroundColor: colors.card,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc',
       borderRadius: 18,
       borderWidth: 1,
       borderColor: colors.border,
@@ -366,7 +368,9 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
     },
     quickTile: {
       width: isMobile ? '47%' : '23%',
-      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc',
+      backgroundColor: isDark
+        ? 'rgba(135, 206, 235, 0.12)'
+        : 'rgba(240, 249, 255, 0.85)',
       borderRadius: 14,
       padding: 12,
       alignItems: 'center',
@@ -458,7 +462,6 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9',
     },
 
-    // ─── Analytics Section (More compact) ───────────────────────────────────
     analyticsContent: {
       padding: 16,
       gap: 14,
@@ -470,7 +473,9 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       gap: 10,
     },
     metricCard: {
-      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc',
+      backgroundColor: isDark
+        ? 'rgba(135, 206, 235, 0.12)'
+        : 'rgba(240, 249, 255, 0.85)',
       borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
@@ -547,6 +552,9 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       gap: 4,
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+      backgroundColor: isDark
+        ? 'rgba(135, 206, 235, 0.12)'
+        : 'rgba(240, 249, 255, 0.85)',
     },
     statusHeader: {
       flexDirection: 'row',
@@ -568,7 +576,9 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
 
     // Chart Container
     chartContainer: {
-      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc',
+      backgroundColor: isDark
+        ? 'rgba(135, 206, 235, 0.12)'
+        : 'rgba(240, 249, 255, 0.85)',
       borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
@@ -695,7 +705,9 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
 
     // ─── Logout Card (Smaller) ──────────────────────────────────────────────
     logoutCard: {
-      backgroundColor: isDark ? 'rgba(239,68,68,0.08)' : '#fef2f2',
+      backgroundColor: isDark
+        ? 'rgba(239, 68, 68, 0.15)'
+        : 'rgba(239, 68, 68, 0.1)',
       borderRadius: 16,
       borderWidth: 1,
       borderColor: isDark ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)',
@@ -751,5 +763,127 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       color: colors.sidebar?.text?.muted || '#94a3b8',
       textTransform: 'uppercase',
       letterSpacing: 0.6,
+    },
+    // ─── Modal Styles (for Change Password) ─────────────────────────────────
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalContainer: {
+      width: '100%',
+      maxWidth: 480,
+      maxHeight: '85%',
+      borderRadius: 24,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.25,
+      shadowRadius: 20,
+      elevation: 10,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      letterSpacing: -0.3,
+    },
+    inputGroup: {
+      marginBottom: 20,
+    },
+    inputLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      marginBottom: 6,
+      letterSpacing: -0.2,
+    },
+    passwordInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      height: 50,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#f8fafc',
+    },
+    passwordInput: {
+      flex: 1,
+      fontSize: 15,
+      paddingVertical: 8,
+      fontWeight: '500',
+    },
+    errorBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 12,
+      backgroundColor: isDark ? 'rgba(239,68,68,0.15)' : '#fef2f2',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.2)',
+      marginBottom: 12,
+    },
+    errorText: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '500',
+      color: '#ef4444',
+    },
+    submitButton: {
+      height: 50,
+      borderRadius: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#0ea5e9',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    submitButtonText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: '#ffffff',
+      letterSpacing: -0.2,
+    },
+    modalOverlay1: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    profileMenuContainer: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 16,
+      width: 250,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    profileMenuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      gap: 12,
+      borderRadius: 12,
+    },
+    profileMenuItemText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text,
     },
   })

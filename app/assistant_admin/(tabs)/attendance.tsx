@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons'
+import * as FileSystem from 'expo-file-system/legacy'
 import { LinearGradient } from 'expo-linear-gradient'
-import * as MediaLibrary from 'expo-media-library'
 import * as Print from 'expo-print'
 import { useRouter } from 'expo-router'
 import * as Sharing from 'expo-sharing'
@@ -35,7 +35,6 @@ import {
 } from 'react-native'
 import DateTimePickerModal from 'react-native-modal-datetime-picker'
 import QRCode from 'react-native-qrcode-svg'
-import { captureRef } from 'react-native-view-shot'
 import { useAuth } from '../../../src/Controller/context/AuthContext'
 import { useTheme } from '../../../src/Controller/context/ThemeContext'
 import { auth, db } from '../../../src/Model/lib/firebaseConfig'
@@ -166,6 +165,7 @@ export default function MainAdminAttendance() {
   const [showStopConfirmModal, setShowStopConfirmModal] = useState(false)
   const [timeLeft, setTimeLeft] = useState<string>('')
   const [qrValue, setQrValue] = useState<string>('')
+  const [isSavingQR, setIsSavingQR] = useState(false)
   const [isCustomDatePickerVisible, setCustomDatePickerVisible] =
     useState(false)
   const [customExpirationDate, setCustomExpirationDate] = useState<Date | null>(
@@ -388,7 +388,6 @@ export default function MainAdminAttendance() {
 
     fetchPenaltyStatuses()
 
-    // Real-time listener
     const penaltiesQuery = query(
       collection(db, 'penalties'),
       where('eventId', '==', selectedEvent.id)
@@ -779,6 +778,8 @@ export default function MainAdminAttendance() {
       return
     }
 
+    setIsSaving(true)
+
     try {
       const eventRef = doc(db, 'events', selectedEvent.id)
       await updateDoc(eventRef, {
@@ -816,9 +817,10 @@ export default function MainAdminAttendance() {
     } catch (error) {
       console.error('Error setting expiration:', error)
       showAlert('Error', 'Failed to set expiration date')
+    } finally {
+      setIsSaving(false)
     }
   }
-
   const clearManualExpiration = async () => {
     if (!selectedEvent) return
 
@@ -1140,91 +1142,208 @@ export default function MainAdminAttendance() {
   }
 
   const captureAndSaveQR = async () => {
-    if (!qrWrapperRef.current) {
+    if (!qrCodeRef.current) {
       showAlert('Error', 'QR code not ready. Please try again.')
       return
     }
 
-    if (!qrValue) {
-      showAlert('Error', 'No QR code data to save.')
+    if (!qrValue || !selectedEvent) {
+      showAlert('Error', 'No QR code data or event selected.')
       return
     }
-
+    setIsSavingQR(true)
     try {
-      if (Platform.OS === 'web') {
-        const getDataURL = (): Promise<string> => {
-          return new Promise((resolve, reject) => {
+      // 1. Get QR code data URL
+      const getDataURL = (): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          setTimeout(() => {
             try {
-              qrCodeRef.current.toDataURL((dataUrl: string) => {
-                if (dataUrl && dataUrl.includes(',')) {
+              qrCodeRef.current.toDataURL((data: string) => {
+                let dataUrl = data
+                if (data && !data.startsWith('data:image/png;base64,')) {
+                  dataUrl = 'data:image/png;base64,' + data
+                }
+                if (
+                  dataUrl &&
+                  dataUrl.includes('base64,') &&
+                  dataUrl.length > 100
+                ) {
                   resolve(dataUrl)
                 } else {
-                  reject(new Error('Invalid QR code data'))
+                  reject(new Error('QR code generation failed.'))
                 }
               })
             } catch (error) {
               reject(error)
             }
-          })
-        }
+          }, 200)
+        })
+      }
 
-        const dataUrl = await getDataURL()
-        const response = await fetch(dataUrl)
-        const blob = await response.blob()
-        const objectUrl = URL.createObjectURL(blob)
+      const qrDataUrl = await getDataURL()
 
+      // 2. Prepare event details
+      const eventTitle = selectedEvent.title || 'Untitled Event'
+      const eventDate = selectedEvent.date
+        ? formatDate(selectedEvent.date)
+        : 'N/A'
+      const eventLocation = selectedEvent.location || 'N/A'
+      const expirationTime = selectedEvent.qrExpiration
+        ? new Date(selectedEvent.qrExpiration).toLocaleString()
+        : 'No expiration set'
+      const generatedTime = new Date().toLocaleString()
+
+      // 3. Build HTML for PDF
+      const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              font-family: 'Helvetica', sans-serif;
+              padding: 30px;
+              text-align: center;
+              color: #1e293b;
+            }
+            .header {
+              border-bottom: 2px solid #3b82f6;
+              padding-bottom: 15px;
+              margin-bottom: 20px;
+            }
+            h1 {
+              color: #1e40af;
+              margin-bottom: 5px;
+            }
+            .subtitle {
+              color: #64748b;
+              font-size: 14px;
+            }
+            .details {
+              background: #f8fafc;
+              border-radius: 12px;
+              padding: 20px;
+              margin: 20px 0;
+              text-align: left;
+            }
+            .detail-row {
+              display: flex;
+              margin-bottom: 10px;
+            }
+            .detail-label {
+              font-weight: 600;
+              width: 120px;
+              color: #475569;
+            }
+            .detail-value {
+              color: #0f172a;
+            }
+            .qr-container {
+              margin: 30px 0;
+              padding: 20px;
+              background: white;
+              border-radius: 16px;
+              box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+              display: inline-block;
+            }
+            .qr-label {
+              margin-top: 10px;
+              color: #64748b;
+              font-size: 12px;
+            }
+            .footer {
+              margin-top: 30px;
+              font-size: 11px;
+              color: #94a3b8;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${eventTitle}</h1>
+            <div class="subtitle">Attendance QR Code</div>
+          </div>
+
+          <div class="details">
+            <div class="detail-row">
+              <span class="detail-label">Date & Time:</span>
+              <span class="detail-value">${eventDate}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Location:</span>
+              <span class="detail-value">${eventLocation}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">QR Expires:</span>
+              <span class="detail-value">${expirationTime}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Generated:</span>
+              <span class="detail-value">${generatedTime}</span>
+            </div>
+          </div>
+
+          <div class="qr-container">
+            <img src="${qrDataUrl}" width="250" height="250" style="display:block;" />
+            <div class="qr-label">Scan to record attendance</div>
+          </div>
+
+          <div class="footer">
+            <p>TMC Connect – Official Attendance System</p>
+          </div>
+        </body>
+      </html>
+    `
+
+      // 4. Generate PDF and share
+      if (Platform.OS === 'web') {
+        // Web: open print window (user can save as PDF)
         const printWindow = window.open('', '_blank')
         if (!printWindow) {
           showAlert(
             'Popup Blocked',
             'Please allow popups to print the QR code.'
           )
-          URL.revokeObjectURL(objectUrl)
           return
         }
-
-        printWindow.document.write(`
-        <html>
-          <head><title>QR Code - ${selectedEvent?.title || 'Event'}</title></head>
-          <body style="text-align:center;padding:20px;">
-            <h2>${selectedEvent?.title || 'Event QR Code'}</h2>
-            <img src="${objectUrl}" style="max-width:300px;border:1px solid #ccc;padding:20px;" />
-            <p>Date: ${selectedEvent?.date ? formatDate(selectedEvent.date) : 'N/A'}</p>
-            <p>Location: ${selectedEvent?.location || 'N/A'}</p>
-            <button onclick="window.print();">Print / Save as PDF</button>
-            <script>
-              window.addEventListener('beforeunload', () => URL.revokeObjectURL('${objectUrl}'));
-            </script>
-          </body>
-        </html>
-      `)
+        printWindow.document.write(htmlContent)
         printWindow.document.close()
-        showAlert(
-          'Print Ready',
-          'Use the print dialog to save as PDF or print.'
-        )
+        printWindow.focus()
+        printWindow.print()
+        showAlert('Print Ready', 'Use the print dialog to save as PDF.')
       } else {
-        if (Platform.OS === 'ios') {
-          const { status } = await MediaLibrary.requestPermissionsAsync()
-          if (status !== 'granted') {
-            showAlert('Permission Denied', 'We need permission to save images.')
-            return
-          }
-        }
-        const uri = await captureRef(qrWrapperRef, {
-          format: 'png',
-          quality: 1,
-          result: 'tmpfile',
+        // Native: generate PDF file and share
+        const { uri } = await Print.printToFileAsync({
+          html: htmlContent,
+          base64: false,
         })
-        const asset = await MediaLibrary.createAssetAsync(uri)
-        await MediaLibrary.createAlbumAsync('Event QR Codes', asset, false)
-        showAlert('Success', 'QR code saved to your gallery!')
+
+        const canShare = await Sharing.isAvailableAsync()
+        if (canShare) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/pdf',
+            dialogTitle: `Save ${eventTitle} QR Code`,
+            UTI: 'com.adobe.pdf',
+          })
+        } else {
+          showAlert('Error', 'Sharing is not available on this device.')
+        }
+
+        // Clean up temp file (optional, but good practice)
+        try {
+          await FileSystem.deleteAsync(uri, { idempotent: true })
+        } catch {}
       }
     } catch (error) {
-      console.error('Error saving QR:', error)
-      showAlert('Error', 'Failed to save QR code. Please try again.')
+      console.error('Error generating PDF:', error)
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to generate QR PDF.'
+      showAlert('Error', errorMessage)
+    } finally {
+      setIsSavingQR(false)
     }
   }
+
   const formatDate = (
     dateValue: string | { seconds: number; nanoseconds: number } | any
   ) => {
@@ -2391,21 +2510,36 @@ export default function MainAdminAttendance() {
                     </View>
                   </View>
 
-                  {/* Download Button (only if QR active) */}
                   {!isCurrentQRExpired && (
                     <View style={styles.downloadButtonContainer}>
                       <TouchableOpacity
-                        style={styles.downloadButton}
+                        style={[
+                          styles.downloadButton,
+                          isSavingQR && { opacity: 0.6 },
+                        ]}
                         onPress={captureAndSaveQR}
                         activeOpacity={0.7}
+                        disabled={isSavingQR}
                       >
-                        <Feather name='download' size={16} color='#ffffff' />
-                        <Text style={styles.downloadButtonText}>Save QR</Text>
+                        {isSavingQR ? (
+                          <ActivityIndicator size='small' color='#ffffff' />
+                        ) : (
+                          <>
+                            <Feather
+                              name='download'
+                              size={16}
+                              color='#ffffff'
+                            />
+                            <Text style={styles.downloadButtonText}>
+                              Save QR
+                            </Text>
+                          </>
+                        )}
                       </TouchableOpacity>
                     </View>
                   )}
 
-                  {/* Expiration hint */}
+                  {/* Expiration */}
                   {selectedEvent.qrExpiration && !isCurrentQRExpired && (
                     <Text style={styles.expirationHint}>
                       Expires:{' '}
@@ -2524,7 +2658,8 @@ export default function MainAdminAttendance() {
                       marginBottom: 12,
                     },
                     (missingAttendees.length === 0 ||
-                      hasPenaltyBeenSent(selectedEvent.id)) && { opacity: 0.5 },
+                      hasPenaltyBeenSent(selectedEvent.id) ||
+                      loading) && { opacity: 0.5 },
                   ]}
                   onPress={() => {
                     if (hasPenaltyBeenSent(selectedEvent.id)) {
@@ -2538,25 +2673,32 @@ export default function MainAdminAttendance() {
                   }}
                   disabled={
                     missingAttendees.length === 0 ||
-                    hasPenaltyBeenSent(selectedEvent.id)
+                    hasPenaltyBeenSent(selectedEvent.id) ||
+                    loading
                   }
                 >
-                  <Feather
-                    name={
-                      hasPenaltyBeenSent(selectedEvent.id)
-                        ? 'check-circle'
-                        : 'alert-triangle'
-                    }
-                    size={18}
-                    color='#ffffff'
-                  />
-                  <Text style={styles.generateReceiptText}>
-                    {missingAttendees.length === 0
-                      ? 'No Missing Students'
-                      : hasPenaltyBeenSent(selectedEvent.id)
-                        ? `Penalties Sent (${missingAttendees.length})`
-                        : `Send Penalty (${missingAttendees.length})`}
-                  </Text>
+                  {loading ? (
+                    <ActivityIndicator size='small' color='#ffffff' />
+                  ) : (
+                    <>
+                      <Feather
+                        name={
+                          hasPenaltyBeenSent(selectedEvent.id)
+                            ? 'check-circle'
+                            : 'alert-triangle'
+                        }
+                        size={18}
+                        color='#ffffff'
+                      />
+                      <Text style={styles.generateReceiptText}>
+                        {missingAttendees.length === 0
+                          ? 'No Missing Students'
+                          : hasPenaltyBeenSent(selectedEvent.id)
+                            ? `Penalties Sent (${missingAttendees.length})`
+                            : `Send Penalty (${missingAttendees.length})`}
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -2649,15 +2791,18 @@ export default function MainAdminAttendance() {
                       onPress={refreshAttendance}
                       disabled={refreshing}
                     >
-                      <Feather
-                        name='refresh-cw'
-                        size={18}
-                        color={
-                          refreshing
-                            ? colors.sidebar.text.muted
-                            : colors.accent.primary
-                        }
-                      />
+                      {refreshing ? (
+                        <ActivityIndicator
+                          size='small'
+                          color={colors.accent.primary}
+                        />
+                      ) : (
+                        <Feather
+                          name='refresh-cw'
+                          size={18}
+                          color={colors.accent.primary}
+                        />
+                      )}
                     </TouchableOpacity>
                   </View>
 
@@ -3729,13 +3874,21 @@ export default function MainAdminAttendance() {
                   style={[
                     styles.modernSubmitButton,
                     { backgroundColor: '#ef4444' },
+                    loading && { opacity: 0.6 },
                   ]}
                   onPress={confirmStopAttendance}
+                  disabled={loading}
                 >
-                  <Feather name='stop-circle' size={18} color='#ffffff' />
-                  <Text style={styles.modernSubmitButtonText}>
-                    Stop Attendance
-                  </Text>
+                  {loading ? (
+                    <ActivityIndicator size='small' color='#ffffff' />
+                  ) : (
+                    <>
+                      <Feather name='stop-circle' size={18} color='#ffffff' />
+                      <Text style={styles.modernSubmitButtonText}>
+                        Stop Attendance
+                      </Text>
+                    </>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -3752,12 +3905,22 @@ export default function MainAdminAttendance() {
         <View style={styles.modernModalOverlay}>
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              width: '100%',
+            }}
           >
             <View
               style={[
                 styles.expirationModalContainer,
                 isMobile && styles.expirationModalContainerMobile,
+                {
+                  width: isMobile ? '90%' : 550,
+                  maxWidth: isMobile ? '90%' : 700,
+                  alignSelf: 'center',
+                },
               ]}
             >
               <View
@@ -4071,25 +4234,32 @@ export default function MainAdminAttendance() {
                   <TouchableOpacity
                     style={[
                       styles.modernSubmitButton,
-                      !customExpiration && styles.modernSubmitButtonDisabled,
+                      (!customExpiration || isSaving) &&
+                        styles.modernSubmitButtonDisabled,
                       isMobile && styles.modernSubmitButtonMobile,
                     ]}
                     onPress={setManualExpiration}
-                    disabled={!customExpiration}
+                    disabled={!customExpiration || isSaving}
                   >
-                    <Feather
-                      name='check'
-                      size={isMobile ? 16 : 18}
-                      color='#ffffff'
-                    />
-                    <Text
-                      style={[
-                        styles.modernSubmitButtonText,
-                        isMobile && styles.modernSubmitButtonTextMobile,
-                      ]}
-                    >
-                      Set Expiration
-                    </Text>
+                    {isSaving ? (
+                      <ActivityIndicator size='small' color='#ffffff' />
+                    ) : (
+                      <>
+                        <Feather
+                          name='check'
+                          size={isMobile ? 16 : 18}
+                          color='#ffffff'
+                        />
+                        <Text
+                          style={[
+                            styles.modernSubmitButtonText,
+                            isMobile && styles.modernSubmitButtonTextMobile,
+                          ]}
+                        >
+                          Set Expiration
+                        </Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 </View>
               </ScrollView>
@@ -4098,7 +4268,6 @@ export default function MainAdminAttendance() {
         </View>
       </Modal>
 
-      {/* Complete Confirmation Modal - MOVED OUTSIDE */}
       <Modal
         visible={showCompleteConfirmModal}
         transparent

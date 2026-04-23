@@ -173,9 +173,7 @@ export const createProfileStyles = (
     modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 16,
+      justifyContent: 'flex-end',
     },
     aboutModal: {
       backgroundColor: colors.card,
@@ -188,7 +186,8 @@ export const createProfileStyles = (
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 16,
+      paddingHorizontal: 20,
+      paddingTop: 20,
       paddingBottom: 12,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
@@ -977,6 +976,14 @@ export const createProfileStyles = (
     },
     statItemLast: {
       borderRightWidth: 0,
+    },
+    settingsOptionValue: { fontSize: 14, color: colors.textSecondary },
+    divider: { height: 1, backgroundColor: colors.border, marginVertical: 9 },
+    modalContainer: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      maxHeight: '100%',
     },
     statIconBox: {
       width: 28,

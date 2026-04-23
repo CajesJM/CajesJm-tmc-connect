@@ -18,6 +18,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Easing,
   FlatList,
   Image,
   Modal,
@@ -288,7 +289,7 @@ export default function UserManagement() {
   const { user, userData } = useAuth()
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
-  const { colors, isDark } = useTheme()
+  const { colors, isDark, toggleTheme } = useTheme()
 
   const isMobile = screenWidth < 640
   const isTablet = screenWidth >= 640 && screenWidth < 1024
@@ -305,6 +306,27 @@ export default function UserManagement() {
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [modalLoading, setModalLoading] = useState(false)
+
+  const [isThemeToggling, setIsThemeToggling] = useState(false)
+  const themeSpinAnim = useRef(new Animated.Value(0)).current
+
+  const handleThemeToggle = () => {
+    if (isThemeToggling) return
+
+    setIsThemeToggling(true)
+    themeSpinAnim.setValue(0)
+
+    Animated.timing(themeSpinAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsThemeToggling(false)
+    })
+
+    toggleTheme()
+  }
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
@@ -2128,16 +2150,15 @@ export default function UserManagement() {
   }
 
   const headerGradientColors = isDark
-    ? (['#0f172a', '#1e293b'] as const)
-    : (['#1e40af', '#3b82f6'] as const)
-
+    ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
+    : (['#0f2456', '#1a3a8f', '#1e53c8'] as const)
   return (
     <View style={styles.container}>
       {/* Header with Gradient */}
       <LinearGradient
         colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
         style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
       >
         <View
@@ -2150,7 +2171,7 @@ export default function UserManagement() {
                 { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
               ]}
             >
-              User Dashboard,
+              Welcome Back,
             </Text>
             <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
               {userData?.name || 'Admin'}
@@ -2211,6 +2232,43 @@ export default function UserManagement() {
             </Text>
           </View>
           <View style={styles.headerActions}>
+            {/* Theme Toggle Button */}
+            <TouchableOpacity
+              style={[
+                styles.headerAction,
+                isMobile && styles.headerActionMobile,
+              ]}
+              onPress={handleThemeToggle}
+              disabled={isThemeToggling}
+              activeOpacity={0.75}
+            >
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: themeSpinAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                    {
+                      scale: themeSpinAnim.interpolate({
+                        inputRange: [0, 0.5, 1],
+                        outputRange: [1, 1.2, 1],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Feather
+                  name={isDark ? 'sun' : 'moon'}
+                  size={isMobile ? 16 : 18}
+                  color='#ffffff'
+                />
+              </Animated.View>
+            </TouchableOpacity>
+
+            {/* Create User Button */}
             <TouchableOpacity
               style={[
                 styles.headerAction,

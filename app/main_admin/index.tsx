@@ -30,6 +30,7 @@ import {
   Animated,
   Easing,
   Image,
+  Modal,
   PanResponder,
   Platform,
   Pressable,
@@ -53,7 +54,7 @@ import {
   generateDashboardPDF,
   sharePDF,
 } from '../../src/Controller/utils/pdfGenerator'
-import { db } from '../../src/Model/lib/firebaseConfig'
+import { auth, db } from '../../src/Model/lib/firebaseConfig'
 import { AnimatedStatCard } from '../../src/View/components/AnimatedStatCard'
 import { NotificationModal } from '../../src/View/components/NotificationModal'
 import { createDashboardStyles } from '../../src/View/styles/main-admin/dashboardStyles'
@@ -63,6 +64,14 @@ import MainAdminEvents from './events'
 import MainAdminProfile from './profile'
 import UserManagement from './users'
 dayjs.extend(relativeTime)
+
+const showAlert = (title: string, message?: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(message ? `${title}\n${message}` : title)
+  } else {
+    Alert.alert(title, message)
+  }
+}
 
 interface Activity {
   id: string
@@ -133,7 +142,7 @@ interface DonutChartProps {
   userRoleStats: UserRoleStat[]
   totalUsers: number
   dynamic: {
-    headerGradient: readonly [string, string]
+    headerGradient: readonly string[]
     chartBackground: readonly [string, string]
     statCardBorder: string
     textPrimary: string
@@ -149,7 +158,6 @@ interface DonutChartProps {
   styles: any
   onExplore?: () => void
 }
-
 interface AnimatedBarProps {
   height: number
   color: string
@@ -1187,8 +1195,8 @@ export default function MainAdminDashboard() {
 
   const router = useRouter()
   const pathname = usePathname()
-  const { userData } = useAuth()
-  const { colors, isDark } = useTheme()
+  const { userData, refreshUserData } = useAuth()
+  const { colors, isDark, toggleTheme } = useTheme()
 
   const styles = useMemo(
     () => createDashboardStyles(colors, isDark),
@@ -1216,6 +1224,8 @@ export default function MainAdminDashboard() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [profileModalVisible, setProfileModalVisible] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [showImageViewer, setShowImageViewer] = useState(false)
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(
     []
   )
@@ -1357,6 +1367,28 @@ export default function MainAdminDashboard() {
     events: 0,
     attendance: 0,
   })
+
+  // Theme toggle animation state
+  const [isThemeToggling, setIsThemeToggling] = useState(false)
+  const themeSpinAnim = useRef(new Animated.Value(0)).current
+
+  const handleThemeToggle = () => {
+    if (isThemeToggling) return
+
+    setIsThemeToggling(true)
+    themeSpinAnim.setValue(0)
+
+    Animated.timing(themeSpinAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsThemeToggling(false)
+    })
+
+    toggleTheme()
+  }
   const [chartLayout, setChartLayout] = useState({
     x: 0,
     y: 0,
@@ -2563,7 +2595,7 @@ export default function MainAdminDashboard() {
   const getPriorityColor = (item: Announcement) => {
     if (item.priority === 'urgent') return '#ef4444'
     if (item.priority === 'important') return '#f59e0b'
-    return '#0ea5e9' // normal
+    return '#0ea5e9'
   }
 
   const uploadProfileImage = async (imageUri: string | File) => {
@@ -2576,22 +2608,27 @@ export default function MainAdminDashboard() {
         const response = await fetch(imageUri)
         blob = await response.blob()
       }
+
       const storage = getStorage()
-      const fileName = `profile_${userData?.email}_${Date.now()}.jpg`
+      const currentUser = auth.currentUser
+      if (!currentUser) throw new Error('No authenticated user')
+
+      const fileName = `profile_${currentUser.uid}.jpg`
       const storageRef = ref(storage, `profileImages/${fileName}`)
       await uploadBytes(storageRef, blob)
       const downloadUrl = await getDownloadURL(storageRef)
-      if (userData?.email) {
-        const userRef = doc(db, 'users', userData.email)
-        await updateDoc(userRef, { photoURL: downloadUrl })
-        Alert.alert('Success', 'Profile image updated successfully!', [
-          { text: 'OK' },
-        ])
-      }
+
+      const userRef = doc(db, 'users', currentUser.uid)
+      await updateDoc(userRef, { photoURL: downloadUrl })
+
+      await refreshUserData()
+
+      showAlert('Success', 'Profile image updated successfully!')
     } catch (error) {
-      Alert.alert('Error', 'Failed to upload image. Please try again.', [
-        { text: 'OK' },
-      ])
+      console.error('Upload error:', error)
+      showAlert('Error', 'Failed to upload image. Please try again.')
+    } finally {
+      setUploadingImage(false)
     }
   }
 
@@ -2755,8 +2792,8 @@ export default function MainAdminDashboard() {
 
   const getDynamicStyles = () => ({
     headerGradient: isDark
-      ? (['#0f172a', '#1e293b'] as const)
-      : (['#1e40af', '#3b82f6'] as const),
+      ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
+      : (['#0f2456', '#1a3a8f', '#1e53c8'] as const),
     chartBackground: isDark
       ? (['#1e293b', '#121e39'] as const)
       : (['#f0f9ff', '#ffffff'] as const),
@@ -2887,17 +2924,13 @@ export default function MainAdminDashboard() {
       style={[
         styles.overviewContainer,
         {
-          backgroundColor: colors.background,
           opacity: pageFadeAnim,
           transform: [{ translateY: pageSlideAnim }],
         },
       ]}
     >
       <ScrollView
-        style={[
-          styles.overviewContainer,
-          { backgroundColor: colors.background },
-        ]}
+        style={[styles.overviewContainer]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -2911,7 +2944,7 @@ export default function MainAdminDashboard() {
         <LinearGradient
           colors={dynamic.headerGradient}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={{ x: 0, y: 1 }}
           style={styles.headerGradient}
         >
           <View style={styles.headerContent}>
@@ -2931,13 +2964,13 @@ export default function MainAdminDashboard() {
                   { color: isDark ? dynamic.textMuted : '#ffffff' },
                 ]}
               >
-                Administrator
+                Dashboard Manager
               </Text>
             </View>
 
             <TouchableOpacity
               style={styles.profileButton}
-              onPress={handleProfileImagePress}
+              onPress={() => setShowProfileMenu(true)}
               disabled={uploadingImage}
             >
               {uploadingImage ? (
@@ -2963,12 +2996,7 @@ export default function MainAdminDashboard() {
 
           <View style={styles.dateSection}>
             <View style={styles.dateContainer}>
-              <Text
-                style={[
-                  styles.dateText,
-                  { color: isDark ? dynamic.textSecondary : '#ffffff' },
-                ]}
-              >
+              <Text style={styles.dateText}>
                 {new Date().toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
@@ -2978,6 +3006,42 @@ export default function MainAdminDashboard() {
               </Text>
             </View>
             <View style={styles.headerActions}>
+              {/* Theme Toggle Button */}
+              <TouchableOpacity
+                style={[
+                  styles.headerAction,
+                  { backgroundColor: 'rgba(255,255,255,0.1)' },
+                ]}
+                onPress={handleThemeToggle}
+                disabled={isThemeToggling}
+                activeOpacity={0.75}
+              >
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        rotate: themeSpinAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '360deg'],
+                        }),
+                      },
+                      {
+                        scale: themeSpinAnim.interpolate({
+                          inputRange: [0, 0.5, 1],
+                          outputRange: [1, 1.2, 1],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Feather
+                    name={isDark ? 'sun' : 'moon'}
+                    size={18}
+                    color='#ffffff'
+                  />
+                </Animated.View>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={[
                   styles.headerAction,
@@ -3029,6 +3093,81 @@ export default function MainAdminDashboard() {
           onReject={handleReject}
           approvalCount={approvalCount}
         />
+
+        {/* Profile Menu Modal */}
+        <Modal
+          visible={showProfileMenu}
+          transparent
+          animationType='fade'
+          onRequestClose={() => setShowProfileMenu(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowProfileMenu(false)}
+          >
+            <View style={styles.profileMenuContainer}>
+              <TouchableOpacity
+                style={styles.profileMenuItem}
+                onPress={() => {
+                  setShowProfileMenu(false)
+                  setShowImageViewer(true)
+                }}
+              >
+                <Feather name='eye' size={20} color={colors.text} />
+                <Text style={styles.profileMenuItemText}>View Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.profileMenuItem}
+                onPress={() => {
+                  setShowProfileMenu(false)
+                  handleProfileImagePress() // your existing upload function
+                }}
+              >
+                <Feather name='camera' size={20} color={colors.text} />
+                <Text style={styles.profileMenuItemText}>Change Photo</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Full-screen image viewer */}
+        <Modal
+          visible={showImageViewer}
+          transparent={false}
+          animationType='fade'
+          onRequestClose={() => setShowImageViewer(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 40, right: 20, zIndex: 10 }}
+              onPress={() => setShowImageViewer(false)}
+            >
+              <Feather name='x' size={28} color='#fff' />
+            </TouchableOpacity>
+            <View
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              {userData?.photoURL ? (
+                <Image
+                  source={{ uri: userData.photoURL }}
+                  style={{ width: '90%', height: '90%', resizeMode: 'contain' }}
+                />
+              ) : (
+                <View style={{ alignItems: 'center' }}>
+                  <Feather name='user' size={80} color='#fff' />
+                  <Text style={{ color: '#fff', marginTop: 16 }}>
+                    No profile photo
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
 
         {renderChartsSection()}
 
@@ -3164,7 +3303,7 @@ export default function MainAdminDashboard() {
                             (p) => p.type === 'announcement'
                           ).length
                         }{' '}
-                        updates
+                        announcements
                       </Text>
                     </View>
                   </LinearGradient>
@@ -3262,406 +3401,6 @@ export default function MainAdminDashboard() {
               )}
             </View>
           </View>
-
-          {/*  <View style={[styles.column, styles.upcomingColumn]}>
-            <View
-              style={[
-                styles.upcomingCard,
-                {
-                  backgroundColor: dynamic.cardBg,
-                  borderColor: dynamic.borderColor,
-                  shadowColor: isDark ? '#000' : '#000',
-                  shadowOpacity: isDark ? 0.3 : 0.05,
-                },
-              ]}
-            >
-              <View style={styles.upcomingHeader}>
-                <Text
-                  style={[styles.upcomingTitle, { color: dynamic.textPrimary }]}
-                >
-                  Upcoming Events
-                </Text>
-                <TouchableOpacity onPress={() => navigateTo('events')}>
-                  <Text
-                    style={[
-                      styles.viewAllText,
-                      { color: colors.accent.primary },
-                    ]}
-                  >
-                    View all
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {eventsLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator
-                    size='small'
-                    color={colors.accent.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.loadingText,
-                      { color: dynamic.textSecondary },
-                    ]}
-                  >
-                    Loading events...
-                  </Text>
-                </View>
-              ) : upcomingEvents.length > 0 ? (
-                <View style={styles.upcomingList}>
-                  {upcomingEvents.map((event) => {
-                    const eventDate = event.date
-                    const day = eventDate.getDate().toString().padStart(2, '0')
-                    const month = eventDate
-                      .toLocaleString('default', { month: 'short' })
-                      .toUpperCase()
-                    const timeString =
-                      event.time ||
-                      eventDate.toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-
-                    // Countdown
-                    const diffDays = Math.ceil(
-                      (eventDate.getTime() - Date.now()) / (1000 * 3600 * 24)
-                    )
-                    const countdownText =
-                      diffDays === 0
-                        ? 'Today'
-                        : diffDays === 1
-                          ? 'Tomorrow'
-                          : `In ${diffDays} days`
-
-                    // Attendee avatars (first 3)
-                    const attendees = event.attendees || []
-                    const displayAvatars = attendees.slice(0, 3)
-
-                    return (
-                      <TouchableOpacity
-                        key={event.id}
-                        style={styles.upcomingItemCard}
-                        onPress={() => navigateTo('events', event.id)}
-                        activeOpacity={0.9}
-                      >
-                        <LinearGradient
-                          colors={
-                            isDark
-                              ? ['#1e293b', '#0f172a']
-                              : ['#ffffff', '#f8fafc']
-                          }
-                          style={styles.upcomingItemGradient}
-                        >
-                          <View style={styles.upcomingItemLeft}>
-                            <LinearGradient
-                              colors={['#0ea5e9', '#0284c7']}
-                              style={styles.eventDateBadge}
-                            >
-                              <Text style={styles.eventDayLarge}>{day}</Text>
-                              <Text style={styles.eventMonthSmall}>
-                                {month}
-                              </Text>
-                            </LinearGradient>
-                            <View style={styles.eventDetails}>
-                              <Text
-                                style={[
-                                  styles.eventName,
-                                  { color: dynamic.textPrimary },
-                                ]}
-                                numberOfLines={1}
-                              >
-                                {event.title}
-                              </Text>
-                              <View style={styles.eventMeta}>
-                                <Ionicons
-                                  name='time-outline'
-                                  size={12}
-                                  color={dynamic.textSecondary}
-                                />
-                                <Text
-                                  style={[
-                                    styles.eventMetaText,
-                                    { color: dynamic.textSecondary },
-                                  ]}
-                                >
-                                  {timeString}
-                                </Text>
-                                <View style={styles.metaDivider} />
-                                <Ionicons
-                                  name='location-outline'
-                                  size={12}
-                                  color={dynamic.textSecondary}
-                                />
-                                <Text
-                                  style={[
-                                    styles.eventMetaText,
-                                    { color: dynamic.textSecondary },
-                                  ]}
-                                  numberOfLines={1}
-                                >
-                                  {event.location || 'TBA'}
-                                </Text>
-                              </View>
-                              <View style={styles.countdownContainer}>
-                                <Feather
-                                  name='clock'
-                                  size={10}
-                                  color='#f59e0b'
-                                />
-                                <Text style={styles.countdownText}>
-                                  {countdownText}
-                                </Text>
-                              </View>
-                            </View>
-                          </View>
-
-                          <View style={styles.upcomingItemRight}>
-                            {displayAvatars.length > 0 && (
-                              <View style={styles.avatarStack}>
-                                {displayAvatars.map((attendee, idx) => (
-                                  <View
-                                    key={idx}
-                                    style={[
-                                      styles.avatarCircle,
-                                      { zIndex: displayAvatars.length - idx },
-                                    ]}
-                                  >
-                                    <Text style={styles.avatarInitial}>
-                                      {(typeof attendee === 'string'
-                                        ? attendee.charAt(0)
-                                        : 'U'
-                                      ).toUpperCase()}
-                                    </Text>
-                                  </View>
-                                ))}
-                                {attendees.length > 3 && (
-                                  <View style={styles.avatarMore}>
-                                    <Text style={styles.avatarMoreText}>
-                                      +{attendees.length - 3}
-                                    </Text>
-                                  </View>
-                                )}
-                              </View>
-                            )}
-                            <Feather
-                              name='chevron-right'
-                              size={20}
-                              color={dynamic.textMuted}
-                            />
-                          </View>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Feather
-                    name='calendar'
-                    size={32}
-                    color={dynamic.textMuted}
-                  />
-                  <Text
-                    style={[styles.emptyText, { color: dynamic.textMuted }]}
-                  >
-                    No upcoming events
-                  </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.createButton,
-                      { backgroundColor: colors.accent.primary },
-                    ]}
-                    onPress={() => navigateTo('events')}
-                  >
-                    <Text style={styles.createButtonText}>Create Event</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-
-            <View
-              style={[
-                styles.announcementCard,
-                {
-                  backgroundColor: dynamic.cardBg,
-                  borderColor: dynamic.borderColor,
-                  shadowColor: isDark ? '#000' : '#000',
-                  shadowOpacity: isDark ? 0.3 : 0.05,
-                },
-              ]}
-            >
-              <View style={styles.announcementHeader}>
-                <Text
-                  style={[
-                    styles.announcementTitle,
-                    { color: dynamic.textPrimary },
-                  ]}
-                >
-                  Recent Announcements
-                </Text>
-                <TouchableOpacity onPress={() => navigateTo('announcements')}>
-                  <Text
-                    style={[
-                      styles.viewAllText,
-                      { color: colors.accent.primary },
-                    ]}
-                  >
-                    View all
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {announcementsLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator
-                    size='small'
-                    color={colors.accent.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.loadingText,
-                      { color: dynamic.textSecondary },
-                    ]}
-                  >
-                    Loading announcements...
-                  </Text>
-                </View>
-              ) : recentAnnouncements.length > 0 ? (
-                <View style={styles.announcementList}>
-                  {recentAnnouncements.map((announcement) => {
-                    const priorityColor = getPriorityColor(announcement)
-                    const isNew = isNewAnnouncement(announcement.createdAt)
-                    const isUrgent = isUrgentAnnouncement(announcement)
-                    const isImportant = isImportantAnnouncement(announcement)
-                    const timeAgo = dayjs(announcement.createdAt).fromNow()
-                    const preview =
-                      announcement.content.substring(0, 70) +
-                      (announcement.content.length > 70 ? '...' : '')
-
-                    return (
-                      <TouchableOpacity
-                        key={announcement.id}
-                        style={[
-                          styles.announcementItemModern,
-                          {
-                            borderLeftColor: priorityColor,
-                            borderLeftWidth: 4,
-                          },
-                        ]}
-                        onPress={() =>
-                          navigateTo('announcements', announcement.id)
-                        }
-                        activeOpacity={0.7}
-                      >
-                        <LinearGradient
-                          colors={
-                            isDark
-                              ? ['#1e293b', '#0f172a']
-                              : ['#ffffff', '#faf5ff']
-                          }
-                          style={styles.announcementGradientModern}
-                        >
-                          <View style={styles.announcementContentModern}>
-                            <View style={styles.announcementHeaderModern}>
-                              <Text
-                                style={[
-                                  styles.announcementTitleModern,
-                                  { color: dynamic.textPrimary },
-                                ]}
-                                numberOfLines={1}
-                              >
-                                {announcement.title}
-                              </Text>
-                              <View style={styles.badgeContainer}>
-                                {isNew && (
-                                  <View
-                                    style={[
-                                      styles.badge,
-                                      { backgroundColor: '#3b82f6' },
-                                    ]}
-                                  >
-                                    <Text style={styles.badgeText}>NEW</Text>
-                                  </View>
-                                )}
-                                {isUrgent && (
-                                  <View
-                                    style={[
-                                      styles.badge,
-                                      { backgroundColor: '#ef4444' },
-                                    ]}
-                                  >
-                                    <Text style={styles.badgeText}>URGENT</Text>
-                                  </View>
-                                )}
-                                {isImportant && !isUrgent && (
-                                  <View
-                                    style={[
-                                      styles.badge,
-                                      { backgroundColor: '#f59e0b' },
-                                    ]}
-                                  >
-                                    <Text style={styles.badgeText}>
-                                      IMPORTANT
-                                    </Text>
-                                  </View>
-                                )}
-                              </View>
-                            </View>
-                            <Text
-                              style={[
-                                styles.announcementPreviewModern,
-                                { color: dynamic.textSecondary },
-                              ]}
-                              numberOfLines={2}
-                            >
-                              {preview}
-                            </Text>
-                            <View style={styles.announcementFooterModern}>
-                              <Text
-                                style={[
-                                  styles.announcementTimeModern,
-                                  { color: dynamic.textMuted },
-                                ]}
-                              >
-                                {timeAgo} • {announcement.author}
-                              </Text>
-                              <Feather
-                                name='chevron-right'
-                                size={16}
-                                color={dynamic.textMuted}
-                              />
-                            </View>
-                          </View>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Feather name='bell' size={32} color={dynamic.textMuted} />
-                  <Text
-                    style={[styles.emptyText, { color: dynamic.textMuted }]}
-                  >
-                    No announcements yet
-                  </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.createButton,
-                      { backgroundColor: colors.accent.primary },
-                    ]}
-                    onPress={() => navigateTo('announcements')}
-                  >
-                    <Text style={styles.createButtonText}>
-                      Create Announcement
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View> 
-            */}
         </View>
       </ScrollView>
     </Animated.View>

@@ -17,7 +17,14 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
-import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage'
+import {
+  deleteObject,
+  getDownloadURL,
+  getStorage,
+  listAll,
+  ref,
+  uploadBytes,
+} from 'firebase/storage'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -28,11 +35,11 @@ import {
   Linking,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
   useWindowDimensions,
 } from 'react-native'
@@ -47,6 +54,14 @@ import type {
   MissedEvent,
 } from '../../../src/Model/lib/types'
 import { createProfileStyles } from '../../../src/View/styles/student/profileStyles'
+
+const showAlert = (title: string, message?: string) => {
+  if (Platform.OS === 'web') {
+    window.alert(message ? `${title}\n${message}` : title)
+  } else {
+    Alert.alert(title, message)
+  }
+}
 
 interface Penalty {
   id: string
@@ -326,7 +341,7 @@ const BarChartItem = ({ data, index, maxValue, colors, isDark }: any) => {
 }
 
 export default function StudentProfile() {
-  const { logout, userData } = useAuth()
+  const { logout, userData, refreshUserData } = useAuth()
   const router = useRouter()
   const { width } = useWindowDimensions()
   const isMobile = width < 640
@@ -357,6 +372,7 @@ export default function StudentProfile() {
   const [selectedEventDetail, setSelectedEventDetail] =
     useState<StudentEvent | null>(null)
   const { theme, setTheme, colors, isDark, toggleTheme } = useTheme()
+  const [showImageViewer, setShowImageViewer] = useState(false)
 
   const [showAttendanceReportModal, setShowAttendanceReportModal] =
     useState(false)
@@ -383,6 +399,11 @@ export default function StudentProfile() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  useEffect(() => {
+    if (userData?.photoURL) {
+      setProfileImage(userData.photoURL)
+    }
+  }, [userData?.photoURL])
 
   const styles = useMemo(
     () => createProfileStyles(colors, isDark, isMobile, isTablet, isDesktop),
@@ -436,7 +457,7 @@ export default function StudentProfile() {
       department: 'Bachelor of Science Information Technology',
       institution: '',
     },
-    version: '1.0.1',
+    version: '2.0',
     description:
       'TMC Connect - A comprehensive solution for managing campus events, attendance tracking, and student engagement.',
   })
@@ -1617,8 +1638,8 @@ export default function StudentProfile() {
         const userRef = doc(db, 'users', user.uid)
         const userDoc = await getDoc(userRef)
 
-        if (userDoc.exists() && userDoc.data().profilePhoto) {
-          setProfileImage(userDoc.data().profilePhoto as string)
+        if (userDoc.exists() && userDoc.data().photoURL) {
+          setProfileImage(userDoc.data().photoURL as string)
         }
       }
     } catch (error) {
@@ -1630,12 +1651,24 @@ export default function StudentProfile() {
     try {
       setShowImageOptions(false)
 
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.onchange = async (e: any) => {
+          const file = e.target.files?.[0]
+          if (file) await uploadImage(file)
+        }
+        input.click()
+        return
+      }
+
       const permissionResult = useCamera
         ? await ImagePicker.requestCameraPermissionsAsync()
         : await ImagePicker.requestMediaLibraryPermissionsAsync()
 
       if (!permissionResult.granted) {
-        Alert.alert('Permission required', 'Please allow access to proceed.')
+        showAlert('Permission Required', 'Please allow access to proceed.')
         return
       }
 
@@ -1656,7 +1689,7 @@ export default function StudentProfile() {
       }
     } catch (error) {
       console.error('Error picking image:', error)
-      Alert.alert('Error', 'Failed to pick image. Please try again.')
+      showAlert('Error', 'Failed to pick image. Please try again.')
     }
   }
 
@@ -1666,7 +1699,7 @@ export default function StudentProfile() {
       const user = auth.currentUser
 
       if (!user) {
-        Alert.alert('Error', 'User not found.')
+        showAlert('Error', 'User not found.')
         return
       }
 
@@ -1674,23 +1707,53 @@ export default function StudentProfile() {
       const blob = await response.blob()
 
       const storage = getStorage()
-      const storageRef = ref(storage, `profile-photos/${user.uid}`)
+      const fileName = user.uid
+      const storageRef = ref(storage, `profile-photos/${fileName}`)
       await uploadBytes(storageRef, blob)
 
       const downloadURL = await getDownloadURL(storageRef)
 
       const userRef = doc(db, 'users', user.uid)
       await updateDoc(userRef, {
-        profilePhoto: downloadURL,
+        photoURL: downloadURL,
       })
 
+      await refreshUserData()
+
       setProfileImage(downloadURL)
-      Alert.alert('Success', 'Profile photo updated successfully!')
+      showAlert('Success', 'Profile photo updated successfully!')
+
+      if (user.email) {
+        deleteOldProfileImages(user.uid, user.email).catch(() => {})
+      }
     } catch (error) {
       console.error('Error uploading image:', error)
-      Alert.alert('Error', 'Failed to upload image. Please try again.')
+      showAlert('Error', 'Failed to upload image. Please try again.')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const deleteOldProfileImages = async (uid: string, email: string) => {
+    const storage = getStorage()
+    const listRef = ref(storage, 'profile-photos')
+    try {
+      const result = await listAll(listRef)
+      const oldFiles = result.items.filter((itemRef) => {
+        const name = itemRef.name
+        const emailPattern = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const regex = new RegExp(`^profile_${emailPattern}_\\d+\\.jpg$`)
+        return (
+          (regex.test(name) || name.includes(email.replace(/[@.]/g, '_'))) &&
+          name !== `${uid}`
+        )
+      })
+      await Promise.all(oldFiles.map((fileRef) => deleteObject(fileRef)))
+      if (oldFiles.length > 0) {
+        console.log(`Deleted ${oldFiles.length} old profile image(s)`)
+      }
+    } catch (err) {
+      console.warn('Failed to clean up old profile images:', err)
     }
   }
 
@@ -1701,16 +1764,29 @@ export default function StudentProfile() {
       const user = auth.currentUser
       if (!user) return
 
+      try {
+        const storage = getStorage()
+        const storageRef = ref(storage, `profile-photos/${user.uid}`)
+        await deleteObject(storageRef)
+      } catch (storageError) {
+        console.warn(
+          'Could not delete from storage, might not exist:',
+          storageError
+        )
+      }
+
       const userRef = doc(db, 'users', user.uid)
       await updateDoc(userRef, {
-        profilePhoto: null,
+        photoURL: null,
       })
 
+      await refreshUserData()
+
       setProfileImage(null)
-      Alert.alert('Success', 'Profile photo removed successfully!')
+      showAlert('Success', 'Profile photo removed successfully!')
     } catch (error) {
       console.error('Error removing profile image:', error)
-      Alert.alert('Error', 'Failed to remove profile photo.')
+      showAlert('Error', 'Failed to remove profile photo.')
     }
   }
 
@@ -2250,101 +2326,94 @@ export default function StudentProfile() {
   const renderSettingsModal = () => (
     <Modal
       visible={showSettingsModal}
-      transparent={true}
+      transparent
       animationType='slide'
       onRequestClose={() => setShowSettingsModal(false)}
     >
       <View style={styles.modalOverlay}>
-        <View style={[styles.aboutModal, { backgroundColor: colors.card }]}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              Settings
-            </Text>
+            <Text style={styles.modalTitle}>Settings</Text>
             <TouchableOpacity onPress={() => setShowSettingsModal(false)}>
-              <Icon name='close' size={24} color={colors.text} />
+              <Icon name='close' size={22} color={colors.text} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.settingsSection}>
-            <Text style={[styles.settingsSectionTitle, { color: colors.text }]}>
-              Theme
-            </Text>
-
-            <TouchableOpacity
-              style={styles.settingsOption}
-              onPress={() => setTheme('light')}
-            >
-              <View style={styles.settingsOptionLeft}>
-                <Icon
-                  name='weather-sunny'
-                  size={24}
-                  color={colors.accent.primary}
-                />
-                <Text
-                  style={[styles.settingsOptionText, { color: colors.text }]}
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsSectionTitle}>Theme Preferences</Text>
+              {[
+                { label: 'Light Mode', value: 'light', icon: 'weather-sunny' },
+                { label: 'Dark Mode', value: 'dark', icon: 'weather-night' },
+                { label: 'System Default', value: 'system', icon: 'cellphone' },
+              ].map((opt) => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={styles.settingsOption}
+                  onPress={() => setTheme(opt.value as any)}
                 >
-                  Light
-                </Text>
-              </View>
-              {theme === 'light' && (
-                <Icon
-                  name='check-circle'
-                  size={20}
-                  color={colors.accent.primary}
-                />
-              )}
-            </TouchableOpacity>
+                  <View style={styles.settingsOptionLeft}>
+                    <Icon
+                      name={opt.icon}
+                      size={20}
+                      color={colors.accent.primary}
+                    />
+                    <Text style={styles.settingsOptionText}>{opt.label}</Text>
+                  </View>
+                  {theme === opt.value && (
+                    <Icon
+                      name='check-circle'
+                      size={18}
+                      color={colors.accent.primary}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
 
-            <TouchableOpacity
-              style={styles.settingsOption}
-              onPress={() => setTheme('dark')}
-            >
-              <View style={styles.settingsOptionLeft}>
-                <Icon
-                  name='weather-night'
-                  size={24}
-                  color={colors.accent.primary}
-                />
-                <Text
-                  style={[styles.settingsOptionText, { color: colors.text }]}
-                >
-                  Dark
-                </Text>
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsSectionTitle}>Preferences</Text>
+              <View style={styles.settingsOption}>
+                <View style={styles.settingsOptionLeft}>
+                  <Icon
+                    name='bell-outline'
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={styles.settingsOptionText}>Notifications</Text>
+                </View>
+                <Text style={styles.settingsOptionValue}>Enabled</Text>
               </View>
-              {theme === 'dark' && (
-                <Icon
-                  name='check-circle'
-                  size={20}
-                  color={colors.accent.primary}
-                />
-              )}
-            </TouchableOpacity>
+              <View style={styles.settingsOption}>
+                <View style={styles.settingsOptionLeft}>
+                  <Icon
+                    name='language'
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={styles.settingsOptionText}>Language</Text>
+                </View>
+                <Text style={styles.settingsOptionValue}>English</Text>
+              </View>
+            </View>
 
-            <TouchableOpacity
-              style={styles.settingsOption}
-              onPress={() => setTheme('system')}
-            >
-              <View style={styles.settingsOptionLeft}>
-                <Icon
-                  name='cellphone'
-                  size={24}
-                  color={colors.accent.primary}
-                />
-                <Text
-                  style={[styles.settingsOptionText, { color: colors.text }]}
-                >
-                  System
-                </Text>
+            <View style={styles.divider} />
+
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsSectionTitle}>About</Text>
+              <View style={styles.settingsOption}>
+                <View style={styles.settingsOptionLeft}>
+                  <Icon
+                    name='information'
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={styles.settingsOptionText}>Version</Text>
+                </View>
+                <Text style={styles.settingsOptionValue}>2.0</Text>
               </View>
-              {theme === 'system' && (
-                <Icon
-                  name='check-circle'
-                  size={20}
-                  color={colors.accent.primary}
-                />
-              )}
-            </TouchableOpacity>
-          </View>
+            </View>
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -3329,9 +3398,9 @@ export default function StudentProfile() {
               <View style={[styles.profileImage, styles.profileFallback]}>
                 <ActivityIndicator size='small' color='#ffffff' />
               </View>
-            ) : profileImage ? (
+            ) : userData?.photoURL ? (
               <Image
-                source={{ uri: profileImage }}
+                source={{ uri: userData.photoURL }}
                 style={styles.profileImage}
               />
             ) : (
@@ -3385,10 +3454,10 @@ export default function StudentProfile() {
                   <View style={styles.avatarFallback}>
                     <ActivityIndicator size='small' color='#0ea5e9' />
                   </View>
-                ) : profileImage ? (
+                ) : userData?.photoURL ? (
                   <Image
-                    source={{ uri: profileImage }}
-                    style={styles.avatarImage}
+                    source={{ uri: userData.photoURL }}
+                    style={styles.profileImage}
                   />
                 ) : (
                   <View style={styles.avatarFallback}>
@@ -3840,50 +3909,99 @@ export default function StudentProfile() {
         animationType='fade'
         onRequestClose={() => setShowImageOptions(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setShowImageOptions(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.imageOptions}>
-                <Text style={styles.optionsTitle}>Profile Photo</Text>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowImageOptions(false)}
+        >
+          <Pressable
+            style={styles.imageOptions}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.optionsTitle}>Profile Photo</Text>
 
-                <TouchableOpacity
-                  style={styles.optionButton}
-                  onPress={() => pickImage(false)}
-                >
-                  <Icon name='image' size={24} color='#3B82F6' />
-                  <Text style={styles.optionText}>Choose from Gallery</Text>
-                </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.optionButton}
+              onPress={() => pickImage(false)}
+            >
+              <Icon name='image' size={24} color='#3B82F6' />
+              <Text style={styles.optionText}>Choose from Gallery</Text>
+            </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.optionButton}
-                  onPress={() => pickImage(true)}
-                >
-                  <Icon name='camera' size={24} color='#10B981' />
-                  <Text style={styles.optionText}>Take Photo</Text>
-                </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.optionButton}
+              onPress={() => pickImage(true)}
+            >
+              <Icon name='camera' size={24} color='#10B981' />
+              <Text style={styles.optionText}>Take Photo</Text>
+            </TouchableOpacity>
 
-                {profileImage && (
-                  <TouchableOpacity
-                    style={[styles.optionButton, styles.removeButton]}
-                    onPress={removeProfileImage}
-                  >
-                    <Icon name='delete' size={24} color='#DC2626' />
-                    <Text style={[styles.optionText, styles.removeText]}>
-                      Remove Photo
-                    </Text>
-                  </TouchableOpacity>
-                )}
+            {profileImage && (
+              <TouchableOpacity
+                style={styles.optionButton}
+                onPress={() => {
+                  setShowImageOptions(false)
+                  setShowImageViewer(true)
+                }}
+              >
+                <Icon name='eye' size={24} color='#8B5CF6' />
+                <Text style={styles.optionText}>View Photo</Text>
+              </TouchableOpacity>
+            )}
 
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => setShowImageOptions(false)}
-                >
-                  <Text style={styles.cancelText}>Cancel</Text>
-                </TouchableOpacity>
+            {profileImage && (
+              <TouchableOpacity
+                style={[styles.optionButton, styles.removeButton]}
+                onPress={removeProfileImage}
+              >
+                <Icon name='delete' size={24} color='#DC2626' />
+                <Text style={[styles.optionText, styles.removeText]}>
+                  Remove Photo
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setShowImageOptions(false)}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Full-screen image viewer */}
+      <Modal
+        visible={showImageViewer}
+        transparent={false}
+        animationType='fade'
+        onRequestClose={() => setShowImageViewer(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 40, right: 20, zIndex: 10 }}
+            onPress={() => setShowImageViewer(false)}
+          >
+            <Icon name='close' size={28} color='#fff' />
+          </TouchableOpacity>
+          <View
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            {profileImage ? (
+              <Image
+                source={{ uri: profileImage }}
+                style={{ width: '90%', height: '90%', resizeMode: 'contain' }}
+              />
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                <Icon name='account' size={80} color='#fff' />
+                <Text style={{ color: '#fff', marginTop: 16 }}>
+                  No profile photo
+                </Text>
               </View>
-            </TouchableWithoutFeedback>
+            )}
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       </Modal>
 
       {renderPenaltiesModal()}

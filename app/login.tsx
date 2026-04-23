@@ -8,6 +8,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -20,9 +22,10 @@ import {
   View,
 } from 'react-native'
 import { useAuth } from '../src/Controller/context/AuthContext'
+import { useTheme } from '../src/Controller/context/ThemeContext'
 import { db } from '../src/Model/lib/firebaseConfig'
 import LoadingScreen from '../src/View/components/LoadingScreen'
-import { COLORS, LoginStyles } from '../src/View/styles/LoginStyles'
+import { createLoginStyles } from '../src/View/styles/LoginStyles'
 
 export default function Login() {
   const router = useRouter()
@@ -58,6 +61,21 @@ export default function Login() {
   const isLoading = busy || loading
   const isLockedOut = lockoutUntil && lockoutUntil > Date.now()
 
+  // Theme integration
+  const { colors, isDark, toggleTheme } = useTheme()
+  const styles = createLoginStyles(isDark, colors)
+  const themeSpinAnim = useRef(new Animated.Value(0)).current
+  const [isThemeToggling, setIsThemeToggling] = useState(false)
+
+  // Dynamic colors based on theme
+  const gradientStart = isDark ? '#4F46E5' : '#3A5BF0'
+  const gradientMid = isDark ? '#7C3AED' : '#5B3FD4'
+  const gradientEnd = isDark ? '#A855F7' : '#7B2FF7'
+  const errorRed = '#EF4444'
+  const iconTint = isDark ? '#94A3B8' : '#8B92C4'
+  const placeholderGray = isDark ? '#64748B' : '#A0A3B5'
+  const successGreen = '#10b981'
+
   const isValidEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/
     return emailRegex.test(email)
@@ -70,13 +88,10 @@ export default function Login() {
     try {
       await AsyncStorage.setItem(
         'studentLoginAttempts',
-        JSON.stringify({
-          failedAttempts: attempts,
-          lockoutUntil: lockoutTime,
-        })
+        JSON.stringify({ failedAttempts: attempts, lockoutUntil: lockoutTime })
       )
     } catch (e) {
-      // Silently fail to avoid disrupting login flow
+      // Silently fail
     }
   }
 
@@ -115,6 +130,19 @@ export default function Login() {
     }
   }
 
+  const handleThemeToggle = () => {
+    if (isThemeToggling) return
+    setIsThemeToggling(true)
+    themeSpinAnim.setValue(0)
+    Animated.timing(themeSpinAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => setIsThemeToggling(false))
+    toggleTheme()
+  }
+
   const restoreForgotCooldown = async () => {
     try {
       const stored = await AsyncStorage.getItem('forgotPasswordCooldown')
@@ -137,7 +165,7 @@ export default function Login() {
     restoreForgotCooldown()
   }, [])
 
-  // Countdown effect for lockout
+  // Lockout countdown
   useEffect(() => {
     let interval: number
     if (lockoutUntil && lockoutUntil > Date.now()) {
@@ -167,6 +195,7 @@ export default function Login() {
     }
   }, [lockoutUntil])
 
+  // Forgot cooldown countdown
   useEffect(() => {
     let interval: number
     if (forgotCooldownUntil && forgotCooldownUntil > Date.now()) {
@@ -199,7 +228,9 @@ export default function Login() {
       remainingLockoutSeconds > 0
     ) {
       setError(
-        `Too many failed attempts. Please wait ${remainingLockoutSeconds} second${remainingLockoutSeconds !== 1 ? 's' : ''} before trying again.`
+        `Too many failed attempts. Please wait ${remainingLockoutSeconds} second${
+          remainingLockoutSeconds !== 1 ? 's' : ''
+        } before trying again.`
       )
     }
   }, [remainingLockoutSeconds, lockoutUntil])
@@ -300,15 +331,14 @@ export default function Login() {
       setForgotLoading(false)
     }
   }
+
   const handleLogin = async () => {
     if (busy || isLockedOut) return
     setError(null)
 
-    // Check lockout
     if (lockoutUntil && lockoutUntil > Date.now()) {
       return
     } else if (lockoutUntil && lockoutUntil <= Date.now()) {
-      // Reset lockout if expired
       setLockoutUntil(null)
       setFailedAttempts(0)
       setRemainingLockoutSeconds(0)
@@ -393,7 +423,7 @@ export default function Login() {
         backgroundColor='transparent'
       />
 
-      {/* Forgot Password Modal */}
+      {/* Forgot Password Modal - Theme Aware */}
       <Modal
         transparent
         visible={forgotModalVisible}
@@ -401,73 +431,63 @@ export default function Login() {
         onRequestClose={() => setForgotModalVisible(false)}
       >
         <View
-          style={[
-            {
-              flex: 1,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              justifyContent: 'center',
-              alignItems: 'center',
-            },
-          ]}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
         >
           <View
-            style={[
-              {
-                width: '80%',
-                maxWidth: 400,
-                backgroundColor: '#fff',
-                borderRadius: 20,
-                padding: 20,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.25,
-                shadowRadius: 4,
-                elevation: 5,
-              },
-            ]}
+            style={{
+              width: '80%',
+              maxWidth: 400,
+              backgroundColor: colors.card,
+              borderRadius: 20,
+              padding: 20,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: isDark ? 0.5 : 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
           >
             <Text
-              style={[
-                {
-                  fontSize: 20,
-                  fontWeight: 'bold',
-                  color: '#1e293b',
-                  marginBottom: 8,
-                  textAlign: 'center',
-                },
-              ]}
+              style={{
+                fontSize: 20,
+                fontWeight: 'bold',
+                color: colors.text,
+                marginBottom: 8,
+                textAlign: 'center',
+              }}
             >
               Reset Password
             </Text>
             <Text
-              style={[
-                {
-                  fontSize: 14,
-                  color: '#64748b',
-                  marginBottom: 20,
-                  textAlign: 'center',
-                },
-              ]}
+              style={{
+                fontSize: 14,
+                color: colors.textSecondary,
+                marginBottom: 20,
+                textAlign: 'center',
+              }}
             >
               Enter your username to receive a password reset email. The link
               will expire in 1 hour.
             </Text>
             <TextInput
-              style={[
-                {
-                  borderWidth: 1,
-                  borderColor: '#e2e8f0',
-                  borderRadius: 12,
-                  paddingHorizontal: 16,
-                  paddingVertical: 12,
-                  fontSize: 16,
-                  color: '#1e293b',
-                  backgroundColor: '#f8fafc',
-                  marginBottom: 12,
-                },
-              ]}
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                fontSize: 16,
+                color: colors.text,
+                backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                marginBottom: 12,
+              }}
               placeholder='Username'
-              placeholderTextColor='#94a3b8'
+              placeholderTextColor={placeholderGray}
               value={forgotUsername}
               onChangeText={setForgotUsername}
               autoCapitalize='none'
@@ -475,39 +495,33 @@ export default function Login() {
             />
             {forgotMessage && (
               <Text
-                style={[
-                  {
-                    color: forgotMessage.startsWith('✓')
-                      ? '#10b981'
-                      : '#ef4444',
-                    fontSize: 12,
-                    marginBottom: 16,
-                    textAlign: 'center',
-                  },
-                ]}
+                style={{
+                  color: forgotMessage.startsWith('✓')
+                    ? successGreen
+                    : errorRed,
+                  fontSize: 12,
+                  marginBottom: 16,
+                  textAlign: 'center',
+                }}
               >
                 {forgotMessage}
               </Text>
             )}
             <View
-              style={[
-                {
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                },
-              ]}
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
             >
               <TouchableOpacity
-                style={[
-                  {
-                    flex: 1,
-                    paddingVertical: 12,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    backgroundColor: '#f1f5f9',
-                  },
-                ]}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  backgroundColor: isDark ? '#334155' : '#f1f5f9',
+                }}
                 onPress={() => {
                   setForgotModalVisible(false)
                   setForgotMessage(null)
@@ -515,25 +529,24 @@ export default function Login() {
                 }}
                 disabled={forgotLoading}
               >
-                <Text style={[{ color: '#64748b', fontWeight: '600' }]}>
+                <Text
+                  style={{ color: colors.textSecondary, fontWeight: '600' }}
+                >
                   Cancel
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  {
-                    flex: 1,
-                    paddingVertical: 12,
-                    borderRadius: 12,
-                    alignItems: 'center',
-                    backgroundColor:
-                      forgotCooldownUntil !== null &&
-                      forgotCooldownUntil > Date.now()
-                        ? '#94a3b8'
-                        : '#0ea5e9',
-                    opacity: forgotLoading ? 0.6 : 1,
-                  },
-                ]}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  backgroundColor:
+                    forgotCooldownUntil && forgotCooldownUntil > Date.now()
+                      ? '#94a3b8'
+                      : gradientStart,
+                  opacity: forgotLoading ? 0.6 : 1,
+                }}
                 onPress={handleForgotPassword}
                 disabled={
                   forgotLoading ||
@@ -543,8 +556,7 @@ export default function Login() {
               >
                 {forgotLoading ? (
                   <ActivityIndicator size='small' color='#fff' />
-                ) : forgotCooldownUntil !== null &&
-                  forgotCooldownUntil > Date.now() ? (
+                ) : forgotCooldownUntil && forgotCooldownUntil > Date.now() ? (
                   <Text style={{ color: '#fff', fontWeight: '600' }}>
                     Wait {forgotCooldownSeconds}s
                   </Text>
@@ -559,75 +571,125 @@ export default function Login() {
         </View>
       </Modal>
 
-      <View style={LoginStyles.root}>
+      <View style={styles.root}>
         <LinearGradient
-          colors={[
-            COLORS.gradientStart,
-            COLORS.gradientMid,
-            COLORS.gradientEnd,
-          ]}
+          colors={[gradientStart, gradientMid, gradientEnd]}
           start={{ x: 0.1, y: 0 }}
           end={{ x: 0.9, y: 1 }}
-          style={LoginStyles.header}
+          style={styles.header}
         >
-          <View style={LoginStyles.statusBarSpacer} />
+          <View style={styles.statusBarSpacer} />
 
-          <View style={LoginStyles.logoWrapper}>
-            <View style={LoginStyles.logoGlow}>
+          {/* Theme Toggle Button */}
+          <View
+            style={{
+              position: 'absolute',
+              top:
+                Platform.OS === 'ios'
+                  ? 50
+                  : (StatusBar.currentHeight || 0) + 10,
+              right: 20,
+              zIndex: 10,
+            }}
+          >
+            <TouchableOpacity
+              onPress={handleThemeToggle}
+              disabled={isThemeToggling}
+              activeOpacity={0.7}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.3)',
+              }}
+            >
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: themeSpinAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                    {
+                      scale: themeSpinAnim.interpolate({
+                        inputRange: [0, 0.5, 1],
+                        outputRange: [1, 1.2, 1],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Ionicons
+                  name={isDark ? 'sunny-outline' : 'moon-outline'}
+                  size={22}
+                  color='#ffffff'
+                />
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.logoWrapper}>
+            <View style={styles.logoGlow}>
               <Image
                 source={require('../assets/images/Logo/TMC_Connect.png')}
-                style={LoginStyles.logo}
+                style={styles.logo}
                 resizeMode='contain'
               />
             </View>
-            <Text style={LoginStyles.appName}>TMC Connect</Text>
+            <Text style={styles.appName}>TMC Connect</Text>
           </View>
         </LinearGradient>
 
         <KeyboardAvoidingView
-          style={LoginStyles.keyboardView}
+          style={styles.keyboardView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <ScrollView
-            contentContainerStyle={LoginStyles.scrollContent}
+            contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps='handled'
           >
             {/* Title */}
-            <View style={LoginStyles.titleRow}>
+            <View style={styles.titleRow}>
               <Text>
-                <Text style={LoginStyles.title}>Welcome </Text>
-                <Text style={LoginStyles.titleAccent}>Back</Text>
-                <Text style={LoginStyles.title}>!</Text>
+                <Text style={styles.title}>Welcome </Text>
+                <Text style={styles.titleAccent}>Back</Text>
+                <Text style={styles.title}>!</Text>
               </Text>
             </View>
-            <Text style={LoginStyles.subtitle}>
+            <Text style={styles.subtitle}>
               Sign in to continue to TMC Campus Hub
             </Text>
 
             {/* Username input */}
             <View
               style={[
-                LoginStyles.inputWrapper,
-                usernameFocused && LoginStyles.inputWrapperFocused,
+                styles.inputWrapper,
+                usernameFocused && styles.inputWrapperFocused,
               ]}
             >
               <Ionicons
                 name='person-outline'
                 size={20}
-                color={usernameFocused ? COLORS.gradientStart : COLORS.iconTint}
-                style={LoginStyles.inputIcon}
+                color={usernameFocused ? gradientStart : iconTint}
+                style={styles.inputIcon}
               />
               <TextInput
                 placeholder='Username'
-                placeholderTextColor={COLORS.placeholderGray}
+                placeholderTextColor={placeholderGray}
                 value={username}
                 onChangeText={(t) => {
                   setUsername(t)
                   if (error) setError(null)
                 }}
-                style={LoginStyles.input}
+                style={styles.input}
                 autoCapitalize='none'
                 autoCorrect={false}
                 returnKeyType='next'
@@ -640,7 +702,7 @@ export default function Login() {
                 <Ionicons
                   name='checkmark-circle'
                   size={18}
-                  color={COLORS.gradientStart}
+                  color={gradientStart}
                 />
               )}
             </View>
@@ -648,26 +710,26 @@ export default function Login() {
             {/* Password input */}
             <View
               style={[
-                LoginStyles.inputWrapper,
-                passwordFocused && LoginStyles.inputWrapperFocused,
+                styles.inputWrapper,
+                passwordFocused && styles.inputWrapperFocused,
               ]}
             >
               <Ionicons
                 name='lock-closed-outline'
                 size={20}
-                color={passwordFocused ? COLORS.gradientStart : COLORS.iconTint}
-                style={LoginStyles.inputIcon}
+                color={passwordFocused ? gradientStart : iconTint}
+                style={styles.inputIcon}
               />
               <TextInput
                 ref={passwordRef}
                 placeholder='Password'
-                placeholderTextColor={COLORS.placeholderGray}
+                placeholderTextColor={placeholderGray}
                 value={password}
                 onChangeText={(t) => {
                   setPassword(t)
                   if (error) setError(null)
                 }}
-                style={[LoginStyles.input, { flex: 1 }]}
+                style={[styles.input, { flex: 1 }]}
                 secureTextEntry={!showPassword}
                 autoCapitalize='none'
                 autoCorrect={false}
@@ -679,47 +741,41 @@ export default function Login() {
               />
               <TouchableOpacity
                 onPress={() => setShowPassword((s) => !s)}
-                style={LoginStyles.eyeButton}
+                style={styles.eyeButton}
                 disabled={isLoading || !!isLockedOut}
               >
                 <Ionicons
                   name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={22}
-                  color={
-                    passwordFocused ? COLORS.gradientStart : COLORS.iconTint
-                  }
+                  color={passwordFocused ? gradientStart : iconTint}
                 />
               </TouchableOpacity>
             </View>
 
             {/* Error banner */}
             {error ? (
-              <View style={LoginStyles.errorBanner}>
+              <View style={styles.errorBanner}>
                 <Ionicons
                   name='alert-circle-outline'
                   size={18}
-                  color={COLORS.errorRed}
+                  color={errorRed}
                 />
-                <Text style={LoginStyles.errorText}>{error}</Text>
+                <Text style={styles.errorText}>{error}</Text>
               </View>
             ) : null}
 
             {/* Sign In button */}
             <LinearGradient
-              colors={[
-                COLORS.gradientStart,
-                COLORS.gradientMid,
-                COLORS.gradientEnd,
-              ]}
+              colors={[gradientStart, gradientMid, gradientEnd]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[
-                LoginStyles.buttonGradient,
-                isLoading && LoginStyles.buttonDisabled,
+                styles.buttonGradient,
+                isLoading && styles.buttonDisabled,
               ]}
             >
               <TouchableOpacity
-                style={LoginStyles.button}
+                style={styles.button}
                 onPress={handleLogin}
                 disabled={isLoading || !!isLockedOut}
                 activeOpacity={0.85}
@@ -727,24 +783,24 @@ export default function Login() {
                 {isLoading ? (
                   <ActivityIndicator color='#FFFFFF' size='small' />
                 ) : (
-                  <Text style={LoginStyles.buttonText}>Sign In</Text>
+                  <Text style={styles.buttonText}>Sign In</Text>
                 )}
               </TouchableOpacity>
             </LinearGradient>
 
             {/* Forgot password */}
             <TouchableOpacity
-              style={LoginStyles.forgotRow}
+              style={styles.forgotRow}
               onPress={() => setForgotModalVisible(true)}
               disabled={isLoading || !!isLockedOut}
             >
-              <Text style={LoginStyles.forgotText}>Forgot Password?</Text>
+              <Text style={styles.forgotText}>Forgot Password?</Text>
             </TouchableOpacity>
 
-            <View style={LoginStyles.dividerRow}>
-              <View style={LoginStyles.dividerLine} />
-              <Text style={LoginStyles.dividerLabel}>Secure Login</Text>
-              <View style={LoginStyles.dividerLine} />
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerLabel}>Secure Login</Text>
+              <View style={styles.dividerLine} />
             </View>
           </ScrollView>
         </KeyboardAvoidingView>

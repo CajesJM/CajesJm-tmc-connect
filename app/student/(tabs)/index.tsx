@@ -12,13 +12,22 @@ import {
   query,
   updateDoc,
 } from 'firebase/firestore'
-import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage'
+import {
+  deleteObject,
+  getDownloadURL,
+  getStorage,
+  listAll,
+  ref,
+  uploadBytes,
+} from 'firebase/storage'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Easing,
+  Image,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -147,10 +156,13 @@ const ShimmerPlaceholder = ({
 
 export default function StudentDashboard() {
   const { width } = useWindowDimensions()
-  const { colors, isDark } = useTheme()
+  const { colors, isDark, toggleTheme } = useTheme()
   const isMobile = width < 768
   const isTablet = width >= 768 && width < 1024
   const isDesktop = width >= 1024
+
+  const themeSpinAnim = useRef(new Animated.Value(0)).current
+  const [isThemeToggling, setIsThemeToggling] = useState(false)
 
   const styles = useMemo(
     () =>
@@ -164,7 +176,6 @@ export default function StudentDashboard() {
     [colors, isDark, isMobile, isTablet, isDesktop]
   )
 
-  // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current
   const slideAnim = useRef(new Animated.Value(50)).current
   const scaleAnim = useRef(new Animated.Value(0.9)).current
@@ -172,15 +183,14 @@ export default function StudentDashboard() {
   const pulseAnim = useRef(new Animated.Value(1)).current
   const rotateAnim = useRef(new Animated.Value(0)).current
 
-  // Interactive donut chart state
   const [selectedSlice, setSelectedSlice] = useState<number | null>(null)
   const [hoveredSlice, setHoveredSlice] = useState<number | null>(null)
   const donutScaleAnim = useRef(new Animated.Value(1)).current
 
   const router = useRouter()
-  const { userData } = useAuth()
-
-  // State declarations - MOVED BEFORE useAnimatedCounter calls
+  const { userData, refreshUserData } = useAuth()
+  const [showImageViewer, setShowImageViewer] = useState(false)
+  const [showImageOptions, setShowImageOptions] = useState(false)
   const [studentStats, setStudentStats] = useState({
     eventsAttended: 0,
     upcomingEvents: 0,
@@ -211,14 +221,12 @@ export default function StudentDashboard() {
   const [badgeCount, setBadgeCount] = useState(0)
   const [lastViewed, setLastViewed] = useState<Date | null>(null)
 
-  // Animated counters - NOW AFTER state declarations
   const animatedEventsAttended = useAnimatedCounter(studentStats.eventsAttended)
   const animatedUpcomingEvents = useAnimatedCounter(studentStats.upcomingEvents)
   const animatedAnnouncements = useAnimatedCounter(
     studentStats.totalAnnouncements
   )
 
-  // Entry animations
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -287,7 +295,6 @@ export default function StudentDashboard() {
 
       eventsSnapshot.docs.forEach((doc) => {
         const data = doc.data()
-        // ✅ Only count if approved or no status
         if (!isApproved(data)) return
 
         const eventDate = data.date?.toDate?.() || data.date
@@ -309,7 +316,6 @@ export default function StudentDashboard() {
       let totalAnnouncements = 0
       announcementsSnapshot.docs.forEach((doc) => {
         const data = doc.data()
-        // ✅ Only count if approved or no status
         if (isApproved(data)) totalAnnouncements++
       })
 
@@ -628,63 +634,95 @@ export default function StudentDashboard() {
     if (currentUser?.uid) {
       await notificationService.markAllAsRead(currentUser.uid)
     }
-    // Immediately update local state to clear the badge
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
     setUnreadCount(0)
   }
-  const handleProfileImagePress = async () => {
+  const handleProfileImagePress = () => {
+    setShowImageOptions(true)
+  }
+
+  const pickImage = async (useCamera = false) => {
     try {
+      setShowImageOptions(false)
+
       if (Platform.OS === 'web') {
         const input = document.createElement('input')
         input.type = 'file'
         input.accept = 'image/*'
         input.onchange = async (e: any) => {
-          const file = e.target.files[0]
+          const file = e.target.files?.[0]
           if (file) await uploadProfileImage(file)
         }
         input.click()
-      } else {
-        const permissionResult =
-          await ImagePicker.requestMediaLibraryPermissionsAsync()
-        if (!permissionResult.granted) {
-          Alert.alert(
-            'Permission Required',
-            'Permission to access camera roll is required!'
-          )
-          return
-        }
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.5,
-        })
-        if (!result.canceled) await uploadProfileImage(result.assets[0].uri)
+        return
+      }
+
+      const permissionResult = useCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Please allow access to proceed.')
+        return
+      }
+
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.5,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.5,
+          })
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        await uploadProfileImage(result.assets[0].uri)
       }
     } catch (error) {
       console.error('Error picking image:', error)
-      Alert.alert('Error', 'Failed to pick image.')
+      Alert.alert('Error', 'Failed to pick image. Please try again.')
     }
   }
 
   const uploadProfileImage = async (imageUri: string | File) => {
     try {
       setUploadingImage(true)
+      const user = auth.currentUser
+
+      if (!user) {
+        Alert.alert('Error', 'User not found.')
+        return
+      }
+
       let blob: Blob
-      if (imageUri instanceof File) blob = imageUri
-      else {
+      if (imageUri instanceof File) {
+        blob = imageUri
+      } else {
         const response = await fetch(imageUri)
         blob = await response.blob()
       }
+
       const storage = getStorage()
-      const fileName = `profile_${userData?.email}_${Date.now()}.jpg`
-      const storageRef = ref(storage, `profileImages/${fileName}`)
+      const fileName = user.uid
+      const storageRef = ref(storage, `profile-photos/${fileName}`)
       await uploadBytes(storageRef, blob)
-      const downloadUrl = await getDownloadURL(storageRef)
-      if (userData?.email) {
-        const userRef = doc(db, 'users', userData.email)
-        await updateDoc(userRef, { photoURL: downloadUrl })
-        Alert.alert('Success', 'Profile image updated!')
+
+      const downloadURL = await getDownloadURL(storageRef)
+
+      const userRef = doc(db, 'users', user.uid)
+      await updateDoc(userRef, {
+        photoURL: downloadURL,
+      })
+
+      await refreshUserData()
+
+      Alert.alert('Success', 'Profile photo updated successfully!')
+
+      if (user.email) {
+        deleteOldProfileImages(user.uid, user.email).catch(() => {})
       }
     } catch (error) {
       console.error('Error uploading image:', error)
@@ -694,8 +732,66 @@ export default function StudentDashboard() {
     }
   }
 
+  const deleteOldProfileImages = async (uid: string, email: string) => {
+    const storage = getStorage()
+    const listRef = ref(storage, 'profile-photos')
+    try {
+      const result = await listAll(listRef)
+      const oldFiles = result.items.filter((itemRef) => {
+        const name = itemRef.name
+        const emailPattern = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const regex = new RegExp(`^profile_${emailPattern}_\\d+\\.jpg$`)
+        return (
+          (regex.test(name) || name.includes(email.replace(/[@.]/g, '_'))) &&
+          name !== uid
+        )
+      })
+      await Promise.all(oldFiles.map((fileRef) => deleteObject(fileRef)))
+      if (oldFiles.length > 0) {
+        console.log(`Deleted ${oldFiles.length} old profile image(s)`)
+      }
+    } catch (err: any) {
+      // Silently ignore permission errors
+      if (err.code === 'storage/unauthorized') {
+        console.log('List permission not granted, skipping old file cleanup')
+      } else {
+        console.warn('Failed to clean up old profile images:', err)
+      }
+    }
+  }
+
+  const removeProfileImage = async () => {
+    try {
+      setShowImageOptions(false)
+
+      const user = auth.currentUser
+      if (!user) return
+
+      try {
+        const storage = getStorage()
+        const storageRef = ref(storage, `profile-photos/${user.uid}`)
+        await deleteObject(storageRef)
+      } catch (storageError) {
+        console.warn(
+          'Could not delete from storage, might not exist:',
+          storageError
+        )
+      }
+
+      const userRef = doc(db, 'users', user.uid)
+      await updateDoc(userRef, {
+        photoURL: null,
+      })
+
+      await refreshUserData()
+      Alert.alert('Success', 'Profile photo removed successfully!')
+    } catch (error) {
+      console.error('Error removing profile image:', error)
+      Alert.alert('Error', 'Failed to remove profile photo.')
+    }
+  }
+
   const navigateTo = (screen: string, id?: string) => {
-    // Add navigation animation
     Animated.sequence([
       Animated.timing(scaleAnim, {
         toValue: 0.95,
@@ -740,7 +836,6 @@ export default function StudentDashboard() {
     return date.toLocaleDateString()
   }
 
-  // Enhanced stat card with animation
   const StatCard = ({
     title,
     value,
@@ -1083,6 +1178,23 @@ export default function StudentDashboard() {
     )
   }
 
+  const handleThemeToggle = () => {
+    if (isThemeToggling) return
+
+    setIsThemeToggling(true)
+    themeSpinAnim.setValue(0)
+
+    Animated.timing(themeSpinAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsThemeToggling(false)
+    })
+    toggleTheme()
+  }
+
   const renderOverview = () => (
     <>
       <ScrollView
@@ -1221,11 +1333,6 @@ export default function StudentDashboard() {
 
             <View style={styles.dateSection}>
               <View style={styles.dateContainer}>
-                <Feather
-                  name='calendar'
-                  size={14}
-                  color='rgba(255,255,255,0.7)'
-                />
                 <Text style={styles.dateText}>
                   {new Date().toLocaleDateString('en-US', {
                     weekday: 'long',
@@ -1255,6 +1362,39 @@ export default function StudentDashboard() {
                       </Text>
                     </View>
                   )}
+                </TouchableOpacity>
+
+                {/* Animated Theme Toggle Button */}
+                <TouchableOpacity
+                  style={styles.headerAction}
+                  onPress={handleThemeToggle}
+                  activeOpacity={0.8}
+                  disabled={isThemeToggling}
+                >
+                  <Animated.View
+                    style={{
+                      transform: [
+                        {
+                          rotate: themeSpinAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: ['0deg', '360deg'],
+                          }),
+                        },
+                        {
+                          scale: themeSpinAnim.interpolate({
+                            inputRange: [0, 0.5, 1],
+                            outputRange: [1, 1.2, 1],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <Feather
+                      name={isDark ? 'sun' : 'moon'}
+                      size={20}
+                      color='#ffffff'
+                    />
+                  </Animated.View>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1596,6 +1736,12 @@ export default function StudentDashboard() {
           </View>
         </Animated.View>
       </ScrollView>
+    </>
+  )
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.contentArea}>{renderOverview()}</View>
 
       <NotificationModal
         visible={notificationModalVisible}
@@ -1628,12 +1774,106 @@ export default function StudentDashboard() {
           location: e.location,
         }))}
       />
-    </>
-  )
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.contentArea}>{renderOverview()}</View>
+      <Modal
+        visible={showImageOptions}
+        transparent={true}
+        animationType='fade'
+        onRequestClose={() => setShowImageOptions(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowImageOptions(false)}
+        >
+          <Pressable
+            style={styles.imageOptionsModal}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.optionsTitle}>Profile Photo</Text>
+
+            <TouchableOpacity
+              style={styles.optionButton}
+              onPress={() => pickImage(false)}
+            >
+              <Ionicons name='image' size={24} color='#3B82F6' />
+              <Text style={styles.optionText}>Choose from Gallery</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.optionButton}
+              onPress={() => pickImage(true)}
+            >
+              <Ionicons name='camera' size={24} color='#10B981' />
+              <Text style={styles.optionText}>Take Photo</Text>
+            </TouchableOpacity>
+
+            {userData?.photoURL && (
+              <>
+                <TouchableOpacity
+                  style={styles.optionButton}
+                  onPress={() => {
+                    setShowImageOptions(false)
+                    setShowImageViewer(true)
+                  }}
+                >
+                  <Ionicons name='eye' size={24} color='#8B5CF6' />
+                  <Text style={styles.optionText}>View Photo</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.optionButton, styles.removeButton]}
+                  onPress={removeProfileImage}
+                >
+                  <Ionicons name='trash' size={24} color='#DC2626' />
+                  <Text style={[styles.optionText, styles.removeText]}>
+                    Remove Photo
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setShowImageOptions(false)}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={showImageViewer}
+        transparent={false}
+        animationType='fade'
+        onRequestClose={() => setShowImageViewer(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 40, right: 20, zIndex: 10 }}
+            onPress={() => setShowImageViewer(false)}
+          >
+            <Ionicons name='close' size={28} color='#fff' />
+          </TouchableOpacity>
+          <View
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            {userData?.photoURL ? (
+              <Image
+                source={{ uri: userData.photoURL }}
+                style={{ width: '90%', height: '90%', resizeMode: 'contain' }}
+              />
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                <Ionicons name='person' size={80} color='#fff' />
+                <Text style={{ color: '#fff', marginTop: 16 }}>
+                  No profile photo
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }

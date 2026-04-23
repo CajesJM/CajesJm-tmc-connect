@@ -732,5 +732,55 @@ export const createStudentDashboardStyles = (
       color: '#ffffff',
       fontWeight: '600',
     },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    imageOptionsModal: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 20,
+      width: isMobile ? '85%' : 320,
+      maxWidth: 400,
+    },
+    optionsTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    optionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      marginBottom: 8,
+      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+    },
+    optionText: {
+      fontSize: 16,
+      color: colors.text,
+      marginLeft: 16,
+    },
+    removeButton: {
+      backgroundColor: isDark ? '#7f1d1d20' : '#fef2f2',
+    },
+    removeText: {
+      color: '#DC2626',
+    },
+    cancelButton: {
+      marginTop: 12,
+      paddingVertical: 12,
+      alignItems: 'center',
+    },
+    cancelText: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
   })
 }

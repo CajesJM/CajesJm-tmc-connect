@@ -1031,7 +1031,7 @@ export default function AssistantAdminAnnouncements() {
                           color={colors.sidebar.text.muted}
                         />
                         <Text style={styles.detailMetaText}>
-                          Created by {selectedAnnouncement.createdByName}
+                          by {selectedAnnouncement.createdByName}
                         </Text>
                       </View>
                     )}

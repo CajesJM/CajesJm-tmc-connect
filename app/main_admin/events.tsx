@@ -21,6 +21,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Easing,
   FlatList,
   Image,
   Linking,
@@ -349,8 +350,28 @@ export default function MainAdminEvents() {
   >(null)
   const [checkingSelectedEventLocation, setCheckingSelectedEventLocation] =
     useState(false)
-  const { colors, isDark } = useTheme()
+  const { colors, isDark, toggleTheme } = useTheme()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isThemeToggling, setIsThemeToggling] = useState(false)
+  const themeSpinAnim = useRef(new Animated.Value(0)).current
+
+  const handleThemeToggle = () => {
+    if (isThemeToggling) return
+
+    setIsThemeToggling(true)
+    themeSpinAnim.setValue(0)
+
+    Animated.timing(themeSpinAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsThemeToggling(false)
+    })
+
+    toggleTheme()
+  }
   const MAX_DESCRIPTION_LENGTH = 500
   const MAX_LOCATION_DESC_LENGTH = 200
 
@@ -1010,8 +1031,8 @@ export default function MainAdminEvents() {
     }
   }
   const headerGradientColors = isDark
-    ? (['#0f172a', '#1e293b'] as const)
-    : (['#1e40af', '#3b82f6'] as const)
+    ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
+    : (['#0f2456', '#1a3a8f', '#1e53c8'] as const)
 
   const handleEditEvent = (event: Event) => {
     try {
@@ -2205,7 +2226,7 @@ export default function MainAdminEvents() {
       <LinearGradient
         colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
         style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
       >
         <View
@@ -2218,7 +2239,7 @@ export default function MainAdminEvents() {
                 { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
               ]}
             >
-              Events Dashboard,
+              Welcome Back,
             </Text>
             <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
               {userData?.name || 'Admin'}
@@ -2269,16 +2290,53 @@ export default function MainAdminEvents() {
               isMobile && styles.dateContainerMobile,
             ]}
           >
-            <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
+            <Text style={styles.dateText}>
               {new Date().toLocaleDateString('en-US', {
-                weekday: isMobile ? 'short' : 'long',
+                weekday: 'long',
                 year: 'numeric',
-                month: isMobile ? 'short' : 'long',
+                month: 'long',
                 day: 'numeric',
               })}
             </Text>
           </View>
           <View style={styles.headerActions}>
+            {/* Theme Toggle Button */}
+            <TouchableOpacity
+              style={[
+                styles.headerAction,
+                isMobile && styles.headerActionMobile,
+              ]}
+              onPress={handleThemeToggle}
+              disabled={isThemeToggling}
+              activeOpacity={0.75}
+            >
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: themeSpinAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                    {
+                      scale: themeSpinAnim.interpolate({
+                        inputRange: [0, 0.5, 1],
+                        outputRange: [1, 1.2, 1],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Feather
+                  name={isDark ? 'sun' : 'moon'}
+                  size={isMobile ? 16 : 18}
+                  color='#ffffff'
+                />
+              </Animated.View>
+            </TouchableOpacity>
+
+            {/* Create Event Button */}
             <TouchableOpacity
               style={[
                 styles.headerAction,

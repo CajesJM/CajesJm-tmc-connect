@@ -200,396 +200,342 @@ export default function MainAdminLayout() {
   const Sidebar = ({ isMobile }: { isMobile?: boolean }) => {
     const animatedWidth = isMobile ? 280 : sidebarAnim
 
+    const sidebarGradient = ['#050e1a', '#0f2456', '#1a3a8f'] as const
+
     return (
       <Animated.View
         style={[
           styles.sidebarContainer,
           {
-            backgroundColor: colors.sidebar.background,
             width: animatedWidth,
-            ...(isWeb &&
-              !isMobile &&
-              ({
-                backgroundColor: isDark
-                  ? 'rgba(15, 25, 35, 0.85)'
-                  : 'rgba(255, 255, 255, 0.85)',
-                backdropFilter: 'blur(20px)',
-              } as any)),
           },
           isMobile && { width: 280 },
         ]}
       >
-        <View style={styles.sidebarContent}>
-          {isWeb && !isMobile && (
-            <TouchableOpacity
-              onPress={() => setCollapsed(!collapsed)}
-              style={[
-                styles.collapseButton,
-                collapsed && styles.collapseButtonCollapsed,
-              ]}
-              activeOpacity={0.8}
-            >
-              <Animated.View
-                style={{
-                  transform: [
-                    {
-                      rotate: sidebarAnim.interpolate({
-                        inputRange: [collapsedWidth, fullWidth],
-                        outputRange: ['180deg', '0deg'],
-                      }),
-                    },
-                  ],
-                }}
-              >
-                <Ionicons
-                  name='chevron-back'
-                  size={18}
-                  color={colors.sidebar.text.muted}
-                />
-              </Animated.View>
-            </TouchableOpacity>
-          )}
-
-          {/* Logo Section */}
-          <Animated.View
-            style={[
-              styles.logoSection,
-              collapsed && styles.logoSectionCollapsed,
-              { opacity: contentOpacity },
-            ]}
-          >
-            <View style={styles.logoWrapper}>
-              <View
+        <LinearGradient
+          colors={sidebarGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.sidebarGradient}
+        >
+          <View style={styles.sidebarContent}>
+            {isWeb && !isMobile && (
+              <TouchableOpacity
+                onPress={() => setCollapsed(!collapsed)}
                 style={[
-                  styles.logoBackground,
+                  styles.collapseButton,
+                  collapsed && styles.collapseButtonCollapsed,
+                ]}
+                activeOpacity={0.8}
+              >
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        rotate: sidebarAnim.interpolate({
+                          inputRange: [collapsedWidth, fullWidth],
+                          outputRange: ['180deg', '0deg'],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Ionicons name='chevron-back' size={18} color='#94a3b8' />
+                </Animated.View>
+              </TouchableOpacity>
+            )}
+
+            {/* Logo Section */}
+            <Animated.View
+              style={[
+                styles.logoSection,
+                collapsed && styles.logoSectionCollapsed,
+                { opacity: contentOpacity },
+              ]}
+            >
+              <View style={styles.logoWrapper}>
+                <View
+                  style={[
+                    styles.logoBackground,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(255,255,255,0.1)'
+                        : '#F1F5F9',
+                    },
+                  ]}
+                >
+                  <Image
+                    source={require('../../assets/images/Logo/V_1.0.1.png')}
+                    style={[
+                      styles.logoImage,
+                      collapsed
+                        ? { width: 30, height: 30 }
+                        : { width: 40, height: 40, borderRadius: 20 },
+                    ]}
+                    resizeMode='contain'
+                  />
+                </View>
+              </View>
+              {!collapsed && (
+                <View style={styles.adminInfo}>
+                  <Text style={[styles.adminTitle, { color: '#ffffff' }]}>
+                    Admin Panel
+                  </Text>
+                  <Text style={[styles.adminSubtitle, { color: '#cbd5e1' }]}>
+                    TMC Campus Hub
+                  </Text>
+                  <View style={styles.statusContainer}>
+                    <View
+                      style={[styles.statusDot, { backgroundColor: '#10B981' }]}
+                    />
+                    <Text style={[styles.statusText, { color: '#10B981' }]}>
+                      {userData?.role === 'main_admin'
+                        ? 'Main Admin'
+                        : 'Assistant Admin'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </Animated.View>
+
+            {/* Quick Stats with animation */}
+            {isWeb && !collapsed && (
+              <Animated.View
+                style={[
+                  styles.quickStats,
                   {
                     backgroundColor: isDark
-                      ? 'rgba(255,255,255,0.1)'
-                      : '#F1F5F9',
+                      ? 'rgba(255,255,255,0.05)'
+                      : 'rgba(0,0,0,0.03)',
+                    opacity: contentOpacity,
+                    transform: [
+                      {
+                        scale: contentOpacity.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.8, 1],
+                        }),
+                      },
+                    ],
                   },
                 ]}
               >
-                <Image
-                  source={require('../../assets/images/Logo/V_1.0.1.png')}
-                  style={[
-                    styles.logoImage,
-                    collapsed
-                      ? { width: 30, height: 30 }
-                      : { width: 40, height: 40, borderRadius: 20 },
-                  ]}
-                  resizeMode='contain'
-                />
-              </View>
-            </View>
-            {!collapsed && (
-              <View style={styles.adminInfo}>
-                <Text
-                  style={[
-                    styles.adminTitle,
-                    { color: colors.sidebar.text.primary },
-                  ]}
-                >
-                  Admin Panel
-                </Text>
-                <Text
-                  style={[
-                    styles.adminSubtitle,
-                    { color: colors.sidebar.text.secondary },
-                  ]}
-                >
-                  TMC Campus Hub
-                </Text>
-                <View style={styles.statusContainer}>
-                  <View
-                    style={[styles.statusDot, { backgroundColor: '#10B981' }]}
-                  />
-                  <Text style={[styles.statusText, { color: '#10B981' }]}>
-                    {userData?.role === 'main_admin'
-                      ? 'Main Admin'
-                      : 'Assistant Admin'}
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: '#ffffff' }]}>
+                    {userStats.newThisWeek}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: '#94a3b8' }]}>
+                    New this week
                   </Text>
                 </View>
-              </View>
+                <View
+                  style={[
+                    styles.statDivider,
+                    { backgroundColor: 'rgba(255,255,255,0.1)' },
+                  ]}
+                />
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: '#ffffff' }]}>
+                    {userStats.total}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: '#94a3b8' }]}>
+                    Total users
+                  </Text>
+                </View>
+              </Animated.View>
             )}
-          </Animated.View>
 
-          {/* Quick Stats with animation */}
-          {isWeb && !collapsed && (
-            <Animated.View
-              style={[
-                styles.quickStats,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(255,255,255,0.05)'
-                    : 'rgba(0,0,0,0.03)',
-                  opacity: contentOpacity,
-                  transform: [
-                    {
-                      scale: contentOpacity.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.8, 1],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <View style={styles.statItem}>
-                <Text
-                  style={[
-                    styles.statValue,
-                    { color: colors.sidebar.text.primary },
-                  ]}
-                >
-                  {userStats.newThisWeek}
-                </Text>
-                <Text
-                  style={[
-                    styles.statLabel,
-                    { color: colors.sidebar.text.secondary },
-                  ]}
-                >
-                  New this week
-                </Text>
-              </View>
-              <View
+            {/* Role Breakdown with animation */}
+            {isWeb && !collapsed && userStats.total > 0 && (
+              <Animated.View
                 style={[
-                  styles.statDivider,
-                  { backgroundColor: colors.sidebar.border },
+                  styles.roleBreakdown,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.03)'
+                      : 'rgba(0,0,0,0.02)',
+                    opacity: contentOpacity,
+                  },
                 ]}
-              />
-              <View style={styles.statItem}>
-                <Text
-                  style={[
-                    styles.statValue,
-                    { color: colors.sidebar.text.primary },
-                  ]}
-                >
-                  {userStats.total}
-                </Text>
-                <Text
-                  style={[
-                    styles.statLabel,
-                    { color: colors.sidebar.text.secondary },
-                  ]}
-                >
-                  Total users
-                </Text>
-              </View>
-            </Animated.View>
-          )}
+              >
+                <View style={styles.roleItem}>
+                  <View
+                    style={[styles.roleDot, { backgroundColor: '#3B82F6' }]}
+                  />
+                  <Text style={[styles.roleText, { color: '#cbd5e1' }]}>
+                    Main Admin: {userStats.mainAdmins}
+                  </Text>
+                </View>
+                <View style={styles.roleItem}>
+                  <View
+                    style={[styles.roleDot, { backgroundColor: '#10B981' }]}
+                  />
+                  <Text style={[styles.roleText, { color: '#cbd5e1' }]}>
+                    Asst. Admin: {userStats.assistantAdmins}
+                  </Text>
+                </View>
+                <View style={styles.roleItem}>
+                  <View
+                    style={[styles.roleDot, { backgroundColor: '#F59E0B' }]}
+                  />
+                  <Text style={[styles.roleText, { color: '#cbd5e1' }]}>
+                    Students: {userStats.students}
+                  </Text>
+                </View>
+              </Animated.View>
+            )}
 
-          {/* Role Breakdown with animation */}
-          {isWeb && !collapsed && userStats.total > 0 && (
-            <Animated.View
-              style={[
-                styles.roleBreakdown,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(255,255,255,0.03)'
-                    : 'rgba(0,0,0,0.02)',
-                  opacity: contentOpacity,
-                },
-              ]}
-            >
-              <View style={styles.roleItem}>
-                <View
-                  style={[styles.roleDot, { backgroundColor: '#3B82F6' }]}
-                />
-                <Text
-                  style={[
-                    styles.roleText,
-                    { color: colors.sidebar.text.secondary },
-                  ]}
-                >
-                  Main Admin: {userStats.mainAdmins}
-                </Text>
-              </View>
-              <View style={styles.roleItem}>
-                <View
-                  style={[styles.roleDot, { backgroundColor: '#10B981' }]}
-                />
-                <Text
-                  style={[
-                    styles.roleText,
-                    { color: colors.sidebar.text.secondary },
-                  ]}
-                >
-                  Asst. Admin: {userStats.assistantAdmins}
-                </Text>
-              </View>
-              <View style={styles.roleItem}>
-                <View
-                  style={[styles.roleDot, { backgroundColor: '#F59E0B' }]}
-                />
-                <Text
-                  style={[
-                    styles.roleText,
-                    { color: colors.sidebar.text.secondary },
-                  ]}
-                >
-                  Students: {userStats.students}
-                </Text>
-              </View>
-            </Animated.View>
-          )}
-
-          {/* Navigation Items with hover & active effects */}
-          <View style={styles.navItems}>
-            {menuItems.map((item, index) => {
-              const isActive = isRouteActive(item.route)
-              return (
-                <TouchableOpacity
-                  key={item.name}
-                  style={[
-                    styles.navItem,
-                    collapsed && styles.navItemCollapsed,
-                    isActive && [
-                      styles.activeNavItem,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(59, 130, 246, 0.15)'
-                          : 'rgba(59, 130, 246, 0.1)',
-                        borderLeftColor: colors.accent.primary,
-                      },
-                    ],
-                  ]}
-                  onPress={() => handleNavigation(item.route)}
-                  activeOpacity={0.7}
-                  {...(isWeb
-                    ? {
-                        onMouseEnter: (e: any) => {
-                          e.currentTarget.style.transform = 'scale(1.02)'
-                          e.currentTarget.style.backgroundColor = isDark
-                            ? 'rgba(255,255,255,0.05)'
-                            : 'rgba(0,0,0,0.03)'
-                        },
-                        onMouseLeave: (e: any) => {
-                          e.currentTarget.style.transform = 'scale(1)'
-                          e.currentTarget.style.backgroundColor = isActive
-                            ? isDark
-                              ? 'rgba(59, 130, 246, 0.15)'
-                              : 'rgba(59, 130, 246, 0.1)'
-                            : 'transparent'
-                        },
-                      }
-                    : {})}
-                >
-                  <Animated.View
+            {/* Navigation Items with hover & active effects */}
+            <View style={styles.navItems}>
+              {menuItems.map((item, index) => {
+                const isActive = isRouteActive(item.route)
+                return (
+                  <TouchableOpacity
+                    key={item.name}
                     style={[
-                      styles.navIconWrapper,
-                      collapsed && styles.navIconWrapperCollapsed,
-                      {
-                        transform: [
-                          {
-                            scale: isActive ? 1.1 : 1,
-                          },
-                        ],
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={item.icon}
-                      size={collapsed ? 24 : 20}
-                      color={
-                        isActive
-                          ? colors.accent.primary
-                          : colors.sidebar.icon.inactive
-                      }
-                    />
-                  </Animated.View>
-                  {!collapsed && (
-                    <Animated.Text
-                      style={[
-                        styles.navText,
+                      styles.navItem,
+                      collapsed && styles.navItemCollapsed,
+                      isActive && [
+                        styles.activeNavItem,
                         {
-                          color: isActive
-                            ? colors.accent.primary
-                            : colors.sidebar.text.secondary,
+                          backgroundColor: isDark
+                            ? 'rgba(59, 130, 246, 0.15)'
+                            : 'rgba(59, 130, 246, 0.1)',
+                          borderLeftColor: colors.accent.primary,
                         },
-                        { opacity: contentOpacity },
+                      ],
+                    ]}
+                    onPress={() => handleNavigation(item.route)}
+                    activeOpacity={0.7}
+                    {...(isWeb
+                      ? {
+                          onMouseEnter: (e: any) => {
+                            e.currentTarget.style.transform = 'scale(1.02)'
+                            e.currentTarget.style.backgroundColor = isDark
+                              ? 'rgba(255,255,255,0.05)'
+                              : 'rgba(0,0,0,0.03)'
+                          },
+                          onMouseLeave: (e: any) => {
+                            e.currentTarget.style.transform = 'scale(1)'
+                            e.currentTarget.style.backgroundColor = isActive
+                              ? isDark
+                                ? 'rgba(59, 130, 246, 0.15)'
+                                : 'rgba(59, 130, 246, 0.1)'
+                              : 'transparent'
+                          },
+                        }
+                      : {})}
+                  >
+                    <Animated.View
+                      style={[
+                        styles.navIconWrapper,
+                        collapsed && styles.navIconWrapperCollapsed,
+                        {
+                          transform: [
+                            {
+                              scale: isActive ? 1.1 : 1,
+                            },
+                          ],
+                        },
                       ]}
                     >
-                      {item.title}
-                    </Animated.Text>
-                  )}
-                  {isActive && !collapsed && (
-                    <View
-                      style={[
-                        styles.activeIndicator,
-                        { backgroundColor: colors.accent.primary },
-                      ]}
-                    />
-                  )}
-                </TouchableOpacity>
-              )
-            })}
-          </View>
+                      <Ionicons
+                        name={item.icon}
+                        size={collapsed ? 24 : 20}
+                        color={
+                          isActive
+                            ? colors.accent.primary
+                            : colors.sidebar.icon.inactive
+                        }
+                      />
+                    </Animated.View>
+                    {!collapsed && (
+                      <Animated.Text
+                        style={[
+                          styles.navText,
+                          {
+                            color: isActive ? colors.accent.primary : '#cbd5e1',
+                          },
+                          { opacity: contentOpacity },
+                        ]}
+                      >
+                        {item.title}
+                      </Animated.Text>
+                    )}
+                    {isActive && !collapsed && (
+                      <View
+                        style={[
+                          styles.activeIndicator,
+                          { backgroundColor: colors.accent.primary },
+                        ]}
+                      />
+                    )}
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
 
-          {/* Bottom Section */}
-          <Animated.View
-            style={[
-              styles.sidebarFooter,
-              {
-                borderTopColor: colors.sidebar.border,
-                opacity: contentOpacity,
-              },
-            ]}
-          >
-            <TouchableOpacity
-              style={[styles.navItem, collapsed && styles.navItemCollapsed]}
-              onPress={() => setSettingsModalVisible(true)}
+            {/* Bottom Section */}
+            <Animated.View
+              style={[
+                styles.sidebarFooter,
+                {
+                  borderTopColor: 'rgba(255,255,255,0.1)',
+                  opacity: contentOpacity,
+                },
+              ]}
             >
-              <View
-                style={[
-                  styles.navIconWrapper,
-                  collapsed && styles.navIconWrapperCollapsed,
-                ]}
+              <TouchableOpacity
+                style={[styles.navItem, collapsed && styles.navItemCollapsed]}
+                onPress={() => setSettingsModalVisible(true)}
               >
-                <Ionicons
-                  name='settings-outline'
-                  size={collapsed ? 24 : 20}
-                  color={colors.sidebar.icon.inactive}
-                />
-              </View>
-              {!collapsed && (
-                <Text
+                <View
                   style={[
-                    styles.navText,
-                    { color: colors.sidebar.text.secondary },
+                    styles.navIconWrapper,
+                    collapsed && styles.navIconWrapperCollapsed,
                   ]}
                 >
-                  Settings
-                </Text>
-              )}
-            </TouchableOpacity>
+                  <Ionicons
+                    name='settings-outline'
+                    size={collapsed ? 24 : 20}
+                    color={colors.sidebar.icon.inactive}
+                  />
+                </View>
+                {!collapsed && (
+                  <Text style={[styles.navText, { color: '#cbd5e1' }]}>
+                    Settings
+                  </Text>
+                )}
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.navItem,
-                styles.logoutButton,
-                collapsed && styles.navItemCollapsed,
-              ]}
-              onPress={() => router.replace('/super-admin-login' as Href)}
-            >
-              <View
+              <TouchableOpacity
                 style={[
-                  styles.navIconWrapper,
-                  collapsed && styles.navIconWrapperCollapsed,
+                  styles.navItem,
+                  styles.logoutButton,
+                  collapsed && styles.navItemCollapsed,
                 ]}
+                onPress={() => router.replace('/super-admin-login' as Href)}
               >
-                <Ionicons
-                  name='log-out-outline'
-                  size={collapsed ? 24 : 20}
-                  color='#EF4444'
-                />
-              </View>
-              {!collapsed && (
-                <Text style={[styles.navText, styles.logoutText]}>Logout</Text>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
+                <View
+                  style={[
+                    styles.navIconWrapper,
+                    collapsed && styles.navIconWrapperCollapsed,
+                  ]}
+                >
+                  <Ionicons
+                    name='log-out-outline'
+                    size={collapsed ? 24 : 20}
+                    color='#EF4444'
+                  />
+                </View>
+                {!collapsed && (
+                  <Text style={[styles.navText, styles.logoutText]}>
+                    Logout
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        </LinearGradient>
       </Animated.View>
     )
   }
@@ -670,13 +616,22 @@ export default function MainAdminLayout() {
         </Animated.View>
       )}
 
-      {/* Main Layout with animated margin */}
       <Animated.View
         style={[styles.mainContent, isWeb && { marginLeft: mainMarginLeft }]}
       >
         {isWeb && <Sidebar />}
 
-        <View style={styles.tabsContainer}>
+        <LinearGradient
+          colors={
+            isDark
+              ? ['#0a1628', '#0f2456', '#1a3a8f']
+              : ['#0f2456', '#1a3a8f', '#1e53c8']
+          }
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.tabsGradientBackground}
+        >
           <Tabs
             initialRouteName='index'
             screenOptions={{
@@ -782,7 +737,7 @@ export default function MainAdminLayout() {
               }}
             />
           </Tabs>
-        </View>
+        </LinearGradient>
       </Animated.View>
       {/* Settings Modal */}
       <Modal
@@ -812,7 +767,6 @@ export default function MainAdminLayout() {
               { borderColor: 'rgba(255,255,255,0.3)' },
             ]}
           >
-            {/* Vibrant gradient header */}
             <LinearGradient
               colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
               start={{ x: 0, y: 0 }}
@@ -1012,6 +966,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
     zIndex: 10,
+    overflow: 'hidden',
   },
   sidebarContent: { flex: 1, paddingVertical: 20 },
   collapseButton: {
@@ -1278,5 +1233,13 @@ const styles = StyleSheet.create({
   modalThemeOptionText: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  tabsGradientBackground: {
+    flex: 1,
+  },
+  sidebarGradient: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
 })

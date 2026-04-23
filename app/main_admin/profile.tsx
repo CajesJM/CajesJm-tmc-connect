@@ -1,25 +1,41 @@
-// MainAdminProfile.tsx
 import { Feather } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+} from 'firebase/auth'
 import { collection, doc, getDocs, updateDoc } from 'firebase/firestore'
-import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage'
-import React, { useEffect, useMemo, useState } from 'react'
+import {
+  deleteObject,
+  getDownloadURL,
+  getStorage,
+  listAll,
+  ref,
+  uploadBytes,
+} from 'firebase/storage'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Clipboard,
+  Easing,
   Image,
+  Modal,
   Platform,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native'
 import { useAuth } from '../../src/Controller/context/AuthContext'
 import { useTheme } from '../../src/Controller/context/ThemeContext'
-import { db } from '../../src/Model/lib/firebaseConfig'
+import { auth, db } from '../../src/Model/lib/firebaseConfig'
 import { createProfileStyles } from '../../src/View/styles/main-admin/profileStyles'
 
 const showAlert = (title: string, message?: string) => {
@@ -44,10 +60,11 @@ function getInitials(name?: string, email?: string): string {
 }
 
 export default function MainAdminProfile() {
-  const { logout, userData } = useAuth()
+  const { logout, userData, refreshUserData } = useAuth()
   const router = useRouter()
-  const { colors, isDark } = useTheme()
+  const { colors, isDark, toggleTheme } = useTheme()
   const { width } = useWindowDimensions()
+  const isMobile = width < 768
 
   const styles = useMemo(
     () => createProfileStyles(colors, isDark),
@@ -58,6 +75,8 @@ export default function MainAdminProfile() {
     userData?.photoURL ?? null
   )
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [showImageViewer, setShowImageViewer] = useState(false)
 
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -81,6 +100,157 @@ export default function MainAdminProfile() {
     pendingPenalties: 0,
   })
   const [loadingStats, setLoadingStats] = useState(true)
+
+  const [isThemeToggling, setIsThemeToggling] = useState(false)
+  const themeSpinAnim = useRef(new Animated.Value(0)).current
+
+  const handleThemeToggle = () => {
+    if (isThemeToggling) return
+
+    setIsThemeToggling(true)
+    themeSpinAnim.setValue(0)
+
+    Animated.timing(themeSpinAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsThemeToggling(false)
+    })
+
+    toggleTheme()
+  }
+
+  // Change Password State
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordStrength, setPasswordStrength] = useState<{
+    score: number
+    label: string
+    color: string
+  }>({ score: 0, label: 'Weak', color: '#EF4444' })
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const calculatePasswordStrength = (password: string) => {
+    let score = 0
+    if (password.length >= 8) score++
+    if (/[A-Z]/.test(password)) score++
+    if (/[a-z]/.test(password)) score++
+    if (/[0-9]/.test(password)) score++
+    if (/[^A-Za-z0-9]/.test(password)) score++
+
+    let label = 'Weak'
+    let color = '#EF4444'
+    if (score >= 4) {
+      label = 'Strong'
+      color = '#10B981'
+    } else if (score >= 3) {
+      label = 'Good'
+      color = '#3B82F6'
+    } else if (score >= 2) {
+      label = 'Fair'
+      color = '#F59E0B'
+    }
+
+    setPasswordStrength({ score, label, color })
+  }
+
+  const isChangePasswordFormValid = () => {
+    if (!currentPassword.trim()) return false
+    if (!newPassword.trim() || passwordStrength.score < 3) return false
+    if (newPassword !== confirmPassword) return false
+    return true
+  }
+  const copyToClipboard = async (text: string, label: string = 'Email') => {
+    try {
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(text)
+      } else {
+        Clipboard.setString(text)
+      }
+      showAlert('Copied!', `${label} copied to clipboard.`)
+    } catch (err) {
+      showAlert('Error', 'Failed to copy. Please try again.')
+    }
+  }
+
+  const resetChangePasswordForm = () => {
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setPasswordError(null)
+    setPasswordStrength({ score: 0, label: 'Weak', color: '#EF4444' })
+    setShowCurrentPassword(false)
+    setShowNewPassword(false)
+    setShowConfirmPassword(false)
+  }
+
+  const handleChangePassword = async () => {
+    setPasswordError(null)
+
+    if (!isChangePasswordFormValid()) {
+      setPasswordError('Please fill all fields correctly.')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirmation do not match.')
+      return
+    }
+
+    const currentUser = auth.currentUser
+    if (!currentUser || !currentUser.email) {
+      setPasswordError('User not authenticated.')
+      return
+    }
+
+    setIsUpdatingPassword(true)
+
+    try {
+      const credential = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
+      )
+      await reauthenticateWithCredential(currentUser, credential)
+      await updatePassword(currentUser, newPassword)
+
+      Alert.alert('Success', 'Your password has been updated successfully.')
+      setShowChangePasswordModal(false)
+      resetChangePasswordForm()
+    } catch (error: any) {
+      console.error('Password change error:', error)
+      if (
+        error.code === 'auth/wrong-password' ||
+        error.code === 'auth/invalid-credential'
+      ) {
+        setPasswordError('Current password is incorrect.')
+      } else if (error.code === 'auth/weak-password') {
+        setPasswordError(
+          'New password is too weak. Please choose a stronger password.'
+        )
+      } else if (error.code === 'auth/too-many-requests') {
+        setPasswordError('Too many attempts. Please try again later.')
+      } else {
+        setPasswordError('Failed to update password. Please try again.')
+      }
+    } finally {
+      setIsUpdatingPassword(false)
+    }
+  }
+
+  const contentApprovalRate = useMemo(() => {
+    const totalContent = stats.totalEvents + stats.totalAnnouncements
+    const approvedContent = stats.combinedApproved
+    if (totalContent === 0) return 0
+    return Math.round((approvedContent / totalContent) * 100)
+  }, [stats])
 
   useEffect(() => {
     if (userData?.photoURL) setPhotoURL(userData.photoURL)
@@ -225,6 +395,231 @@ export default function MainAdminProfile() {
     router.replace('/login')
   }
 
+  const renderChangePasswordModal = () => (
+    <Modal
+      visible={showChangePasswordModal}
+      transparent
+      animationType='slide'
+      onRequestClose={() => {
+        setShowChangePasswordModal(false)
+        resetChangePasswordForm()
+      }}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              Change Password
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setShowChangePasswordModal(false)
+                resetChangePasswordForm()
+              }}
+            >
+              <Feather name='x' size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={{ padding: 16 }}>
+              {/* Current Password */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  Current Password *
+                </Text>
+                <View
+                  style={[
+                    styles.passwordInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.passwordInput, { color: colors.text }]}
+                    placeholder='Enter current password'
+                    placeholderTextColor={colors.textSecondary}
+                    secureTextEntry={!showCurrentPassword}
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    editable={!isUpdatingPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                  >
+                    <Feather
+                      name={showCurrentPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* New Password */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  New Password *
+                </Text>
+                <View
+                  style={[
+                    styles.passwordInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.passwordInput, { color: colors.text }]}
+                    placeholder='Enter new password'
+                    placeholderTextColor={colors.textSecondary}
+                    secureTextEntry={!showNewPassword}
+                    value={newPassword}
+                    onChangeText={(text) => {
+                      setNewPassword(text)
+                      calculatePasswordStrength(text)
+                    }}
+                    editable={!isUpdatingPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    <Feather
+                      name={showNewPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {newPassword.length > 0 && (
+                  <View style={{ marginTop: 8 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 4,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: colors.textSecondary,
+                          fontSize: 12,
+                          marginRight: 8,
+                        }}
+                      >
+                        Strength:
+                      </Text>
+                      <Text
+                        style={{
+                          color: passwordStrength.color,
+                          fontSize: 12,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {passwordStrength.label}
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        height: 4,
+                        backgroundColor: colors.border,
+                        borderRadius: 2,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: `${(passwordStrength.score / 5) * 100}%`,
+                          height: '100%',
+                          backgroundColor: passwordStrength.color,
+                          borderRadius: 2,
+                        }}
+                      />
+                    </View>
+                    <Text
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: 10,
+                        marginTop: 4,
+                      }}
+                    >
+                      Use at least 8 characters with uppercase, lowercase,
+                      number, and symbol.
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Confirm Password */}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.text }]}>
+                  Confirm New Password *
+                </Text>
+                <View
+                  style={[
+                    styles.passwordInputContainer,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <TextInput
+                    style={[styles.passwordInput, { color: colors.text }]}
+                    placeholder='Confirm new password'
+                    placeholderTextColor={colors.textSecondary}
+                    secureTextEntry={!showConfirmPassword}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    editable={!isUpdatingPassword}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    <Feather
+                      name={showConfirmPassword ? 'eye-off' : 'eye'}
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {confirmPassword.length > 0 &&
+                  newPassword !== confirmPassword && (
+                    <Text
+                      style={{ color: '#EF4444', fontSize: 12, marginTop: 4 }}
+                    >
+                      Passwords do not match.
+                    </Text>
+                  )}
+              </View>
+
+              {passwordError && (
+                <View style={styles.errorBanner}>
+                  <Feather name='alert-circle' size={16} color='#EF4444' />
+                  <Text style={styles.errorText}>{passwordError}</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.submitButton,
+                  {
+                    backgroundColor:
+                      isChangePasswordFormValid() && !isUpdatingPassword
+                        ? colors.accent.primary
+                        : colors.border,
+                    marginTop: 24,
+                  },
+                ]}
+                onPress={handleChangePassword}
+                disabled={!isChangePasswordFormValid() || isUpdatingPassword}
+              >
+                {isUpdatingPassword ? (
+                  <ActivityIndicator size='small' color='#FFFFFF' />
+                ) : (
+                  <Text style={styles.submitButtonText}>Update Password</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  )
+
   const handlePickImage = async () => {
     try {
       if (Platform.OS === 'web') {
@@ -272,12 +667,18 @@ export default function MainAdminProfile() {
         blob = await res.blob()
       }
       const storage = getStorage()
-      const fileName = `profile_${userData.email}_${Date.now()}.jpg`
+      const currentUser = auth.currentUser
+      if (!currentUser) throw new Error('No authenticated user')
+
+      const fileName = `profile_${currentUser.uid}.jpg`
       const storageRef = ref(storage, `profileImages/${fileName}`)
       await uploadBytes(storageRef, blob)
       const downloadUrl = await getDownloadURL(storageRef)
-      const userRef = doc(db, 'users', userData.email)
+
+      const userRef = doc(db, 'users', currentUser.uid)
       await updateDoc(userRef, { photoURL: downloadUrl })
+      await refreshUserData()
+      await deleteOldProfileImages(currentUser.uid, userData.email)
 
       setPhotoURL(downloadUrl)
       showAlert('Success', 'Profile photo updated!')
@@ -286,6 +687,27 @@ export default function MainAdminProfile() {
       showAlert('Error', 'Failed to upload photo. Please try again.')
     } finally {
       setUploadingImage(false)
+    }
+  }
+
+  const deleteOldProfileImages = async (uid: string, email: string) => {
+    const storage = getStorage()
+    const listRef = ref(storage, 'profileImages')
+    try {
+      const result = await listAll(listRef)
+      const oldFiles = result.items.filter((itemRef) => {
+        const name = itemRef.name
+        // Match old pattern: profile_<email>_<timestamp>.jpg
+        const emailPattern = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const regex = new RegExp(`^profile_${emailPattern}_\\d+\\.jpg$`)
+        return regex.test(name) && name !== `profile_${uid}.jpg`
+      })
+      await Promise.all(oldFiles.map((fileRef) => deleteObject(fileRef)))
+      if (oldFiles.length > 0) {
+        console.log(`Deleted ${oldFiles.length} old profile image(s)`)
+      }
+    } catch (err) {
+      console.warn('Failed to clean up old profile images:', err)
     }
   }
 
@@ -301,10 +723,9 @@ export default function MainAdminProfile() {
     : '—'
 
   const headerGradient = isDark
-    ? (['#0f172a', '#1e293b'] as const)
-    : (['#1e40af', '#3b82f6'] as const)
+    ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
+    : (['#0f2456', '#1a3a8f', '#1e53c8'] as const)
 
-  // Quick actions with enhanced metadata
   const quickActions = [
     {
       label: 'Events',
@@ -353,99 +774,123 @@ export default function MainAdminProfile() {
 
   return (
     <View style={styles.container}>
-      {/* Header Gradient – PRESERVED EXACTLY AS REQUESTED */}
-      <LinearGradient
-        colors={headerGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <View style={styles.headerContent}>
-          <View>
-            <Text
-              style={[
-                styles.greetingText,
-                {
-                  color: isDark
-                    ? 'rgba(148,163,184,0.85)'
-                    : 'rgba(255,255,255,0.75)',
-                },
-              ]}
-            >
-              My Profile
-            </Text>
-            <Text style={styles.userName}>{displayName}</Text>
-            <Text
-              style={[
-                styles.roleText,
-                {
-                  color: isDark
-                    ? 'rgba(148,163,184,0.6)'
-                    : 'rgba(255,255,255,0.65)',
-                },
-              ]}
-            >
-              System Administrator
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={handlePickImage}
-            disabled={uploadingImage}
-            activeOpacity={0.8}
-          >
-            {uploadingImage ? (
-              <View style={[styles.profileImage, styles.profileFallback]}>
-                <ActivityIndicator size='small' color='#ffffff' />
-              </View>
-            ) : photoURL ? (
-              <Image source={{ uri: photoURL }} style={styles.profileImage} />
-            ) : (
-              <View style={[styles.profileImage, styles.profileFallback]}>
-                <Text style={styles.profileInitials}>{initials}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.dateSection}>
-          <View style={styles.dateContainer}>
-            <Text
-              style={[
-                styles.dateText,
-                {
-                  color: isDark
-                    ? colors.sidebar?.text?.muted || '#94a3b8'
-                    : '#ffffff',
-                },
-              ]}
-            >
-              {new Date().toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
-            </Text>
-          </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={[styles.headerAction, styles.logoutHeaderButton]}
-              onPress={handleLogout}
-            >
-              <Feather name='log-out' size={18} color='#ef4444' />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </LinearGradient>
-
-      {/* Enhanced Scrollable Content */}
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        <LinearGradient
+          colors={headerGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={[
+            styles.headerGradient,
+            { marginHorizontal: isMobile ? -12 : -20 },
+          ]}
+        >
+          <View style={styles.headerContent}>
+            <View>
+              <Text
+                style={[
+                  styles.greetingText,
+                  { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+                ]}
+              >
+                Welcome Back,
+              </Text>
+              <Text style={styles.userName}>{displayName}</Text>
+              <Text
+                style={[
+                  styles.roleText,
+                  { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+                ]}
+              >
+                My Profile
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() => setShowProfileMenu(true)}
+              disabled={uploadingImage}
+            >
+              {uploadingImage ? (
+                <View style={[styles.profileImage, styles.profileFallback]}>
+                  <ActivityIndicator size='small' color='#ffffff' />
+                </View>
+              ) : photoURL ? (
+                <Image source={{ uri: photoURL }} style={styles.profileImage} />
+              ) : (
+                <View style={[styles.profileImage, styles.profileFallback]}>
+                  <Text style={styles.profileInitials}>{initials}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.dateSection}>
+            <View style={styles.dateContainer}>
+              <Text style={styles.dateText}>
+                {new Date().toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </Text>
+            </View>
+            <View style={styles.headerActions}>
+              {/* Theme Toggle Button */}
+              <TouchableOpacity
+                style={styles.headerAction}
+                onPress={handleThemeToggle}
+                disabled={isThemeToggling}
+                activeOpacity={0.75}
+              >
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        rotate: themeSpinAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '360deg'],
+                        }),
+                      },
+                      {
+                        scale: themeSpinAnim.interpolate({
+                          inputRange: [0, 0.5, 1],
+                          outputRange: [1, 1.2, 1],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Feather
+                    name={isDark ? 'sun' : 'moon'}
+                    size={18}
+                    color='#ffffff'
+                  />
+                </Animated.View>
+              </TouchableOpacity>
+
+              {/* Change Password Button */}
+              <TouchableOpacity
+                style={styles.headerAction}
+                onPress={() => setShowChangePasswordModal(true)}
+              >
+                <Feather name='lock' size={18} color={colors.accent.primary} />
+              </TouchableOpacity>
+
+              {/* Logout Button */}
+              <TouchableOpacity
+                style={[styles.headerAction, styles.logoutHeaderButton]}
+                onPress={handleLogout}
+              >
+                <Feather name='log-out' size={18} color='#ef4444' />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </LinearGradient>
         {/* Profile Hero Card */}
         <View style={styles.heroCard}>
           <View style={styles.heroCardContent}>
@@ -666,7 +1111,8 @@ export default function MainAdminProfile() {
               },
               {
                 label: 'Username',
-                value: userData?.email?.split('@')[0] || '—',
+                value:
+                  userData?.username || userData?.email?.split('@')[0] || '—',
                 icon: 'at-sign',
               },
               { label: 'Member Since', value: memberSince, icon: 'calendar' },
@@ -710,7 +1156,10 @@ export default function MainAdminProfile() {
                     {item.value}
                   </Text>
                   {item.copyable && (
-                    <TouchableOpacity style={styles.copyButton}>
+                    <TouchableOpacity
+                      style={styles.copyButton}
+                      onPress={() => copyToClipboard(item.value, item.label)}
+                    >
                       <Feather
                         name='copy'
                         size={14}
@@ -749,161 +1198,176 @@ export default function MainAdminProfile() {
           <View style={styles.analyticsContent}>
             {/* Top Metrics */}
             <View style={styles.metricsRow}>
-              {/* Attendance Card */}
-              <View style={[styles.metricCard, styles.metricCardLarge]}>
+              {/* Attendance Card with green gradient */}
+              <LinearGradient
+                colors={['#10b981', '#059669']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.metricCard, styles.metricCardLarge]}
+              >
                 <View style={styles.metricHeader}>
                   <View
                     style={[
                       styles.metricIconBox,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(16,185,129,0.15)'
-                          : '#d1fae5',
-                      },
+                      { backgroundColor: 'rgba(255,255,255,0.2)' },
                     ]}
                   >
-                    <Feather name='check-square' size={18} color='#10b981' />
+                    <Feather name='check-square' size={18} color='#ffffff' />
                   </View>
                   <View
                     style={[
                       styles.metricTrend,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(16,185,129,0.15)'
-                          : '#d1fae5',
-                      },
+                      { backgroundColor: 'rgba(255,255,255,0.2)' },
                     ]}
                   >
-                    <Feather name='trending-up' size={12} color='#10b981' />
+                    <Feather name='trending-up' size={12} color='#ffffff' />
                     <Text
-                      style={[styles.metricTrendText, { color: '#10b981' }]}
+                      style={[styles.metricTrendText, { color: '#ffffff' }]}
                     >
-                      +12%
+                      {attendanceRate}%
                     </Text>
                   </View>
                 </View>
                 <View style={styles.metricBody}>
                   {loadingStats ? (
-                    <ActivityIndicator color='#10b981' />
+                    <ActivityIndicator color='#ffffff' />
                   ) : (
-                    <Text style={styles.metricValue}>
+                    <Text style={[styles.metricValue, { color: '#ffffff' }]}>
                       {stats.totalAttendance}
                     </Text>
                   )}
-                  <Text style={styles.metricLabel}>Total Attendance</Text>
+                  <Text style={[styles.metricLabel, { color: '#ffffffcc' }]}>
+                    Total Attendance
+                  </Text>
                 </View>
                 <View style={styles.metricFooter}>
                   <View style={styles.metricBar}>
                     <View
                       style={[
                         styles.metricBarFill,
-                        { width: '75%', backgroundColor: '#10b981' },
+                        {
+                          width: `${attendanceRate}%`,
+                          backgroundColor: '#ffffffcc',
+                        },
                       ]}
                     />
                   </View>
                 </View>
-              </View>
+              </LinearGradient>
 
-              {/* Posts Card */}
-              <View style={[styles.metricCard, styles.metricCardLarge]}>
+              {/* Posts Card with orange/yellow gradient */}
+              <LinearGradient
+                colors={['#f59e0b', '#d97706']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.metricCard, styles.metricCardLarge]}
+              >
                 <View style={styles.metricHeader}>
                   <View
                     style={[
                       styles.metricIconBox,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(245,158,11,0.15)'
-                          : '#fef3c7',
-                      },
+                      { backgroundColor: 'rgba(255,255,255,0.2)' },
                     ]}
                   >
-                    <Feather name='bell' size={18} color='#f59e0b' />
+                    <Feather name='bell' size={18} color='#ffffff' />
                   </View>
                   <View
                     style={[
                       styles.metricTrend,
-                      {
-                        backgroundColor: isDark
-                          ? 'rgba(245,158,11,0.15)'
-                          : '#fef3c7',
-                      },
+                      { backgroundColor: 'rgba(255,255,255,0.2)' },
                     ]}
                   >
-                    <Feather name='trending-up' size={12} color='#f59e0b' />
+                    <Feather name='trending-up' size={12} color='#ffffff' />
                     <Text
-                      style={[styles.metricTrendText, { color: '#f59e0b' }]}
+                      style={[styles.metricTrendText, { color: '#ffffff' }]}
                     >
-                      +5%
+                      {contentApprovalRate}%
                     </Text>
                   </View>
                 </View>
                 <View style={styles.metricBody}>
                   {loadingStats ? (
-                    <ActivityIndicator color='#f59e0b' />
+                    <ActivityIndicator color='#ffffff' />
                   ) : (
-                    <Text style={styles.metricValue}>
+                    <Text style={[styles.metricValue, { color: '#ffffff' }]}>
                       {stats.totalEvents + stats.totalAnnouncements}
                     </Text>
                   )}
-                  <Text style={styles.metricLabel}>Total Posts</Text>
+                  <Text style={[styles.metricLabel, { color: '#ffffffcc' }]}>
+                    Total Posts
+                  </Text>
                 </View>
                 <View style={styles.metricFooter}>
                   <View style={styles.metricBar}>
                     <View
                       style={[
                         styles.metricBarFill,
-                        { width: '60%', backgroundColor: '#f59e0b' },
+                        {
+                          width: `${contentApprovalRate}%`,
+                          backgroundColor: '#ffffffcc',
+                        },
                       ]}
                     />
                   </View>
                 </View>
-              </View>
+              </LinearGradient>
             </View>
 
             {/* Status Breakdown */}
             <View style={styles.statusGrid}>
-              {[
-                {
-                  label: 'Approved',
-                  value: stats.combinedApproved,
-                  color: '#10b981',
-                  icon: 'check-circle',
-                },
-                {
-                  label: 'Pending',
-                  value: stats.combinedPending,
-                  color: '#f59e0b',
-                  icon: 'clock',
-                },
-                {
-                  label: 'Rejected',
-                  value: stats.combinedRejected,
-                  color: '#ef4444',
-                  icon: 'x-circle',
-                },
-              ].map((status) => (
-                <View
-                  key={status.label}
-                  style={[
-                    styles.statusItem,
-                    { backgroundColor: `${status.color}10` },
-                  ]}
-                >
-                  <View style={styles.statusHeader}>
-                    <Feather
-                      name={status.icon as any}
-                      size={14}
-                      color={status.color}
-                    />
-                    <Text style={[styles.statusValue, { color: status.color }]}>
-                      {loadingStats ? '—' : status.value}
-                    </Text>
-                  </View>
-                  <Text style={[styles.statusLabel, { color: status.color }]}>
-                    {status.label}
+              {/* Approved */}
+              <LinearGradient
+                colors={['#10b981', '#059669']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.statusItem, { backgroundColor: 'transparent' }]}
+              >
+                <View style={styles.statusHeader}>
+                  <Feather name='check-circle' size={14} color='#ffffff' />
+                  <Text style={[styles.statusValue, { color: '#ffffff' }]}>
+                    {loadingStats ? '—' : stats.combinedApproved}
                   </Text>
                 </View>
-              ))}
+                <Text style={[styles.statusLabel, { color: '#ffffffcc' }]}>
+                  Approved
+                </Text>
+              </LinearGradient>
+
+              {/* Pending */}
+              <LinearGradient
+                colors={['#f59e0b', '#d97706']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.statusItem, { backgroundColor: 'transparent' }]}
+              >
+                <View style={styles.statusHeader}>
+                  <Feather name='clock' size={14} color='#ffffff' />
+                  <Text style={[styles.statusValue, { color: '#ffffff' }]}>
+                    {loadingStats ? '—' : stats.combinedPending}
+                  </Text>
+                </View>
+                <Text style={[styles.statusLabel, { color: '#ffffffcc' }]}>
+                  Pending
+                </Text>
+              </LinearGradient>
+
+              {/* Rejected */}
+              <LinearGradient
+                colors={['#ef4444', '#b91c1c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.statusItem, { backgroundColor: 'transparent' }]}
+              >
+                <View style={styles.statusHeader}>
+                  <Feather name='x-circle' size={14} color='#ffffff' />
+                  <Text style={[styles.statusValue, { color: '#ffffff' }]}>
+                    {loadingStats ? '—' : stats.combinedRejected}
+                  </Text>
+                </View>
+                <Text style={[styles.statusLabel, { color: '#ffffffcc' }]}>
+                  Rejected
+                </Text>
+              </LinearGradient>
             </View>
 
             {/* User Distribution Chart */}
@@ -1091,10 +1555,85 @@ export default function MainAdminProfile() {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerBrand}>Campus Hub</Text>
+          <Text style={styles.footerBrand}>TMC Connect</Text>
           <Text style={styles.footerVersion}>Administration Panel v2.0</Text>
         </View>
       </ScrollView>
+
+      {renderChangePasswordModal()}
+
+      {/* Profile Menu Modal */}
+      <Modal
+        visible={showProfileMenu}
+        transparent
+        animationType='fade'
+        onRequestClose={() => setShowProfileMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay1}
+          activeOpacity={1}
+          onPress={() => setShowProfileMenu(false)}
+        >
+          <View style={styles.profileMenuContainer}>
+            <TouchableOpacity
+              style={styles.profileMenuItem}
+              onPress={() => {
+                setShowProfileMenu(false)
+                setShowImageViewer(true)
+              }}
+            >
+              <Feather name='eye' size={20} color={colors.text} />
+              <Text style={styles.profileMenuItemText}>View Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.profileMenuItem}
+              onPress={() => {
+                setShowProfileMenu(false)
+                handlePickImage()
+              }}
+            >
+              <Feather name='camera' size={20} color={colors.text} />
+              <Text style={styles.profileMenuItemText}>Change Photo</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Full-screen image viewer */}
+      <Modal
+        visible={showImageViewer}
+        transparent={false}
+        animationType='fade'
+        onRequestClose={() => setShowImageViewer(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 40, right: 20, zIndex: 10 }}
+            onPress={() => setShowImageViewer(false)}
+          >
+            <Feather name='x' size={28} color='#fff' />
+          </TouchableOpacity>
+          <View
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            {photoURL ? (
+              <Image
+                source={{ uri: photoURL }}
+                style={{ width: '90%', height: '90%', resizeMode: 'contain' }}
+              />
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                <Feather name='user' size={80} color='#fff' />
+                <Text style={{ color: '#fff', marginTop: 16 }}>
+                  No profile photo
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {renderChangePasswordModal()}
     </View>
   )
 }

@@ -13,13 +13,22 @@ import {
   updateDoc,
   where,
 } from 'firebase/firestore'
-import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage'
+import {
+  deleteObject,
+  getDownloadURL,
+  getStorage,
+  listAll,
+  ref,
+  uploadBytes,
+} from 'firebase/storage'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Easing,
+  Image,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -42,7 +51,7 @@ import {
   generateDashboardPDF,
   sharePDF,
 } from '../../../src/Controller/utils/pdfGenerator'
-import { db } from '../../../src/Model/lib/firebaseConfig'
+import { auth, db } from '../../../src/Model/lib/firebaseConfig'
 import AutoSlidingStats from '../../../src/View/components/AutoSlidingStats-AssAd'
 import { NotificationModal } from '../../../src/View/components/NotificationModal'
 import { styles } from '../../../src/View/styles/assistant-admin/dashboardStyles'
@@ -1005,8 +1014,6 @@ const ActivityItem = ({
   )
 }
 
-// ─── Quick Action Button ───────────────────────────────────────────────────────
-
 const QuickActionButton = ({
   title,
   icon,
@@ -1098,10 +1105,12 @@ const QuickActionButton = ({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AssistantAdminDashboard() {
+  const [showImageOptions, setShowImageOptions] = useState(false)
+  const [showImageViewer, setShowImageViewer] = useState(false)
   const { width } = useWindowDimensions()
-  const { colors, isDark } = useTheme()
+  const { colors, isDark, toggleTheme } = useTheme()
   const router = useRouter()
-  const { userData } = useAuth()
+  const { userData, refreshUserData } = useAuth()
 
   const isMobile = width < 768
   const isTablet = width >= 768 && width < 1024
@@ -1115,6 +1124,8 @@ export default function AssistantAdminDashboard() {
   const pulseAnim = useRef(new Animated.Value(1)).current
   const rotateAnim = useRef(new Animated.Value(0)).current
   const scaleAnim = useRef(new Animated.Value(0.9)).current
+  const themeSpinAnim = useRef(new Animated.Value(0)).current
+  const [isThemeToggling, setIsThemeToggling] = useState(false)
 
   const [dashboardStats, setDashboardStats] = useState({
     myEvents: 0,
@@ -1249,7 +1260,6 @@ export default function AssistantAdminDashboard() {
     }
   }
 
-  // FIX 2: fetch donut data with pending + rejected
   const fetchAdminDonutData = async () => {
     try {
       const now = new Date()
@@ -1468,6 +1478,24 @@ export default function AssistantAdminDashboard() {
     }
   }
 
+  const handleThemeToggle = () => {
+    if (isThemeToggling) return
+
+    setIsThemeToggling(true)
+    themeSpinAnim.setValue(0)
+
+    Animated.timing(themeSpinAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsThemeToggling(false)
+    })
+
+    toggleTheme()
+  }
+
   const calculateMonthlyStats = async (): Promise<MonthlyStats[]> => {
     try {
       const now = new Date()
@@ -1669,65 +1697,156 @@ export default function AssistantAdminDashboard() {
     if (userData?.email) await notificationService.markAllAsRead(userData.email)
   }
 
-  const handleProfileImagePress = async () => {
+  const deleteOldProfileImages = async (uid: string, email: string) => {
+    const storage = getStorage()
+    const listRef = ref(storage, 'profile-photos')
     try {
+      const result = await listAll(listRef)
+      const oldFiles = result.items.filter((itemRef) => {
+        const name = itemRef.name
+        const emailPattern = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const regex = new RegExp(`^profile_${emailPattern}_\\d+\\.jpg$`)
+        return (
+          (regex.test(name) || name.includes(email.replace(/[@.]/g, '_'))) &&
+          name !== uid
+        )
+      })
+      await Promise.all(oldFiles.map((fileRef) => deleteObject(fileRef)))
+      if (oldFiles.length > 0) {
+        console.log(`Deleted ${oldFiles.length} old profile image(s)`)
+      }
+    } catch (err: any) {
+      if (err.code === 'storage/unauthorized') {
+        console.log('List permission not granted, skipping old file cleanup')
+      } else {
+        console.warn('Failed to clean up old profile images:', err)
+      }
+    }
+  }
+
+  const handleProfileImagePress = () => {
+    setShowImageOptions(true)
+  }
+
+  const pickImage = async (useCamera = false) => {
+    try {
+      setShowImageOptions(false)
+
       if (Platform.OS === 'web') {
         const input = document.createElement('input')
         input.type = 'file'
         input.accept = 'image/*'
         input.onchange = async (e: any) => {
-          const f = e.target.files[0]
-          if (f) await uploadProfileImage(f)
+          const file = e.target.files?.[0]
+          if (file) await uploadProfileImage(file)
         }
         input.click()
-      } else {
-        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
-        if (!perm.granted) {
-          Alert.alert(
-            'Permission Required',
-            'Camera roll permission is required.'
-          )
-          return
-        }
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.5,
-        })
-        if (!result.canceled) await uploadProfileImage(result.assets[0].uri)
+        return
+      }
+
+      const permissionResult = useCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Please allow access to proceed.')
+        return
+      }
+
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.5,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.5,
+          })
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        await uploadProfileImage(result.assets[0].uri)
       }
     } catch (error) {
-      console.error('Image pick error:', error)
-      Alert.alert('Error', 'Failed to pick image.')
+      console.error('Error picking image:', error)
+      Alert.alert('Error', 'Failed to pick image. Please try again.')
     }
   }
 
   const uploadProfileImage = async (imageUri: string | File) => {
     try {
       setUploadingImage(true)
-      const blob: Blob =
-        imageUri instanceof File
-          ? imageUri
-          : await (await fetch(imageUri)).blob()
+      const user = auth.currentUser
+
+      if (!user) {
+        Alert.alert('Error', 'User not found.')
+        return
+      }
+
+      let blob: Blob
+      if (imageUri instanceof File) {
+        blob = imageUri
+      } else {
+        const response = await fetch(imageUri)
+        blob = await response.blob()
+      }
+
       const storage = getStorage()
-      const storageRef = ref(
-        storage,
-        `profileImages/profile_${userData?.email}_${Date.now()}.jpg`
-      )
+      const fileName = user.uid
+      const storageRef = ref(storage, `profile-photos/${fileName}`)
       await uploadBytes(storageRef, blob)
-      const downloadUrl = await getDownloadURL(storageRef)
-      if (userData?.email) {
-        await updateDoc(doc(db, 'users', userData.email), {
-          photoURL: downloadUrl,
-        })
-        Alert.alert('Success', 'Profile image updated!')
+
+      const downloadURL = await getDownloadURL(storageRef)
+
+      const userRef = doc(db, 'users', user.uid)
+      await updateDoc(userRef, {
+        photoURL: downloadURL,
+      })
+
+      await refreshUserData()
+
+      Alert.alert('Success', 'Profile photo updated successfully!')
+
+      if (user.email) {
+        deleteOldProfileImages(user.uid, user.email).catch(() => {})
       }
     } catch (error) {
-      console.error('Upload error:', error)
+      console.error('Error uploading image:', error)
       Alert.alert('Error', 'Failed to upload image.')
     } finally {
       setUploadingImage(false)
+    }
+  }
+
+  const removeProfileImage = async () => {
+    try {
+      setShowImageOptions(false)
+
+      const user = auth.currentUser
+      if (!user) return
+
+      try {
+        const storage = getStorage()
+        const storageRef = ref(storage, `profile-photos/${user.uid}`)
+        await deleteObject(storageRef)
+      } catch (storageError) {
+        console.warn(
+          'Could not delete from storage, might not exist:',
+          storageError
+        )
+      }
+
+      const userRef = doc(db, 'users', user.uid)
+      await updateDoc(userRef, {
+        photoURL: null,
+      })
+
+      await refreshUserData()
+      Alert.alert('Success', 'Profile photo removed successfully!')
+    } catch (error) {
+      console.error('Error removing profile image:', error)
+      Alert.alert('Error', 'Failed to remove profile photo.')
     }
   }
 
@@ -1947,11 +2066,6 @@ export default function AssistantAdminDashboard() {
             {/* Date Section */}
             <View style={styles.dateSection}>
               <View style={styles.dateContainer}>
-                <Feather
-                  name='calendar'
-                  size={14}
-                  color='rgba(255,255,255,0.7)'
-                />
                 <Text style={styles.dateText}>
                   {new Date().toLocaleDateString('en-US', {
                     weekday: 'long',
@@ -1961,6 +2075,39 @@ export default function AssistantAdminDashboard() {
                   })}
                 </Text>
               </View>
+
+              {/* Theme Toggle Button */}
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={handleThemeToggle}
+                activeOpacity={0.75}
+                disabled={isThemeToggling}
+              >
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        rotate: themeSpinAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '360deg'],
+                        }),
+                      },
+                      {
+                        scale: themeSpinAnim.interpolate({
+                          inputRange: [0, 0.5, 1],
+                          outputRange: [1, 1.2, 1],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Feather
+                    name={isDark ? 'sun' : 'moon'}
+                    size={20}
+                    color='#ffffff'
+                  />
+                </Animated.View>
+              </TouchableOpacity>
             </View>
           </LinearGradient>
         </Animated.View>
@@ -2144,7 +2291,6 @@ export default function AssistantAdminDashboard() {
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      {/* FIX 5: Notification modal — properly triggered by bell */}
       <NotificationModal
         visible={notificationModalVisible}
         onClose={() => setNotificationModalVisible(false)}
@@ -2154,6 +2300,203 @@ export default function AssistantAdminDashboard() {
         pendingApprovals={[]}
         approvalCount={0}
       />
+
+      {/* Image Options Modal */}
+      <Modal
+        visible={showImageOptions}
+        transparent={true}
+        animationType='fade'
+        onRequestClose={() => setShowImageOptions(false)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+          onPress={() => setShowImageOptions(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: isDark ? '#1e293b' : '#ffffff',
+              borderRadius: 20,
+              padding: 20,
+              width: '85%',
+              maxWidth: 350,
+            }}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: '600',
+                color: isDark ? '#ffffff' : '#1e293b',
+                textAlign: 'center',
+                marginBottom: 20,
+              }}
+            >
+              Profile Photo
+            </Text>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                marginBottom: 8,
+                backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+              }}
+              onPress={() => pickImage(false)}
+            >
+              <Ionicons name='image' size={24} color='#3B82F6' />
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: isDark ? '#ffffff' : '#1e293b',
+                  marginLeft: 16,
+                }}
+              >
+                Choose from Gallery
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                marginBottom: 8,
+                backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+              }}
+              onPress={() => pickImage(true)}
+            >
+              <Ionicons name='camera' size={24} color='#10B981' />
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: isDark ? '#ffffff' : '#1e293b',
+                  marginLeft: 16,
+                }}
+              >
+                Take Photo
+              </Text>
+            </TouchableOpacity>
+
+            {userData?.photoURL && (
+              <>
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    marginBottom: 8,
+                    backgroundColor: isDark ? '#0f172a' : '#f8fafc',
+                  }}
+                  onPress={() => {
+                    setShowImageOptions(false)
+                    setShowImageViewer(true)
+                  }}
+                >
+                  <Ionicons name='eye' size={24} color='#8B5CF6' />
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: isDark ? '#ffffff' : '#1e293b',
+                      marginLeft: 16,
+                    }}
+                  >
+                    View Photo
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    borderRadius: 12,
+                    marginBottom: 8,
+                    backgroundColor: isDark ? '#7f1d1d20' : '#fef2f2',
+                  }}
+                  onPress={removeProfileImage}
+                >
+                  <Ionicons name='trash' size={24} color='#DC2626' />
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: '#DC2626',
+                      marginLeft: 16,
+                    }}
+                  >
+                    Remove Photo
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <TouchableOpacity
+              style={{
+                marginTop: 12,
+                paddingVertical: 12,
+                alignItems: 'center',
+              }}
+              onPress={() => setShowImageOptions(false)}
+            >
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: isDark ? '#94a3b8' : '#64748b',
+                  fontWeight: '500',
+                }}
+              >
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Full-screen image viewer */}
+      <Modal
+        visible={showImageViewer}
+        transparent={false}
+        animationType='fade'
+        onRequestClose={() => setShowImageViewer(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 40, right: 20, zIndex: 10 }}
+            onPress={() => setShowImageViewer(false)}
+          >
+            <Ionicons name='close' size={28} color='#fff' />
+          </TouchableOpacity>
+          <View
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            {userData?.photoURL ? (
+              <Image
+                source={{ uri: userData.photoURL }}
+                style={{ width: '90%', height: '90%', resizeMode: 'contain' }}
+              />
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                <Ionicons name='person' size={80} color='#fff' />
+                <Text style={{ color: '#fff', marginTop: 16 }}>
+                  No profile photo
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }

@@ -2,7 +2,6 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 import * as FileSystem from 'expo-file-system'
 import { LinearGradient } from 'expo-linear-gradient'
-import * as MediaLibrary from 'expo-media-library'
 import * as Print from 'expo-print'
 import { useRouter } from 'expo-router'
 import * as Sharing from 'expo-sharing'
@@ -24,6 +23,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Easing,
   FlatList,
   Image,
   Modal,
@@ -259,7 +259,7 @@ export default function MainAdminAttendance() {
   const { user, userData } = useAuth()
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
-  const { colors, isDark } = useTheme()
+  const { colors, isDark, toggleTheme } = useTheme()
 
   const isMobile = screenWidth < 640
   const isTablet = screenWidth >= 640 && screenWidth < 1024
@@ -333,6 +333,27 @@ export default function MainAdminAttendance() {
   const [selectedEventForAction, setSelectedEventForAction] =
     useState<Event | null>(null)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+
+  const [isThemeToggling, setIsThemeToggling] = useState(false)
+  const themeSpinAnim = useRef(new Animated.Value(0)).current
+
+  const handleThemeToggle = () => {
+    if (isThemeToggling) return
+
+    setIsThemeToggling(true)
+    themeSpinAnim.setValue(0)
+
+    Animated.timing(themeSpinAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsThemeToggling(false)
+    })
+
+    toggleTheme()
+  }
 
   const [missingPage, setMissingPage] = useState(1)
   const missingItemsPerPage = 10
@@ -1294,50 +1315,201 @@ export default function MainAdminAttendance() {
       return
     }
 
+    if (!qrValue || !selectedEvent) {
+      showAlert('Error', 'No QR code data or event selected.')
+      return
+    }
+
     try {
+      // 1. Get QR code data URL with proper prefix
+      const getDataURL = (): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          setTimeout(() => {
+            try {
+              qrCodeRef.current.toDataURL((data: string) => {
+                let dataUrl = data
+                if (data && !data.startsWith('data:image/png;base64,')) {
+                  dataUrl = 'data:image/png;base64,' + data
+                }
+                if (
+                  dataUrl &&
+                  dataUrl.includes('base64,') &&
+                  dataUrl.length > 100
+                ) {
+                  resolve(dataUrl)
+                } else {
+                  reject(new Error('QR code generation failed.'))
+                }
+              })
+            } catch (error) {
+              reject(error)
+            }
+          }, 200)
+        })
+      }
+
+      const qrDataUrl = await getDataURL()
+
+      // 2. Prepare event details
+      const eventTitle = selectedEvent.title || 'Untitled Event'
+      const eventDate = selectedEvent.date
+        ? formatDate(selectedEvent.date)
+        : 'N/A'
+      const eventLocation = selectedEvent.location || 'N/A'
+      const expirationTime = selectedEvent.qrExpiration
+        ? new Date(selectedEvent.qrExpiration).toLocaleString()
+        : 'No expiration set'
+      const generatedTime = new Date().toLocaleString()
+
+      // 3. Build HTML for PDF
+      const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              font-family: 'Helvetica', sans-serif;
+              padding: 30px;
+              text-align: center;
+              color: #1e293b;
+            }
+            .header {
+              border-bottom: 2px solid #3b82f6;
+              padding-bottom: 15px;
+              margin-bottom: 20px;
+            }
+            h1 {
+              color: #1e40af;
+              margin-bottom: 5px;
+            }
+            .subtitle {
+              color: #64748b;
+              font-size: 14px;
+            }
+            .details {
+              background: #f8fafc;
+              border-radius: 12px;
+              padding: 20px;
+              margin: 20px 0;
+              text-align: left;
+            }
+            .detail-row {
+              display: flex;
+              margin-bottom: 10px;
+            }
+            .detail-label {
+              font-weight: 600;
+              width: 120px;
+              color: #475569;
+            }
+            .detail-value {
+              color: #0f172a;
+            }
+            .qr-container {
+              margin: 30px 0;
+              padding: 20px;
+              background: white;
+              border-radius: 16px;
+              box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+              display: inline-block;
+            }
+            .qr-label {
+              margin-top: 10px;
+              color: #64748b;
+              font-size: 12px;
+            }
+            .footer {
+              margin-top: 30px;
+              font-size: 11px;
+              color: #94a3b8;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${eventTitle}</h1>
+            <div class="subtitle">Attendance QR Code</div>
+          </div>
+
+          <div class="details">
+            <div class="detail-row">
+              <span class="detail-label">Date & Time:</span>
+              <span class="detail-value">${eventDate}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Location:</span>
+              <span class="detail-value">${eventLocation}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">QR Expires:</span>
+              <span class="detail-value">${expirationTime}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Generated:</span>
+              <span class="detail-value">${generatedTime}</span>
+            </div>
+          </div>
+
+          <div class="qr-container">
+            <img src="${qrDataUrl}" width="250" height="250" style="display:block;" />
+            <div class="qr-label">Scan to record attendance</div>
+          </div>
+
+          <div class="footer">
+            <p>TMC Connect – Official Attendance System</p>
+          </div>
+        </body>
+      </html>
+    `
+
+      // 4. Generate PDF and share / print
       if (Platform.OS === 'web') {
-        qrCodeRef.current.toDataURL(async (dataUrl: string) => {
-          try {
-            // ✅ Direct download as PNG
-            const link = document.createElement('a')
-            link.href = dataUrl
-            link.download = `QR_${selectedEvent?.title?.replace(/\s+/g, '_') || 'event'}_${Date.now()}.png`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            showAlert('Downloaded', 'QR code saved as PNG!')
-          } catch (err) {
-            showAlert('Error', 'Failed to download QR code.')
-          }
-        })
-      } else {
-        // Native (unchanged)
-        if (Platform.OS === 'ios') {
-          const { status } = await MediaLibrary.requestPermissionsAsync()
-          if (status !== 'granted') {
-            showAlert(
-              'Permission Denied',
-              'We need permission to save images to your device.'
-            )
-            return
-          }
+        // Web: open print window (user can save as PDF)
+        const printWindow = window.open('', '_blank')
+        if (!printWindow) {
+          showAlert(
+            'Popup Blocked',
+            'Please allow popups to print the QR code.'
+          )
+          return
         }
-        const dataUrl = await qrCodeRef.current.toDataURL()
-        const base64Data = dataUrl.split(',')[1]
-        const fileUri =
-          (FileSystem as any).documentDirectory +
-          `qr_${selectedEvent?.id}_${Date.now()}.png`
-        await (FileSystem as any).writeAsStringAsync(fileUri, base64Data, {
-          encoding: (FileSystem as any).EncodingType.Base64,
+        printWindow.document.write(htmlContent)
+        printWindow.document.close()
+        printWindow.focus()
+        printWindow.print()
+        showAlert('Print Ready', 'Use the print dialog to save as PDF.')
+      } else {
+        // Native: generate PDF file and share
+        const { uri } = await Print.printToFileAsync({
+          html: htmlContent,
+          base64: false,
         })
-        const asset = await MediaLibrary.createAssetAsync(fileUri)
-        await MediaLibrary.createAlbumAsync('Event QR Codes', asset, false)
-        showAlert('Success', 'QR code saved to your gallery!')
+
+        const canShare = await Sharing.isAvailableAsync()
+        if (canShare) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/pdf',
+            dialogTitle: `Save ${eventTitle} QR Code`,
+            UTI: 'com.adobe.pdf',
+          })
+        } else {
+          showAlert('Error', 'Sharing is not available on this device.')
+        }
+
+        // Clean up temp file
+        try {
+          await FileSystem.deleteAsync(uri, { idempotent: true })
+        } catch {}
       }
     } catch (error) {
-      showAlert('Error', 'Failed to save QR code. Please try again.')
+      console.error('Error generating PDF:', error)
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to generate QR PDF.'
+      showAlert('Error', errorMessage)
     }
   }
+
   const formatDate = (
     dateValue: string | { seconds: number; nanoseconds: number } | any
   ) => {
@@ -2190,16 +2362,16 @@ export default function MainAdminAttendance() {
   }
 
   const headerGradientColors = isDark
-    ? (['#0f172a', '#1e293b'] as const)
-    : (['#1e40af', '#3b82f6'] as const)
+    ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
+    : (['#0f2456', '#1a3a8f', '#1e53c8'] as const)
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header with Gradient */}
       <LinearGradient
         colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
         style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
       >
         <View
@@ -2212,7 +2384,7 @@ export default function MainAdminAttendance() {
                 { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
               ]}
             >
-              Attendance Dashboard,
+              Welcome Back,
             </Text>
             <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
               {userData?.name || 'Admin'}
@@ -2272,7 +2444,43 @@ export default function MainAdminAttendance() {
               })}
             </Text>
           </View>
-          {/* Removed the calendar icon – matches Announcement */}
+          <View style={styles.headerActions}>
+            {/* Theme Toggle Button */}
+            <TouchableOpacity
+              style={[
+                styles.headerAction,
+                isMobile && styles.headerActionMobile,
+              ]}
+              onPress={handleThemeToggle}
+              disabled={isThemeToggling}
+              activeOpacity={0.75}
+            >
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: themeSpinAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                    {
+                      scale: themeSpinAnim.interpolate({
+                        inputRange: [0, 0.5, 1],
+                        outputRange: [1, 1.2, 1],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Feather
+                  name={isDark ? 'sun' : 'moon'}
+                  size={isMobile ? 16 : 18}
+                  color='#ffffff'
+                />
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
         </View>
       </LinearGradient>
 

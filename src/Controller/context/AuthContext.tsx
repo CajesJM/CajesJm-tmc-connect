@@ -12,6 +12,7 @@ interface UserData {
   email: string
   role: Role
   name: string
+  username?: string
   surname?: string
   studentID?: number
   active?: boolean
@@ -37,6 +38,7 @@ interface AuthContextValue {
   hasPermission: (permission: string) => boolean
   isMainAdmin: () => boolean
   isAssistantAdmin: () => boolean
+  refreshUserData: () => Promise<void>
 }
 
 const KEY_USER_DATA = 'user_data'
@@ -168,6 +170,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw error
     }
   }
+  const refreshUserData = async (): Promise<void> => {
+    if (!user) return
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid))
+      if (userDoc.exists()) {
+        const freshData = userDoc.data() as UserData
+        setUserData(freshData)
+        await storeUserData(freshData)
+      }
+    } catch (error) {
+      console.error('Failed to refresh user data:', error)
+    }
+  }
 
   // Helper functions for role checking
   const hasPermission = (permission: string): boolean => {
@@ -198,6 +213,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     hasPermission,
     isMainAdmin,
     isAssistantAdmin,
+    refreshUserData,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

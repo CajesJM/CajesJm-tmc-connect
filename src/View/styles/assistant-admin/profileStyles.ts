@@ -267,7 +267,17 @@ export const createAssistantProfileStyles = (colors: any, isDark: boolean) =>
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.text,
+      marginLeft: 20,
+    },
+    sectionTitle1: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.text,
+    },
 
     // Menu
     menuList: { paddingVertical: 4 },
@@ -513,6 +523,50 @@ export const createAssistantProfileStyles = (colors: any, isDark: boolean) =>
       alignItems: 'center',
       gap: 12,
       flex: 1,
+    },
+    imageOptionsModal: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 20,
+      width: '100%',
+      maxWidth: 400,
+    },
+    imageOptionsTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    imageOptionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      backgroundColor: isDark ? '#1e293b' : '#f8fafc',
+      marginBottom: 8,
+    },
+    imageOptionText: {
+      fontSize: 16,
+      color: colors.text,
+      marginLeft: 12,
+    },
+    imageOptionRemove: {
+      backgroundColor: isDark ? '#450a0a' : '#fef2f2',
+    },
+    imageOptionRemoveText: {
+      color: '#DC2626',
+    },
+    imageOptionCancel: {
+      marginTop: 12,
+      paddingVertical: 12,
+      alignItems: 'center',
+    },
+    imageOptionCancelText: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      fontWeight: '500',
     },
     faqQuestionText: { fontSize: 14, fontWeight: '500', color: colors.text },
     faqAnswer: { paddingTop: 12, paddingLeft: 30 },

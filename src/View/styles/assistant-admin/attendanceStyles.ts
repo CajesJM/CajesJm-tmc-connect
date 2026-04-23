@@ -650,7 +650,7 @@ export const createAttendanceStyles = (
     modernModalContainer: {
       width: '100%',
       maxWidth: 500,
-      maxHeight: '90%',
+      maxHeight: '95%',
       backgroundColor: colors.card,
       borderRadius: 24,
       overflow: 'hidden',
@@ -661,9 +661,8 @@ export const createAttendanceStyles = (
       elevation: 10,
     },
     expirationModalContainer: {
-      width: isMobile ? '120%' : '150%',
-      maxWidth: isMobile ? 450 : 800,
-      maxHeight: isMobile ? '90%' : '85%',
+      width: isMobile ? '90%' : 500,
+      alignSelf: 'center',
       backgroundColor: colors.card,
       borderRadius: 24,
       overflow: 'hidden',
@@ -721,7 +720,7 @@ export const createAttendanceStyles = (
     },
     modernModalContent: {
       padding: isMobile ? 15 : 20,
-      maxHeight: isMobile ? 500 : 700,
+      maxHeight: isMobile ? 600 : 800,
     },
 
     // Modern Form Elements
@@ -1276,7 +1275,7 @@ export const createAttendanceStyles = (
     modernModalTitleMobile: { fontSize: 16 },
     modernModalSubtitleMobile: { fontSize: 10 },
     modernModalCloseButtonMobile: { width: 32, height: 32, borderRadius: 16 },
-    modernModalContentMobile: { padding: 15, maxHeight: 350 },
+    modernModalContentMobile: { padding: 15, maxHeight: 510 },
     modernFormLabelMobile: { fontSize: 13, marginBottom: 6 },
     modernFormInputMobile: {
       paddingHorizontal: 14,

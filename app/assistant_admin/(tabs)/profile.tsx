@@ -8,18 +8,27 @@ import {
   updatePassword,
 } from 'firebase/auth'
 import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
-import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage'
+import {
+  deleteObject,
+  getDownloadURL,
+  getStorage,
+  listAll,
+  ref,
+  uploadBytes,
+} from 'firebase/storage'
 import React, { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   Platform,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   useWindowDimensions,
   View,
 } from 'react-native'
@@ -48,8 +57,9 @@ function getInitials(name?: string, email?: string): string {
   if (email) return email[0].toUpperCase()
   return 'A'
 }
+
 export default function AssistantAdminProfile() {
-  const { logout, userData, user } = useAuth()
+  const { logout, userData, user, refreshUserData } = useAuth()
   const router = useRouter()
   const { theme, setTheme, colors, isDark } = useTheme()
   const { width } = useWindowDimensions()
@@ -68,6 +78,8 @@ export default function AssistantAdminProfile() {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showAboutModal, setShowAboutModal] = useState(false)
   const [showHelpModal, setShowHelpModal] = useState(false)
+  const [showImageOptions, setShowImageOptions] = useState(false)
+  const [showImageViewer, setShowImageViewer] = useState(false)
 
   // Change Password State
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false)
@@ -363,43 +375,39 @@ export default function AssistantAdminProfile() {
     }
   }
 
-  const handlePickImage = async () => {
+  const deleteOldProfileImages = async (uid: string, email: string) => {
+    const storage = getStorage()
+    const listRef = ref(storage, 'profile-photos')
     try {
-      if (Platform.OS === 'web') {
-        const input = document.createElement('input')
-        input.type = 'file'
-        input.accept = 'image/*'
-        input.onchange = async (e: any) => {
-          const file = e.target.files?.[0]
-          if (file) await uploadImage(file)
-        }
-        input.click()
-      } else {
-        const { granted } =
-          await ImagePicker.requestMediaLibraryPermissionsAsync()
-        if (!granted) {
-          showAlert(
-            'Permission Required',
-            'Please allow access to your photo library.'
-          )
-          return
-        }
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.6,
-        })
-        if (!result.canceled) await uploadImage(result.assets[0].uri)
+      const result = await listAll(listRef)
+      const oldFiles = result.items.filter((itemRef) => {
+        const name = itemRef.name
+        const emailPattern = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const regex = new RegExp(`^profile_${emailPattern}_\\d+\\.jpg$`)
+        return (
+          (regex.test(name) || name.includes(email.replace(/[@.]/g, '_'))) &&
+          name !== uid
+        )
+      })
+      await Promise.all(oldFiles.map((fileRef) => deleteObject(fileRef)))
+      if (oldFiles.length > 0) {
+        console.log(`Deleted ${oldFiles.length} old profile image(s)`)
       }
-    } catch (err) {
-      console.error('Image pick error:', err)
-      showAlert('Error', 'Failed to select image.')
+    } catch (err: any) {
+      if (err.code === 'storage/unauthorized') {
+        console.log('List permission not granted, skipping old file cleanup')
+      } else {
+        console.warn('Failed to clean up old profile images:', err)
+      }
     }
   }
 
   const uploadImage = async (source: string | File) => {
-    if (!userData?.email) return
+    const currentUser = auth.currentUser
+    if (!currentUser) {
+      showAlert('Error', 'User not authenticated.')
+      return
+    }
     try {
       setUploadingImage(true)
       let blob: Blob
@@ -410,20 +418,104 @@ export default function AssistantAdminProfile() {
         blob = await res.blob()
       }
       const storage = getStorage()
-      const fileName = `profile_${userData.email}_${Date.now()}.jpg`
-      const storageRef = ref(storage, `profileImages/${fileName}`)
+      const fileName = currentUser.uid
+      const storageRef = ref(storage, `profile-photos/${fileName}`)
       await uploadBytes(storageRef, blob)
       const downloadUrl = await getDownloadURL(storageRef)
-      const userRef = doc(db, 'users', userData.email)
+
+      const userRef = doc(db, 'users', currentUser.uid)
       await updateDoc(userRef, { photoURL: downloadUrl })
 
+      await refreshUserData()
       setPhotoURL(downloadUrl)
       showAlert('Success', 'Profile photo updated!')
+
+      if (currentUser.email) {
+        deleteOldProfileImages(currentUser.uid, currentUser.email).catch(
+          () => {}
+        )
+      }
     } catch (err) {
       console.error('Upload error:', err)
       showAlert('Error', 'Failed to upload photo.')
     } finally {
       setUploadingImage(false)
+    }
+  }
+
+  const pickImage = async (useCamera = false) => {
+    try {
+      setShowImageOptions(false)
+
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = 'image/*'
+        input.onchange = async (e: any) => {
+          const file = e.target.files?.[0]
+          if (file) await uploadImage(file)
+        }
+        input.click()
+        return
+      }
+
+      const permissionResult = useCamera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+      if (!permissionResult.granted) {
+        showAlert('Permission Required', 'Please allow access to proceed.')
+        return
+      }
+
+      const result = useCamera
+        ? await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.6,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.6,
+          })
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        await uploadImage(result.assets[0].uri)
+      }
+    } catch (error) {
+      console.error('Error picking image:', error)
+      showAlert('Error', 'Failed to pick image. Please try again.')
+    }
+  }
+
+  const removeProfileImage = async () => {
+    try {
+      setShowImageOptions(false)
+
+      const currentUser = auth.currentUser
+      if (!currentUser) return
+
+      try {
+        const storage = getStorage()
+        const storageRef = ref(storage, `profile-photos/${currentUser.uid}`)
+        await deleteObject(storageRef)
+      } catch (storageError) {
+        console.warn(
+          'Could not delete from storage, might not exist:',
+          storageError
+        )
+      }
+
+      const userRef = doc(db, 'users', currentUser.uid)
+      await updateDoc(userRef, { photoURL: null })
+
+      await refreshUserData()
+      setPhotoURL(null)
+      showAlert('Success', 'Profile photo removed successfully!')
+    } catch (error) {
+      console.error('Error removing profile image:', error)
+      showAlert('Error', 'Failed to remove profile photo.')
     }
   }
 
@@ -487,6 +579,7 @@ export default function AssistantAdminProfile() {
       route: '/assistant_admin/students',
     },
   ]
+
   const renderSettingsModal = () => (
     <Modal
       visible={showSettingsModal}
@@ -697,6 +790,33 @@ export default function AssistantAdminProfile() {
     )
   }
 
+  const SUPPORT_EMAIL = 'developertmcconnect@gmail.com'
+
+  const handleContactSupport = () => {
+    const subject = encodeURIComponent(
+      'Support Request - Assistant Admin - TMC Connect'
+    )
+    const body = encodeURIComponent(
+      `Hello TMC Support Team,\n\n` +
+        `I need assistance with the following:\n\n` +
+        `[Please describe your issue here]\n\n` +
+        `---\n` +
+        `Assistant Admin: ${userData?.name || userData?.email || 'N/A'}\n` +
+        `Email: ${userData?.email || ''}\n` +
+        `App Version: 2.0\n` +
+        `Platform: ${Platform.OS}`
+    )
+    const mailtoUrl = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`
+
+    Linking.openURL(mailtoUrl).catch((err) => {
+      Alert.alert(
+        'Email Not Configured',
+        'Unable to open email client. Please manually email us at ' +
+          SUPPORT_EMAIL
+      )
+    })
+  }
+
   const renderHelpModal = () => {
     const faqs = [
       {
@@ -717,7 +837,7 @@ export default function AssistantAdminProfile() {
         id: '3',
         question: 'How do I create announcements?',
         answer:
-          'Go to Announcement tab and tap "+ New" and fill the needed information.',
+          'Go to Announcement tab and tap "+ New" and fill the needed field.',
         icon: 'bullhorn',
       },
       {
@@ -754,7 +874,10 @@ export default function AssistantAdminProfile() {
                 <Text style={styles.supportBannerTitle}>
                   Need Immediate Help?
                 </Text>
-                <TouchableOpacity style={styles.contactSupportButton}>
+                <TouchableOpacity
+                  style={styles.contactSupportButton}
+                  onPress={handleContactSupport}
+                >
                   <Icon name='headset' size={18} color='#FFFFFF' />
                   <Text style={styles.contactSupportText}>Contact Support</Text>
                 </TouchableOpacity>
@@ -801,7 +924,7 @@ export default function AssistantAdminProfile() {
               <View style={styles.versionInfo}>
                 <Text style={styles.versionText}>TMC Connect v2.0</Text>
                 <Text style={styles.copyrightText}>
-                  © 2026 TMC Connect. All rights reserved.
+                  © 2026 TMC Connect. jmx9f2a.
                 </Text>
               </View>
             </ScrollView>
@@ -1051,7 +1174,7 @@ export default function AssistantAdminProfile() {
 
           <TouchableOpacity
             style={styles.profileButton}
-            onPress={handlePickImage}
+            onPress={() => setShowImageOptions(true)}
             disabled={uploadingImage}
             activeOpacity={0.8}
           >
@@ -1099,7 +1222,7 @@ export default function AssistantAdminProfile() {
             <View style={styles.avatarSection}>
               <TouchableOpacity
                 style={styles.avatarButton}
-                onPress={handlePickImage}
+                onPress={() => setShowImageOptions(true)}
                 disabled={uploadingImage}
               >
                 {uploadingImage ? (
@@ -1192,7 +1315,7 @@ export default function AssistantAdminProfile() {
         {/* Account Details & Menu */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Account & Preferences</Text>
+            <Text style={styles.sectionTitle1}>Account & Preferences</Text>
           </View>
 
           <View style={styles.menuList}>
@@ -1269,7 +1392,7 @@ export default function AssistantAdminProfile() {
         {/* Analytics Summary */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your Analytics</Text>
+            <Text style={styles.sectionTitle1}>Your Analytics</Text>
           </View>
           <View style={styles.analyticsContent}>
             {/* Event Status Pills */}
@@ -1354,6 +1477,116 @@ export default function AssistantAdminProfile() {
       {renderChangePasswordModal()}
       {renderAboutModal()}
       {renderHelpModal()}
+
+      {/* Image Options Modal */}
+      <Modal
+        visible={showImageOptions}
+        transparent={true}
+        animationType='fade'
+        onRequestClose={() => setShowImageOptions(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setShowImageOptions(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.imageOptionsModal}>
+                <Text style={styles.imageOptionsTitle}>Profile Photo</Text>
+
+                <TouchableOpacity
+                  style={styles.imageOptionButton}
+                  onPress={() => pickImage(false)}
+                >
+                  <Icon name='image' size={24} color='#3B82F6' />
+                  <Text style={styles.imageOptionText}>
+                    Choose from Gallery
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.imageOptionButton}
+                  onPress={() => pickImage(true)}
+                >
+                  <Icon name='camera' size={24} color='#10B981' />
+                  <Text style={styles.imageOptionText}>Take Photo</Text>
+                </TouchableOpacity>
+
+                {photoURL && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.imageOptionButton}
+                      onPress={() => {
+                        setShowImageOptions(false)
+                        setShowImageViewer(true)
+                      }}
+                    >
+                      <Icon name='eye' size={24} color='#8B5CF6' />
+                      <Text style={styles.imageOptionText}>View Photo</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.imageOptionButton,
+                        styles.imageOptionRemove,
+                      ]}
+                      onPress={removeProfileImage}
+                    >
+                      <Icon name='delete' size={24} color='#DC2626' />
+                      <Text
+                        style={[
+                          styles.imageOptionText,
+                          styles.imageOptionRemoveText,
+                        ]}
+                      >
+                        Remove Photo
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                <TouchableOpacity
+                  style={styles.imageOptionCancel}
+                  onPress={() => setShowImageOptions(false)}
+                >
+                  <Text style={styles.imageOptionCancelText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Full-screen image viewer */}
+      <Modal
+        visible={showImageViewer}
+        transparent={false}
+        animationType='fade'
+        onRequestClose={() => setShowImageViewer(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 40, right: 20, zIndex: 10 }}
+            onPress={() => setShowImageViewer(false)}
+          >
+            <Icon name='close' size={28} color='#fff' />
+          </TouchableOpacity>
+          <View
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+          >
+            {photoURL ? (
+              <Image
+                source={{ uri: photoURL }}
+                style={{ width: '90%', height: '90%', resizeMode: 'contain' }}
+              />
+            ) : (
+              <View style={{ alignItems: 'center' }}>
+                <Icon name='account' size={80} color='#fff' />
+                <Text style={{ color: '#fff', marginTop: 16 }}>
+                  No profile photo
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   )
 }

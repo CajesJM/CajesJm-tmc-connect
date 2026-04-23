@@ -22,6 +22,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Easing,
   FlatList,
   Image,
   Modal,
@@ -296,7 +297,7 @@ const AnimatedAnnouncementItem = memo(function AnimatedAnnouncementItem({
 
 export default function MainAdminAnnouncements() {
   const { width: screenWidth } = useWindowDimensions()
-  const { colors, isDark } = useTheme()
+  const { colors, isDark, toggleTheme } = useTheme()
   const { user, userData } = useAuth()
   const router = useRouter()
 
@@ -328,6 +329,27 @@ export default function MainAdminAnnouncements() {
   const [totalPages, setTotalPages] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [itemsPerPage] = useState(isMobile ? 10 : 10)
+
+  const [isThemeToggling, setIsThemeToggling] = useState(false)
+  const themeSpinAnim = useRef(new Animated.Value(0)).current
+
+  const handleThemeToggle = () => {
+    if (isThemeToggling) return
+
+    setIsThemeToggling(true)
+    themeSpinAnim.setValue(0)
+
+    Animated.timing(themeSpinAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsThemeToggling(false)
+    })
+
+    toggleTheme()
+  }
 
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<
     string | null
@@ -921,8 +943,8 @@ export default function MainAdminAnnouncements() {
   }
 
   const headerGradientColors = isDark
-    ? (['#0f172a', '#1e293b'] as const)
-    : (['#1e40af', '#3b82f6'] as const)
+    ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
+    : (['#0f2456', '#1a3a8f', '#1e53c8'] as const)
 
   return (
     <View style={styles.container}>
@@ -930,7 +952,7 @@ export default function MainAdminAnnouncements() {
       <LinearGradient
         colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0, y: 1 }}
         style={[styles.headerGradient, isMobile && styles.headerGradientMobile]}
       >
         <View
@@ -943,7 +965,7 @@ export default function MainAdminAnnouncements() {
                 { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
               ]}
             >
-              Announcements Dashboard,
+              Welcome Back,
             </Text>
             <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
               {userData?.name || 'Admin'}
@@ -1005,6 +1027,41 @@ export default function MainAdminAnnouncements() {
             </Text>
           </View>
           <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={[
+                styles.headerAction,
+                isMobile && styles.headerActionMobile,
+              ]}
+              onPress={handleThemeToggle}
+              disabled={isThemeToggling}
+              activeOpacity={0.75}
+            >
+              <Animated.View
+                style={{
+                  transform: [
+                    {
+                      rotate: themeSpinAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                    {
+                      scale: themeSpinAnim.interpolate({
+                        inputRange: [0, 0.5, 1],
+                        outputRange: [1, 1.2, 1],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Feather
+                  name={isDark ? 'sun' : 'moon'}
+                  size={isMobile ? 16 : 18}
+                  color='#ffffff'
+                />
+              </Animated.View>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={[
                 styles.headerAction,

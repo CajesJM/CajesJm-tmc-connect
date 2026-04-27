@@ -760,38 +760,38 @@ export default function AssistantAdminProfile() {
       developers: [
         {
           id: '1',
-          name: 'John Mark Cajes',
-          profilePhoto: require('../../../assets/images/Profile/Jm.jpg'),
-          role: 'Lead Developer',
-          email: 'markcajes@gmail.com',
-        },
-        {
-          id: '2',
-          name: 'Ken Suarez',
-          profilePhoto: require('../../../assets/images/Profile/ken.jpg'),
-          role: 'Lead Developer',
+          name: 'Ken I. Suarez',
+          profilePhoto: require('../../../assets/images/Profile/kensuarez.jpg'),
+          role: 'Project Manager',
           email: 'kensuarez31@gmail.com',
         },
         {
+          id: '2',
+          name: 'John Mark T. Cajes',
+          profilePhoto: require('../../../assets/images/Profile/Jm.png'),
+          role: 'Developer',
+          email: 'markcajes24@gmail.com',
+        },
+        {
           id: '3',
-          name: 'Denmerk Apa',
-          profilePhoto: require('../../../assets/images/Profile/denmerk.jpg'),
-          role: 'QA Tester',
-          email: 'denmerk@gmail.com',
+          name: 'Karl James A. Ayuban',
+          profilePhoto: require('../../../assets/images/Profile/karljames.jpg'),
+          role: 'UI/UX Designer',
+          email: 'karljamesayuban1234@gmail.com',
         },
         {
           id: '4',
-          name: 'Sherylann Inanod',
-          profilePhoto: require('../../../assets/images/Profile/Jm.jpg'),
-          role: 'UI/UX Designer',
-          email: 'inanodsherylann@gmail.com',
+          name: 'Denmerk N. Apa',
+          profilePhoto: require('../../../assets/images/Profile/denmerkapa.jpg'),
+          role: 'Tester',
+          email: 'denmerkapa6@gmail.com',
         },
         {
           id: '5',
-          name: 'Karl James Ayuban',
-          profilePhoto: require('../../../assets/images/Profile/jim.jpg'),
-          role: '',
-          email: 'ayubankarljames@gmail.com',
+          name: 'Sheryl Ann Inanod',
+          profilePhoto: require('../../../assets/images/Profile/sheryl.png'),
+          role: 'Researcher',
+          email: 'sherylann062@gmail.com',
         },
       ],
       organization: 'TMC Connect Developers',
@@ -1434,7 +1434,7 @@ export default function AssistantAdminProfile() {
                   size={18}
                   color={colors.accent.primary}
                 />
-                <Text style={styles.menuItemText}>About</Text>
+                <Text style={styles.menuItemText}>About this App</Text>
               </View>
               <Icon
                 name='chevron-right'

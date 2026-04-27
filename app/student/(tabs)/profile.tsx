@@ -94,12 +94,7 @@ interface AboutInfo {
     members: TeamMember[]
     organization?: string
   }
-  submittedTo: {
-    name: string
-    profilePhoto?: any
-    department?: string
-    institution?: string
-  }
+
   version?: string
   description?: string
 }
@@ -432,47 +427,41 @@ export default function StudentProfile() {
       members: [
         {
           id: '1',
-          name: 'John Mark Cajes',
-          profilePhoto: require('../../../assets/images/Profile/Jm.jpg'),
-          role: 'Lead Developer',
-          email: 'markcajes@gmail.com',
-        },
-        {
-          id: '2',
-          name: 'Ken Suarez',
-          profilePhoto: require('../../../assets/images/Profile/ken.jpg'),
-          role: 'Lead Developer',
+          name: 'Ken I. Suarez',
+          profilePhoto: require('../../../assets/images/Profile/kensuarez.jpg'),
+          role: 'Project Manager',
           email: 'kensuarez31@gmail.com',
         },
         {
+          id: '2',
+          name: 'John Mark T. Cajes',
+          profilePhoto: require('../../../assets/images/Profile/Jm.png'),
+          role: 'Developer',
+          email: 'markcajes24@gmail.com',
+        },
+        {
           id: '3',
-          name: 'Denmerk Apa',
-          profilePhoto: require('../../../assets/images/Profile/denmerk.jpg'),
-          role: 'QA Tester',
-          email: 'denmerk@gmail.com',
+          name: 'Karl James A. Ayuban',
+          profilePhoto: require('../../../assets/images/Profile/karljames.jpg'),
+          role: 'UI/UX Designer',
+          email: 'karljamesayuban1234@gmail.com',
         },
         {
           id: '4',
-          name: 'Sherylann Inanod',
-          profilePhoto: require('../../../assets/images/Profile/Jm.jpg'),
-          role: 'UI/UX Designer',
-          email: 'inanodsherylann@gmail.com',
+          name: 'Denmerk N. Apa',
+          profilePhoto: require('../../../assets/images/Profile/denmerkapa.jpg'),
+          role: 'Tester',
+          email: 'denmerkapa6@gmail.com',
         },
         {
           id: '5',
-          name: 'Karl James Ayuban',
-          profilePhoto: require('../../../assets/images/Profile/jim.jpg'),
-          role: '',
-          email: 'ayubankarljames@gmail.com',
+          name: 'Sheryl Ann Inanod',
+          profilePhoto: require('../../../assets/images/Profile/sheryl.png'),
+          role: 'Researcher',
+          email: 'sherylann062@gmail.com',
         },
       ],
       organization: 'TMC Connect Developers',
-    },
-    submittedTo: {
-      name: 'Cristine Joy Yap',
-      profilePhoto: '',
-      department: 'Bachelor of Science Information Technology',
-      institution: '',
     },
     version: '2.0',
     description:
@@ -1943,28 +1932,6 @@ export default function StudentProfile() {
                     </View>
                   </View>
                 ))}
-              </View>
-            </View>
-
-            <View style={styles.aboutSection}>
-              <Text style={styles.sectionLabel}>Submitted To</Text>
-              <View style={styles.submittedToCard}>
-                <Icon name='school' size={24} color='#3B82F6' />
-                <View style={styles.submittedToInfo}>
-                  <Text style={styles.submittedToName}>
-                    {aboutInfo.submittedTo.name}
-                  </Text>
-                  {aboutInfo.submittedTo.department && (
-                    <Text style={styles.submittedToDepartment}>
-                      {aboutInfo.submittedTo.department}
-                    </Text>
-                  )}
-                  {aboutInfo.submittedTo.institution && (
-                    <Text style={styles.submittedToInstitution}>
-                      {aboutInfo.submittedTo.institution}
-                    </Text>
-                  )}
-                </View>
               </View>
             </View>
 

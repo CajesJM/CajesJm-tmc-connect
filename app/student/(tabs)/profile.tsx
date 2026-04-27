@@ -341,7 +341,7 @@ const BarChartItem = ({ data, index, maxValue, colors, isDark }: any) => {
 }
 
 export default function StudentProfile() {
-  const { logout, userData, refreshUserData } = useAuth()
+  const { logout, userData, refreshUserData, isAuthenticated } = useAuth()
   const router = useRouter()
   const { width } = useWindowDimensions()
   const isMobile = width < 640
@@ -373,6 +373,7 @@ export default function StudentProfile() {
     useState<StudentEvent | null>(null)
   const { theme, setTheme, colors, isDark, toggleTheme } = useTheme()
   const [showImageViewer, setShowImageViewer] = useState(false)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
 
   const [showAttendanceReportModal, setShowAttendanceReportModal] =
     useState(false)
@@ -404,6 +405,22 @@ export default function StudentProfile() {
       setProfileImage(userData.photoURL)
     }
   }, [userData?.photoURL])
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid
+    if (!uid) return
+
+    const fetchPref = async () => {
+      const snap = await getDoc(doc(db, 'users', uid))
+      if (snap.exists()) {
+        const data = snap.data()
+        if (typeof data.notificationEnabled === 'boolean') {
+          setNotificationsEnabled(data.notificationEnabled)
+        }
+      }
+    }
+    fetchPref()
+  }, [])
 
   const styles = useMemo(
     () => createProfileStyles(colors, isDark, isMobile, isTablet, isDesktop),
@@ -1552,6 +1569,12 @@ export default function StudentProfile() {
   )
 
   useEffect(() => {
+    if (!isAuthenticated || !userData) {
+      setPenalties([])
+      setPenaltyMap({})
+      return
+    }
+
     const userId = auth.currentUser?.uid
     if (!userId) return
 
@@ -1608,7 +1631,7 @@ export default function StudentProfile() {
     )
 
     return () => unsubscribe()
-  }, [])
+  }, [isAuthenticated, userData])
 
   useFocusEffect(
     useCallback(() => {
@@ -2373,17 +2396,72 @@ export default function StudentProfile() {
 
             <View style={styles.settingsSection}>
               <Text style={styles.settingsSectionTitle}>Preferences</Text>
-              <View style={styles.settingsOption}>
+              <TouchableOpacity
+                style={styles.settingsOption}
+                onPress={async () => {
+                  const newValue = !notificationsEnabled
+                  setNotificationsEnabled(newValue)
+                  try {
+                    if (auth.currentUser) {
+                      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+                        notificationEnabled: newValue,
+                      })
+                    }
+                  } catch (e) {
+                    console.error('Failed to update notification preference', e)
+                    // revert to previous state
+                    setNotificationsEnabled(!newValue)
+                  }
+                }}
+                activeOpacity={0.7}
+              >
                 <View style={styles.settingsOptionLeft}>
                   <Icon
                     name='bell-outline'
                     size={20}
-                    color={colors.textSecondary}
+                    color={colors.sidebar.text.secondary}
                   />
-                  <Text style={styles.settingsOptionText}>Notifications</Text>
+                  <Text style={styles.settingsOptionText}>
+                    Push Notifications
+                  </Text>
                 </View>
-                <Text style={styles.settingsOptionValue}>Enabled</Text>
-              </View>
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: notificationsEnabled ? '#10B981' : '#EF4444',
+                    }}
+                  >
+                    {notificationsEnabled ? 'Enabled' : 'Disabled'}
+                  </Text>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: notificationsEnabled
+                        ? '#10B981'
+                        : '#9CA3AF',
+                      justifyContent: 'center',
+                      paddingHorizontal: 2,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        backgroundColor: '#fff',
+                        transform: [
+                          { translateX: notificationsEnabled ? 20 : 0 },
+                        ],
+                      }}
+                    />
+                  </View>
+                </View>
+              </TouchableOpacity>
               <View style={styles.settingsOption}>
                 <View style={styles.settingsOptionLeft}>
                   <Icon

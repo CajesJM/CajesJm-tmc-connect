@@ -23,7 +23,7 @@ export const createDashboardStyles = (colors: any, isDark: boolean) =>
 
     // ─── Header ───────────────────────────────────────────────────────────────
     headerGradient: {
-      paddingTop: 28,
+      paddingTop: 20,
       paddingBottom: 20,
       paddingHorizontal: 28,
       borderBottomLeftRadius: 24,
@@ -71,12 +71,12 @@ export const createDashboardStyles = (colors: any, isDark: boolean) =>
       height: '100%',
     },
     profileFallback: {
-      backgroundColor: 'rgba(255,255,255,0.2)',
+      backgroundColor: isDark ? '#334155' : '#e2e8f0',
       justifyContent: 'center',
       alignItems: 'center',
     },
     profileInitials: {
-      color: '#ffffff',
+      color: isDark ? '#ffffff' : '#1e293b',
       fontSize: 18,
       fontWeight: '700',
     },

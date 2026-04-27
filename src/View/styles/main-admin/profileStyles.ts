@@ -20,7 +20,7 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
     },
 
     headerGradient: {
-      paddingTop: 28,
+      paddingTop: 20,
       paddingBottom: 20,
       paddingHorizontal: 28,
       borderBottomLeftRadius: 24,
@@ -68,12 +68,12 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       height: '100%',
     },
     profileFallback: {
-      backgroundColor: 'rgba(255,255,255,0.2)',
+      backgroundColor: isDark ? '#334155' : '#e2e8f0',
       justifyContent: 'center',
       alignItems: 'center',
     },
     profileInitials: {
-      color: '#ffffff',
+      color: isDark ? '#ffffff' : '#1e293b',
       fontSize: 18,
       fontWeight: '700',
     },
@@ -749,7 +749,7 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       alignItems: 'center',
       paddingVertical: 20,
       gap: 4,
-      marginTop: 4,
+      marginTop: -30,
     },
     footerBrand: {
       fontSize: 13,
@@ -861,6 +861,12 @@ export const createProfileStyles = (colors: any, isDark: boolean) =>
       backgroundColor: 'rgba(0,0,0,0.5)',
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    logoImageButtom: {
+      width: 200,
+      height: 250,
+      marginBottom: -100,
+      marginTop: -70,
     },
     profileMenuContainer: {
       backgroundColor: colors.card,

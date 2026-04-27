@@ -1,8 +1,8 @@
 import * as SecureStore from 'expo-secure-store'
 import { signInWithEmailAndPassword, signOut, User } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot } from 'firebase/firestore'
 import React, { createContext, useContext, useState } from 'react'
-import { Platform } from 'react-native'
+import { Alert, Platform } from 'react-native'
 import { auth, db } from '../../Model/lib/firebaseConfig'
 
 type Role = 'main_admin' | 'assistant_admin' | 'student' | null
@@ -16,6 +16,7 @@ interface UserData {
   surname?: string
   studentID?: number
   active?: boolean
+  status?: 'active' | 'inactive'
   deactivatedAt?: string
   photoURL?: string
   permissions?: {
@@ -89,6 +90,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     initializeAuth()
   }, [])
 
+  React.useEffect(() => {
+    if (!user) return
+
+    const unsubscribe = onSnapshot(
+      doc(db, 'users', user.uid),
+      (docSnapshot) => {
+        if (!docSnapshot.exists()) return
+
+        const data = docSnapshot.data()
+        const isStillActive =
+          (data.status ? data.status !== 'inactive' : true) &&
+          data.active !== false
+
+        if (!isStillActive) {
+          setUser(null)
+          setUserData(null)
+          storeUserData(null)
+
+          signOut(auth).catch((e) =>
+            console.error('Sign out after deactivation failed:', e)
+          )
+
+          if (Platform.OS !== 'web') {
+            Alert.alert(
+              'Account Deactivated',
+              'Your account has been deactivated. You have been signed out.'
+            )
+          } else {
+            window.alert(
+              'Your account has been deactivated. You have been signed out.'
+            )
+          }
+        }
+      },
+      (error: any) => {
+        console.error('Error listening to user doc:', error)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [user])
+
   const login = async (email: string, password: string): Promise<UserData> => {
     try {
       if (!email || !password) {
@@ -115,8 +158,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const userDataFromDB = userDoc.data() as UserData & { active?: boolean }
 
       // Check if user is active
-      if (userDataFromDB.active === false) {
-        // Sign out the user since they're deactivated
+      const isActive =
+        (userDataFromDB.status ? userDataFromDB.status !== 'inactive' : true) &&
+        userDataFromDB.active !== false
+
+      if (!isActive) {
         await signOut(auth)
         throw new Error(
           'This account has been deactivated. Please contact an administrator.'

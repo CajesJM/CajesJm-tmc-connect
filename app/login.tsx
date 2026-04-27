@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { getAuth, sendPasswordResetEmail } from 'firebase/auth'
 import { collection, getDocs, query, where } from 'firebase/firestore'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +27,70 @@ import { db } from '../src/Model/lib/firebaseConfig'
 import LoadingScreen from '../src/View/components/LoadingScreen'
 import { createLoginStyles } from '../src/View/styles/LoginStyles'
 
+function PulseRing({
+  delay = 0,
+  color,
+  size = 130,
+}: {
+  delay?: number
+  color: string
+  size?: number
+}) {
+  const scale = useRef(new Animated.Value(1)).current
+  const opacity = useRef(new Animated.Value(0.5)).current
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(scale, {
+            toValue: 1.6,
+            duration: 1800,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 1,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 1800,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0.5,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [])
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: 1,
+        borderColor: color,
+        opacity,
+        transform: [{ scale }],
+      }}
+    />
+  )
+}
 export default function Login() {
   const router = useRouter()
   const { login, loading } = useAuth()
@@ -40,7 +104,6 @@ export default function Login() {
   const [usernameFocused, setUsernameFocused] = useState(false)
   const [passwordFocused, setPasswordFocused] = useState(false)
 
-  // Lockout state
   const [failedAttempts, setFailedAttempts] = useState(0)
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null)
   const [remainingLockoutSeconds, setRemainingLockoutSeconds] = useState(0)
@@ -50,37 +113,184 @@ export default function Login() {
   const [forgotUsername, setForgotUsername] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
   const [forgotMessage, setForgotMessage] = useState<string | null>(null)
-
   const [forgotCooldownUntil, setForgotCooldownUntil] = useState<number | null>(
     null
   )
   const [forgotCooldownSeconds, setForgotCooldownSeconds] = useState(0)
 
   const passwordRef = useRef<TextInput>(null)
-
   const isLoading = busy || loading
   const isLockedOut = lockoutUntil && lockoutUntil > Date.now()
 
-  // Theme integration
+  // Theme
   const { colors, isDark, toggleTheme } = useTheme()
-  const styles = createLoginStyles(isDark, colors)
+  const styles = useMemo(
+    () => createLoginStyles(isDark, colors),
+    [isDark, colors]
+  )
+
+  // Animation refs
   const themeSpinAnim = useRef(new Animated.Value(0)).current
   const [isThemeToggling, setIsThemeToggling] = useState(false)
 
-  // Dynamic colors based on theme
-  const gradientStart = isDark ? '#4F46E5' : '#3A5BF0'
-  const gradientMid = isDark ? '#7C3AED' : '#5B3FD4'
-  const gradientEnd = isDark ? '#A855F7' : '#7B2FF7'
+  // Mount animation
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const slideAnim = useRef(new Animated.Value(30)).current
+  const logoScaleAnim = useRef(new Animated.Value(0.8)).current
+  const logoFadeAnim = useRef(new Animated.Value(0)).current
+
+  // Button press animation
+  const buttonScaleAnim = useRef(new Animated.Value(1)).current
+
+  // Error shake animation
+  const shakeAnim = useRef(new Animated.Value(0)).current
+
+  // Gradient colors
+  const gradientStart = isDark ? '#3730A3' : '#3A5BF0'
+  const gradientMid = isDark ? '#5B21B6' : '#4F46E5'
+  const gradientEnd = isDark ? '#7C3AED' : '#6D28D9'
+
   const errorRed = '#EF4444'
-  const iconTint = isDark ? '#94A3B8' : '#8B92C4'
-  const placeholderGray = isDark ? '#64748B' : '#A0A3B5'
-  const successGreen = '#10b981'
+  const iconTint = isDark ? '#3D4E78' : '#A0A8D0'
+  const placeholderColor = isDark ? '#3D4E78' : '#A0A3B5'
+  const successGreen = '#10B981'
+
+  if (Platform.OS === 'web') {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 20,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: '600',
+            marginBottom: 12,
+            color: colors.text,
+          }}
+        >
+          Student & Assistant Admin login is only available on the mobile app.
+        </Text>
+        <Text
+          style={{
+            fontSize: 15,
+            color: colors.sidebar?.text?.secondary || '#666',
+          }}
+        >
+          Please use the Super Admin Login portal instead:
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.replace('/super-admin-login')}
+          style={{
+            marginTop: 20,
+            paddingHorizontal: 24,
+            paddingVertical: 12,
+            backgroundColor: '#3b82f6',
+            borderRadius: 8,
+          }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '600' }}>
+            Go to Super Admin Login
+          </Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(logoFadeAnim, {
+        toValue: 1,
+        duration: 700,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScaleAnim, {
+        toValue: 1,
+        tension: 60,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start()
+
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 500,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 500,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start()
+    }, 200)
+  }, [])
+
+  // ─── Shake on error ───────────────────────────────────────────
+  const triggerShake = () => {
+    shakeAnim.setValue(0)
+    Animated.sequence([
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -10,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 8,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -8,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 0,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }
+
+  // ─── Button press animation ───────────────────────────────────
+  const onButtonPressIn = () => {
+    Animated.spring(buttonScaleAnim, {
+      toValue: 0.96,
+      tension: 200,
+      friction: 10,
+      useNativeDriver: true,
+    }).start()
+  }
+
+  const onButtonPressOut = () => {
+    Animated.spring(buttonScaleAnim, {
+      toValue: 1,
+      tension: 200,
+      friction: 10,
+      useNativeDriver: true,
+    }).start()
+  }
 
   const isValidEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/
     return emailRegex.test(email)
   }
 
+  // ─── Persistence helpers ──────────────────────────────────────
   const saveLockoutState = async (
     attempts: number,
     lockoutTime: number | null
@@ -90,9 +300,7 @@ export default function Login() {
         'studentLoginAttempts',
         JSON.stringify({ failedAttempts: attempts, lockoutUntil: lockoutTime })
       )
-    } catch (e) {
-      // Silently fail
-    }
+    } catch (e) {}
   }
 
   const restoreLockoutState = async () => {
@@ -113,9 +321,7 @@ export default function Login() {
     } catch (e) {
       try {
         await AsyncStorage.removeItem('studentLoginAttempts')
-      } catch (err) {
-        // Silently fail
-      }
+      } catch {}
     }
   }
 
@@ -125,22 +331,7 @@ export default function Login() {
         'forgotPasswordCooldown',
         JSON.stringify({ cooldownUntil: cooldownTime })
       )
-    } catch (e) {
-      // Silently fail
-    }
-  }
-
-  const handleThemeToggle = () => {
-    if (isThemeToggling) return
-    setIsThemeToggling(true)
-    themeSpinAnim.setValue(0)
-    Animated.timing(themeSpinAnim, {
-      toValue: 1,
-      duration: 500,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => setIsThemeToggling(false))
-    toggleTheme()
+    } catch (e) {}
   }
 
   const restoreForgotCooldown = async () => {
@@ -155,9 +346,20 @@ export default function Login() {
           setForgotCooldownUntil(null)
         }
       }
-    } catch (e) {
-      // Silently fail
-    }
+    } catch (e) {}
+  }
+
+  const handleThemeToggle = () => {
+    if (isThemeToggling) return
+    setIsThemeToggling(true)
+    themeSpinAnim.setValue(0)
+    Animated.timing(themeSpinAnim, {
+      toValue: 1,
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => setIsThemeToggling(false))
+    toggleTheme()
   }
 
   useEffect(() => {
@@ -228,9 +430,7 @@ export default function Login() {
       remainingLockoutSeconds > 0
     ) {
       setError(
-        `Too many failed attempts. Please wait ${remainingLockoutSeconds} second${
-          remainingLockoutSeconds !== 1 ? 's' : ''
-        } before trying again.`
+        `Too many failed attempts. Please wait ${remainingLockoutSeconds} second${remainingLockoutSeconds !== 1 ? 's' : ''} before trying again.`
       )
     }
   }, [remainingLockoutSeconds, lockoutUntil])
@@ -238,6 +438,7 @@ export default function Login() {
   const handleFailedAttempt = (errorMessage: string) => {
     const newAttempts = failedAttempts + 1
     setFailedAttempts(newAttempts)
+    triggerShake()
 
     if (newAttempts >= 3) {
       const lockoutTime = Date.now() + 60 * 1000
@@ -245,7 +446,7 @@ export default function Login() {
       setRemainingLockoutSeconds(60)
       saveLockoutState(newAttempts, lockoutTime).catch(() => {})
       setError(
-        `Too many failed attempts. Please wait 60 seconds before trying again.`
+        'Too many failed attempts. Please wait 60 seconds before trying again.'
       )
     } else {
       setError(`${errorMessage} ${3 - newAttempts} attempt(s) remaining.`)
@@ -258,7 +459,6 @@ export default function Login() {
       setForgotMessage('Please enter your username')
       return
     }
-
     if (forgotCooldownUntil && forgotCooldownUntil > Date.now()) {
       setForgotMessage(
         `Please wait ${forgotCooldownSeconds} seconds before requesting again.`
@@ -282,6 +482,19 @@ export default function Login() {
 
       const userDoc = querySnapshot.docs[0]
       const userData = userDoc.data()
+      const accountStatus = userData.status || 'active'
+      if (accountStatus !== 'active') {
+        setBusy(false)
+        setError(
+          'Your account has been deactivated. Please contact an administrator.'
+        )
+        Alert.alert(
+          'Account Inactive',
+          'Your account has been deactivated. Please contact an administrator.'
+        )
+        return
+      }
+
       if (userData.role !== 'student' && userData.role !== 'assistant_admin') {
         setForgotMessage('Account type not supported for password reset here.')
         setForgotLoading(false)
@@ -312,21 +525,19 @@ export default function Login() {
       setForgotCooldownUntil(cooldownTime)
       setForgotCooldownSeconds(60)
       saveForgotCooldown(cooldownTime).catch(() => {})
-
       setForgotMessage(
         '✓ Reset email sent! The link expires in 1 hour. Check your inbox.'
       )
       setForgotLoading(false)
     } catch (error: any) {
       let errorMessage = 'Failed to send reset email. Please try again later.'
-      if (error.code === 'auth/user-not-found') {
+      if (error.code === 'auth/user-not-found')
         errorMessage =
           'No account found with that email. Please contact support.'
-      } else if (error.code === 'auth/invalid-email') {
+      else if (error.code === 'auth/invalid-email')
         errorMessage = 'Invalid email address. Please contact support.'
-      } else if (error.code === 'auth/too-many-requests') {
+      else if (error.code === 'auth/too-many-requests')
         errorMessage = 'Too many requests. Please try again later.'
-      }
       setForgotMessage(errorMessage)
       setForgotLoading(false)
     }
@@ -346,7 +557,8 @@ export default function Login() {
     }
 
     if (!username || !password) {
-      setError('Please enter username and password')
+      setError('Please enter your username and password.')
+      triggerShake()
       return
     }
 
@@ -378,6 +590,20 @@ export default function Login() {
         return
       }
 
+      const accountStatus = userData.status || 'active'
+      if (accountStatus !== 'active') {
+        setBusy(false)
+        setError(
+          'Your account has been deactivated. Please contact an administrator.'
+        )
+        Alert.alert(
+          'Account Inactive',
+          'Your account has been deactivated. Please contact an administrator.'
+        )
+        return
+      }
+
+      // Now it's safe to authenticate
       setLoadingMessage('Authenticating')
       const loggedInUser = await login(userData.email, password)
 
@@ -396,9 +622,7 @@ export default function Login() {
       }, 300)
     } catch (err: any) {
       setBusy(false)
-
       let errorMessage = 'Invalid username or password. Please try again.'
-
       if (
         err.code === 'auth/invalid-credential' ||
         err.code === 'auth/wrong-password' ||
@@ -410,10 +634,12 @@ export default function Login() {
       } else if (err.code === 'auth/network-request-failed') {
         errorMessage = 'Network error. Please check your connection.'
       }
-
       handleFailedAttempt(errorMessage)
     }
   }
+
+  const accentFocused = isDark ? '#6366F1' : '#4F46E5'
+  const pulseRingColor = isDark ? accentFocused : '#A5B4FC'
 
   return (
     <>
@@ -423,7 +649,7 @@ export default function Login() {
         backgroundColor='transparent'
       />
 
-      {/* Forgot Password Modal - Theme Aware */}
+      {/* ── Forgot Password Modal ── */}
       <Modal
         transparent
         visible={forgotModalVisible}
@@ -433,94 +659,139 @@ export default function Login() {
         <View
           style={{
             flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.5)',
+            backgroundColor: 'rgba(0,0,0,0.6)',
             justifyContent: 'center',
             alignItems: 'center',
+            paddingHorizontal: 24,
           }}
         >
           <View
             style={{
-              width: '80%',
-              maxWidth: 400,
-              backgroundColor: colors.card,
-              borderRadius: 20,
-              padding: 20,
+              width: '100%',
+              maxWidth: 380,
+              backgroundColor: isDark ? '#0F1629' : '#FFFFFF',
+              borderRadius: 28,
+              padding: 28,
+              borderWidth: 1,
+              borderColor: isDark ? '#1E2A4A' : '#E2E5FF',
               shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: isDark ? 0.5 : 0.25,
-              shadowRadius: 4,
-              elevation: 5,
+              shadowOffset: { width: 0, height: 20 },
+              shadowOpacity: isDark ? 0.6 : 0.15,
+              shadowRadius: 40,
+              elevation: 16,
             }}
           >
-            <Text
-              style={{
-                fontSize: 20,
-                fontWeight: 'bold',
-                color: colors.text,
-                marginBottom: 8,
-                textAlign: 'center',
-              }}
-            >
-              Reset Password
-            </Text>
-            <Text
-              style={{
-                fontSize: 14,
-                color: colors.textSecondary,
-                marginBottom: 20,
-                textAlign: 'center',
-              }}
-            >
-              Enter your username to receive a password reset email. The link
-              will expire in 1 hour.
-            </Text>
+            {/* Modal header */}
+            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 26,
+                  backgroundColor: isDark ? '#1E2A4A' : '#EEF0FF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 14,
+                }}
+              >
+                <Ionicons name='key-outline' size={24} color={accentFocused} />
+              </View>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: '700',
+                  color: isDark ? '#F1F5FF' : '#0F172A',
+                  letterSpacing: -0.4,
+                  marginBottom: 6,
+                }}
+              >
+                Reset Password
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: isDark ? '#8892B0' : '#64748B',
+                  textAlign: 'center',
+                  lineHeight: 18,
+                }}
+              >
+                Enter your username and we'll send a reset link to your
+                registered email.
+              </Text>
+            </View>
+
             <TextInput
               style={{
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: 12,
+                borderWidth: 1.5,
+                borderColor: isDark ? '#1E2A4A' : '#D0D4F5',
+                borderRadius: 14,
                 paddingHorizontal: 16,
-                paddingVertical: 12,
-                fontSize: 16,
-                color: colors.text,
-                backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                marginBottom: 12,
+                paddingVertical: 14,
+                fontSize: 15,
+                color: isDark ? '#F1F5FF' : '#0F172A',
+                backgroundColor: isDark ? '#131929' : '#F5F6FF',
+                marginBottom: 14,
+                letterSpacing: 0.2,
               }}
-              placeholder='Username'
-              placeholderTextColor={placeholderGray}
+              placeholder='Enter your username'
+              placeholderTextColor={isDark ? '#3D4E78' : '#A0A3B5'}
               value={forgotUsername}
               onChangeText={setForgotUsername}
               autoCapitalize='none'
               editable={!forgotLoading}
             />
+
             {forgotMessage && (
-              <Text
+              <View
                 style={{
-                  color: forgotMessage.startsWith('✓')
-                    ? successGreen
-                    : errorRed,
-                  fontSize: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  backgroundColor: forgotMessage.startsWith('✓')
+                    ? 'rgba(16,185,129,0.08)'
+                    : 'rgba(239,68,68,0.08)',
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: forgotMessage.startsWith('✓')
+                    ? 'rgba(16,185,129,0.25)'
+                    : 'rgba(239,68,68,0.25)',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
                   marginBottom: 16,
-                  textAlign: 'center',
                 }}
               >
-                {forgotMessage}
-              </Text>
+                <Ionicons
+                  name={
+                    forgotMessage.startsWith('✓')
+                      ? 'checkmark-circle-outline'
+                      : 'alert-circle-outline'
+                  }
+                  size={16}
+                  color={forgotMessage.startsWith('✓') ? '#10B981' : '#EF4444'}
+                />
+                <Text
+                  style={{
+                    flex: 1,
+                    color: forgotMessage.startsWith('✓')
+                      ? '#10B981'
+                      : '#EF4444',
+                    fontSize: 12,
+                    lineHeight: 17,
+                  }}
+                >
+                  {forgotMessage}
+                </Text>
+              </View>
             )}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                gap: 12,
-              }}
-            >
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity
                 style={{
                   flex: 1,
-                  paddingVertical: 12,
-                  borderRadius: 12,
+                  paddingVertical: 14,
+                  borderRadius: 14,
                   alignItems: 'center',
-                  backgroundColor: isDark ? '#334155' : '#f1f5f9',
+                  backgroundColor: isDark ? '#1E2A4A' : '#F0F2FF',
                 }}
                 onPress={() => {
                   setForgotModalVisible(false)
@@ -530,22 +801,29 @@ export default function Login() {
                 disabled={forgotLoading}
               >
                 <Text
-                  style={{ color: colors.textSecondary, fontWeight: '600' }}
+                  style={{
+                    color: isDark ? '#8892B0' : '#64748B',
+                    fontWeight: '600',
+                    fontSize: 14,
+                  }}
                 >
                   Cancel
                 </Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={{
                   flex: 1,
-                  paddingVertical: 12,
-                  borderRadius: 12,
+                  paddingVertical: 14,
+                  borderRadius: 14,
                   alignItems: 'center',
                   backgroundColor:
                     forgotCooldownUntil && forgotCooldownUntil > Date.now()
-                      ? '#94a3b8'
-                      : gradientStart,
-                  opacity: forgotLoading ? 0.6 : 1,
+                      ? isDark
+                        ? '#2D3A5A'
+                        : '#C7CAE8'
+                      : accentFocused,
+                  opacity: forgotLoading ? 0.65 : 1,
                 }}
                 onPress={handleForgotPassword}
                 disabled={
@@ -557,12 +835,20 @@ export default function Login() {
                 {forgotLoading ? (
                   <ActivityIndicator size='small' color='#fff' />
                 ) : forgotCooldownUntil && forgotCooldownUntil > Date.now() ? (
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>
+                  <Text
+                    style={{
+                      color: isDark ? '#8892B0' : '#7B82C4',
+                      fontWeight: '600',
+                      fontSize: 14,
+                    }}
+                  >
                     Wait {forgotCooldownSeconds}s
                   </Text>
                 ) : (
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>
-                    Send Email
+                  <Text
+                    style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}
+                  >
+                    Send Link
                   </Text>
                 )}
               </TouchableOpacity>
@@ -571,71 +857,96 @@ export default function Login() {
         </View>
       </Modal>
 
+      {/* ── Main Screen ── */}
       <View style={styles.root}>
+        {/* ── HEADER ── */}
         <LinearGradient
           colors={[gradientStart, gradientMid, gradientEnd]}
-          start={{ x: 0.1, y: 0 }}
-          end={{ x: 0.9, y: 1 }}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={styles.header}
         >
-          <View style={styles.statusBarSpacer} />
-
-          {/* Theme Toggle Button */}
+          {/* Decorative circle accents */}
           <View
             style={{
               position: 'absolute',
-              top:
-                Platform.OS === 'ios'
-                  ? 50
-                  : (StatusBar.currentHeight || 0) + 10,
-              right: 20,
-              zIndex: 10,
+              top: -40,
+              right: -40,
+              width: 180,
+              height: 180,
+              borderRadius: 90,
+              backgroundColor: 'rgba(255,255,255,0.05)',
             }}
+          />
+          <View
+            style={{
+              position: 'absolute',
+              bottom: -20,
+              left: -30,
+              width: 130,
+              height: 130,
+              borderRadius: 65,
+              backgroundColor: 'rgba(255,255,255,0.04)',
+            }}
+          />
+
+          <View style={styles.statusBarSpacer} />
+
+          {/* Theme Toggle */}
+          <TouchableOpacity
+            style={styles.themeToggle}
+            onPress={handleThemeToggle}
+            disabled={isThemeToggling}
+            activeOpacity={0.75}
           >
-            <TouchableOpacity
-              onPress={handleThemeToggle}
-              disabled={isThemeToggling}
-              activeOpacity={0.7}
+            <Animated.View
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: 'rgba(255,255,255,0.15)',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.3)',
+                transform: [
+                  {
+                    rotate: themeSpinAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    }),
+                  },
+                  {
+                    scale: themeSpinAnim.interpolate({
+                      inputRange: [0, 0.5, 1],
+                      outputRange: [1, 1.2, 1],
+                    }),
+                  },
+                ],
               }}
             >
-              <Animated.View
-                style={{
-                  transform: [
-                    {
-                      rotate: themeSpinAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0deg', '360deg'],
-                      }),
-                    },
-                    {
-                      scale: themeSpinAnim.interpolate({
-                        inputRange: [0, 0.5, 1],
-                        outputRange: [1, 1.2, 1],
-                      }),
-                    },
-                  ],
-                }}
-              >
-                <Ionicons
-                  name={isDark ? 'sunny-outline' : 'moon-outline'}
-                  size={22}
-                  color='#ffffff'
-                />
-              </Animated.View>
-            </TouchableOpacity>
-          </View>
+              <Ionicons
+                name={isDark ? 'sunny-outline' : 'moon-outline'}
+                size={20}
+                color='rgba(255,255,255,0.9)'
+              />
+            </Animated.View>
+          </TouchableOpacity>
 
-          <View style={styles.logoWrapper}>
-            <View style={styles.logoGlow}>
+          <Animated.View
+            style={[
+              styles.logoWrapper,
+              {
+                opacity: logoFadeAnim,
+                transform: [{ scale: logoScaleAnim }],
+              },
+            ]}
+          >
+            <View
+              style={{
+                position: 'absolute',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginTop: -24,
+              }}
+            >
+              <PulseRing delay={0} color={pulseRingColor} size={130} />
+              <PulseRing delay={900} color={pulseRingColor} size={130} />
+            </View>
+
+            <View style={styles.logoRing}>
               <Image
                 source={require('../assets/images/Logo/TMC_Connect.png')}
                 style={styles.logo}
@@ -643,13 +954,13 @@ export default function Login() {
               />
             </View>
             <Text style={styles.appName}>TMC Connect</Text>
-          </View>
+          </Animated.View>
         </LinearGradient>
 
         <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          keyboardVerticalOffset={0}
         >
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -665,152 +976,187 @@ export default function Login() {
               </Text>
             </View>
             <Text style={styles.subtitle}>
-              Sign in to continue to TMC Campus Hub
+              Sign in to continue to TMC Connect
             </Text>
 
-            {/* Username input */}
-            <View
-              style={[
-                styles.inputWrapper,
-                usernameFocused && styles.inputWrapperFocused,
-              ]}
+            {/* ── Username ── */}
+            <Animated.View
+              style={{
+                transform: [{ translateX: shakeAnim }],
+              }}
             >
-              <Ionicons
-                name='person-outline'
-                size={20}
-                color={usernameFocused ? gradientStart : iconTint}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                placeholder='Username'
-                placeholderTextColor={placeholderGray}
-                value={username}
-                onChangeText={(t) => {
-                  setUsername(t)
-                  if (error) setError(null)
-                }}
-                style={styles.input}
-                autoCapitalize='none'
-                autoCorrect={false}
-                returnKeyType='next'
-                onSubmitEditing={() => passwordRef.current?.focus()}
-                onFocus={() => setUsernameFocused(true)}
-                onBlur={() => setUsernameFocused(false)}
-                editable={!isLoading && !isLockedOut}
-              />
-              {username.length > 0 && (
-                <Ionicons
-                  name='checkmark-circle'
-                  size={18}
-                  color={gradientStart}
-                />
-              )}
-            </View>
-
-            {/* Password input */}
-            <View
-              style={[
-                styles.inputWrapper,
-                passwordFocused && styles.inputWrapperFocused,
-              ]}
-            >
-              <Ionicons
-                name='lock-closed-outline'
-                size={20}
-                color={passwordFocused ? gradientStart : iconTint}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                ref={passwordRef}
-                placeholder='Password'
-                placeholderTextColor={placeholderGray}
-                value={password}
-                onChangeText={(t) => {
-                  setPassword(t)
-                  if (error) setError(null)
-                }}
-                style={[styles.input, { flex: 1 }]}
-                secureTextEntry={!showPassword}
-                autoCapitalize='none'
-                autoCorrect={false}
-                returnKeyType='done'
-                onSubmitEditing={handleLogin}
-                onFocus={() => setPasswordFocused(true)}
-                onBlur={() => setPasswordFocused(false)}
-                editable={!isLoading && !isLockedOut}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword((s) => !s)}
-                style={styles.eyeButton}
-                disabled={isLoading || !!isLockedOut}
+              <View
+                style={[
+                  styles.inputWrapper,
+                  usernameFocused && styles.inputWrapperFocused,
+                ]}
               >
                 <Ionicons
-                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                  size={22}
-                  color={passwordFocused ? gradientStart : iconTint}
+                  name='person-outline'
+                  size={19}
+                  color={usernameFocused ? accentFocused : iconTint}
+                  style={styles.inputIcon}
                 />
-              </TouchableOpacity>
-            </View>
+                <TextInput
+                  placeholder='Username'
+                  placeholderTextColor={placeholderColor}
+                  value={username}
+                  onChangeText={(t) => {
+                    setUsername(t)
+                    if (error) setError(null)
+                  }}
+                  style={styles.input}
+                  autoCapitalize='none'
+                  autoCorrect={false}
+                  returnKeyType='next'
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  editable={!isLoading && !isLockedOut}
+                />
+                {username.length > 0 && (
+                  <Ionicons
+                    name='checkmark-circle'
+                    size={18}
+                    color={accentFocused}
+                  />
+                )}
+              </View>
 
-            {/* Error banner */}
+              {/* ── Password ── */}
+              <View
+                style={[
+                  styles.inputWrapper,
+                  passwordFocused && styles.inputWrapperFocused,
+                ]}
+              >
+                <Ionicons
+                  name='lock-closed-outline'
+                  size={19}
+                  color={passwordFocused ? accentFocused : iconTint}
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  ref={passwordRef}
+                  placeholder='Password'
+                  placeholderTextColor={placeholderColor}
+                  value={password}
+                  onChangeText={(t) => {
+                    setPassword(t)
+                    if (error) setError(null)
+                  }}
+                  style={[styles.input, { flex: 1 }]}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize='none'
+                  autoCorrect={false}
+                  returnKeyType='done'
+                  onSubmitEditing={handleLogin}
+                  editable={!isLoading && !isLockedOut}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword((s) => !s)}
+                  style={styles.eyeButton}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={passwordFocused ? accentFocused : iconTint}
+                  />
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+
+            {/* ── Error Banner ── */}
             {error ? (
               <View style={styles.errorBanner}>
                 <Ionicons
                   name='alert-circle-outline'
-                  size={18}
+                  size={17}
                   color={errorRed}
                 />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             ) : null}
 
-            {/* Sign In button */}
-            <LinearGradient
-              colors={[gradientStart, gradientMid, gradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                styles.buttonGradient,
-                isLoading && styles.buttonDisabled,
-              ]}
-            >
-              <TouchableOpacity
-                style={styles.button}
-                onPress={handleLogin}
-                disabled={isLoading || !!isLockedOut}
-                activeOpacity={0.85}
+            {/* ── Sign In Button ── */}
+            <Animated.View style={{ transform: [{ scale: buttonScaleAnim }] }}>
+              <LinearGradient
+                colors={[gradientStart, gradientMid, gradientEnd]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[
+                  styles.buttonGradient,
+                  isLoading && styles.buttonDisabled,
+                ]}
               >
-                {isLoading ? (
-                  <ActivityIndicator color='#FFFFFF' size='small' />
-                ) : (
-                  <Text style={styles.buttonText}>Sign In</Text>
-                )}
-              </TouchableOpacity>
-            </LinearGradient>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={handleLogin}
+                  onPressIn={onButtonPressIn}
+                  onPressOut={onButtonPressOut}
+                  activeOpacity={1}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color='#FFFFFF' size='small' />
+                  ) : (
+                    <>
+                      <Text style={styles.buttonText}>Sign In</Text>
+                      <View style={styles.buttonArrow}>
+                        <Ionicons name='arrow-forward' size={14} color='#fff' />
+                      </View>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </LinearGradient>
+            </Animated.View>
 
-            {/* Forgot password */}
+            {/* ── Forgot Password ── */}
             <TouchableOpacity
               style={styles.forgotRow}
               onPress={() => setForgotModalVisible(true)}
-              disabled={isLoading || !!isLockedOut}
             >
               <Text style={styles.forgotText}>Forgot Password?</Text>
             </TouchableOpacity>
 
+            {/* ── Divider ── */}
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerLabel}>Secure Login</Text>
               <View style={styles.dividerLine} />
             </View>
+
+            {/* ── Secure Badge ── */}
+            <View style={styles.secureBadge}>
+              <Ionicons
+                name='shield-checkmark-outline'
+                size={13}
+                color={isDark ? '#3D4E78' : '#A0A8D0'}
+              />
+              <Text style={styles.secureBadgeText}>
+                Protected by Firebase Auth
+              </Text>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
 
-      <Modal transparent visible={isLoading} animationType='fade'>
-        <LoadingScreen
-          message={loadingMessage || 'Signing you in...'}
-          subMessage='Please wait while we prepare your dashboard'
-        />
+      <Modal
+        transparent
+        visible={busy}
+        animationType='fade'
+        statusBarTranslucent
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <LoadingScreen
+            message={loadingMessage || 'Signing you in...'}
+            subMessage='Please wait while we prepare your dashboard'
+          />
+        </View>
       </Modal>
     </>
   )

@@ -48,6 +48,7 @@ import { auth, db } from '../../../src/Model/lib/firebaseConfig'
 import AutoSlidingStats from '../../../src/View/components/AutoSlidingStats-Stu'
 import { NotificationModal } from '../../../src/View/components/NotificationModal'
 import { StudentActivityModal } from '../../../src/View/components/StudentActivityModal'
+import { WeatherWidget } from '../../../src/View/components/WeatherWidget'
 import { createStudentDashboardStyles } from '../../../src/View/styles/student/dashboardStyles'
 
 interface Event {
@@ -283,6 +284,7 @@ export default function StudentDashboard() {
   }
 
   const fetchStudentStats = async () => {
+    if (!auth.currentUser) return
     try {
       setLoading(true)
       if (!userData?.email) return
@@ -324,14 +326,17 @@ export default function StudentDashboard() {
         upcomingEvents: upcomingCount,
         totalAnnouncements,
       })
-    } catch (error) {
-      console.error('Error fetching student stats:', error)
+    } catch (error: any) {
+      if (error.code !== 'permission-denied') {
+        console.error('Error fetching student stats:', error)
+      }
     } finally {
       setLoading(false)
     }
   }
 
   const fetchDonutData = async () => {
+    if (!auth.currentUser) return
     try {
       const now = new Date()
       const eventsSnapshot = await getDocs(collection(db, 'events'))
@@ -340,7 +345,7 @@ export default function StudentDashboard() {
 
       eventsSnapshot.docs.forEach((doc) => {
         const data = doc.data()
-        // ✅ Only count if approved or no status
+
         if (!isApproved(data)) return
 
         const eventDate = data.date?.toDate?.() || data.date
@@ -359,7 +364,7 @@ export default function StudentDashboard() {
       let totalAnnouncements = 0
       announcementsSnapshot.docs.forEach((doc) => {
         const data = doc.data()
-        // ✅ Only count if approved or no status
+
         if (isApproved(data)) totalAnnouncements++
       })
 
@@ -368,22 +373,24 @@ export default function StudentDashboard() {
         pastEvents: pastEventsCount,
         announcements: totalAnnouncements,
       })
-    } catch (error) {
-      console.error('Error fetching donut data:', error)
+    } catch (error: any) {
+      if (error.code !== 'permission-denied') {
+        console.error('Error fetching donut data:', error)
+      }
     }
   }
 
   const fetchRecentEvents = () => {
     setEventsLoading(true)
 
-    // Order by event date (ascending) so upcoming events appear first
     const unsubscribe = onSnapshot(
       query(collection(db, 'events'), orderBy('date', 'asc')),
       (snapshot) => {
+        if (!auth.currentUser) return
         const events: Event[] = []
         snapshot.docs.forEach((doc) => {
           const data = doc.data()
-          // Only include approved events
+
           if (!isApproved(data)) return
 
           const eventDate = data.date?.toDate?.() || data.date
@@ -412,7 +419,9 @@ export default function StudentDashboard() {
         setEventsLoading(false)
       },
       (error) => {
-        console.error('Error fetching events:', error)
+        if (error.code !== 'permission-denied') {
+          console.error('Error fetching events:', error)
+        }
         setEventsLoading(false)
       }
     )
@@ -425,6 +434,7 @@ export default function StudentDashboard() {
     const unsubscribe = onSnapshot(
       collection(db, 'announcements'),
       (snapshot) => {
+        if (!auth.currentUser) return
         const announcements: Announcement[] = []
         snapshot.docs.forEach((doc) => {
           const data = doc.data()
@@ -447,7 +457,9 @@ export default function StudentDashboard() {
         setAnnouncementsLoading(false)
       },
       (error) => {
-        console.error('Error fetching announcements:', error)
+        if (error.code !== 'permission-denied') {
+          console.error('Error fetching announcements:', error)
+        }
         setAnnouncementsLoading(false)
       }
     )
@@ -456,17 +468,32 @@ export default function StudentDashboard() {
   }
 
   useEffect(() => {
+    if (!userData) {
+      setStudentStats({
+        eventsAttended: 0,
+        upcomingEvents: 0,
+        totalAnnouncements: 0,
+      })
+      setDonutData({ upcomingEvents: 0, pastEvents: 0, announcements: 0 })
+      setUpcomingEvents([])
+      setRecentAnnouncements([])
+      setEventsLoading(false)
+      setAnnouncementsLoading(false)
+      setLoading(false)
+      return
+    }
+
     fetchStudentStats()
     fetchDonutData()
 
     const unsubscribeEvents = fetchRecentEvents()
     const unsubscribeAnnouncements = fetchRecentAnnouncements()
 
+    // Notification listeners
     let unsubscribeEmail: (() => void) | undefined
     let unsubscribeUid: (() => void) | undefined
     const currentUser = auth.currentUser
 
-    // Helper to safely get timestamp in milliseconds
     const getTime = (timestamp: any): number => {
       if (!timestamp) return 0
       if (
@@ -476,39 +503,28 @@ export default function StudentDashboard() {
       ) {
         return timestamp.toDate().getTime()
       }
-      if (timestamp instanceof Date) {
-        return timestamp.getTime()
-      }
-      if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      if (timestamp instanceof Date) return timestamp.getTime()
+      if (typeof timestamp === 'string' || typeof timestamp === 'number')
         return new Date(timestamp).getTime()
-      }
       return 0
     }
 
-    // Listen with email (if available)
-    if (userData?.email) {
+    if (userData.email) {
       unsubscribeEmail = notificationService.listenForNotifications(
         userData.email,
         (notifs) => {
           setNotifications((prev) => {
             const combined = [...prev]
             notifs.forEach((n) => {
-              if (!combined.some((ex) => ex.id === n.id)) {
-                combined.push(n)
-              }
+              if (!combined.some((ex) => ex.id === n.id)) combined.push(n)
             })
-            combined.sort((a, b) => {
-              const timeA = getTime(a.timestamp)
-              const timeB = getTime(b.timestamp)
-              return timeB - timeA
-            })
+            combined.sort((a, b) => getTime(b.timestamp) - getTime(a.timestamp))
             return combined
           })
         }
       )
     }
 
-    // Listen with Firebase UID (if available)
     if (currentUser?.uid) {
       unsubscribeUid = notificationService.listenForNotifications(
         currentUser.uid,
@@ -516,21 +532,16 @@ export default function StudentDashboard() {
           setNotifications((prev) => {
             const combined = [...prev]
             notifs.forEach((n) => {
-              if (!combined.some((ex) => ex.id === n.id)) {
-                combined.push(n)
-              }
+              if (!combined.some((ex) => ex.id === n.id)) combined.push(n)
             })
-            combined.sort((a, b) => {
-              const timeA = getTime(a.timestamp)
-              const timeB = getTime(b.timestamp)
-              return timeB - timeA
-            })
+            combined.sort((a, b) => getTime(b.timestamp) - getTime(a.timestamp))
             return combined
           })
         }
       )
     }
 
+    // 🧹 Cleanup: runs when userData changes (i.e. logout) or component unmounts
     return () => {
       unsubscribeEvents()
       unsubscribeAnnouncements()
@@ -538,7 +549,7 @@ export default function StudentDashboard() {
       if (unsubscribeUid) unsubscribeUid()
       notificationService.cleanup()
     }
-  }, [userData])
+  }, [userData]) // 👈 Dependency on userData is key!
   // Update unread count whenever notifications change
   useEffect(() => {
     const unread = notifications.filter((n) => !n.read).length
@@ -582,8 +593,8 @@ export default function StudentDashboard() {
   }, [recentAnnouncements, upcomingEvents, lastViewed, activityModalVisible])
 
   const onRefresh = React.useCallback(() => {
+    if (!auth.currentUser) return
     setRefreshing(true)
-    // Trigger rotation animation
     Animated.timing(rotateAnim, {
       toValue: 1,
       duration: 1000,
@@ -1403,6 +1414,7 @@ export default function StudentDashboard() {
 
         <InteractiveDonutChart />
         <AutoSlidingStats />
+        <WeatherWidget colors={colors} isDark={isDark} isMobile={isMobile} />
 
         {/* Two Column Layout with Animations */}
         <Animated.View

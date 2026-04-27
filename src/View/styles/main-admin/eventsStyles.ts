@@ -28,7 +28,7 @@ export const createEventsStyles = (
       backgroundColor: colors.background,
     },
     headerGradient: {
-      paddingTop: isMobile ? 20 : 28,
+      paddingTop: isMobile ? 20 : 20,
       paddingBottom: isMobile ? 16 : 20,
       paddingHorizontal: isMobile ? 20 : 28,
       borderBottomLeftRadius: isMobile ? 20 : 24,
@@ -84,6 +84,7 @@ export const createEventsStyles = (
     },
     characterCounterText: {
       fontSize: 12,
+      color: colors.sidebar.text.muted,
     },
     characterCounterWarning: {
       fontSize: 12,
@@ -94,12 +95,12 @@ export const createEventsStyles = (
       height: '100%',
     },
     profileFallback: {
-      backgroundColor: 'rgba(255,255,255,0.2)',
+      backgroundColor: isDark ? '#334155' : '#e2e8f0',
       justifyContent: 'center',
       alignItems: 'center',
     },
     profileInitials: {
-      color: '#ffffff',
+      color: isDark ? '#ffffff' : '#1e293b',
       fontSize: isMobile ? 16 : 18,
       fontWeight: '700',
     },
@@ -1161,6 +1162,7 @@ export const createEventsStyles = (
       fontSize: 16,
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.2)',
+      color: colors.text,
     },
     glassFormInputMobile: {
       fontSize: 14,

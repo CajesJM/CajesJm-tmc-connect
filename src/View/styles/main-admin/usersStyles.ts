@@ -14,7 +14,7 @@ export const createUsersStyles = (
       backgroundColor: colors.background,
     },
     headerGradient: {
-      paddingTop: isMobile ? 20 : 28,
+      paddingTop: isMobile ? 20 : 20,
       paddingBottom: isMobile ? 16 : 20,
       paddingHorizontal: isMobile ? 20 : 28,
       borderBottomLeftRadius: isMobile ? 20 : 24,
@@ -67,12 +67,12 @@ export const createUsersStyles = (
       height: '100%',
     },
     profileFallback: {
-      backgroundColor: 'rgba(255,255,255,0.2)',
+      backgroundColor: isDark ? '#334155' : '#e2e8f0',
       justifyContent: 'center',
       alignItems: 'center',
     },
     profileInitials: {
-      color: '#ffffff',
+      color: isDark ? '#ffffff' : '#1e293b',
       fontSize: isMobile ? 16 : 18,
       fontWeight: '700',
     },

@@ -229,8 +229,7 @@ export default function StudentEventsScreen() {
   ): 'attended' | 'missed' | 'not-recorded' => {
     if (!userData?.studentID) return 'not-recorded'
 
-    const now = new Date()
-    const isPast = event.date <= now
+    const isPast = dayjs(event.date).isBefore(dayjs(), 'day')
 
     if (!isPast) return 'not-recorded'
 
@@ -238,8 +237,7 @@ export default function StudentEventsScreen() {
       (attendee: any) => attendee.studentID === userData.studentID
     )
 
-    if (hasAttended) return 'attended'
-    return 'missed'
+    return hasAttended ? 'attended' : 'missed'
   }
 
   const getEmptyTitle = () => {
@@ -400,7 +398,7 @@ export default function StudentEventsScreen() {
       setIsWithinRange(within)
 
       Alert.alert(
-        within ? '✅ You are within range!' : '❌ You are outside the range',
+        within ? '✓ You are within range!' : '✗ You are outside the range',
         `Your distance: ${Math.round(dist)}m\nAllowed radius: ${event.coordinates.radius}m`
       )
     } catch (error) {
@@ -478,7 +476,7 @@ export default function StudentEventsScreen() {
   const renderEventCard = ({ item, index }: { item: Event; index: number }) => {
     const days = getDaysUntilEvent(item.date)
     const imageSource = getLocationImage(item)
-    const isPast = item.date <= new Date()
+    const isPast = dayjs(item.date).isBefore(dayjs(), 'day')
     const attendanceStatus = getAttendanceStatus(item)
 
     // Global number across all pages

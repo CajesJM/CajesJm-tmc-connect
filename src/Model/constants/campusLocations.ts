@@ -8,7 +8,7 @@ export interface CampusLocation {
 export const CAMPUS_LOCATIONS: CampusLocation[] = [
   {
     id: 'optional',
-    name: 'Optional',
+    name: 'No Specific Location',
     image: require('../../../assets/images/campusLocations/optional.jpg'),
     description: 'Optional location for events without a specific venue',
   },
@@ -41,5 +41,11 @@ export const CAMPUS_LOCATIONS: CampusLocation[] = [
     name: 'Guinobatan Gymnasium',
     image: require('../../../assets/images/campusLocations/Guinobatan.jpeg'),
     description: 'Gymnasium for performances and sports events',
+  },
+  {
+    id: 'maincampus',
+    name: 'Main Campus',
+    image: require('../../../assets/images/campusLocations/MainCampus.jpg'),
+    description: 'Main campus area with academic buildings and common spaces',
   },
 ]

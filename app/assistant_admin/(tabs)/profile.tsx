@@ -7,7 +7,13 @@ import {
   reauthenticateWithCredential,
   updatePassword,
 } from 'firebase/auth'
-import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import {
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  updateDoc,
+} from 'firebase/firestore'
 import {
   deleteObject,
   getDownloadURL,
@@ -59,6 +65,7 @@ function getInitials(name?: string, email?: string): string {
 }
 
 export default function AssistantAdminProfile() {
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const { logout, userData, user, refreshUserData } = useAuth()
   const router = useRouter()
   const { theme, setTheme, colors, isDark } = useTheme()
@@ -105,6 +112,22 @@ export default function AssistantAdminProfile() {
   useEffect(() => {
     if (userData?.photoURL) setPhotoURL(userData.photoURL)
   }, [userData?.photoURL])
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid
+    if (!uid) return
+
+    const fetchPref = async () => {
+      const snap = await getDoc(doc(db, 'users', uid))
+      if (snap.exists()) {
+        const data = snap.data()
+        if (typeof data.notificationEnabled === 'boolean') {
+          setNotificationsEnabled(data.notificationEnabled)
+        }
+      }
+    }
+    fetchPref()
+  }, [])
 
   const calculatePasswordStrength = (password: string) => {
     let score = 0
@@ -391,11 +414,9 @@ export default function AssistantAdminProfile() {
       })
       await Promise.all(oldFiles.map((fileRef) => deleteObject(fileRef)))
       if (oldFiles.length > 0) {
-        console.log(`Deleted ${oldFiles.length} old profile image(s)`)
       }
     } catch (err: any) {
       if (err.code === 'storage/unauthorized') {
-        console.log('List permission not granted, skipping old file cleanup')
       } else {
         console.warn('Failed to clean up old profile images:', err)
       }
@@ -630,17 +651,71 @@ export default function AssistantAdminProfile() {
 
             <View style={styles.settingsSection}>
               <Text style={styles.settingsSectionTitle}>Preferences</Text>
-              <View style={styles.settingsOption}>
+              <TouchableOpacity
+                style={styles.settingsOption}
+                onPress={async () => {
+                  const newValue = !notificationsEnabled
+                  setNotificationsEnabled(newValue)
+                  try {
+                    if (auth.currentUser) {
+                      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+                        notificationEnabled: newValue,
+                      })
+                    }
+                  } catch (e) {
+                    console.error('Failed to update notification preference', e)
+                    setNotificationsEnabled(!newValue)
+                  }
+                }}
+                activeOpacity={0.7}
+              >
                 <View style={styles.settingsOptionLeft}>
                   <Icon
                     name='bell-outline'
                     size={20}
                     color={colors.textSecondary}
                   />
-                  <Text style={styles.settingsOptionText}>Notifications</Text>
+                  <Text style={styles.settingsOptionText}>
+                    Push Notifications
+                  </Text>
                 </View>
-                <Text style={styles.settingsOptionValue}>Enabled</Text>
-              </View>
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: notificationsEnabled ? '#10B981' : '#EF4444',
+                    }}
+                  >
+                    {notificationsEnabled ? 'Enabled' : 'Disabled'}
+                  </Text>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: notificationsEnabled
+                        ? '#10B981'
+                        : '#9CA3AF',
+                      justifyContent: 'center',
+                      paddingHorizontal: 2,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        backgroundColor: '#fff',
+                        transform: [
+                          { translateX: notificationsEnabled ? 20 : 0 },
+                        ],
+                      }}
+                    />
+                  </View>
+                </View>
+              </TouchableOpacity>
               <View style={styles.settingsOption}>
                 <View style={styles.settingsOptionLeft}>
                   <Icon

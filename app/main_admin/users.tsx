@@ -95,7 +95,7 @@ interface User {
   yearLevel?: string
   block?: string
   gender?: string
-  active?: boolean
+  status?: 'active' | 'inactive'
   deactivatedAt?: string
 }
 
@@ -167,7 +167,7 @@ const AnimatedUserItem = memo(function AnimatedUserItem({
           styles.paginatedItem,
           isActive && styles.paginatedItemActive,
           isMobile && styles.paginatedItemMobile,
-          !item.active && { opacity: 0.6 },
+          item.status !== 'active' && { opacity: 0.6 },
         ]}
         onPress={() => setSelectedUserId(item.id)}
       >
@@ -193,7 +193,7 @@ const AnimatedUserItem = memo(function AnimatedUserItem({
             >
               {item.surname ? `${item.surname}, ${item.name}` : item.name}
             </Text>
-            {!item.active && (
+            {item.status !== 'active' && (
               <View style={styles.inactiveBadge}>
                 <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
               </View>
@@ -253,15 +253,18 @@ const AnimatedUserItem = memo(function AnimatedUserItem({
               <TouchableOpacity
                 style={[
                   styles.paginatedStatusButton,
-                  { backgroundColor: item.active ? '#fff7ed' : '#e6f7e6' },
+                  {
+                    backgroundColor:
+                      item.status === 'active' ? '#fff7ed' : '#e6f7e6',
+                  },
                   isMobile && styles.paginatedStatusButtonMobile,
                 ]}
                 onPress={() => handleToggleActive(item)}
               >
                 <Feather
-                  name={item.active ? 'user-x' : 'user-check'}
+                  name={item.status === 'active' ? 'user-x' : 'user-check'}
                   size={isMobile ? 12 : 14}
-                  color={item.active ? '#ef4444' : '#10b981'}
+                  color={item.status === 'active' ? '#ef4444' : '#10b981'}
                 />
               </TouchableOpacity>
               <TouchableOpacity
@@ -442,7 +445,7 @@ export default function UserManagement() {
           yearLevel: data.yearLevel,
           block: data.block,
           gender: data.gender,
-          active: data.active === undefined ? true : data.active,
+          status: data.status || (data.active ? 'active' : 'inactive'),
           deactivatedAt: data.deactivatedAt,
         } as User)
       })
@@ -593,7 +596,7 @@ export default function UserManagement() {
         role: newUser.role,
         createdAt: new Date(),
         uid: uid,
-        active: true,
+        status: 'active',
       }
       if (newUser.role === 'student') {
         userData.studentID = newUser.studentID.trim()
@@ -840,96 +843,76 @@ export default function UserManagement() {
   }
 
   const handleToggleActive = async (user: User) => {
-    const newActiveStatus = !user.active
-    const action = newActiveStatus ? 'activate' : 'deactivate'
-    const actionTitle = newActiveStatus ? 'Activate' : 'Deactivate'
+    const newStatus = user.status === 'active' ? 'inactive' : 'active'
+    const action = newStatus === 'active' ? 'activate' : 'deactivate'
+    const actionTitle = newStatus === 'active' ? 'Activate' : 'Deactivate'
+
+    const doUpdate = async () => {
+      setModalLoading(true)
+      const userRef = doc(db, 'users', user.id)
+      await updateDoc(userRef, {
+        status: newStatus,
+        ...(newStatus === 'inactive'
+          ? { deactivatedAt: new Date().toISOString() }
+          : { deactivatedAt: null }),
+      })
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === user.id
+            ? {
+                ...u,
+                status: newStatus,
+                deactivatedAt:
+                  newStatus === 'inactive'
+                    ? new Date().toISOString()
+                    : undefined,
+              }
+            : u
+        )
+      )
+    }
 
     if (Platform.OS === 'web') {
       const isConfirmed = window.confirm(
         `Are you sure you want to ${action} ${user.name}?`
       )
-      if (isConfirmed) {
-        try {
-          setModalLoading(true)
-          const userRef = doc(db, 'users', user.id)
-          await updateDoc(userRef, {
-            active: newActiveStatus,
-            ...(action === 'deactivate' && {
-              deactivatedAt: new Date().toISOString(),
-            }),
-            ...(action === 'activate' && { deactivatedAt: null }),
-          })
-          setUsers((prevUsers) =>
-            prevUsers.map((u) =>
-              u.id === user.id
-                ? {
-                    ...u,
-                    active: newActiveStatus,
-                    deactivatedAt:
-                      action === 'deactivate'
-                        ? new Date().toISOString()
-                        : undefined,
-                  }
-                : u
-            )
-          )
-          window.alert(`User ${action}d successfully`)
-        } catch (error: any) {
-          window.alert(
-            `Failed to ${action} user: ${error.message || 'Unknown error'}`
-          )
-        } finally {
-          setModalLoading(false)
-        }
+      if (!isConfirmed) return
+      try {
+        await doUpdate()
+        window.alert(`User ${action}d successfully`)
+      } catch (error: any) {
+        window.alert(
+          `Failed to ${action} user: ${error.message || 'Unknown error'}`
+        )
+      } finally {
+        setModalLoading(false)
       }
-      return
-    }
-    Alert.alert(
-      `${actionTitle} User`,
-      `Are you sure you want to ${action} ${user.name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: `Yes, ${actionTitle}`,
-          style: action === 'deactivate' ? 'destructive' : 'default',
-          onPress: async () => {
-            try {
-              setModalLoading(true)
-              const userRef = doc(db, 'users', user.id)
-              await updateDoc(userRef, {
-                active: newActiveStatus,
-                ...(action === 'deactivate' && {
-                  deactivatedAt: new Date().toISOString(),
-                }),
-                ...(action === 'activate' && { deactivatedAt: null }),
-              })
-              setUsers((prevUsers) =>
-                prevUsers.map((u) =>
-                  u.id === user.id
-                    ? {
-                        ...u,
-                        active: newActiveStatus,
-                        deactivatedAt:
-                          action === 'deactivate'
-                            ? new Date().toISOString()
-                            : undefined,
-                      }
-                    : u
+    } else {
+      Alert.alert(
+        `${actionTitle} User`,
+        `Are you sure you want to ${action} ${user.name}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: `Yes, ${actionTitle}`,
+            style: action === 'deactivate' ? 'destructive' : 'default',
+            onPress: async () => {
+              try {
+                await doUpdate()
+                Alert.alert('Success', `User ${action}d successfully`)
+              } catch (error: any) {
+                Alert.alert(
+                  'Error',
+                  `Failed to ${action} user: ${error.message || 'Unknown error'}`
                 )
-              )
-              Alert.alert('Success', `User ${action}d successfully`)
-            } catch (error: any) {
-              Alert.alert(
-                'Error',
-                `Failed to ${action} user: ${error.message || 'Unknown error'}`
-              )
-            } finally {
-              setModalLoading(false)
-            }
+              } finally {
+                setModalLoading(false)
+              }
+            },
           },
-        },
-      ]
-    )
+        ]
+      )
+    }
   }
 
   const resetForm = () => {
@@ -1026,7 +1009,7 @@ export default function UserManagement() {
           styles.paginatedItem,
           isActive && styles.paginatedItemActive,
           isMobile && styles.paginatedItemMobile,
-          !item.active && { opacity: 0.6 },
+          item.status !== 'active' && { opacity: 0.6 },
         ]}
         onPress={() => setSelectedUserId(item.id)}
       >
@@ -1058,7 +1041,7 @@ export default function UserManagement() {
             >
               {item.surname ? `${item.surname}, ${item.name}` : item.name}
             </Text>
-            {!item.active && (
+            {item.status !== 'active' && (
               <View style={styles.inactiveBadge}>
                 <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
               </View>
@@ -1123,15 +1106,18 @@ export default function UserManagement() {
               <TouchableOpacity
                 style={[
                   styles.paginatedStatusButton,
-                  { backgroundColor: item.active ? '#fff7ed' : '#e6f7e6' },
+                  {
+                    backgroundColor:
+                      item.status === 'active' ? '#fff7ed' : '#e6f7e6',
+                  },
                   isMobile && styles.paginatedStatusButtonMobile,
                 ]}
                 onPress={() => handleToggleActive(item)}
               >
                 <Feather
-                  name={item.active ? 'user-x' : 'user-check'}
+                  name={item.status === 'active' ? 'user-x' : 'user-check'}
                   size={isMobile ? 12 : 14}
-                  color={item.active ? '#ef4444' : '#10b981'}
+                  color={item.status === 'active' ? '#ef4444' : '#10b981'}
                 />
               </TouchableOpacity>
               <TouchableOpacity
@@ -1191,7 +1177,7 @@ export default function UserManagement() {
               {item.surname ? `${item.surname}, ${item.name}` : item.name}
             </Text>
             <View style={styles.searchResultBadges}>
-              {!item.active && (
+              {item.status !== 'active' && (
                 <View
                   style={[
                     styles.searchResultBadge,
@@ -1274,7 +1260,10 @@ export default function UserManagement() {
                 <TouchableOpacity
                   style={[
                     styles.searchResultStatusButton,
-                    { backgroundColor: item.active ? '#fff7ed' : '#e6f7e6' },
+                    {
+                      backgroundColor:
+                        item.status === 'active' ? '#fff7ed' : '#e6f7e6',
+                    },
                     isMobile && styles.searchResultStatusButtonMobile,
                   ]}
                   onPress={(e) => {
@@ -1283,9 +1272,9 @@ export default function UserManagement() {
                   }}
                 >
                   <Feather
-                    name={item.active ? 'user-x' : 'user-check'}
+                    name={item.status === 'active' ? 'user-x' : 'user-check'}
                     size={isMobile ? 12 : 14}
-                    color={item.active ? '#ef4444' : '#10b981'}
+                    color={item.status === 'active' ? '#ef4444' : '#10b981'}
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1392,7 +1381,7 @@ export default function UserManagement() {
             ]}
           >
             <Text style={[styles.paginatedBadgeText, { color: roleColor }]}>
-              {selected.active ? 'ACTIVE' : 'INACTIVE'}
+              {selected.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
             </Text>
           </View>
         </View>
@@ -2150,8 +2139,8 @@ export default function UserManagement() {
   }
 
   const headerGradientColors = isDark
-    ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
-    : (['#0f2456', '#1a3a8f', '#1e53c8'] as const)
+    ? (['#060c18', '#0a1a3a', '#10254e'] as const)
+    : (['#ffffff', '#f5f9ff', '#eaf2ff'] as const)
   return (
     <View style={styles.container}>
       {/* Header with Gradient */}
@@ -2168,18 +2157,24 @@ export default function UserManagement() {
             <Text
               style={[
                 styles.greetingText,
-                { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+                { color: isDark ? '#cbd5e1' : '#475569' },
               ]}
             >
               Welcome Back,
             </Text>
-            <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
+            <Text
+              style={[
+                styles.userName,
+                isMobile && styles.userNameMobile,
+                { color: isDark ? '#ffffff' : '#0f172a' },
+              ]}
+            >
               {userData?.name || 'Admin'}
             </Text>
             <Text
               style={[
                 styles.roleText,
-                { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+                { color: isDark ? '#94a3b8' : '#64748b' },
               ]}
             >
               User Manager
@@ -2222,7 +2217,13 @@ export default function UserManagement() {
               isMobile && styles.dateContainerMobile,
             ]}
           >
-            <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
+            <Text
+              style={[
+                styles.dateText,
+                isMobile && styles.dateTextMobile,
+                { color: isDark ? '#cbd5e1' : '#334155' },
+              ]}
+            >
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
                 year: 'numeric',
@@ -2237,6 +2238,11 @@ export default function UserManagement() {
               style={[
                 styles.headerAction,
                 isMobile && styles.headerActionMobile,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(255,255,255,0.12)'
+                    : 'rgba(0,0,0,0.05)',
+                },
               ]}
               onPress={handleThemeToggle}
               disabled={isThemeToggling}
@@ -2262,8 +2268,8 @@ export default function UserManagement() {
               >
                 <Feather
                   name={isDark ? 'sun' : 'moon'}
-                  size={isMobile ? 16 : 18}
-                  color='#ffffff'
+                  size={18}
+                  color={isDark ? '#fff' : '#1e293b'}
                 />
               </Animated.View>
             </TouchableOpacity>
@@ -2273,13 +2279,18 @@ export default function UserManagement() {
               style={[
                 styles.headerAction,
                 isMobile && styles.headerActionMobile,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(255,255,255,0.12)'
+                    : 'rgba(0,0,0,0.05)',
+                },
               ]}
               onPress={() => setShowCreateModal(true)}
             >
               <Feather
                 name='user-plus'
                 size={isMobile ? 16 : 18}
-                color='#ffffff'
+                color={isDark ? '#fff' : '#1e293b'}
               />
             </TouchableOpacity>
           </View>

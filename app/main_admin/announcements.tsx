@@ -943,8 +943,8 @@ export default function MainAdminAnnouncements() {
   }
 
   const headerGradientColors = isDark
-    ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
-    : (['#0f2456', '#1a3a8f', '#1e53c8'] as const)
+    ? (['#060c18', '#0a1a3a', '#10254e'] as const)
+    : (['#ffffff', '#f5f9ff', '#eaf2ff'] as const)
 
   return (
     <View style={styles.container}>
@@ -962,18 +962,23 @@ export default function MainAdminAnnouncements() {
             <Text
               style={[
                 styles.greetingText,
-                { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+                { color: isDark ? '#cbd5e1' : '#475569' },
               ]}
             >
               Welcome Back,
             </Text>
-            <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
+            <Text
+              style={[
+                styles.userName,
+                { color: isDark ? '#ffffff' : '#0f172a' },
+              ]}
+            >
               {userData?.name || 'Admin'}
             </Text>
             <Text
               style={[
                 styles.roleText,
-                { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+                { color: isDark ? '#94a3b8' : '#64748b' },
               ]}
             >
               {' '}
@@ -1017,7 +1022,12 @@ export default function MainAdminAnnouncements() {
               isMobile && styles.dateContainerMobile,
             ]}
           >
-            <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
+            <Text
+              style={[
+                styles.dateText,
+                { color: isDark ? '#cbd5e1' : '#334155' },
+              ]}
+            >
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
                 year: 'numeric',
@@ -1031,6 +1041,11 @@ export default function MainAdminAnnouncements() {
               style={[
                 styles.headerAction,
                 isMobile && styles.headerActionMobile,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(255,255,255,0.12)'
+                    : 'rgba(0,0,0,0.05)',
+                },
               ]}
               onPress={handleThemeToggle}
               disabled={isThemeToggling}
@@ -1056,8 +1071,8 @@ export default function MainAdminAnnouncements() {
               >
                 <Feather
                   name={isDark ? 'sun' : 'moon'}
-                  size={isMobile ? 16 : 18}
-                  color='#ffffff'
+                  size={18}
+                  color={isDark ? '#fff' : '#1e293b'}
                 />
               </Animated.View>
             </TouchableOpacity>
@@ -1066,10 +1081,19 @@ export default function MainAdminAnnouncements() {
               style={[
                 styles.headerAction,
                 isMobile && styles.headerActionMobile,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(255,255,255,0.12)'
+                    : 'rgba(0,0,0,0.05)',
+                },
               ]}
               onPress={() => setShowCreateForm(true)}
             >
-              <Feather name='plus' size={isMobile ? 16 : 18} color='#ffffff' />
+              <Feather
+                name='plus'
+                size={isMobile ? 16 : 18}
+                color={isDark ? '#fff' : '#1e293b'}
+              />
             </TouchableOpacity>
           </View>
         </View>

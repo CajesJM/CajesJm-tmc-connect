@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Animated,
+  Easing,
   Text,
   TouchableOpacity,
   useWindowDimensions,
@@ -14,10 +15,152 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '../src/Controller/context/AuthContext'
 import { COLORS, LandingStyles } from '../src/View/styles/LandingStyles'
 
-import { Easing } from 'react-native'
-
 const EASE_OUT_CUBIC = Easing.out(Easing.cubic)
 const EASE_IN_OUT = Easing.inOut(Easing.cubic)
+const EASE_OUT_BACK = Easing.out(Easing.back(1.4))
+
+// ── Tiny decorative star particles ──────────────────────────────
+const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100, // percent of width
+  y: Math.random() * 70, // percent of height
+  r: Math.random() * 1.5 + 0.5,
+  delay: Math.random() * 1200,
+}))
+
+function StarParticle({
+  x,
+  y,
+  r,
+  delay,
+}: {
+  x: number
+  y: number
+  r: number
+  delay: number
+}) {
+  const { width, height } = useWindowDimensions()
+  const opacity = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.sin),
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.1,
+          duration: 1200,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.sin),
+        }),
+      ])
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [])
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left: (x / 100) * width,
+        top: (y / 100) * height,
+        width: r * 2,
+        height: r * 2,
+        borderRadius: r,
+        backgroundColor: 'rgba(200,210,255,0.9)',
+        opacity,
+      }}
+    />
+  )
+}
+
+// ── Animated pulsing ring behind logo ───────────────────────────
+function PulseRing({ delay = 0 }: { delay?: number }) {
+  const scale = useRef(new Animated.Value(1)).current
+  const opacity = useRef(new Animated.Value(0.5)).current
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(scale, {
+            toValue: 1.6,
+            duration: 1800,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 1,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 1800,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 0.5,
+            duration: 0,
+            useNativeDriver: true,
+          }),
+        ]),
+      ])
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [])
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        width: 140,
+        height: 140,
+        borderRadius: 70,
+        borderWidth: 1,
+        borderColor: 'rgba(165,180,252,0.4)',
+        opacity,
+        transform: [{ scale }],
+      }}
+    />
+  )
+}
+
+// ── Loading badge dot blink ──────────────────────────────────────
+function BlinkDot() {
+  const opacity = useRef(new Animated.Value(1)).current
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.2,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ])
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [])
+  return <Animated.View style={[LandingStyles.loadingBadgeDot, { opacity }]} />
+}
 
 export default function Landing() {
   const insets = useSafeAreaInsets()
@@ -33,81 +176,115 @@ export default function Landing() {
   const transitionTimerRef = useRef<number | null>(null)
   const entranceTimerRef = useRef<number | null>(null)
 
-  // Entrance
+  // ── Animated values ─────────────────────────────────────────────
   const logoOpacity = useRef(new Animated.Value(0)).current
-  const logoScale = useRef(new Animated.Value(0.6)).current
+  const logoScale = useRef(new Animated.Value(0.5)).current
   const logoRotate = useRef(new Animated.Value(0)).current
+
+  const haloOpacity = useRef(new Animated.Value(0)).current
+  const haloScale = useRef(new Animated.Value(0.4)).current
+
   const ringScale = useRef(new Animated.Value(0.5)).current
   const ringOpacity = useRef(new Animated.Value(0)).current
-  const textOpacity = useRef(new Animated.Value(0)).current
-  const textTranslate = useRef(new Animated.Value(24)).current
-  const orb1Opacity = useRef(new Animated.Value(0)).current
-  const orb1Scale = useRef(new Animated.Value(0.4)).current
-  const orb2Opacity = useRef(new Animated.Value(0)).current
-  const orb2Scale = useRef(new Animated.Value(0.4)).current
-  const orb3Opacity = useRef(new Animated.Value(0)).current
-  const orb3Scale = useRef(new Animated.Value(0.4)).current
-  const progressOpacity = useRef(new Animated.Value(0)).current
 
-  // Exit
+  const textOpacity = useRef(new Animated.Value(0)).current
+  const textTranslate = useRef(new Animated.Value(28)).current
+
+  const eyebrowOpacity = useRef(new Animated.Value(0)).current
+  const eyebrowTranslate = useRef(new Animated.Value(14)).current
+
+  const dotsOpacity = useRef(new Animated.Value(0)).current
+
+  const orb1Opacity = useRef(new Animated.Value(0)).current
+  const orb1Scale = useRef(new Animated.Value(0.3)).current
+  const orb2Opacity = useRef(new Animated.Value(0)).current
+  const orb2Scale = useRef(new Animated.Value(0.3)).current
+  const orb3Opacity = useRef(new Animated.Value(0)).current
+  const orb3Scale = useRef(new Animated.Value(0.3)).current
+  const orb4Opacity = useRef(new Animated.Value(0)).current
+
+  const progressOpacity = useRef(new Animated.Value(0)).current
+  const badgeOpacity = useRef(new Animated.Value(0)).current
+  const badgeTranslate = useRef(new Animated.Value(12)).current
+
   const screenOpacity = useRef(new Animated.Value(1)).current
-  const screenTranslateY = useRef(new Animated.Value(0)).current
+  const screenScale = useRef(new Animated.Value(1)).current
   const logoExitScale = useRef(new Animated.Value(1)).current
   const logoExitTranslate = useRef(new Animated.Value(0)).current
 
-  // ── Auth-based redirect ────────────────────────────────────────
+  // ── Stars entrance ──────────────────────────────────────────────
+  const starsOpacity = useRef(new Animated.Value(0)).current
+
+  // ── Auth redirect ────────────────────────────────────────────────
   useEffect(() => {
     if (!isAuthenticated) return
-    if (userData?.role === 'main_admin') {
-      router.replace('/main_admin')
-    } else if (userData?.role === 'assistant_admin') {
+    if (userData?.role === 'main_admin') router.replace('/main_admin')
+    else if (userData?.role === 'assistant_admin')
       router.replace('/assistant_admin/(tabs)/announcements')
-    } else if (userData?.role === 'student') {
+    else if (userData?.role === 'student')
       router.replace('/student/(tabs)/announcements')
-    }
   }, [isAuthenticated, userData, router])
 
-  // ── Reset all animated values ────────────────────────────────
+  // ── Reset ────────────────────────────────────────────────────────
   const resetAnimations = useCallback(() => {
-    ;[
+    const allValues = [
       logoOpacity,
       logoScale,
       logoRotate,
+      haloOpacity,
+      haloScale,
       ringScale,
       ringOpacity,
       textOpacity,
       textTranslate,
+      eyebrowOpacity,
+      eyebrowTranslate,
+      dotsOpacity,
       orb1Opacity,
       orb1Scale,
       orb2Opacity,
       orb2Scale,
       orb3Opacity,
       orb3Scale,
+      orb4Opacity,
       progressOpacity,
+      badgeOpacity,
+      badgeTranslate,
       screenOpacity,
-      screenTranslateY,
+      screenScale,
       logoExitScale,
       logoExitTranslate,
-    ].forEach((v) => v.stopAnimation())
+      starsOpacity,
+    ]
+    allValues.forEach((v) => v.stopAnimation())
 
     logoOpacity.setValue(0)
-    logoScale.setValue(0.6)
+    logoScale.setValue(0.5)
     logoRotate.setValue(0)
+    haloOpacity.setValue(0)
+    haloScale.setValue(0.4)
     ringScale.setValue(0.5)
     ringOpacity.setValue(0)
     textOpacity.setValue(0)
-    textTranslate.setValue(24)
+    textTranslate.setValue(28)
+    eyebrowOpacity.setValue(0)
+    eyebrowTranslate.setValue(14)
+    dotsOpacity.setValue(0)
     orb1Opacity.setValue(0)
-    orb1Scale.setValue(0.4)
+    orb1Scale.setValue(0.3)
     orb2Opacity.setValue(0)
-    orb2Scale.setValue(0.4)
+    orb2Scale.setValue(0.3)
     orb3Opacity.setValue(0)
-    orb3Scale.setValue(0.4)
+    orb3Scale.setValue(0.3)
+    orb4Opacity.setValue(0)
     progressOpacity.setValue(0)
+    badgeOpacity.setValue(0)
+    badgeTranslate.setValue(12)
     screenOpacity.setValue(1)
-    screenTranslateY.setValue(0)
+    screenScale.setValue(1)
     logoExitScale.setValue(1)
     logoExitTranslate.setValue(0)
+    starsOpacity.setValue(0)
 
     setIsAnimating(false)
     setProgress(0)
@@ -122,33 +299,17 @@ export default function Landing() {
     progressIntervalRef.current = null
     transitionTimerRef.current = null
     entranceTimerRef.current = null
-  }, [
-    logoOpacity,
-    logoScale,
-    logoRotate,
-    ringScale,
-    ringOpacity,
-    textOpacity,
-    textTranslate,
-    orb1Opacity,
-    orb1Scale,
-    orb2Opacity,
-    orb2Scale,
-    orb3Opacity,
-    orb3Scale,
-    progressOpacity,
-    screenOpacity,
-    screenTranslateY,
-    logoExitScale,
-    logoExitTranslate,
-  ])
+  }, [])
 
-  // ── Progress ticker ────────────────────────────────────────────
+  // ── Progress ticker ──────────────────────────────────────────────
   const startProgressTicker = useCallback(() => {
     setProgress(0)
     progressIntervalRef.current = setInterval(() => {
       setProgress((prev) => {
-        const next = prev + 100 / 30
+        // Ease-out curve: slower near 100
+        const remaining = 100 - prev
+        const step = Math.max(1, remaining * 0.1)
+        const next = prev + step
         if (next >= 100) {
           clearInterval(progressIntervalRef.current!)
           progressIntervalRef.current = null
@@ -156,10 +317,10 @@ export default function Landing() {
         }
         return next
       })
-    }, 100) as unknown as number
+    }, 80) as unknown as number
   }, [])
 
-  // ── Exit / transition animation ────────────────────────────────
+  // ── Exit animation ───────────────────────────────────────────────
   const startTransitionAnimation = useCallback(() => {
     if (isAnimating) return
     setIsAnimating(true)
@@ -171,30 +332,50 @@ export default function Landing() {
     setProgress(100)
 
     Animated.parallel([
+      // Logo drifts up + shrinks
       Animated.timing(logoExitTranslate, {
-        toValue: -80,
-        duration: 700,
+        toValue: -60,
+        duration: 650,
         easing: EASE_IN_OUT,
         useNativeDriver: true,
       }),
       Animated.timing(logoExitScale, {
-        toValue: 0.65,
-        duration: 700,
+        toValue: 0.7,
+        duration: 650,
         easing: EASE_IN_OUT,
         useNativeDriver: true,
       }),
+      // Text fades quickly
       Animated.timing(textOpacity, {
-        toValue: 0,
-        duration: 350,
-        easing: EASE_IN_OUT,
-        useNativeDriver: true,
-      }),
-      Animated.timing(progressOpacity, {
         toValue: 0,
         duration: 300,
         easing: EASE_IN_OUT,
         useNativeDriver: true,
       }),
+      Animated.timing(eyebrowOpacity, {
+        toValue: 0,
+        duration: 250,
+        easing: EASE_IN_OUT,
+        useNativeDriver: true,
+      }),
+      Animated.timing(dotsOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      // Progress + badge fade
+      Animated.timing(progressOpacity, {
+        toValue: 0,
+        duration: 280,
+        easing: EASE_IN_OUT,
+        useNativeDriver: true,
+      }),
+      Animated.timing(badgeOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      // Orbs fade
       Animated.timing(orb1Opacity, {
         toValue: 0,
         duration: 500,
@@ -210,59 +391,66 @@ export default function Landing() {
         duration: 500,
         useNativeDriver: true,
       }),
-
+      Animated.timing(orb4Opacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(starsOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      // Screen fades out with slight scale-down for depth
       Animated.sequence([
-        Animated.delay(500),
-        Animated.timing(screenOpacity, {
-          toValue: 0,
-          duration: 400,
-          easing: EASE_IN_OUT,
-          useNativeDriver: true,
-        }),
+        Animated.delay(420),
+        Animated.parallel([
+          Animated.timing(screenOpacity, {
+            toValue: 0,
+            duration: 420,
+            easing: EASE_IN_OUT,
+            useNativeDriver: true,
+          }),
+          Animated.timing(screenScale, {
+            toValue: 1.04,
+            duration: 420,
+            easing: EASE_IN_OUT,
+            useNativeDriver: true,
+          }),
+        ]),
       ]),
     ]).start(() => {
       router.push('/login')
     })
-  }, [
-    isAnimating,
-    logoExitTranslate,
-    logoExitScale,
-    textOpacity,
-    progressOpacity,
-    orb1Opacity,
-    orb2Opacity,
-    orb3Opacity,
-    screenOpacity,
-    router,
-  ])
+  }, [isAnimating])
 
-  // ── Entrance animation ─────────────────────────────────────────
+  // ── Entrance animation ───────────────────────────────────────────
   const playEntranceAnimation = useCallback(() => {
     Animated.sequence([
-      // 1. Orbs bloom in
+      // Phase 1 — ambient orbs bloom in softly
       Animated.parallel([
         Animated.timing(orb1Opacity, {
           toValue: 1,
-          duration: 700,
+          duration: 900,
           easing: EASE_OUT_CUBIC,
           useNativeDriver: true,
         }),
         Animated.timing(orb1Scale, {
           toValue: 1,
-          duration: 700,
+          duration: 900,
           easing: EASE_OUT_CUBIC,
           useNativeDriver: true,
         }),
         Animated.timing(orb2Opacity, {
           toValue: 1,
-          duration: 700,
+          duration: 900,
           delay: 100,
           easing: EASE_OUT_CUBIC,
           useNativeDriver: true,
         }),
         Animated.timing(orb2Scale, {
           toValue: 1,
-          duration: 700,
+          duration: 900,
           delay: 100,
           easing: EASE_OUT_CUBIC,
           useNativeDriver: true,
@@ -281,9 +469,38 @@ export default function Landing() {
           easing: EASE_OUT_CUBIC,
           useNativeDriver: true,
         }),
+        Animated.timing(orb4Opacity, {
+          toValue: 1,
+          duration: 800,
+          delay: 150,
+          easing: EASE_OUT_CUBIC,
+          useNativeDriver: true,
+        }),
+        Animated.timing(starsOpacity, {
+          toValue: 1,
+          duration: 1000,
+          delay: 300,
+          useNativeDriver: true,
+        }),
       ]),
 
-      // 2. Glow ring expands
+      // Phase 2 — outer halo ring blooms
+      Animated.parallel([
+        Animated.timing(haloOpacity, {
+          toValue: 0.6,
+          duration: 600,
+          easing: EASE_OUT_CUBIC,
+          useNativeDriver: true,
+        }),
+        Animated.timing(haloScale, {
+          toValue: 1,
+          duration: 700,
+          easing: EASE_OUT_BACK,
+          useNativeDriver: true,
+        }),
+      ]),
+
+      // Phase 3 — glow ring + logo spring in with rotation
       Animated.parallel([
         Animated.timing(ringOpacity, {
           toValue: 1,
@@ -294,13 +511,9 @@ export default function Landing() {
         Animated.timing(ringScale, {
           toValue: 1,
           duration: 600,
-          easing: EASE_OUT_CUBIC,
+          easing: EASE_OUT_BACK,
           useNativeDriver: true,
         }),
-      ]),
-
-      // 3. Logo spins in
-      Animated.parallel([
         Animated.timing(logoOpacity, {
           toValue: 1,
           duration: 500,
@@ -309,19 +522,35 @@ export default function Landing() {
         }),
         Animated.timing(logoScale, {
           toValue: 1,
-          duration: 600,
-          easing: EASE_OUT_CUBIC,
+          duration: 650,
+          easing: EASE_OUT_BACK,
           useNativeDriver: true,
         }),
         Animated.timing(logoRotate, {
           toValue: 1,
-          duration: 700,
+          duration: 750,
           easing: EASE_OUT_CUBIC,
           useNativeDriver: true,
         }),
       ]),
 
-      // 4. Text slides up + fades in
+      // Phase 4 — eyebrow label slides up
+      Animated.parallel([
+        Animated.timing(eyebrowOpacity, {
+          toValue: 1,
+          duration: 450,
+          easing: EASE_OUT_CUBIC,
+          useNativeDriver: true,
+        }),
+        Animated.timing(eyebrowTranslate, {
+          toValue: 0,
+          duration: 450,
+          easing: EASE_OUT_CUBIC,
+          useNativeDriver: true,
+        }),
+      ]),
+
+      // Phase 5 — brand text slides up with slight delay
       Animated.parallel([
         Animated.timing(textOpacity, {
           toValue: 1,
@@ -337,44 +566,47 @@ export default function Landing() {
         }),
       ]),
 
-      // 5. Progress bar fades in
-      Animated.timing(progressOpacity, {
-        toValue: 1,
-        duration: 400,
-        easing: EASE_OUT_CUBIC,
-        useNativeDriver: true,
-      }),
+      // Phase 6 — dots + progress/badge
+      Animated.parallel([
+        Animated.timing(dotsOpacity, {
+          toValue: 1,
+          duration: 400,
+          easing: EASE_OUT_CUBIC,
+          useNativeDriver: true,
+        }),
+        Animated.timing(progressOpacity, {
+          toValue: 1,
+          duration: 500,
+          easing: EASE_OUT_CUBIC,
+          useNativeDriver: true,
+        }),
+        Animated.timing(badgeOpacity, {
+          toValue: 1,
+          duration: 500,
+          easing: EASE_OUT_CUBIC,
+          useNativeDriver: true,
+        }),
+        Animated.timing(badgeTranslate, {
+          toValue: 0,
+          duration: 500,
+          easing: EASE_OUT_CUBIC,
+          useNativeDriver: true,
+        }),
+      ]),
     ]).start(() => {
       setEntranceComplete(true)
       startProgressTicker()
       transitionTimerRef.current = setTimeout(() => {
         startTransitionAnimation()
-      }, 3000) as unknown as number
+      }, 3200) as unknown as number
     })
-  }, [
-    orb1Opacity,
-    orb1Scale,
-    orb2Opacity,
-    orb2Scale,
-    orb3Opacity,
-    orb3Scale,
-    ringOpacity,
-    ringScale,
-    logoOpacity,
-    logoScale,
-    logoRotate,
-    textOpacity,
-    textTranslate,
-    progressOpacity,
-    startProgressTicker,
-    startTransitionAnimation,
-  ])
+  }, [startProgressTicker, startTransitionAnimation])
 
-  // ── Lifecycle ──────────────────────────────────────────────────
+  // ── Lifecycle ────────────────────────────────────────────────────
   useEffect(() => {
     entranceTimerRef.current = setTimeout(
       playEntranceAnimation,
-      300
+      250
     ) as unknown as number
     return () => {
       resetAnimations()
@@ -386,7 +618,7 @@ export default function Landing() {
       resetAnimations()
       entranceTimerRef.current = setTimeout(
         playEntranceAnimation,
-        300
+        250
       ) as unknown as number
       return () => {
         resetAnimations()
@@ -394,7 +626,7 @@ export default function Landing() {
     }, [resetAnimations, playEntranceAnimation])
   )
 
-  // ── Derived animated styles ────────────────────────────────────
+  // ── Derived ──────────────────────────────────────────────────────
   const logoRotateDeg = logoRotate.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
@@ -404,6 +636,8 @@ export default function Landing() {
     if (entranceComplete && !isAnimating) startTransitionAnimation()
   }
 
+  const clampedProgress = Math.min(progress, 100)
+
   return (
     <>
       <StatusBar style='light' translucent backgroundColor='transparent' />
@@ -412,7 +646,7 @@ export default function Landing() {
           style={{
             flex: 1,
             opacity: screenOpacity,
-            transform: [{ translateY: screenTranslateY }],
+            transform: [{ scale: screenScale }],
           }}
         >
           <LinearGradient
@@ -421,11 +655,27 @@ export default function Landing() {
               COLORS.gradientMid,
               COLORS.gradientEnd,
             ]}
-            start={{ x: 0.1, y: 0 }}
-            end={{ x: 0.9, y: 1 }}
+            start={{ x: 0.15, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
             style={LandingStyles.gradient}
           >
-            {/* ── Floating orbs ─────────────────────────────────── */}
+            {/* ── Star particles ──────────────────────────── */}
+            <Animated.View
+              pointerEvents='none'
+              style={{ ...LandingStyles.orbsContainer, opacity: starsOpacity }}
+            >
+              {PARTICLES.map((p) => (
+                <StarParticle
+                  key={p.id}
+                  x={p.x}
+                  y={p.y}
+                  r={p.r}
+                  delay={p.delay}
+                />
+              ))}
+            </Animated.View>
+
+            {/* ── Floating orbs ───────────────────────────── */}
             <View style={LandingStyles.orbsContainer} pointerEvents='none'>
               <Animated.View
                 style={[
@@ -457,9 +707,18 @@ export default function Landing() {
                   },
                 ]}
               />
+              <Animated.View
+                style={[
+                  LandingStyles.orb,
+                  LandingStyles.orb4,
+                  {
+                    opacity: orb4Opacity,
+                  },
+                ]}
+              />
             </View>
 
-            {/* ── Main content ──────────────────────────────────── */}
+            {/* ── Main content ─────────────────────────────── */}
             <View style={LandingStyles.mainContainer}>
               <Animated.View
                 style={[
@@ -472,6 +731,23 @@ export default function Landing() {
                   },
                 ]}
               >
+                {/* Halo */}
+                <Animated.View
+                  style={[
+                    LandingStyles.logoHaloRing,
+                    {
+                      position: 'absolute',
+                      opacity: haloOpacity,
+                      transform: [{ scale: haloScale }],
+                    },
+                  ]}
+                />
+
+                {/* Pulse rings */}
+                <PulseRing delay={0} />
+                <PulseRing delay={900} />
+
+                {/* Glow ring */}
                 <Animated.View
                   style={[
                     LandingStyles.logoGlowRing,
@@ -481,7 +757,8 @@ export default function Landing() {
                     },
                   ]}
                 >
-                  <Animated.View style={LandingStyles.logoInnerRing}>
+                  {/* Inner ring */}
+                  <View style={LandingStyles.logoInnerRing}>
                     <Animated.Image
                       source={require('../assets/images/Logo/TMC_Connect.png')}
                       style={[
@@ -496,75 +773,109 @@ export default function Landing() {
                       ]}
                       resizeMode='contain'
                     />
-                  </Animated.View>
+                  </View>
                 </Animated.View>
               </Animated.View>
 
-              {/* Text content */}
-              <Animated.View
-                style={[
-                  LandingStyles.textContent,
-                  {
+              {/* Text block */}
+              <View style={{ alignItems: 'center' }}>
+                {/* Eyebrow */}
+                <Animated.Text
+                  style={[
+                    LandingStyles.eyebrow,
+                    {
+                      opacity: eyebrowOpacity,
+                      transform: [{ translateY: eyebrowTranslate }],
+                    },
+                  ]}
+                >
+                  Welcome to
+                </Animated.Text>
+
+                {/* Brand */}
+                <Animated.View
+                  style={{
                     opacity: textOpacity,
                     transform: [{ translateY: textTranslate }],
-                  },
-                ]}
-              >
-                <Text style={LandingStyles.eyebrow}>Welcome to</Text>
+                  }}
+                >
+                  <Text style={{ textAlign: 'center' }}>
+                    <Text style={LandingStyles.brandName}>TMC </Text>
+                    <Text style={LandingStyles.brandAccent}>Connect</Text>
+                  </Text>
 
-                <Text>
-                  <Text style={LandingStyles.brandName}>TMC </Text>
-                  <Text style={LandingStyles.brandAccent}>Connect</Text>
-                </Text>
+                  <Text style={LandingStyles.subtitleLine}>
+                    Your campus hub for announcements,
+                  </Text>
+                  <Text style={LandingStyles.subtitleLine}>
+                    events, and attendance.
+                  </Text>
+                </Animated.View>
 
-                <Text style={[LandingStyles.subtitleLine, { marginTop: 8 }]}>
-                  Your campus hub for announcements,
-                </Text>
-                <Text style={LandingStyles.subtitleLine}>
-                  events, and attendance
-                </Text>
-
-                {/* Dot indicator row */}
-                <View style={LandingStyles.dotRow}>
+                {/* Dot indicator */}
+                <Animated.View
+                  style={[LandingStyles.dotRow, { opacity: dotsOpacity }]}
+                >
                   <View style={LandingStyles.dot} />
                   <View style={LandingStyles.dotActive} />
                   <View style={LandingStyles.dot} />
-                </View>
-              </Animated.View>
+                </Animated.View>
+              </View>
             </View>
 
-            {/* ── Progress section ──────────────────────────────── */}
+            {/* ── Progress section ─────────────────────────── */}
             <Animated.View
               style={[
                 LandingStyles.progressSection,
                 { opacity: progressOpacity },
               ]}
             >
+              {/* Loading badge */}
+              <Animated.View
+                style={[
+                  LandingStyles.loadingBadge,
+                  {
+                    opacity: badgeOpacity,
+                    transform: [{ translateY: badgeTranslate }],
+                  },
+                ]}
+              >
+                <BlinkDot />
+                <Text style={LandingStyles.loadingBadgeText}>Loading</Text>
+              </Animated.View>
+
+              {/* Progress bar + percent */}
               <View style={LandingStyles.progressRow}>
                 <View style={LandingStyles.progressTrack}>
                   <View
                     style={[
                       LandingStyles.progressFill,
-                      { width: `${Math.min(progress, 100)}%` },
+                      { width: `${clampedProgress}%` },
                     ]}
-                  />
+                  >
+                    {/* Glow cap at fill end */}
+                    {clampedProgress > 2 && (
+                      <View style={LandingStyles.progressFillGlow} />
+                    )}
+                  </View>
                 </View>
                 <Text style={LandingStyles.progressPercent}>
-                  {Math.round(progress)}%
+                  {Math.round(clampedProgress)}%
                 </Text>
               </View>
+
               <Text style={LandingStyles.progressLabel}>
-                Loading login screen...
+                Preparing your experience
               </Text>
 
               {entranceComplete && !isAnimating && (
                 <TouchableOpacity
                   onPress={handleSkipToLogin}
                   style={LandingStyles.skipHint}
-                  activeOpacity={0.6}
+                  activeOpacity={0.55}
                 >
                   <Text style={LandingStyles.skipHintText}>
-                    Tap to continue
+                    Tap anywhere to continue →
                   </Text>
                 </TouchableOpacity>
               )}

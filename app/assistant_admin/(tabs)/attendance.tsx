@@ -226,6 +226,14 @@ export default function MainAdminAttendance() {
       return false
     }
   }
+  const parseEventDate = (date: any): Date | null => {
+    if (!date) return null
+    if (typeof date === 'object' && date.toDate) return date.toDate()
+    if (typeof date === 'object' && date.seconds)
+      return new Date(date.seconds * 1000)
+    const d = new Date(date)
+    return isNaN(d.getTime()) ? null : d
+  }
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -303,6 +311,41 @@ export default function MainAdminAttendance() {
     return () => unsubscribe()
   }, [])
 
+  const sortedEvents = useMemo(() => {
+    return [...events].sort((a, b) => {
+      const dateA = parseEventDate(a.date)
+      const dateB = parseEventDate(b.date)
+
+      if (!dateA && !dateB) return 0
+      if (!dateA) return 1
+      if (!dateB) return -1
+
+      const now = new Date()
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const dayA = new Date(
+        dateA.getFullYear(),
+        dateA.getMonth(),
+        dateA.getDate()
+      )
+      const dayB = new Date(
+        dateB.getFullYear(),
+        dateB.getMonth(),
+        dateB.getDate()
+      )
+
+      const isUpcomingA = dayA >= today
+      const isUpcomingB = dayB >= today
+
+      if (isUpcomingA && !isUpcomingB) return -1
+      if (!isUpcomingA && isUpcomingB) return 1
+
+      if (isUpcomingA) {
+        return dateA.getTime() - dateB.getTime()
+      } else {
+        return dateB.getTime() - dateA.getTime()
+      }
+    })
+  }, [events])
   const isQRCodeExpired = (event: Event | null): boolean => {
     if (!event) return false
     if (event.isActive === false) return true
@@ -1993,12 +2036,12 @@ export default function MainAdminAttendance() {
     }
   }
 
-  const totalEventPages = Math.ceil(events.length / eventItemsPerPage)
+  const totalEventPages = Math.ceil(sortedEvents.length / eventItemsPerPage)
   const paginatedEvents = useMemo(() => {
     const start = (eventPage - 1) * eventItemsPerPage
     const end = start + eventItemsPerPage
-    return events.slice(start, end)
-  }, [events, eventPage, eventItemsPerPage])
+    return sortedEvents.slice(start, end)
+  }, [sortedEvents, eventPage, eventItemsPerPage])
 
   const renderEventItem = ({ item }: { item: Event }) => {
     const isExpired = isQRCodeExpired(item)

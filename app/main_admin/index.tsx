@@ -2792,8 +2792,8 @@ export default function MainAdminDashboard() {
 
   const getDynamicStyles = () => ({
     headerGradient: isDark
-      ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
-      : (['#0f2456', '#1a3a8f', '#1e53c8'] as const),
+      ? (['#060c18', '#0a1a3a', '#10254e'] as const)
+      : (['#ffffff', '#f5f9ff', '#eaf2ff'] as const),
     chartBackground: isDark
       ? (['#1e293b', '#121e39'] as const)
       : (['#f0f9ff', '#ffffff'] as const),
@@ -2952,16 +2952,23 @@ export default function MainAdminDashboard() {
               <Text
                 style={[
                   styles.greetingText,
-                  { color: isDark ? dynamic.textSecondary : '#ffffff' },
+                  { color: isDark ? '#cbd5e1' : '#475569' },
                 ]}
               >
                 Welcome back,
               </Text>
-              <Text style={styles.userName}>{userData?.name || 'Admin'}</Text>
+              <Text
+                style={[
+                  styles.userName,
+                  { color: isDark ? '#ffffff' : '#0f172a' },
+                ]}
+              >
+                {userData?.name || 'Admin'}
+              </Text>
               <Text
                 style={[
                   styles.roleText,
-                  { color: isDark ? dynamic.textMuted : '#ffffff' },
+                  { color: isDark ? '#94a3b8' : '#64748b' },
                 ]}
               >
                 Dashboard Manager
@@ -2996,7 +3003,12 @@ export default function MainAdminDashboard() {
 
           <View style={styles.dateSection}>
             <View style={styles.dateContainer}>
-              <Text style={styles.dateText}>
+              <Text
+                style={[
+                  styles.dateText,
+                  { color: isDark ? '#cbd5e1' : '#334155' },
+                ]}
+              >
                 {new Date().toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
@@ -3010,7 +3022,11 @@ export default function MainAdminDashboard() {
               <TouchableOpacity
                 style={[
                   styles.headerAction,
-                  { backgroundColor: 'rgba(255,255,255,0.1)' },
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.12)'
+                      : 'rgba(0,0,0,0.05)',
+                  },
                 ]}
                 onPress={handleThemeToggle}
                 disabled={isThemeToggling}
@@ -3037,7 +3053,7 @@ export default function MainAdminDashboard() {
                   <Feather
                     name={isDark ? 'sun' : 'moon'}
                     size={18}
-                    color='#ffffff'
+                    color={isDark ? '#fff' : '#1e293b'}
                   />
                 </Animated.View>
               </TouchableOpacity>
@@ -3045,26 +3061,45 @@ export default function MainAdminDashboard() {
               <TouchableOpacity
                 style={[
                   styles.headerAction,
-                  { backgroundColor: 'rgba(255,255,255,0.1)' },
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.12)'
+                      : 'rgba(0,0,0,0.05)',
+                  },
                 ]}
                 onPress={handleDownloadReport}
                 disabled={downloadLoading}
               >
                 {downloadLoading ? (
-                  <ActivityIndicator size='small' color='#ffffff' />
+                  <ActivityIndicator
+                    size='small'
+                    color={isDark ? '#fff' : '#1e293b'}
+                  />
                 ) : (
-                  <Feather name='download' size={18} color='#ffffff' />
+                  <Feather
+                    name='download'
+                    size={18}
+                    color={isDark ? '#ffffff' : '#1e293b'}
+                  />
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
                   styles.headerAction,
-                  { backgroundColor: 'rgba(255,255,255,0.1)' },
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.12)'
+                      : 'rgba(0,0,0,0.05)',
+                  },
                 ]}
                 onPress={() => setNotificationModalVisible(true)}
               >
-                <Feather name='bell' size={18} color='#ffffff' />
+                <Feather
+                  name='bell'
+                  size={18}
+                  color={isDark ? '#ffffff' : '#1e293b'}
+                />
                 {unreadCount > 0 && (
                   <View
                     style={[

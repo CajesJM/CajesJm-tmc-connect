@@ -23,10 +23,13 @@ import { useTheme } from '../../src/Controller/context/ThemeContext'
 import { db } from '../../src/Model/lib/firebaseConfig'
 import LoadingScreen from '../../src/View/components/LoadingScreen'
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 interface MenuItem {
   name: string
   title: string
   icon: React.ComponentProps<typeof Ionicons>['name']
+  activeIcon: React.ComponentProps<typeof Ionicons>['name']
   route: Href
 }
 
@@ -38,40 +41,239 @@ interface UserStats {
   students: number
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SIDEBAR_FULL_WIDTH = 260
+const SIDEBAR_COLLAPSED_WIDTH = 72
+const MOBILE_SIDEBAR_WIDTH = 280
+
 const menuItems: MenuItem[] = [
-  { name: 'index', title: 'Dashboard', icon: 'home', route: '/main_admin' },
+  {
+    name: 'index',
+    title: 'Dashboard',
+    icon: 'home-outline',
+    activeIcon: 'home',
+    route: '/main_admin',
+  },
   {
     name: 'announcements',
     title: 'Announcements',
-    icon: 'megaphone',
+    icon: 'megaphone-outline',
+    activeIcon: 'megaphone',
     route: '/main_admin/announcements',
   },
   {
     name: 'events',
     title: 'Events',
-    icon: 'calendar',
+    icon: 'calendar-outline',
+    activeIcon: 'calendar',
     route: '/main_admin/events',
   },
   {
     name: 'attendance',
     title: 'Attendance',
-    icon: 'calendar',
+    icon: 'checkmark-circle-outline',
+    activeIcon: 'checkmark-circle',
     route: '/main_admin/attendance',
   },
-  { name: 'users', title: 'Users', icon: 'people', route: '/main_admin/users' },
+  {
+    name: 'users',
+    title: 'Users',
+    icon: 'people-outline',
+    activeIcon: 'people',
+    route: '/main_admin/users',
+  },
   {
     name: 'profile',
     title: 'Profile',
-    icon: 'person',
+    icon: 'person-outline',
+    activeIcon: 'person',
     route: '/main_admin/profile',
   },
 ]
 
+// ─── Gradient Palettes ────────────────────────────────────────────────────────
+
+/**
+ * Light mode: predominantly white with a subtle splash of sky-blue.
+ * Dark mode:  predominantly near-black with a deep navy accent.
+ */
+const SIDEBAR_GRADIENT_LIGHT = [
+  '#ffffff',
+  '#f0f6ff',
+  '#e3eeff',
+  '#d6e6ff',
+] as const
+
+const SIDEBAR_GRADIENT_DARK = [
+  '#060c18',
+  '#0a1528',
+  '#0d1e3d',
+  '#0f2456',
+] as const
+
+// ─── NavItem sub-component ────────────────────────────────────────────────────
+
+interface NavItemProps {
+  item: MenuItem
+  isActive: boolean
+  collapsed: boolean
+  isDark: boolean
+  contentOpacity: Animated.Value
+  onPress: () => void
+  isWeb: boolean
+  accentColor: string
+}
+
+const NavItem: React.FC<NavItemProps> = ({
+  item,
+  isActive,
+  collapsed,
+  isDark,
+  contentOpacity,
+  onPress,
+  isWeb,
+  accentColor,
+}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current
+  const bgAnim = useRef(new Animated.Value(isActive ? 1 : 0)).current
+
+  useEffect(() => {
+    Animated.timing(bgAnim, {
+      toValue: isActive ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start()
+  }, [isActive])
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 30,
+    }).start()
+  }
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 20,
+    }).start()
+  }
+
+  // Interpolated background color for pill highlight
+  const pillBg = bgAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      'transparent',
+      isDark ? 'rgba(59,130,246,0.18)' : 'rgba(37,99,235,0.12)',
+    ],
+  })
+
+  // Icon / label colours
+  const activeColor = accentColor
+  const inactiveColor = isDark ? '#8ba3c7' : '#5c7aa8'
+  const itemColor = isActive ? activeColor : inactiveColor
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+        {...(isWeb
+          ? {
+              // @ts-ignore – web-only event handlers
+              onMouseEnter: (e: any) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = isDark
+                    ? 'rgba(255,255,255,0.05)'
+                    : 'rgba(37,99,235,0.06)'
+                }
+              },
+              onMouseLeave: (e: any) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }
+              },
+            }
+          : {})}
+      >
+        {/* Pill background */}
+        <Animated.View
+          style={[
+            styles.navItem,
+            collapsed ? styles.navItemCollapsed : styles.navItemExpanded,
+            { backgroundColor: pillBg },
+            isActive && styles.navItemActive,
+          ]}
+        >
+          {/* Left accent bar */}
+          {isActive && !collapsed && (
+            <View
+              style={[styles.activeBar, { backgroundColor: accentColor }]}
+            />
+          )}
+
+          {/* Icon container */}
+          <View
+            style={[
+              styles.iconContainer,
+              collapsed && styles.iconContainerCollapsed,
+              isActive && {
+                backgroundColor: isDark
+                  ? 'rgba(59,130,246,0.22)'
+                  : 'rgba(37,99,235,0.14)',
+              },
+            ]}
+          >
+            <Ionicons
+              name={isActive ? item.activeIcon : item.icon}
+              size={20}
+              color={itemColor}
+            />
+          </View>
+
+          {/* Label */}
+          {!collapsed && (
+            <Animated.Text
+              style={[
+                styles.navLabel,
+                { color: itemColor, opacity: contentOpacity },
+              ]}
+              numberOfLines={1}
+            >
+              {item.title}
+            </Animated.Text>
+          )}
+
+          {/* Right dot for active state (collapsed) */}
+          {isActive && collapsed && (
+            <View
+              style={[
+                styles.collapsedActiveDot,
+                { backgroundColor: accentColor },
+              ]}
+            />
+          )}
+        </Animated.View>
+      </TouchableOpacity>
+    </Animated.View>
+  )
+}
+
+// ─── Main Layout ──────────────────────────────────────────────────────────────
+
 export default function MainAdminLayout() {
   const pathname = usePathname()
   const isWeb = Platform.OS === 'web'
+
   const [collapsed, setCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [settingsModalVisible, setSettingsModalVisible] = useState(false)
+  const [isLayoutReady, setIsLayoutReady] = useState(false)
   const [userStats, setUserStats] = useState<UserStats>({
     total: 0,
     newThisWeek: 0,
@@ -79,94 +281,96 @@ export default function MainAdminLayout() {
     assistantAdmins: 0,
     students: 0,
   })
-  const [isLayoutReady, setIsLayoutReady] = useState(false)
 
-  const sidebarAnim = useRef(new Animated.Value(260)).current
+  const sidebarAnim = useRef(new Animated.Value(SIDEBAR_FULL_WIDTH)).current
   const contentOpacity = useRef(new Animated.Value(1)).current
-  const mobileSlideAnim = useRef(new Animated.Value(-300)).current
+  const mobileSlideAnim = useRef(
+    new Animated.Value(-MOBILE_SIDEBAR_WIDTH)
+  ).current
   const mobileOverlayAnim = useRef(new Animated.Value(0)).current
 
-  const { userData } = useAuth()
+  const { userData, logout } = useAuth()
   const { colors, isDark, theme, setTheme, toggleTheme } = useTheme()
-  const [settingsModalVisible, setSettingsModalVisible] = useState(false)
-  const fullWidth = 260
-  const collapsedWidth = 80
-  const sidebarWidth = collapsed ? collapsedWidth : fullWidth
 
+  // Accent blue that works on both gradient styles
+  const accentColor = isDark ? '#60a5fa' : '#2563eb'
+
+  // ── Sidebar collapse animation ─────────────────────────────────────────────
   useEffect(() => {
     Animated.parallel([
       Animated.timing(sidebarAnim, {
-        toValue: collapsed ? collapsedWidth : fullWidth,
-        duration: 300,
+        toValue: collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_FULL_WIDTH,
+        duration: 280,
         useNativeDriver: false,
       }),
       Animated.timing(contentOpacity, {
         toValue: collapsed ? 0 : 1,
-        duration: 200,
+        duration: 180,
         useNativeDriver: true,
       }),
     ]).start()
   }, [collapsed])
 
+  // ── Mobile drawer animation ────────────────────────────────────────────────
   useEffect(() => {
     Animated.parallel([
       Animated.spring(mobileSlideAnim, {
-        toValue: mobileMenuOpen ? 0 : -300,
+        toValue: mobileMenuOpen ? 0 : -MOBILE_SIDEBAR_WIDTH,
         useNativeDriver: true,
-        speed: 12,
-        bounciness: 8,
+        speed: 14,
+        bounciness: 6,
       }),
       Animated.timing(mobileOverlayAnim, {
         toValue: mobileMenuOpen ? 1 : 0,
-        duration: 300,
+        duration: 280,
         useNativeDriver: true,
       }),
     ]).start()
   }, [mobileMenuOpen])
 
+  // ── Layout ready delay ─────────────────────────────────────────────────────
   useEffect(() => {
-    const timer = setTimeout(() => setIsLayoutReady(true), 300)
-    return () => clearTimeout(timer)
+    const t = setTimeout(() => setIsLayoutReady(true), 300)
+    return () => clearTimeout(t)
   }, [])
 
+  // ── Firestore user stats ───────────────────────────────────────────────────
   useEffect(() => {
-    const usersQuery = query(collection(db, 'users'))
-    const unsubscribe = onSnapshot(usersQuery, (snapshot) => {
-      const now = new Date()
-      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const q = query(collection(db, 'users'))
+    const unsub = onSnapshot(q, (snap) => {
+      const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       let mainAdmins = 0,
         assistantAdmins = 0,
         students = 0,
         newThisWeek = 0
 
-      snapshot.docs.forEach((doc) => {
-        const data = doc.data()
-        const role = data.role
-        if (role === 'main_admin') mainAdmins++
-        else if (role === 'assistant_admin') assistantAdmins++
-        else if (role === 'student') students++
+      snap.docs.forEach((doc) => {
+        const d = doc.data()
+        if (d.role === 'main_admin') mainAdmins++
+        else if (d.role === 'assistant_admin') assistantAdmins++
+        else if (d.role === 'student') students++
 
-        const createdAt = data.createdAt?.toDate?.() || data.createdAt
-        if (createdAt && createdAt >= oneWeekAgo) newThisWeek++
+        const ca = d.createdAt?.toDate?.() ?? d.createdAt
+        if (ca && ca >= oneWeekAgo) newThisWeek++
       })
 
       setUserStats({
-        total: snapshot.size,
+        total: snap.size,
         newThisWeek,
         mainAdmins,
         assistantAdmins,
         students,
       })
     })
-    return () => unsubscribe()
+    return () => unsub()
   }, [])
 
-  const isRouteActive = (route: Href) => {
-    const routeString = route.toString()
-    if (routeString === '/main_admin') {
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const isRouteActive = (route: Href): boolean => {
+    const r = route.toString()
+    if (r === '/main_admin')
       return pathname === '/main_admin' || pathname === '/main_admin/'
-    }
-    return pathname.includes(routeString.replace('/main_admin/', ''))
+    return pathname.includes(r.replace('/main_admin/', ''))
   }
 
   const handleNavigation = (route: Href) => {
@@ -174,18 +378,16 @@ export default function MainAdminLayout() {
     if (!isWeb) setMobileMenuOpen(false)
   }
 
+  // ── Swipe-to-close gesture (mobile) ───────────────────────────────────────
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return mobileMenuOpen && gestureState.dx > 20
+      onMoveShouldSetPanResponder: (_, g) => mobileMenuOpen && g.dx < -20,
+      onPanResponderMove: (_, g) => {
+        if (g.dx < 0)
+          mobileSlideAnim.setValue(Math.max(-MOBILE_SIDEBAR_WIDTH, g.dx))
       },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dx > 0) {
-          mobileSlideAnim.setValue(-300 + gestureState.dx)
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > 100) {
+      onPanResponderRelease: (_, g) => {
+        if (g.dx < -80) {
           setMobileMenuOpen(false)
         } else {
           Animated.spring(mobileSlideAnim, {
@@ -197,349 +399,350 @@ export default function MainAdminLayout() {
     })
   ).current
 
-  const Sidebar = ({ isMobile }: { isMobile?: boolean }) => {
-    const animatedWidth = isMobile ? 280 : sidebarAnim
+  // ─── Sidebar Component ─────────────────────────────────────────────────────
 
-    const sidebarGradient = ['#050e1a', '#0f2456', '#1a3a8f'] as const
+  const Sidebar = ({ isMobile = false }: { isMobile?: boolean }) => {
+    const gradientColors = isDark
+      ? SIDEBAR_GRADIENT_DARK
+      : SIDEBAR_GRADIENT_LIGHT
+
+    // Border / divider colour based on mode
+    const dividerColor = isDark
+      ? 'rgba(255,255,255,0.08)'
+      : 'rgba(37,99,235,0.12)'
+    const mutedText = isDark ? '#8ba3c7' : '#4d6a9a'
+    const primaryText = isDark ? '#e2eaf8' : '#1e3a6e'
 
     return (
       <Animated.View
         style={[
           styles.sidebarContainer,
-          {
-            width: animatedWidth,
+          { width: isMobile ? MOBILE_SIDEBAR_WIDTH : sidebarAnim },
+          // Light mode: thin right border for separation
+          !isDark && {
+            borderRightWidth: 1,
+            borderRightColor: 'rgba(37,99,235,0.12)',
           },
-          isMobile && { width: 280 },
         ]}
       >
         <LinearGradient
-          colors={sidebarGradient}
+          colors={gradientColors}
           start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
+          end={{ x: isDark ? 0 : 0.6, y: 1 }}
+          locations={isDark ? [0, 0.35, 0.65, 1] : [0, 0.45, 0.8, 1]}
           style={styles.sidebarGradient}
         >
+          {/* Shadow overlay for depth in dark mode */}
+          {isDark && (
+            <View style={StyleSheet.absoluteFill} pointerEvents='none'>
+              <LinearGradient
+                colors={['rgba(9,30,77,0.25)', 'transparent']}
+                start={{ x: 1, y: 0 }}
+                end={{ x: 0, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </View>
+          )}
+
           <View style={styles.sidebarContent}>
+            {/* ── Collapse toggle (web only) ── */}
             {isWeb && !isMobile && (
               <TouchableOpacity
                 onPress={() => setCollapsed(!collapsed)}
                 style={[
-                  styles.collapseButton,
-                  collapsed && styles.collapseButtonCollapsed,
+                  styles.collapseBtn,
+                  collapsed && styles.collapseBtnCollapsed,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.06)'
+                      : 'rgba(37,99,235,0.08)',
+                  },
                 ]}
-                activeOpacity={0.8}
+                activeOpacity={0.75}
               >
                 <Animated.View
                   style={{
                     transform: [
                       {
                         rotate: sidebarAnim.interpolate({
-                          inputRange: [collapsedWidth, fullWidth],
+                          inputRange: [
+                            SIDEBAR_COLLAPSED_WIDTH,
+                            SIDEBAR_FULL_WIDTH,
+                          ],
                           outputRange: ['180deg', '0deg'],
                         }),
                       },
                     ],
                   }}
                 >
-                  <Ionicons name='chevron-back' size={18} color='#94a3b8' />
+                  <Ionicons name='chevron-back' size={16} color={mutedText} />
                 </Animated.View>
               </TouchableOpacity>
             )}
 
-            {/* Logo Section */}
-            <Animated.View
-              style={[
-                styles.logoSection,
-                collapsed && styles.logoSectionCollapsed,
-                { opacity: contentOpacity },
-              ]}
+            {/* ── Logo / Brand ── */}
+            <View
+              style={[styles.brandRow, collapsed && styles.brandRowCollapsed]}
             >
-              <View style={styles.logoWrapper}>
-                <View
-                  style={[
-                    styles.logoBackground,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(255,255,255,0.1)'
-                        : '#F1F5F9',
-                    },
-                  ]}
-                >
-                  <Image
-                    source={require('../../assets/images/Logo/V_1.0.1.png')}
-                    style={[
-                      styles.logoImage,
-                      collapsed
-                        ? { width: 30, height: 30 }
-                        : { width: 40, height: 40, borderRadius: 20 },
-                    ]}
-                    resizeMode='contain'
-                  />
-                </View>
+              <View
+                style={[
+                  styles.logoWrap,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(96,165,250,0.12)'
+                      : 'rgba(37,99,235,0.10)',
+                    borderColor: isDark
+                      ? 'rgba(96,165,250,0.2)'
+                      : 'rgba(37,99,235,0.18)',
+                  },
+                ]}
+              >
+                <Image
+                  source={require('../../assets/images/Logo/V_1.0.1.png')}
+                  style={styles.logoImage}
+                  resizeMode='contain'
+                />
               </View>
+
               {!collapsed && (
-                <View style={styles.adminInfo}>
-                  <Text style={[styles.adminTitle, { color: '#ffffff' }]}>
+                <Animated.View
+                  style={[styles.brandText, { opacity: contentOpacity }]}
+                >
+                  <Text style={[styles.brandName, { color: primaryText }]}>
                     Admin Panel
                   </Text>
-                  <Text style={[styles.adminSubtitle, { color: '#cbd5e1' }]}>
+                  <Text style={[styles.brandSub, { color: mutedText }]}>
                     TMC Campus Hub
                   </Text>
-                  <View style={styles.statusContainer}>
+                  <View style={styles.roleChip}>
                     <View
-                      style={[styles.statusDot, { backgroundColor: '#10B981' }]}
+                      style={[
+                        styles.roleDotIndicator,
+                        { backgroundColor: '#10b981' },
+                      ]}
                     />
-                    <Text style={[styles.statusText, { color: '#10B981' }]}>
+                    <Text style={[styles.roleChipText, { color: '#10b981' }]}>
                       {userData?.role === 'main_admin'
                         ? 'Main Admin'
                         : 'Assistant Admin'}
                     </Text>
                   </View>
-                </View>
+                </Animated.View>
               )}
-            </Animated.View>
+            </View>
 
-            {/* Quick Stats with animation */}
+            {/* ── Quick Stats (web, expanded) ── */}
             {isWeb && !collapsed && (
               <Animated.View
                 style={[
-                  styles.quickStats,
+                  styles.statsCard,
                   {
                     backgroundColor: isDark
-                      ? 'rgba(255,255,255,0.05)'
-                      : 'rgba(0,0,0,0.03)',
+                      ? 'rgba(255,255,255,0.04)'
+                      : 'rgba(37,99,235,0.06)',
+                    borderColor: dividerColor,
                     opacity: contentOpacity,
-                    transform: [
-                      {
-                        scale: contentOpacity.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [0.8, 1],
-                        }),
-                      },
-                    ],
                   },
                 ]}
               >
                 <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: '#ffffff' }]}>
+                  <Text style={[styles.statValue, { color: primaryText }]}>
                     {userStats.newThisWeek}
                   </Text>
-                  <Text style={[styles.statLabel, { color: '#94a3b8' }]}>
-                    New this week
+                  <Text style={[styles.statLabel, { color: mutedText }]}>
+                    New / week
                   </Text>
                 </View>
                 <View
                   style={[
                     styles.statDivider,
-                    { backgroundColor: 'rgba(255,255,255,0.1)' },
+                    { backgroundColor: dividerColor },
                   ]}
                 />
                 <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: '#ffffff' }]}>
+                  <Text style={[styles.statValue, { color: primaryText }]}>
                     {userStats.total}
                   </Text>
-                  <Text style={[styles.statLabel, { color: '#94a3b8' }]}>
+                  <Text style={[styles.statLabel, { color: mutedText }]}>
                     Total users
                   </Text>
                 </View>
               </Animated.View>
             )}
 
-            {/* Role Breakdown with animation */}
+            {/* ── Role breakdown (web, expanded) ── */}
             {isWeb && !collapsed && userStats.total > 0 && (
               <Animated.View
-                style={[
-                  styles.roleBreakdown,
-                  {
-                    backgroundColor: isDark
-                      ? 'rgba(255,255,255,0.03)'
-                      : 'rgba(0,0,0,0.02)',
-                    opacity: contentOpacity,
-                  },
-                ]}
+                style={[styles.roleBreakdown, { opacity: contentOpacity }]}
               >
-                <View style={styles.roleItem}>
-                  <View
-                    style={[styles.roleDot, { backgroundColor: '#3B82F6' }]}
-                  />
-                  <Text style={[styles.roleText, { color: '#cbd5e1' }]}>
-                    Main Admin: {userStats.mainAdmins}
-                  </Text>
-                </View>
-                <View style={styles.roleItem}>
-                  <View
-                    style={[styles.roleDot, { backgroundColor: '#10B981' }]}
-                  />
-                  <Text style={[styles.roleText, { color: '#cbd5e1' }]}>
-                    Asst. Admin: {userStats.assistantAdmins}
-                  </Text>
-                </View>
-                <View style={styles.roleItem}>
-                  <View
-                    style={[styles.roleDot, { backgroundColor: '#F59E0B' }]}
-                  />
-                  <Text style={[styles.roleText, { color: '#cbd5e1' }]}>
-                    Students: {userStats.students}
-                  </Text>
-                </View>
+                {[
+                  {
+                    label: 'Main Admin',
+                    count: userStats.mainAdmins,
+                    color: '#8b5cf6',
+                  },
+                  {
+                    label: 'Asst. Admin',
+                    count: userStats.assistantAdmins,
+                    color: '#f59e0b',
+                  },
+                  {
+                    label: 'Students',
+                    count: userStats.students,
+                    color: '#0ea5e9',
+                  },
+                ].map((r) => (
+                  <View key={r.label} style={styles.roleRow}>
+                    <View
+                      style={[styles.roleDot, { backgroundColor: r.color }]}
+                    />
+                    <Text style={[styles.roleLabel, { color: mutedText }]}>
+                      {r.label}
+                    </Text>
+                    <Text style={[styles.roleCount, { color: primaryText }]}>
+                      {r.count}
+                    </Text>
+                  </View>
+                ))}
               </Animated.View>
             )}
 
-            {/* Navigation Items with hover & active effects */}
-            <View style={styles.navItems}>
-              {menuItems.map((item, index) => {
-                const isActive = isRouteActive(item.route)
-                return (
-                  <TouchableOpacity
-                    key={item.name}
-                    style={[
-                      styles.navItem,
-                      collapsed && styles.navItemCollapsed,
-                      isActive && [
-                        styles.activeNavItem,
-                        {
-                          backgroundColor: isDark
-                            ? 'rgba(59, 130, 246, 0.15)'
-                            : 'rgba(59, 130, 246, 0.1)',
-                          borderLeftColor: colors.accent.primary,
-                        },
-                      ],
-                    ]}
-                    onPress={() => handleNavigation(item.route)}
-                    activeOpacity={0.7}
-                    {...(isWeb
-                      ? {
-                          onMouseEnter: (e: any) => {
-                            e.currentTarget.style.transform = 'scale(1.02)'
-                            e.currentTarget.style.backgroundColor = isDark
-                              ? 'rgba(255,255,255,0.05)'
-                              : 'rgba(0,0,0,0.03)'
-                          },
-                          onMouseLeave: (e: any) => {
-                            e.currentTarget.style.transform = 'scale(1)'
-                            e.currentTarget.style.backgroundColor = isActive
-                              ? isDark
-                                ? 'rgba(59, 130, 246, 0.15)'
-                                : 'rgba(59, 130, 246, 0.1)'
-                              : 'transparent'
-                          },
-                        }
-                      : {})}
-                  >
-                    <Animated.View
-                      style={[
-                        styles.navIconWrapper,
-                        collapsed && styles.navIconWrapperCollapsed,
-                        {
-                          transform: [
-                            {
-                              scale: isActive ? 1.1 : 1,
-                            },
-                          ],
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={item.icon}
-                        size={collapsed ? 24 : 20}
-                        color={
-                          isActive
-                            ? colors.accent.primary
-                            : colors.sidebar.icon.inactive
-                        }
-                      />
-                    </Animated.View>
-                    {!collapsed && (
-                      <Animated.Text
-                        style={[
-                          styles.navText,
-                          {
-                            color: isActive ? colors.accent.primary : '#cbd5e1',
-                          },
-                          { opacity: contentOpacity },
-                        ]}
-                      >
-                        {item.title}
-                      </Animated.Text>
-                    )}
-                    {isActive && !collapsed && (
-                      <View
-                        style={[
-                          styles.activeIndicator,
-                          { backgroundColor: colors.accent.primary },
-                        ]}
-                      />
-                    )}
-                  </TouchableOpacity>
-                )
-              })}
+            {/* ── Section label ── */}
+            {!collapsed && (
+              <Animated.Text
+                style={[
+                  styles.sectionLabel,
+                  { color: mutedText, opacity: contentOpacity },
+                ]}
+              >
+                NAVIGATION
+              </Animated.Text>
+            )}
+
+            {/* ── Nav Items ── */}
+            <View style={styles.navList}>
+              {menuItems.map((item) => (
+                <NavItem
+                  key={item.name}
+                  item={item}
+                  isActive={isRouteActive(item.route)}
+                  collapsed={collapsed}
+                  isDark={isDark}
+                  contentOpacity={contentOpacity}
+                  onPress={() => handleNavigation(item.route)}
+                  isWeb={isWeb}
+                  accentColor={accentColor}
+                />
+              ))}
             </View>
 
-            {/* Bottom Section */}
-            <Animated.View
-              style={[
-                styles.sidebarFooter,
-                {
-                  borderTopColor: 'rgba(255,255,255,0.1)',
-                  opacity: contentOpacity,
-                },
-              ]}
+            {/* ── Footer ── */}
+            <View
+              style={[styles.sidebarFooter, { borderTopColor: dividerColor }]}
             >
+              {/* Settings – now with hover */}
               <TouchableOpacity
-                style={[styles.navItem, collapsed && styles.navItemCollapsed]}
+                style={[
+                  styles.footerItem,
+                  collapsed && styles.footerItemCollapsed,
+                ]}
                 onPress={() => setSettingsModalVisible(true)}
+                activeOpacity={0.75}
+                {...(isWeb
+                  ? {
+                      // @ts-ignore
+                      onMouseEnter: (e: any) => {
+                        e.currentTarget.style.backgroundColor = isDark
+                          ? 'rgba(255,255,255,0.05)'
+                          : 'rgba(37,99,235,0.06)'
+                      },
+                      // @ts-ignore
+                      onMouseLeave: (e: any) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      },
+                    }
+                  : {})}
               >
                 <View
                   style={[
-                    styles.navIconWrapper,
-                    collapsed && styles.navIconWrapperCollapsed,
+                    styles.iconContainer,
+                    collapsed && styles.iconContainerCollapsed,
                   ]}
                 >
                   <Ionicons
                     name='settings-outline'
-                    size={collapsed ? 24 : 20}
-                    color={colors.sidebar.icon.inactive}
+                    size={20}
+                    color={mutedText}
                   />
                 </View>
                 {!collapsed && (
-                  <Text style={[styles.navText, { color: '#cbd5e1' }]}>
+                  <Animated.Text
+                    style={[
+                      styles.footerLabel,
+                      { color: mutedText, opacity: contentOpacity },
+                    ]}
+                  >
                     Settings
-                  </Text>
+                  </Animated.Text>
                 )}
               </TouchableOpacity>
 
+              {/* Logout – now with hover AND actual logout */}
               <TouchableOpacity
                 style={[
-                  styles.navItem,
-                  styles.logoutButton,
-                  collapsed && styles.navItemCollapsed,
+                  styles.footerItem,
+                  collapsed && styles.footerItemCollapsed,
+                  styles.logoutItem,
                 ]}
-                onPress={() => router.replace('/super-admin-login' as Href)}
+                onPress={async () => {
+                  try {
+                    await logout()
+                    router.replace('/super-admin-login' as Href)
+                  } catch (error) {
+                    console.error('Logout failed:', error)
+                  }
+                }}
+                activeOpacity={0.75}
+                {...(isWeb
+                  ? {
+                      // @ts-ignore
+                      onMouseEnter: (e: any) => {
+                        e.currentTarget.style.backgroundColor = isDark
+                          ? 'rgba(239,68,68,0.10)'
+                          : 'rgba(239,68,68,0.06)'
+                      },
+                      // @ts-ignore
+                      onMouseLeave: (e: any) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      },
+                    }
+                  : {})}
               >
                 <View
                   style={[
-                    styles.navIconWrapper,
-                    collapsed && styles.navIconWrapperCollapsed,
+                    styles.iconContainer,
+                    styles.logoutIconContainer,
+                    collapsed && styles.iconContainerCollapsed,
                   ]}
                 >
-                  <Ionicons
-                    name='log-out-outline'
-                    size={collapsed ? 24 : 20}
-                    color='#EF4444'
-                  />
+                  <Ionicons name='log-out-outline' size={20} color='#ef4444' />
                 </View>
                 {!collapsed && (
-                  <Text style={[styles.navText, styles.logoutText]}>
-                    Logout
-                  </Text>
+                  <Animated.Text
+                    style={[styles.logoutLabel, { opacity: contentOpacity }]}
+                  >
+                    Log Out
+                  </Animated.Text>
                 )}
               </TouchableOpacity>
-            </Animated.View>
+            </View>
           </View>
         </LinearGradient>
       </Animated.View>
     )
   }
 
+  // ─── Loading gate ──────────────────────────────────────────────────────────
   if (!isLayoutReady) {
     return (
       <LoadingScreen
@@ -550,15 +753,16 @@ export default function MainAdminLayout() {
   }
 
   const mainMarginLeft = sidebarAnim.interpolate({
-    inputRange: [collapsedWidth, fullWidth],
-    outputRange: [collapsedWidth, fullWidth],
+    inputRange: [SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_FULL_WIDTH],
+    outputRange: [SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_FULL_WIDTH],
   })
 
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colors.statusBar} />
 
-      {/* Mobile Header */}
+      {/* Mobile header bar */}
       {!isWeb && (
         <View
           style={[
@@ -571,79 +775,65 @@ export default function MainAdminLayout() {
         >
           <TouchableOpacity
             onPress={() => setMobileMenuOpen(!mobileMenuOpen)}
-            style={styles.hamburgerButton}
+            style={styles.hamburger}
           >
             <Ionicons
               name={mobileMenuOpen ? 'close' : 'menu'}
-              size={28}
+              size={26}
               color={colors.header.text}
             />
           </TouchableOpacity>
-          <View style={styles.mobileLogoContainer}>
+
+          <View style={styles.mobileLogoBox}>
             <Image
               source={require('../../assets/images/Logo/V_1.0.1.png')}
               style={styles.mobileLogo}
               resizeMode='contain'
             />
           </View>
-          <View style={styles.mobileHeaderRight} />
+
+          <View style={{ width: 40 }} />
         </View>
       )}
 
-      {/* Mobile Overlay with fade */}
+      {/* Mobile overlay */}
       {!isWeb && mobileMenuOpen && (
         <Animated.View
-          style={[styles.overlay, { opacity: mobileOverlayAnim }]}
+          style={[styles.mobileOverlay, { opacity: mobileOverlayAnim }]}
           {...panResponder.panHandlers}
         >
           <TouchableOpacity
-            style={styles.overlayTouch}
+            style={StyleSheet.absoluteFill}
             activeOpacity={1}
             onPress={() => setMobileMenuOpen(false)}
           />
         </Animated.View>
       )}
 
-      {/* Mobile Sidebar */}
+      {/* Mobile drawer */}
       {!isWeb && (
         <Animated.View
           style={[
-            styles.mobileSidebarContainer,
+            styles.mobileDrawer,
             { transform: [{ translateX: mobileSlideAnim }] },
           ]}
         >
-          <Sidebar isMobile={true} />
+          <Sidebar isMobile />
         </Animated.View>
       )}
 
+      {/* Main content area */}
       <Animated.View
         style={[styles.mainContent, isWeb && { marginLeft: mainMarginLeft }]}
       >
         {isWeb && <Sidebar />}
 
-        <LinearGradient
-          colors={
-            isDark
-              ? ['#0a1628', '#0f2456', '#1a3a8f']
-              : ['#0f2456', '#1a3a8f', '#1e53c8']
-          }
-          locations={[0, 0.5, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={styles.tabsGradientBackground}
-        >
+        {/* Tab content */}
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
           <Tabs
             initialRouteName='index'
             screenOptions={{
               headerShown: false,
-              headerStyle: { backgroundColor: colors.header.background },
-              headerTitleStyle: {
-                color: colors.header.text,
-                fontSize: 20,
-                fontWeight: '600',
-              },
-              headerTintColor: colors.header.text,
-              headerShadowVisible: false,
               tabBarStyle: !isWeb
                 ? {
                     backgroundColor: colors.card,
@@ -654,181 +844,134 @@ export default function MainAdminLayout() {
                     height: 65,
                   }
                 : { display: 'none' },
-              tabBarActiveTintColor: colors.accent.primary,
-              tabBarInactiveTintColor: isDark ? '#94A3B8' : '#64748B',
+              tabBarActiveTintColor: accentColor,
+              tabBarInactiveTintColor: isDark ? '#94a3b8' : '#64748b',
             }}
           >
-            <Tabs.Screen
-              name='index'
-              options={{
-                title: 'Dashboard',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? 'home' : 'home-outline'}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name='announcements'
-              options={{
-                title: 'Announcements',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? 'megaphone' : 'megaphone-outline'}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name='attendance'
-              options={{
-                title: 'Attendance',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? 'calendar' : 'calendar-outline'}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name='events'
-              options={{
-                title: 'Events',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? 'calendar' : 'calendar-outline'}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name='users'
-              options={{
-                title: 'Users',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? 'people' : 'people-outline'}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
-            <Tabs.Screen
-              name='profile'
-              options={{
-                title: 'Profile',
-                tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? 'person' : 'person-outline'}
-                    size={24}
-                    color={color}
-                  />
-                ),
-              }}
-            />
+            {menuItems.map((item) => (
+              <Tabs.Screen
+                key={item.name}
+                name={item.name}
+                options={{
+                  title: item.title,
+                  tabBarIcon: ({ color, focused }) => (
+                    <Ionicons
+                      name={focused ? item.activeIcon : item.icon}
+                      size={22}
+                      color={color}
+                    />
+                  ),
+                }}
+              />
+            ))}
           </Tabs>
-        </LinearGradient>
+        </View>
       </Animated.View>
-      {/* Settings Modal */}
+
+      {/* ── Settings Modal ─────────────────────────────────────────────────── */}
       <Modal
         visible={settingsModalVisible}
-        transparent={true}
+        transparent
         animationType='fade'
         onRequestClose={() => setSettingsModalVisible(false)}
       >
-        {/* Outer overlay with blur (glass background) */}
         <BlurView
-          intensity={80}
+          intensity={70}
           tint={isDark ? 'dark' : 'light'}
           style={StyleSheet.absoluteFill}
         >
           <TouchableOpacity
-            style={styles.modalOverlayTouch}
+            style={StyleSheet.absoluteFill}
             activeOpacity={1}
             onPress={() => setSettingsModalVisible(false)}
           />
         </BlurView>
 
-        {/* Modal container with glassmorphism + vibrant gradient */}
         <View style={styles.modalCentered}>
           <View
             style={[
-              styles.modalGlassContainer,
-              { borderColor: 'rgba(255,255,255,0.3)' },
+              styles.modalCard,
+              {
+                borderColor: isDark
+                  ? 'rgba(255,255,255,0.12)'
+                  : 'rgba(37,99,235,0.15)',
+                shadowColor: isDark ? '#000' : '#1e3a6e',
+              },
             ]}
           >
+            {/* Modal header gradient */}
             <LinearGradient
-              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.modalGradientHeader}
+              colors={isDark ? ['#0d1e3d', '#060c18'] : ['#ffffff', '#e3eeff']}
+              style={styles.modalHeaderGradient}
             >
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>
+              <View style={styles.modalHeaderRow}>
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    { color: isDark ? '#e2eaf8' : '#1e3a6e' },
+                  ]}
+                >
                   Settings
                 </Text>
                 <TouchableOpacity
                   onPress={() => setSettingsModalVisible(false)}
                 >
-                  <Ionicons
-                    name='close-circle'
-                    size={28}
-                    color={colors.accent.primary}
-                  />
+                  <Ionicons name='close-circle' size={26} color={accentColor} />
                 </TouchableOpacity>
               </View>
             </LinearGradient>
 
-            {/* Scrollable content with glass effect */}
             <ScrollView
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.modalScrollContent}
+              contentContainerStyle={styles.modalBody}
               style={{
                 backgroundColor: isDark
-                  ? 'rgba(15, 25, 35, 0.7)'
-                  : 'rgba(255, 255, 255, 0.7)',
+                  ? 'rgba(10,18,36,0.92)'
+                  : 'rgba(248,251,255,0.95)',
               }}
             >
-              {/* Appearance Section */}
+              {/* Appearance */}
               <View
                 style={[
                   styles.modalSection,
                   {
-                    backgroundColor: 'transparent',
-                    borderColor: 'rgba(255,255,255,0.2)',
+                    borderColor: isDark
+                      ? 'rgba(255,255,255,0.08)'
+                      : 'rgba(37,99,235,0.10)',
                   },
                 ]}
               >
                 <Text
-                  style={[styles.modalSectionTitle, { color: colors.text }]}
+                  style={[
+                    styles.modalSectionTitle,
+                    { color: isDark ? '#e2eaf8' : '#1e3a6e' },
+                  ]}
                 >
                   Appearance
                 </Text>
 
+                {/* Dark mode toggle */}
                 <View
                   style={[
-                    styles.modalSettingItem,
-                    { borderBottomColor: 'rgba(255,255,255,0.15)' },
+                    styles.modalRow,
+                    {
+                      borderBottomColor: isDark
+                        ? 'rgba(255,255,255,0.06)'
+                        : 'rgba(37,99,235,0.08)',
+                    },
                   ]}
                 >
-                  <View style={styles.modalSettingLeft}>
+                  <View style={styles.modalRowLeft}>
                     <Ionicons
                       name={isDark ? 'moon' : 'sunny'}
-                      size={24}
-                      color={colors.accent.primary}
+                      size={22}
+                      color={accentColor}
                     />
                     <Text
-                      style={[styles.modalSettingText, { color: colors.text }]}
+                      style={[
+                        styles.modalRowText,
+                        { color: isDark ? '#cbd5e1' : '#334155' },
+                      ]}
                     >
                       {isDark ? 'Dark Mode' : 'Light Mode'}
                     </Text>
@@ -836,107 +979,121 @@ export default function MainAdminLayout() {
                   <Switch
                     value={isDark}
                     onValueChange={toggleTheme}
-                    trackColor={{
-                      false: '#767577',
-                      true: colors.accent.primary,
-                    }}
-                    thumbColor={isDark ? '#fff' : '#f4f3f4'}
+                    trackColor={{ false: '#767577', true: accentColor }}
+                    thumbColor='#fff'
                   />
                 </View>
 
+                {/* Theme options */}
                 <Text
                   style={[
-                    styles.modalSubTitle,
-                    { color: colors.sidebar.text.secondary },
+                    styles.modalSubLabel,
+                    { color: isDark ? '#8ba3c7' : '#4d6a9a' },
                   ]}
                 >
-                  Theme Preference
+                  THEME PREFERENCE
                 </Text>
 
-                {[
-                  {
-                    value: 'light',
-                    label: 'Light Mode',
-                    icon: 'sunny-outline',
-                  },
-                  { value: 'dark', label: 'Dark Mode', icon: 'moon-outline' },
-                  {
-                    value: 'system',
-                    label: 'System Default',
-                    icon: 'phone-portrait-outline',
-                  },
-                ].map((option) => (
+                {(
+                  [
+                    {
+                      value: 'light',
+                      label: 'Light Mode',
+                      icon: 'sunny-outline',
+                    },
+                    { value: 'dark', label: 'Dark Mode', icon: 'moon-outline' },
+                    {
+                      value: 'system',
+                      label: 'System Default',
+                      icon: 'phone-portrait-outline',
+                    },
+                  ] as const
+                ).map((opt) => (
                   <TouchableOpacity
-                    key={option.value}
+                    key={opt.value}
                     style={[
-                      styles.modalThemeOption,
-                      theme === option.value && {
-                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                      styles.themeOption,
+                      theme === opt.value && {
+                        backgroundColor: isDark
+                          ? 'rgba(59,130,246,0.15)'
+                          : 'rgba(37,99,235,0.10)',
                       },
                     ]}
-                    onPress={() => setTheme(option.value as any)}
+                    onPress={() => setTheme(opt.value)}
                   >
-                    <View style={styles.modalThemeOptionLeft}>
+                    <View style={styles.themeOptionLeft}>
                       <Ionicons
-                        name={option.icon as any}
-                        size={22}
+                        name={opt.icon}
+                        size={20}
                         color={
-                          theme === option.value
-                            ? colors.accent.primary
-                            : colors.sidebar.text.secondary
+                          theme === opt.value
+                            ? accentColor
+                            : isDark
+                              ? '#8ba3c7'
+                              : '#4d6a9a'
                         }
                       />
                       <Text
                         style={[
-                          styles.modalThemeOptionText,
+                          styles.themeOptionText,
                           {
                             color:
-                              theme === option.value
-                                ? colors.accent.primary
-                                : colors.text,
+                              theme === opt.value
+                                ? accentColor
+                                : isDark
+                                  ? '#cbd5e1'
+                                  : '#334155',
                           },
                         ]}
                       >
-                        {option.label}
+                        {opt.label}
                       </Text>
                     </View>
-                    {theme === option.value && (
+                    {theme === opt.value && (
                       <Ionicons
                         name='checkmark-circle'
-                        size={22}
-                        color={colors.accent.primary}
+                        size={20}
+                        color={accentColor}
                       />
                     )}
                   </TouchableOpacity>
                 ))}
               </View>
 
-              {/* About Section */}
+              {/* About */}
               <View
                 style={[
                   styles.modalSection,
                   {
-                    backgroundColor: 'transparent',
-                    borderColor: 'rgba(255,255,255,0.2)',
+                    borderColor: isDark
+                      ? 'rgba(255,255,255,0.08)'
+                      : 'rgba(37,99,235,0.10)',
                   },
                 ]}
               >
                 <Text
-                  style={[styles.modalSectionTitle, { color: colors.text }]}
+                  style={[
+                    styles.modalSectionTitle,
+                    { color: isDark ? '#e2eaf8' : '#1e3a6e' },
+                  ]}
                 >
                   About
                 </Text>
-                <View style={styles.modalSettingItem}>
+                <View style={styles.modalRow}>
                   <Text
-                    style={[
-                      styles.modalSettingText,
-                      { color: colors.sidebar.text.secondary },
-                    ]}
+                    style={{
+                      color: isDark ? '#8ba3c7' : '#4d6a9a',
+                      fontSize: 15,
+                    }}
                   >
                     Version
                   </Text>
                   <Text
-                    style={[styles.modalVersionText, { color: colors.text }]}
+                    style={{
+                      color: isDark ? '#e2eaf8' : '#1e3a6e',
+                      fontSize: 15,
+                      fontWeight: '600',
+                    }}
                   >
                     2.0.0
                   </Text>
@@ -950,139 +1107,215 @@ export default function MainAdminLayout() {
   )
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  mainContent: { flex: 1, flexDirection: 'row' },
-  tabsContainer: { flex: 1 },
+  root: { flex: 1 },
+
+  // ── Sidebar ──
   sidebarContainer: {
     height: '100%',
-    position: 'fixed',
+    position: 'fixed' as any,
     left: 0,
     top: 0,
     bottom: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 8,
     zIndex: 10,
     overflow: 'hidden',
+    // Subtle shadow on the right edge
+    shadowColor: '#1e3a6e',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  sidebarContent: { flex: 1, paddingVertical: 20 },
-  collapseButton: {
+  sidebarGradient: { flex: 1 },
+  sidebarContent: { flex: 1, paddingVertical: 4 },
+
+  // Collapse button
+  collapseBtn: {
     alignSelf: 'flex-end',
-    padding: 8,
+    marginRight: 14,
+    marginBottom: 12,
+    padding: 6,
     borderRadius: 8,
-    marginRight: 16,
-    marginBottom: 16,
-    width: 34,
+    width: 30,
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.03)',
   },
-  collapseButtonCollapsed: {
+  collapseBtnCollapsed: {
     alignSelf: 'center',
     marginRight: 0,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '90%',
-    maxWidth: 500,
-    maxHeight: '80%',
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
 
-  logoSection: {
+  // Brand row
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     marginBottom: 20,
   },
-  logoSectionCollapsed: { justifyContent: 'center', paddingHorizontal: 8 },
-  logoWrapper: { marginRight: 12 },
-  logoBackground: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
+  brandRowCollapsed: { justifyContent: 'center', paddingHorizontal: 0 },
+  logoWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    justifyContent: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
   },
-  logoImage: { width: 50, height: 50, borderRadius: 25 },
-  adminInfo: { flex: 1 },
-  adminTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  adminSubtitle: { fontSize: 12, marginBottom: 8 },
-  statusContainer: { flexDirection: 'row', alignItems: 'center' },
-  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  statusText: { fontSize: 11, fontWeight: '500' },
-  quickStats: {
+  logoImage: { width: 36, height: 36, borderRadius: 18 },
+  brandText: { flex: 1 },
+  brandName: { fontSize: 15, fontWeight: '700', letterSpacing: -0.3 },
+  brandSub: { fontSize: 11, marginTop: 1, marginBottom: 6 },
+  roleChip: {
     flexDirection: 'row',
-    borderRadius: 12,
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    backgroundColor: 'rgba(16,185,129,0.12)',
+  },
+  roleDotIndicator: { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
+  roleChipText: { fontSize: 10, fontWeight: '600' },
+
+  // Stats card
+  statsCard: {
+    flexDirection: 'row',
+    marginHorizontal: 12,
+    marginBottom: 10,
+    borderRadius: 14,
+    borderWidth: 1,
     padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 12,
   },
   statItem: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 18, fontWeight: '700' },
-  statLabel: { fontSize: 11, marginTop: 2 },
-  statDivider: { width: 1, marginHorizontal: 8 },
+  statValue: { fontSize: 20, fontWeight: '700' },
+  statLabel: { fontSize: 10, marginTop: 2 },
+  statDivider: { width: 1, marginHorizontal: 10 },
+
+  // Role breakdown
   roleBreakdown: {
-    borderRadius: 8,
-    padding: 10,
-    marginHorizontal: 16,
+    marginHorizontal: 12,
     marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
-  roleItem: { flexDirection: 'row', alignItems: 'center', marginVertical: 3 },
-  roleDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  roleText: { fontSize: 11 },
-  navItems: { flex: 1, paddingHorizontal: 8 },
+  roleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  roleDot: { width: 7, height: 7, borderRadius: 3.5, marginRight: 8 },
+  roleLabel: { flex: 1, fontSize: 11 },
+  roleCount: { fontSize: 11, fontWeight: '600' },
+
+  // Section label
+  sectionLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    marginHorizontal: 20,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+
+  // Nav list
+  navList: { flex: 1, paddingHorizontal: 8 },
+
+  // Nav item
   navItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
     marginVertical: 2,
-    borderRadius: 12,
+    borderRadius: 14, // pill-ish shape
     position: 'relative',
+    overflow: 'hidden',
   },
-  navItemCollapsed: { justifyContent: 'center', paddingHorizontal: 0 },
-  activeNavItem: {
-    borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
+  navItemExpanded: {
+    paddingVertical: 10,
+    paddingLeft: 6,
+    paddingRight: 12,
   },
-  activeIndicator: {
+  navItemCollapsed: {
+    paddingVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  navItemActive: {
+    // extra left padding to accommodate the accent bar
+    paddingLeft: 10,
+  },
+
+  // Left accent bar (active state)
+  activeBar: {
     position: 'absolute',
-    right: 0,
-    top: '25%',
+    left: 0,
+    top: '20%',
     width: 3,
-    height: '50%',
+    height: '60%',
     borderRadius: 2,
   },
-  navIconWrapper: { width: 32, alignItems: 'center', justifyContent: 'center' },
-  navIconWrapperCollapsed: { width: 'auto' },
-  navText: { marginLeft: 12, fontSize: 15, fontWeight: '500' },
-  sidebarFooter: {
-    paddingHorizontal: 8,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    marginTop: 20,
-    paddingTop: 20,
+
+  // Collapsed active dot
+  collapsedActiveDot: {
+    position: 'absolute',
+    bottom: 6,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
   },
-  logoutButton: { marginTop: 5 },
-  logoutText: { color: '#EF4444' },
+
+  // Icon container (small rounded square)
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  iconContainerCollapsed: { marginRight: 0 },
+
+  // Nav label
+  navLabel: { fontSize: 14, fontWeight: '600', flex: 1 },
+
+  // Footer
+  sidebarFooter: {
+    borderTopWidth: 1,
+    paddingTop: 12,
+    paddingBottom: 20,
+    paddingHorizontal: 8,
+    marginTop: 8,
+  },
+  footerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    marginVertical: 2,
+  },
+  footerItemCollapsed: {
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+  },
+  footerLabel: { fontSize: 14, fontWeight: '500', marginLeft: 10 },
+  logoutItem: { marginTop: 4 },
+  logoutIconContainer: { backgroundColor: 'rgba(239,68,68,0.10)' },
+  logoutLabel: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 10,
+  },
+
+  // Main content
+  mainContent: { flex: 1, flexDirection: 'row' },
+
+  // Mobile header
   mobileHeader: {
     position: 'absolute',
     top: 0,
@@ -1097,149 +1330,106 @@ const styles = StyleSheet.create({
     elevation: 5,
     borderBottomWidth: 1,
   },
-  hamburgerButton: {
+  hamburger: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
   },
-  mobileLogoContainer: { flex: 1, alignItems: 'center' },
-  mobileLogo: { width: 40, height: 40 },
-  mobileHeaderRight: { width: 40 },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  mobileLogoBox: { flex: 1, alignItems: 'center' },
+  mobileLogo: { width: 36, height: 36 },
+
+  // Mobile overlay + drawer
+  mobileOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     zIndex: 1001,
   },
-  overlayTouch: {
-    flex: 1,
-  },
-  mobileSidebarContainer: {
+  mobileDrawer: {
     position: 'absolute',
     top: 0,
     left: 0,
     bottom: 0,
-    width: 280,
+    width: MOBILE_SIDEBAR_WIDTH,
     zIndex: 1002,
     elevation: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 2, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOffset: { width: 3, height: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
   },
-  modalOverlayTouch: {
-    flex: 1,
-  },
+
+  // Settings modal
   modalCentered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
-  modalGlassContainer: {
+  modalCard: {
     width: '100%',
-    maxWidth: 500,
+    maxWidth: 480,
     maxHeight: '85%',
-    borderRadius: 28,
+    borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
     shadowRadius: 20,
-    elevation: 15,
+    elevation: 14,
   },
-  modalGradientHeader: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    overflow: 'hidden',
-  },
-  modalScrollContent: {
-    paddingBottom: 20,
-  },
-  modalHeader: {
+  modalHeaderGradient: {},
+  modalHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 18,
   },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
+  modalTitle: { fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
+  modalBody: { paddingBottom: 24 },
   modalSection: {
-    marginHorizontal: 16,
-    marginVertical: 12,
-    borderRadius: 20,
+    margin: 16,
+    marginBottom: 8,
+    borderRadius: 18,
     borderWidth: 1,
     overflow: 'hidden',
-    backgroundColor: 'transparent',
   },
   modalSectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    padding: 16,
-    paddingBottom: 8,
-  },
-  modalSubTitle: {
-    fontSize: 13,
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    paddingTop: 14,
+    paddingBottom: 6,
   },
-  modalSettingItem: {
+  modalSubLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+  modalRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
   },
-  modalSettingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  modalSettingText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  modalVersionText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  modalThemeOption: {
+  modalRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  modalRowText: { fontSize: 15, fontWeight: '500' },
+  themeOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginHorizontal: 8,
-    marginVertical: 4,
+    marginVertical: 3,
     borderRadius: 12,
   },
-  modalThemeOptionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  modalThemeOptionText: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  tabsGradientBackground: {
-    flex: 1,
-  },
-  sidebarGradient: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
+  themeOptionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  themeOptionText: { fontSize: 14, fontWeight: '500' },
 })

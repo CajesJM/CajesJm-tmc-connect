@@ -134,6 +134,42 @@ interface Student {
   course: string
   role?: string
 }
+
+const parseEventDate = (date: any): Date | null => {
+  if (!date) return null
+  try {
+    if (typeof date === 'object' && date.seconds) {
+      return new Date(date.seconds * 1000)
+    }
+    if (typeof date === 'string') {
+      const d = new Date(date)
+      return isNaN(d.getTime()) ? null : d
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+const sortEventsByUpcoming = (events: Event[]): Event[] => {
+  const now = new Date()
+  return [...events].sort((a, b) => {
+    const dateA = parseEventDate(a.date)
+    const dateB = parseEventDate(b.date)
+
+    const isUpcomingA = dateA && dateA > now
+    const isUpcomingB = dateB && dateB > now
+
+    if (isUpcomingA && !isUpcomingB) return -1
+    if (!isUpcomingA && isUpcomingB) return 1
+
+    if (isUpcomingA && isUpcomingB) {
+      return dateA!.getTime() - dateB!.getTime()
+    } else {
+      return dateB!.getTime() - dateA!.getTime()
+    }
+  })
+}
 const AnimatedBlock = memo(function AnimatedBlock({
   block,
   students,
@@ -431,7 +467,7 @@ export default function MainAdminAttendance() {
             status: eventData.status || 'approved',
           }
         })
-        setEvents(eventsList)
+        setEvents(sortEventsByUpcoming(eventsList))
       } catch (error) {
         showAlert('Error', 'Failed to load events')
       } finally {
@@ -455,7 +491,7 @@ export default function MainAdminAttendance() {
           status: eventData.status || 'approved',
         }
       })
-      setEvents(updatedEvents)
+      setEvents(sortEventsByUpcoming(updatedEvents))
     })
 
     return () => unsubscribe()
@@ -2362,8 +2398,8 @@ export default function MainAdminAttendance() {
   }
 
   const headerGradientColors = isDark
-    ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
-    : (['#0f2456', '#1a3a8f', '#1e53c8'] as const)
+    ? (['#060c18', '#0a1a3a', '#10254e'] as const)
+    : (['#ffffff', '#f5f9ff', '#eaf2ff'] as const)
 
   return (
     <View style={styles.container}>
@@ -2381,18 +2417,24 @@ export default function MainAdminAttendance() {
             <Text
               style={[
                 styles.greetingText,
-                { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+                { color: isDark ? '#cbd5e1' : '#475569' },
               ]}
             >
               Welcome Back,
             </Text>
-            <Text style={[styles.userName, isMobile && styles.userNameMobile]}>
+            <Text
+              style={[
+                styles.userName,
+                isMobile && styles.userNameMobile,
+                { color: isDark ? '#ffffff' : '#0f172a' },
+              ]}
+            >
               {userData?.name || 'Admin'}
             </Text>
             <Text
               style={[
                 styles.roleText,
-                { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+                { color: isDark ? '#94a3b8' : '#64748b' },
               ]}
             >
               Attendance Manager
@@ -2435,7 +2477,13 @@ export default function MainAdminAttendance() {
               isMobile && styles.dateContainerMobile,
             ]}
           >
-            <Text style={[styles.dateText, isMobile && styles.dateTextMobile]}>
+            <Text
+              style={[
+                styles.dateText,
+                isMobile && styles.dateTextMobile,
+                { color: isDark ? '#cbd5e1' : '#334155' },
+              ]}
+            >
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
                 year: 'numeric',
@@ -2450,6 +2498,11 @@ export default function MainAdminAttendance() {
               style={[
                 styles.headerAction,
                 isMobile && styles.headerActionMobile,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(255,255,255,0.12)'
+                    : 'rgba(0,0,0,0.05)',
+                },
               ]}
               onPress={handleThemeToggle}
               disabled={isThemeToggling}
@@ -2475,8 +2528,8 @@ export default function MainAdminAttendance() {
               >
                 <Feather
                   name={isDark ? 'sun' : 'moon'}
-                  size={isMobile ? 16 : 18}
-                  color='#ffffff'
+                  size={18}
+                  color={isDark ? '#fff' : '#1e293b'}
                 />
               </Animated.View>
             </TouchableOpacity>

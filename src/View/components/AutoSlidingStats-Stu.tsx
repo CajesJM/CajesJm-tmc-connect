@@ -1,11 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient'
 import React, { useEffect, useRef, useState } from 'react'
 import {
-  Animated,
-  FlatList,
-  ListRenderItemInfo,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -56,18 +54,13 @@ const TIPS: Tip[] = [
 const AutoSlidingTips = () => {
   const { isDark } = useTheme()
   const [currentIndex, setCurrentIndex] = useState(0)
-  const currentIndexRef = useRef(0)
-  const listRef = useRef<FlatList<Tip> | null>(null)
+  const scrollRef = useRef<ScrollView>(null)
   const timerRef = useRef<number | null>(null)
-  const [containerWidth, setContainerWidth] = useState<number>(0)
+  const [containerWidth, setContainerWidth] = useState(0)
 
-  const scrollX = useRef(new Animated.Value(0)).current
-
+  // Auto‑scroll
   useEffect(() => {
-    currentIndexRef.current = currentIndex
-  }, [currentIndex])
-
-  useEffect(() => {
+    if (containerWidth <= 0) return
     startAutoScroll()
     return () => stopAutoScroll()
   }, [containerWidth])
@@ -75,14 +68,9 @@ const AutoSlidingTips = () => {
   const startAutoScroll = () => {
     stopAutoScroll()
     timerRef.current = setInterval(() => {
-      const next = (currentIndexRef.current + 1) % TIPS.length
-      if (listRef.current && containerWidth > 0) {
-        listRef.current.scrollToOffset({
-          offset: next * containerWidth,
-          animated: true,
-        })
-        setCurrentIndex(next)
-      }
+      const next = (currentIndex + 1) % TIPS.length
+      scrollRef.current?.scrollTo({ x: next * containerWidth, animated: true })
+      setCurrentIndex(next)
     }, 4500) as unknown as number
   }
 
@@ -95,95 +83,25 @@ const AutoSlidingTips = () => {
 
   const onLayout = (ev: any) => {
     const w = ev.nativeEvent.layout.width
-    if (w && w !== containerWidth) {
-      setContainerWidth(w)
-      // re-align immediately (no animation) after layout change
-      setTimeout(() => {
-        if (listRef.current) {
-          listRef.current.scrollToOffset({
-            offset: currentIndexRef.current * w,
-            animated: false,
-          })
-        }
-      }, 0)
-    }
+    if (w && w !== containerWidth) setContainerWidth(w)
   }
 
-  const onMomentumScrollBegin = () => {
-    // user started a fling; stop auto-scroll to avoid fighting native momentum
-    stopAutoScroll()
-  }
-
-  const onMomentumScrollEnd = (ev: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetX = ev.nativeEvent.contentOffset.x
-    const idx = Math.round(offsetX / Math.max(1, containerWidth))
+  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = e.nativeEvent.contentOffset.x
+    const idx = Math.round(offsetX / containerWidth)
     setCurrentIndex(idx)
-    // restart auto-scroll after momentum finishes
+    // Restart auto‑scroll after user swipe
+    stopAutoScroll()
     setTimeout(() => startAutoScroll(), 600)
   }
 
   const onScrollBeginDrag = () => stopAutoScroll()
   const onScrollEndDrag = () => {
-    // let momentum handlers decide when to restart
-    // small safety restart if momentum doesn't fire
+    // If momentum isn't enough to move, restart timer
     setTimeout(() => {
       if (!timerRef.current) startAutoScroll()
     }, 1200)
   }
-
-  const renderItem = ({ item }: ListRenderItemInfo<Tip>) => (
-    <View
-      style={[
-        styles.tipWrapper,
-        { width: containerWidth, height: containerWidth > 400 ? 150 : 170 },
-      ]}
-    >
-      <View style={styles.content}>
-        <Text
-          style={[
-            styles.title,
-            {
-              color: isDark ? '#FFF' : '#0F172A',
-              fontSize: containerWidth > 400 ? 18 : 16,
-            },
-          ]}
-          numberOfLines={2}
-        >
-          {item.title}
-        </Text>
-        <Text
-          style={[
-            styles.description,
-            {
-              color: isDark ? '#CBD5E1' : '#334155',
-              fontSize: containerWidth > 400 ? 14 : 12,
-            },
-          ]}
-        >
-          {item.description}
-        </Text>
-      </View>
-    </View>
-  )
-
-  const indicatorDots = TIPS.map((_, i) => {
-    const inputRange = [
-      (i - 1) * containerWidth,
-      i * containerWidth,
-      (i + 1) * containerWidth,
-    ]
-    const scale = scrollX.interpolate({
-      inputRange,
-      outputRange: [1, 1.6, 1],
-      extrapolate: 'clamp',
-    })
-    const opacity = scrollX.interpolate({
-      inputRange,
-      outputRange: [0.6, 1, 0.6],
-      extrapolate: 'clamp',
-    })
-    return { scale, opacity }
-  })
 
   return (
     <View style={styles.outerContainer} onLayout={onLayout}>
@@ -200,6 +118,7 @@ const AutoSlidingTips = () => {
           { height: (containerWidth > 400 ? 150 : 170) + 56 },
         ]}
       >
+        {/* Decorative shapes (unchanged) */}
         <View
           style={[
             styles.shape,
@@ -237,40 +156,65 @@ const AutoSlidingTips = () => {
           pointerEvents='none'
         />
 
-        <Animated.FlatList
-          ref={listRef}
-          data={TIPS}
-          keyExtractor={(item) => item.id.toString()}
+        <ScrollView
+          ref={scrollRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
-          renderItem={renderItem}
-          onMomentumScrollBegin={onMomentumScrollBegin}
           onMomentumScrollEnd={onMomentumScrollEnd}
           onScrollBeginDrag={onScrollBeginDrag}
           onScrollEndDrag={onScrollEndDrag}
-          getItemLayout={(_, index) => ({
-            length: containerWidth || 1,
-            offset: (containerWidth || 1) * index,
-            index,
-          })}
-          contentContainerStyle={{ alignItems: 'center' }}
           scrollEventThrottle={16}
-          // native snapping physics
           decelerationRate='fast'
+          disableIntervalMomentum
           snapToInterval={containerWidth}
           snapToAlignment='center'
-          disableIntervalMomentum={true}
-          // drive animated value from native scroll (useNativeDriver true)
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-            { useNativeDriver: true }
-          )}
-        />
+          contentContainerStyle={{ alignItems: 'center' }}
+        >
+          {TIPS.map((tip) => (
+            <View
+              key={tip.id}
+              style={[
+                styles.tipWrapper,
+                {
+                  width: containerWidth,
+                  height: containerWidth > 400 ? 150 : 170,
+                },
+              ]}
+            >
+              <View style={styles.content}>
+                <Text
+                  style={[
+                    styles.title,
+                    {
+                      color: isDark ? '#FFF' : '#0F172A',
+                      fontSize: containerWidth > 400 ? 18 : 16,
+                    },
+                  ]}
+                  numberOfLines={2}
+                >
+                  {tip.title}
+                </Text>
+                <Text
+                  style={[
+                    styles.description,
+                    {
+                      color: isDark ? '#CBD5E1' : '#334155',
+                      fontSize: containerWidth > 400 ? 14 : 12,
+                    },
+                  ]}
+                >
+                  {tip.description}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
 
+        {/* Indicator dots */}
         <View style={styles.indicatorContainer}>
-          {indicatorDots.map((anim, idx) => (
-            <Animated.View
+          {TIPS.map((_, idx) => (
+            <View
               key={idx}
               style={[
                 styles.dot,
@@ -283,8 +227,6 @@ const AutoSlidingTips = () => {
                       : isDark
                         ? '#475569'
                         : '#CBD5E1',
-                  transform: [{ scale: anim.scale }],
-                  opacity: anim.opacity,
                   width: idx === currentIndex ? 20 : 8,
                 },
               ]}

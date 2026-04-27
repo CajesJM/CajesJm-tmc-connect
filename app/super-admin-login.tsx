@@ -27,20 +27,22 @@ import { styles } from '../src/View/styles/SuperAdminLogin'
 const modalStyles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   container: {
-    width: '20%',
+    width: '90%',
+    maxWidth: 400,
     backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 32,
+    padding: 28,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 12,
   },
   title: {
     fontSize: 20,
@@ -88,6 +90,7 @@ const modalStyles = StyleSheet.create({
   },
   submitButton: {
     backgroundColor: '#0ea5e9',
+    borderRadius: 40,
   },
   cancelText: {
     color: '#64748b',
@@ -347,10 +350,22 @@ export default function SuperAdminLogin() {
       const userDoc = querySnapshot.docs[0]
       const userData = userDoc.data()
 
-      if (userData.role !== 'main_admin') {
-        throw new Error(
-          'Access denied. This portal is for administrators only.'
+      const isActive =
+        (userData.status ? userData.status !== 'inactive' : true) &&
+        userData.active !== false
+
+      if (!isActive) {
+        setError(
+          'Your account has been deactivated. Please contact the system administrator.'
         )
+        setBusy(false)
+        return
+      }
+
+      if (userData.role !== 'main_admin') {
+        setError('Access denied. This portal is for administrators only.')
+        setBusy(false)
+        return
       }
 
       await login(userData.email, password)
@@ -477,14 +492,14 @@ export default function SuperAdminLogin() {
   }
 
   const isLoading = busy || authLoading
-  const isLockedOut = lockoutUntil && lockoutUntil > Date.now()
+  const isLockedOut = !!(lockoutUntil && lockoutUntil > Date.now())
 
   const usernameLabelStyle = {
     transform: [
       {
         translateY: usernameAnim.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, -24],
+          outputRange: [0, -16],
         }),
       },
       {
@@ -501,7 +516,7 @@ export default function SuperAdminLogin() {
       {
         translateY: passwordAnim.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, -24],
+          outputRange: [0, -16],
         }),
       },
       {
@@ -616,11 +631,10 @@ export default function SuperAdminLogin() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.container}>
-          {/* LEFT COLUMN */}
           <LinearGradient
-            colors={['#0a2b4a', '#1e4a76', '#3182ce']}
+            colors={['#0f2b4db7', '#0d2e4f', '#0b0732']}
             start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
+            end={{ x: 1, y: 1 }}
             style={[styles.leftColumn, { flex: 1.15 }]}
           >
             <View
@@ -643,6 +657,28 @@ export default function SuperAdminLogin() {
                 height: 260,
                 borderRadius: 130,
                 backgroundColor: 'rgba(14,165,233,0.04)',
+              }}
+            />
+            <View
+              style={{
+                position: 'absolute',
+                top: '20%',
+                left: -100,
+                width: 300,
+                height: 300,
+                borderRadius: 150,
+                backgroundColor: 'rgba(14,165,233,0.05)',
+              }}
+            />
+            <View
+              style={{
+                position: 'absolute',
+                bottom: '10%',
+                right: -50,
+                width: 200,
+                height: 200,
+                borderRadius: 100,
+                backgroundColor: 'rgba(14,165,233,0.08)',
               }}
             />
 
@@ -697,14 +733,11 @@ export default function SuperAdminLogin() {
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.cardBadge}>
-                  <View style={styles.cardBadgeIcon}>
-                    <Ionicons
-                      name='shield-checkmark'
-                      size={14}
-                      color='#0ea5e9'
-                    />
-                  </View>
-                  <Text style={styles.cardBadgeText}>Secure Access</Text>
+                  <Image
+                    source={require('../assets/images/Logo/TMC-Coonect-V.2.png')}
+                    style={styles.logoImage1}
+                    resizeMode='contain'
+                  />
                 </View>
                 <Text style={styles.title}>Administrator Login</Text>
                 <Text style={styles.subtitle}>
@@ -835,35 +868,46 @@ export default function SuperAdminLogin() {
                 </TouchableOpacity>
               </View>
 
-              {error && <Text style={styles.error}>{error}</Text>}
+              {error && (
+                <View style={styles.error}>
+                  <Ionicons name='alert-circle' size={16} color='#ef4444' />
+                  <Text style={{ flex: 1, color: '#ef4444' }}>{error}</Text>
+                </View>
+              )}
 
               <TouchableOpacity
                 style={[
                   styles.button,
-                  (isLoading || !!isLockedOut) && styles.disabled,
+                  isLoading || isLockedOut ? styles.disabled : undefined,
                 ]}
                 onPress={handleLogin}
-                disabled={isLoading || !!isLockedOut}
-                activeOpacity={0.8}
+                disabled={isLoading || isLockedOut}
+                activeOpacity={0.7}
               >
-                <Ionicons name='log-in-outline' size={18} color='#ffffff' />
-                <Text style={styles.buttonText}>Sign In to Dashboard</Text>
+                <LinearGradient
+                  colors={['#0ea5e9', '#3b82f6']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={StyleSheet.absoluteFillObject}
+                />
+                <Ionicons name='log-in-outline' size={20} color='#fff' />
+                <Text style={styles.buttonText}>Enter Portal</Text>
               </TouchableOpacity>
 
               <View style={styles.footerLinks}>
                 <TouchableOpacity
-                  onPress={() => router.push('/login')}
+                  onPress={() => router.push('/')}
                   style={styles.backLink}
                   disabled={isLoading || !!isLockedOut}
                 >
-                  <Text style={styles.backLinkText}>← Back to User Login</Text>
+                  <Text style={styles.backLinkText}>← Back to Home</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.securityNote}>
                 <Ionicons name='lock-closed' size={11} color='#94a3b8' />
                 <Text style={styles.securityNoteText}>
-                  Secured with end-to-end encryption · TMC Connect v2
+                  Secured with end-to-end encryption · TMC Connect v2.0
                 </Text>
               </View>
             </View>

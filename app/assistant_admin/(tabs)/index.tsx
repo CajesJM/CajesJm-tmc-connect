@@ -54,6 +54,7 @@ import {
 import { auth, db } from '../../../src/Model/lib/firebaseConfig'
 import AutoSlidingStats from '../../../src/View/components/AutoSlidingStats-AssAd'
 import { NotificationModal } from '../../../src/View/components/NotificationModal'
+import { WeatherWidget } from '../../../src/View/components/WeatherWidget'
 import { styles } from '../../../src/View/styles/assistant-admin/dashboardStyles'
 
 interface Activity {
@@ -640,11 +641,13 @@ const InteractiveChart = ({
   colors,
   isDark,
   chartWidth,
+  isMobile,
 }: {
   monthlyStats: MonthlyStats[]
   colors: any
   isDark: boolean
   chartWidth: number
+  isMobile: boolean
 }) => {
   const [selectedDataset, setSelectedDataset] = useState<
     'events' | 'attendance' | null
@@ -1212,6 +1215,7 @@ export default function AssistantAdminDashboard() {
   }, [])
 
   const fetchDashboardStats = async () => {
+    if (!auth.currentUser) return
     try {
       if (!userData?.email) return
       const myEventsQuery = query(
@@ -1255,12 +1259,15 @@ export default function AssistantAdminDashboard() {
         pendingMyEvents,
         pendingMyAnnouncements,
       })
-    } catch (error) {
-      console.error('Error fetching stats:', error)
+    } catch (error: any) {
+      if (error.code !== 'permission-denied') {
+        console.error('Error fetching stats:', error)
+      }
     }
   }
 
   const fetchAdminDonutData = async () => {
+    if (!auth.currentUser) return
     try {
       const now = new Date()
       const eventsSnap = await getDocs(collection(db, 'events'))
@@ -1290,12 +1297,21 @@ export default function AssistantAdminDashboard() {
       let announcements = 0
       announcementsSnap.docs.forEach((doc) => {
         const data = doc.data()
-        if (data.status === 'approved' || !data.status) announcements++
+        const status = data.status
+        if (status === 'pending') {
+          pending++
+        } else if (status === 'rejected') {
+          rejected++
+        } else {
+          announcements++
+        }
       })
 
       setAdminDonutData({ upcoming, past, pending, rejected, announcements })
-    } catch (error) {
-      console.error('Error fetching donut data:', error)
+    } catch (error: any) {
+      if (error.code !== 'permission-denied') {
+        console.error('Error fetching donut data:', error)
+      }
     }
   }
   const fetchPastEvents = () => {
@@ -1307,6 +1323,7 @@ export default function AssistantAdminDashboard() {
       limit(5)
     )
     return onSnapshot(pastQuery, (snapshot) => {
+      if (!auth.currentUser) return
       const events = snapshot.docs.map((doc) => {
         const data = doc.data()
         const eventDate = data.date?.toDate()
@@ -1328,6 +1345,7 @@ export default function AssistantAdminDashboard() {
     return onSnapshot(
       query(collection(db, 'events'), orderBy('date', 'asc')),
       (snapshot) => {
+        if (!auth.currentUser) return
         const events = snapshot.docs
           .map((doc) => {
             const data = doc.data()
@@ -1366,6 +1384,7 @@ export default function AssistantAdminDashboard() {
     return onSnapshot(
       query(collection(db, 'announcements'), orderBy('createdAt', 'desc')),
       (snapshot) => {
+        if (!auth.currentUser) return
         const announcements = snapshot.docs
           .map((doc) => {
             const data = doc.data()
@@ -1497,6 +1516,7 @@ export default function AssistantAdminDashboard() {
   }
 
   const calculateMonthlyStats = async (): Promise<MonthlyStats[]> => {
+    if (!auth.currentUser) return []
     try {
       const now = new Date()
       const months: MonthlyStats[] = []
@@ -1531,12 +1551,43 @@ export default function AssistantAdminDashboard() {
 
       setMonthlyStats(months)
       return months
-    } catch (error) {
-      console.error('Error calculating monthly stats:', error)
+    } catch (error: any) {
+      if (error.code !== 'permission-denied') {
+        console.error('Error calculating monthly stats:', error)
+      }
       return []
     }
   }
   useEffect(() => {
+    if (!userData) {
+      // User signed out – clear dashboard data and stop here
+      setDashboardStats({
+        myEvents: 0,
+        myAnnouncements: 0,
+        upcomingEvents: 0,
+        totalAttendance: 0,
+        pendingMyEvents: 0,
+        pendingMyAnnouncements: 0,
+      })
+      setAdminDonutData({
+        upcoming: 0,
+        past: 0,
+        pending: 0,
+        rejected: 0,
+        announcements: 0,
+      })
+      setUpcomingEvents([])
+      setRecentAnnouncements([])
+      setPastEvents([])
+      setRecentActivities([])
+      setMonthlyStats([])
+      setActivitiesLoading(false)
+      setEventsLoading(false)
+      setAnnouncementsLoading(false)
+      return
+    }
+
+    // User is authenticated – fetch data and set up listeners
     fetchDashboardStats()
     fetchAdminDonutData()
     const u1 = setupRealtimeActivities()
@@ -1545,28 +1596,25 @@ export default function AssistantAdminDashboard() {
     const u5 = fetchPastEvents()
     calculateMonthlyStats()
 
-    if (userData?.email) {
-      const u4 = notificationService.listenForNotifications(
+    let unsubscribeNotifications: (() => void) | undefined
+    if (userData.email) {
+      unsubscribeNotifications = notificationService.listenForNotifications(
         userData.email,
         (notifs) => {
           setNotifications(notifs)
           setUnreadCount(notifs.filter((n) => !n.read).length)
         }
       )
-      return () => {
-        u1()
-        u2()
-        u3()
-        u4()
-        u5()
-        notificationService.cleanup()
-      }
     }
+
+    // Cleanup runs when userData changes (i.e. sign out) or component unmounts
     return () => {
       u1()
       u2()
       u3()
       u5()
+      if (unsubscribeNotifications) unsubscribeNotifications()
+      notificationService.cleanup()
     }
   }, [userData])
 
@@ -1577,6 +1625,7 @@ export default function AssistantAdminDashboard() {
   }, [recentActivities, currentPage])
 
   const onRefresh = React.useCallback(() => {
+    if (!auth.currentUser) return
     setRefreshing(true)
     Promise.all([
       fetchDashboardStats(),
@@ -2125,9 +2174,11 @@ export default function AssistantAdminDashboard() {
               colors={colors}
               isDark={isDark}
               chartWidth={chartWidth}
+              isMobile={isMobile}
             />
           )}
         </View>
+        <WeatherWidget colors={colors} isDark={isDark} isMobile={isMobile} />
         <View style={styles.twoColumnLayout}>
           <View style={styles.column}>
             <View style={styles.sectionHeader}>

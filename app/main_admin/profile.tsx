@@ -384,7 +384,7 @@ export default function MainAdminProfile() {
           style: 'destructive',
           onPress: () => {
             logout()
-            router.replace('/login')
+            router.replace('/super-admin-login')
           },
         },
       ])
@@ -392,7 +392,7 @@ export default function MainAdminProfile() {
     }
 
     logout()
-    router.replace('/login')
+    router.replace('/super-admin-login')
   }
 
   const renderChangePasswordModal = () => (
@@ -723,8 +723,8 @@ export default function MainAdminProfile() {
     : '—'
 
   const headerGradient = isDark
-    ? (['#050e1a', '#0f2456', '#1a3a8f'] as const)
-    : (['#0f2456', '#1a3a8f', '#1e53c8'] as const)
+    ? (['#060c18', '#0a1a3a', '#10254e'] as const)
+    : (['#ffffff', '#f5f9ff', '#eaf2ff'] as const)
 
   const quickActions = [
     {
@@ -793,16 +793,23 @@ export default function MainAdminProfile() {
               <Text
                 style={[
                   styles.greetingText,
-                  { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+                  { color: isDark ? '#cbd5e1' : '#475569' },
                 ]}
               >
                 Welcome Back,
               </Text>
-              <Text style={styles.userName}>{displayName}</Text>
+              <Text
+                style={[
+                  styles.userName,
+                  { color: isDark ? '#ffffff' : '#0f172a' },
+                ]}
+              >
+                {displayName}
+              </Text>
               <Text
                 style={[
                   styles.roleText,
-                  { color: isDark ? colors.sidebar.text.secondary : '#ffffff' },
+                  { color: isDark ? '#94a3b8' : '#64748b' },
                 ]}
               >
                 My Profile
@@ -830,7 +837,12 @@ export default function MainAdminProfile() {
 
           <View style={styles.dateSection}>
             <View style={styles.dateContainer}>
-              <Text style={styles.dateText}>
+              <Text
+                style={[
+                  styles.dateText,
+                  { color: isDark ? '#cbd5e1' : '#334155' },
+                ]}
+              >
                 {new Date().toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
@@ -842,7 +854,14 @@ export default function MainAdminProfile() {
             <View style={styles.headerActions}>
               {/* Theme Toggle Button */}
               <TouchableOpacity
-                style={styles.headerAction}
+                style={[
+                  styles.headerAction,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.12)'
+                      : 'rgba(0,0,0,0.05)',
+                  },
+                ]}
                 onPress={handleThemeToggle}
                 disabled={isThemeToggling}
                 activeOpacity={0.75}
@@ -868,22 +887,41 @@ export default function MainAdminProfile() {
                   <Feather
                     name={isDark ? 'sun' : 'moon'}
                     size={18}
-                    color='#ffffff'
+                    color={isDark ? '#fff' : '#1e293b'}
                   />
                 </Animated.View>
               </TouchableOpacity>
 
               {/* Change Password Button */}
               <TouchableOpacity
-                style={styles.headerAction}
+                style={[
+                  styles.headerAction,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.12)'
+                      : 'rgba(0,0,0,0.05)',
+                  },
+                ]}
                 onPress={() => setShowChangePasswordModal(true)}
               >
-                <Feather name='lock' size={18} color={colors.accent.primary} />
+                <Feather
+                  name='lock'
+                  size={18}
+                  color={isDark ? '#fff' : '#1e293b'}
+                />
               </TouchableOpacity>
 
               {/* Logout Button */}
               <TouchableOpacity
-                style={[styles.headerAction, styles.logoutHeaderButton]}
+                style={[
+                  styles.headerAction,
+                  styles.logoutHeaderButton,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(255,255,255,0.12)'
+                      : 'rgba(0,0,0,0.05)',
+                  },
+                ]}
                 onPress={handleLogout}
               >
                 <Feather name='log-out' size={18} color='#ef4444' />
@@ -979,7 +1017,7 @@ export default function MainAdminProfile() {
               },
               {
                 value: stats.activeEvents,
-                label: 'Active Events',
+                label: 'Upcoming Events',
                 icon: 'calendar',
                 color: '#f59e0b',
               },
@@ -991,7 +1029,7 @@ export default function MainAdminProfile() {
               },
               {
                 value: stats.pendingPenalties,
-                label: 'Penalties',
+                label: 'Penalties Sent',
                 icon: 'alert-circle',
                 color: '#ec4899',
               },
@@ -1555,7 +1593,12 @@ export default function MainAdminProfile() {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerBrand}>TMC Connect</Text>
+          <Image
+            source={require('../../assets/images/Logo/TMC-Coonect-V.2.png')}
+            style={styles.logoImageButtom}
+            resizeMode='contain'
+          />
+          {/* <Text style={styles.footerBrand}>TMC Connect</Text> */}
           <Text style={styles.footerVersion}>Administration Panel v2.0</Text>
         </View>
       </ScrollView>

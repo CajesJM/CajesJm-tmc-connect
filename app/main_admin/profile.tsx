@@ -711,8 +711,16 @@ export default function MainAdminProfile() {
     }
   }
 
-  const displayName =
-    userData?.name || userData?.email?.split('@')[0] || 'Admin'
+  const displayName = (() => {
+    const name = userData?.name
+    const surname = userData?.surname
+    const email = userData?.email
+    if (name) {
+      return `${name} ${surname || ''}`.trim() || name
+    }
+    return email?.split('@')[0] || 'Admin'
+  })()
+
   const initials = getInitials(userData?.name, userData?.email)
   const memberSince = userData?.createdAt
     ? new Date(
@@ -804,7 +812,10 @@ export default function MainAdminProfile() {
                   { color: isDark ? '#ffffff' : '#0f172a' },
                 ]}
               >
-                {displayName}
+                {userData
+                  ? `${userData.name} ${userData.surname || ''}`.trim() ||
+                    userData.name
+                  : 'Admin'}
               </Text>
               <Text
                 style={[
@@ -965,7 +976,13 @@ export default function MainAdminProfile() {
             </View>
 
             <View style={styles.identitySection}>
-              <Text style={styles.identityName}>{displayName}</Text>
+              <Text style={styles.identityName}>
+                {''}
+                {userData
+                  ? `${userData.name} ${userData.surname || ''}`.trim() ||
+                    userData.name
+                  : 'Admin'}
+              </Text>
               <Text style={styles.identityEmail}>{userData?.email || '—'}</Text>
 
               <View style={styles.roleBadge}>

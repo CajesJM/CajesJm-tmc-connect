@@ -973,7 +973,10 @@ export default function MainAdminAnnouncements() {
                 { color: isDark ? '#ffffff' : '#0f172a' },
               ]}
             >
-              {userData?.name || 'Admin'}
+              {userData
+                ? `${userData.name} ${userData.surname || ''}`.trim() ||
+                  userData.name
+                : 'Admin'}
             </Text>
             <Text
               style={[

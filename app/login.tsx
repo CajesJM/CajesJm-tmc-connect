@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import NetInfo from '@react-native-community/netinfo'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { getAuth, sendPasswordResetEmail } from 'firebase/auth'
@@ -122,30 +123,24 @@ export default function Login() {
   const isLoading = busy || loading
   const isLockedOut = lockoutUntil && lockoutUntil > Date.now()
 
-  // Theme
   const { colors, isDark, toggleTheme } = useTheme()
   const styles = useMemo(
     () => createLoginStyles(isDark, colors),
     [isDark, colors]
   )
 
-  // Animation refs
   const themeSpinAnim = useRef(new Animated.Value(0)).current
   const [isThemeToggling, setIsThemeToggling] = useState(false)
 
-  // Mount animation
   const fadeAnim = useRef(new Animated.Value(0)).current
   const slideAnim = useRef(new Animated.Value(30)).current
   const logoScaleAnim = useRef(new Animated.Value(0.8)).current
   const logoFadeAnim = useRef(new Animated.Value(0)).current
 
-  // Button press animation
   const buttonScaleAnim = useRef(new Animated.Value(1)).current
 
-  // Error shake animation
   const shakeAnim = useRef(new Animated.Value(0)).current
 
-  // Gradient colors
   const gradientStart = isDark ? '#3730A3' : '#3A5BF0'
   const gradientMid = isDark ? '#5B21B6' : '#4F46E5'
   const gradientEnd = isDark ? '#7C3AED' : '#6D28D9'
@@ -543,6 +538,15 @@ export default function Login() {
     }
   }
 
+  const isOnline = async (): Promise<boolean> => {
+    try {
+      const state = await NetInfo.fetch()
+      return !!(state.isConnected && state.isInternetReachable)
+    } catch {
+      return true
+    }
+  }
+
   const handleLogin = async () => {
     if (busy || isLockedOut) return
     setError(null)
@@ -565,6 +569,16 @@ export default function Login() {
     setBusy(true)
     setLoadingMessage('Verifying credentials')
 
+    const online = await isOnline()
+    if (!online) {
+      setBusy(false)
+      setError(
+        'No internet connection. Please check your network and try again.'
+      )
+      triggerShake()
+      return
+    }
+
     try {
       setLoadingMessage('Checking user account')
       const usersCollection = collection(db, 'users')
@@ -573,7 +587,7 @@ export default function Login() {
 
       if (querySnapshot.empty) {
         setBusy(false)
-        handleFailedAttempt('Invalid username or password')
+        handleFailedAttempt('Invalid username or password.')
         return
       }
 
@@ -603,7 +617,6 @@ export default function Login() {
         return
       }
 
-      // Now it's safe to authenticate
       setLoadingMessage('Authenticating')
       const loggedInUser = await login(userData.email, password)
 
@@ -622,17 +635,31 @@ export default function Login() {
       }, 300)
     } catch (err: any) {
       setBusy(false)
-      let errorMessage = 'Invalid username or password. Please try again.'
+
+      const isNetworkError =
+        err?.code === 'auth/network-request-failed' ||
+        err?.code === 'unavailable' ||
+        err?.message?.toLowerCase().includes('network') ||
+        err?.message?.toLowerCase().includes('offline') ||
+        err?.message?.toLowerCase().includes('fetch')
+
+      if (isNetworkError) {
+        setError(
+          'No internet connection. Please check your network and try again.'
+        )
+        triggerShake()
+        return
+      }
+
+      let errorMessage = 'Invalid username or password.'
       if (
         err.code === 'auth/invalid-credential' ||
         err.code === 'auth/wrong-password' ||
         err.code === 'auth/user-not-found'
       ) {
-        errorMessage = 'Invalid username or password'
+        errorMessage = 'Invalid username or password.'
       } else if (err.code === 'auth/too-many-requests') {
         errorMessage = 'Too many failed attempts. Please try again later.'
-      } else if (err.code === 'auth/network-request-failed') {
-        errorMessage = 'Network error. Please check your connection.'
       }
       handleFailedAttempt(errorMessage)
     }

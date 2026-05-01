@@ -1,5 +1,4 @@
-import { Feather, Ionicons } from '@expo/vector-icons'
-import { BlurView } from 'expo-blur'
+import { Feather } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth'
@@ -16,13 +15,11 @@ import {
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   FlatList,
   Image,
   Modal,
-  Platform,
   TextInput as RNTextInput,
   ScrollView,
   Text,
@@ -32,16 +29,13 @@ import {
 } from 'react-native'
 import { useAuth } from '../../src/Controller/context/AuthContext'
 import { useTheme } from '../../src/Controller/context/ThemeContext'
+import { useConfirm } from '../../src/Controller/hooks/useConfirm'
+import { useToast } from '../../src/Controller/hooks/useToast'
 import { db } from '../../src/Model/lib/firebaseConfig'
+import { ConfirmDialog } from '../../src/View/components/ConfirmDialog'
+import { Toast } from '../../src/View/components/Toast'
 import { createUsersStyles } from '../../src/View/styles/main-admin/usersStyles'
 
-const showAlert = (title: string, message?: string) => {
-  if (Platform.OS === 'web') {
-    window.alert(message ? `${title}\n${message}` : title)
-  } else {
-    Alert.alert(title, message)
-  }
-}
 const FormTextInput = ({
   style,
   value,
@@ -291,7 +285,7 @@ const AnimatedUserItem = memo(function AnimatedUserItem({
 export default function UserManagement() {
   const { user, userData } = useAuth()
   const router = useRouter()
-  const { width: screenWidth } = useWindowDimensions()
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions()
   const { colors, isDark, toggleTheme } = useTheme()
 
   const isMobile = screenWidth < 640
@@ -309,7 +303,8 @@ export default function UserManagement() {
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [modalLoading, setModalLoading] = useState(false)
-
+  const { toast, showToast, hideToast } = useToast()
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm()
   const [isThemeToggling, setIsThemeToggling] = useState(false)
   const themeSpinAnim = useRef(new Animated.Value(0)).current
 
@@ -467,7 +462,7 @@ export default function UserManagement() {
 
       setUsers(usersList)
     } catch (error) {
-      Alert.alert('Error', 'Failed to load users')
+      showToast('Failed to load users', 'error')
     } finally {
       setLoading(false)
     }
@@ -543,7 +538,7 @@ export default function UserManagement() {
   const handleCreateUser = async () => {
     const validation = validateCreateUser()
     if (!validation.isValid) {
-      showAlert('Validation Error', validation.errorMessage)
+      showToast(validation.errorMessage, 'error')
       setModalLoading(false)
       return
     }
@@ -558,9 +553,9 @@ export default function UserManagement() {
         const studentIdSnapshot = await getDocs(studentIdQuery)
         if (!studentIdSnapshot.empty) {
           const existingUser = studentIdSnapshot.docs[0].data()
-          showAlert(
-            'Duplicate Student ID',
-            `Student ID "${newUser.studentID}" is already registered to ${existingUser.name}. Please use a different Student ID.`
+          showToast(
+            `Student ID "${newUser.studentID}" is already taken`,
+            'error'
           )
           setModalLoading(false)
           return
@@ -578,10 +573,7 @@ export default function UserManagement() {
         )
       } catch (authError: any) {
         if (authError.code === 'auth/email-already-in-use') {
-          showAlert(
-            'Email Already Registered',
-            `The email "${newUser.email}" is already registered. Please use a different email address.`
-          )
+          showToast(`Email "${newUser.email}" is already registered`, 'error')
           setModalLoading(false)
           return
         }
@@ -608,11 +600,8 @@ export default function UserManagement() {
         userData.studentID = newUser.studentID.trim()
       }
       await setDoc(doc(db, 'users', uid), userData)
-      const successMessage =
-        newUser.role === 'student'
-          ? `Student ${newUser.name} created successfully!\n\nUsername: ${newUser.username}\nPassword: ${newUser.studentID}`
-          : `Admin ${newUser.name} created successfully!\n\nEmail: ${newUser.email}\nPassword: ${newUser.password}`
-      showAlert('Success', successMessage)
+
+      showToast('User created successfully!', 'success')
       setShowCreateModal(false)
       resetForm()
       fetchUsers()
@@ -625,7 +614,7 @@ export default function UserManagement() {
       } else if (error.message) {
         errorMessage = error.message
       }
-      showAlert('Error', errorMessage)
+      showToast(errorMessage, 'error')
     } finally {
       setModalLoading(false)
     }
@@ -697,7 +686,7 @@ export default function UserManagement() {
   const handleUpdateUser = async () => {
     const validation = validateEditUser()
     if (!validation.isValid) {
-      showAlert('Validation Error', validation.errorMessage)
+      showToast(validation.errorMessage, 'error')
       return
     }
     if (!selectedUser) return
@@ -705,18 +694,16 @@ export default function UserManagement() {
     try {
       setModalLoading(true)
 
-      // --- Uniqueness checks
       const trimmedEmail = selectedUser.email.trim()
       const trimmedUsername = selectedUser.username.trim()
 
-      // Check email uniqueness
       const emailConflict = users.some(
         (u) => u.id !== selectedUser.id && u.email.trim() === trimmedEmail
       )
       if (emailConflict) {
-        showAlert(
-          'Email Already Exists',
-          `Email "${trimmedEmail}" is already used by another user.`
+        showToast(
+          `Email "${trimmedEmail}" is already used by another user`,
+          'error'
         )
         setModalLoading(false)
         return
@@ -726,15 +713,12 @@ export default function UserManagement() {
         (u) => u.id !== selectedUser.id && u.username.trim() === trimmedUsername
       )
       if (usernameConflict) {
-        showAlert(
-          'Username Already Exists',
-          `Username "${trimmedUsername}" is already taken.`
-        )
+        showToast(`Username "${trimmedUsername}" is already taken`, 'error')
         setModalLoading(false)
         return
       }
 
-      // Student ID uniqueness (already present)
+      // Student ID uniqueness
       if (selectedUser.role === 'student' && selectedUser.studentID) {
         const trimmedStudentID = selectedUser.studentID.trim()
         const duplicateUser = users.find(
@@ -742,9 +726,9 @@ export default function UserManagement() {
             u.id !== selectedUser.id && u.studentID?.trim() === trimmedStudentID
         )
         if (duplicateUser) {
-          showAlert(
-            'Duplicate Student ID',
-            `Student ID "${trimmedStudentID}" is already registered to ${duplicateUser.name}.`
+          showToast(
+            `Student ID "${trimmedStudentID}" is already registered to ${duplicateUser.name}`,
+            'error'
           )
           setModalLoading(false)
           return
@@ -760,7 +744,6 @@ export default function UserManagement() {
         username: trimmedUsername,
       }
 
-      // Student-specific fields
       if (selectedUser.role === 'student') {
         updateData.studentID = selectedUser.studentID?.trim() || null
         updateData.course = selectedUser.course?.trim() || null
@@ -778,15 +761,15 @@ export default function UserManagement() {
       }
       await updateDoc(userRef, updateData)
 
-      showAlert('Success', 'User updated successfully!')
+      showToast('User updated successfully!', 'success')
       setShowEditModal(false)
       setSelectedUser(null)
-      fetchUsers() // Refresh the user list
+      fetchUsers()
     } catch (error: any) {
       console.error('Update user error:', error)
-      showAlert(
-        'Error',
-        error.message || 'Failed to update user. Please try again.'
+      showToast(
+        error.message || 'Failed to update user. Please try again.',
+        'error'
       )
     } finally {
       setModalLoading(false)
@@ -794,51 +777,26 @@ export default function UserManagement() {
   }
 
   const handleDeleteUser = async (userId: string, userName: string) => {
-    if (Platform.OS === 'web') {
-      const isConfirmed = window.confirm(
-        `Are you sure you want to delete "${userName}"? This action cannot be undone.`
+    const confirmed = await confirm({
+      title: 'Delete User',
+      message: `Are you sure you want to permanently delete "${userName}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      confirmDestructive: true,
+    })
+    if (!confirmed) return
+    try {
+      setModalLoading(true)
+      await deleteDoc(doc(db, 'users', userId))
+      showToast(`"${userName}" deleted successfully!`, 'success')
+      fetchUsers()
+    } catch (error: any) {
+      showToast(
+        'Failed to delete user: ' + (error.message || 'Unknown error'),
+        'error'
       )
-      if (isConfirmed) {
-        try {
-          setModalLoading(true)
-          await deleteDoc(doc(db, 'users', userId))
-          window.alert(`"${userName}" deleted successfully!`)
-          fetchUsers()
-        } catch (error: any) {
-          window.alert(
-            'Failed to delete user: ' + (error.message || 'Unknown error')
-          )
-        } finally {
-          setModalLoading(false)
-        }
-      }
-    } else {
-      Alert.alert(
-        'Delete User',
-        `Are you sure you want to permanently delete ${userName}? This action cannot be undone.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                setModalLoading(true)
-                await deleteDoc(doc(db, 'users', userId))
-                Alert.alert('Success', `"${userName}" deleted successfully!`)
-                fetchUsers()
-              } catch (error: any) {
-                Alert.alert(
-                  'Error',
-                  'Failed to delete user: ' + (error.message || 'Unknown error')
-                )
-              } finally {
-                setModalLoading(false)
-              }
-            },
-          },
-        ]
-      )
+    } finally {
+      setModalLoading(false)
     }
   }
 
@@ -847,7 +805,16 @@ export default function UserManagement() {
     const action = newStatus === 'active' ? 'activate' : 'deactivate'
     const actionTitle = newStatus === 'active' ? 'Activate' : 'Deactivate'
 
-    const doUpdate = async () => {
+    const confirmed = await confirm({
+      title: `${actionTitle} User`,
+      message: `Are you sure you want to ${action} ${user.name}?`,
+      confirmLabel: `Yes, ${actionTitle}`,
+      cancelLabel: 'Cancel',
+      confirmDestructive: action === 'deactivate',
+    })
+    if (!confirmed) return
+
+    try {
       setModalLoading(true)
       const userRef = doc(db, 'users', user.id)
       await updateDoc(userRef, {
@@ -870,48 +837,14 @@ export default function UserManagement() {
             : u
         )
       )
-    }
-
-    if (Platform.OS === 'web') {
-      const isConfirmed = window.confirm(
-        `Are you sure you want to ${action} ${user.name}?`
+      showToast(`User ${action}d successfully`, 'success')
+    } catch (error: any) {
+      showToast(
+        `Failed to ${action} user: ${error.message || 'Unknown error'}`,
+        'error'
       )
-      if (!isConfirmed) return
-      try {
-        await doUpdate()
-        window.alert(`User ${action}d successfully`)
-      } catch (error: any) {
-        window.alert(
-          `Failed to ${action} user: ${error.message || 'Unknown error'}`
-        )
-      } finally {
-        setModalLoading(false)
-      }
-    } else {
-      Alert.alert(
-        `${actionTitle} User`,
-        `Are you sure you want to ${action} ${user.name}?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: `Yes, ${actionTitle}`,
-            style: action === 'deactivate' ? 'destructive' : 'default',
-            onPress: async () => {
-              try {
-                await doUpdate()
-                Alert.alert('Success', `User ${action}d successfully`)
-              } catch (error: any) {
-                Alert.alert(
-                  'Error',
-                  `Failed to ${action} user: ${error.message || 'Unknown error'}`
-                )
-              } finally {
-                setModalLoading(false)
-              }
-            },
-          },
-        ]
-      )
+    } finally {
+      setModalLoading(false)
     }
   }
 
@@ -982,164 +915,6 @@ export default function UserManagement() {
     }
   }
 
-  const stats = useMemo(() => {
-    const total = users.length
-    const mainAdmins = users.filter((u) => u.role === 'main_admin').length
-    const assistantAdmins = users.filter(
-      (u) => u.role === 'assistant_admin'
-    ).length
-    const students = users.filter((u) => u.role === 'student').length
-    return { total, mainAdmins, assistantAdmins, students }
-  }, [users])
-
-  const renderPaginatedItem = ({
-    item,
-    index,
-  }: {
-    item: User
-    index: number
-  }) => {
-    const isActive = selectedUserId === item.id
-    const roleColor = getRoleColor(item.role)
-    const isCurrentUser = item.email === userData?.email
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.paginatedItem,
-          isActive && styles.paginatedItemActive,
-          isMobile && styles.paginatedItemMobile,
-          item.status !== 'active' && { opacity: 0.6 },
-        ]}
-        onPress={() => setSelectedUserId(item.id)}
-      >
-        <View
-          style={[
-            styles.paginatedNumber,
-            { backgroundColor: `${roleColor}15` },
-          ]}
-        >
-          <Text style={[styles.paginatedNumberText, { color: roleColor }]}>
-            {(currentPage - 1) * itemsPerPage + index + 1}
-          </Text>
-        </View>
-        <View style={styles.paginatedInfo}>
-          {/* Row 1: Name + Inactive Badge (badge on the right) */}
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Text
-              style={[
-                styles.paginatedName,
-                isMobile && styles.paginatedNameMobile,
-              ]}
-              numberOfLines={1}
-            >
-              {item.surname ? `${item.surname}, ${item.name}` : item.name}
-            </Text>
-            {item.status !== 'active' && (
-              <View style={styles.inactiveBadge}>
-                <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Row 2: Email + Role Badge (badge on the right) */}
-          <View
-            style={[styles.paginatedMeta, { justifyContent: 'space-between' }]}
-          >
-            <Text
-              style={[
-                styles.paginatedEmail,
-                isMobile && styles.paginatedEmailMobile,
-              ]}
-            >
-              {item.email}
-            </Text>
-            <View
-              style={[
-                styles.paginatedBadge,
-                { backgroundColor: getRoleBgColor(item.role) },
-              ]}
-            >
-              <Text style={[styles.paginatedBadgeText, { color: roleColor }]}>
-                {item.role.replace('_', ' ').toUpperCase()}
-              </Text>
-            </View>
-          </View>
-
-          {/* Row 3: Username */}
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Feather name='at-sign' size={8} color={colors.accent.primary} />
-            <Text
-              style={[styles.paginatedUsername, { marginLeft: 4 }]}
-              numberOfLines={1}
-            >
-              {item.username}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.paginatedActions}>
-          {/* action buttons unchanged */}
-          <TouchableOpacity
-            style={[
-              styles.paginatedEditButton,
-              isMobile && styles.paginatedEditButtonMobile,
-            ]}
-            onPress={() => {
-              setSelectedUser(item)
-              setShowEditModal(true)
-            }}
-          >
-            <Feather
-              name='edit-2'
-              size={isMobile ? 12 : 14}
-              color={colors.accent.primary}
-            />
-          </TouchableOpacity>
-          {!isCurrentUser && (
-            <>
-              <TouchableOpacity
-                style={[
-                  styles.paginatedStatusButton,
-                  {
-                    backgroundColor:
-                      item.status === 'active' ? '#fff7ed' : '#e6f7e6',
-                  },
-                  isMobile && styles.paginatedStatusButtonMobile,
-                ]}
-                onPress={() => handleToggleActive(item)}
-              >
-                <Feather
-                  name={item.status === 'active' ? 'user-x' : 'user-check'}
-                  size={isMobile ? 12 : 14}
-                  color={item.status === 'active' ? '#ef4444' : '#10b981'}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.paginatedDeleteButton,
-                  isMobile && styles.paginatedDeleteButtonMobile,
-                ]}
-                onPress={() => handleDeleteUser(item.id, item.name)}
-              >
-                <Feather
-                  name='trash-2'
-                  size={isMobile ? 12 : 14}
-                  color='#ef4444'
-                />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </TouchableOpacity>
-    )
-  }
-
   const renderSearchResultItem = ({ item }: { item: User }) => {
     const roleColor = getRoleColor(item.role)
     const isCurrentUser = item.email === userData?.email
@@ -1156,7 +931,6 @@ export default function UserManagement() {
         activeOpacity={0.7}
       >
         <View style={styles.searchResultHeader}>
-          {/* Title row: name on left, badges on right */}
           <View
             style={[
               styles.searchResultTitleContainer,
@@ -1202,7 +976,6 @@ export default function UserManagement() {
             </View>
           </View>
 
-          {/* Email and matched student ID indicator */}
           <Text
             style={[
               styles.searchResultEmail,
@@ -1236,7 +1009,6 @@ export default function UserManagement() {
               </View>
             )}
 
-          {/* Action buttons */}
           <View style={styles.searchResultActions}>
             <TouchableOpacity
               style={[
@@ -1298,7 +1070,6 @@ export default function UserManagement() {
           </View>
         </View>
 
-        {/* Footer (username and student ID) */}
         <View style={styles.searchResultFooter}>
           <View style={styles.searchResultRole}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1616,202 +1387,160 @@ export default function UserManagement() {
         animationType='fade'
         onRequestClose={handleCloseForm}
       >
-        {/* Outer blur overlay */}
-        <BlurView
-          intensity={80}
-          tint={isDark ? 'dark' : 'light'}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        <TouchableOpacity
+          style={styles.glassModalOverlay}
+          activeOpacity={1}
+          onPress={handleCloseForm}
         >
           <TouchableOpacity
-            style={styles.glassModalOverlayTouch}
-            activeOpacity={1}
-            onPress={handleCloseForm}
-          />
-        </BlurView>
-
-        {/* Modal container */}
-        <View style={styles.glassModalCentered}>
-          <View
             style={[
-              styles.glassModalContainer,
-              { borderColor: 'rgba(255,255,255,0.3)' },
+              styles.glassModalContent,
+              isMobile && styles.glassModalContentMobile,
+              { maxHeight: screenHeight * 0.9 },
             ]}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
           >
-            {/* Gradient header */}
-            <LinearGradient
-              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.glassModalGradientHeader}
+            {/* Header */}
+            <View style={styles.glassModalHeader}>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                <Feather
+                  name='arrow-right'
+                  size={20}
+                  color={colors.accent.primary}
+                />
+                <Text
+                  style={[
+                    styles.glassModalTitle,
+                    isMobile && styles.glassModalTitleMobile,
+                  ]}
+                >
+                  {isEdit ? 'Edit User' : 'New User'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={handleCloseForm}
+                style={styles.glassModalClose}
+              >
+                <Feather
+                  name='x'
+                  size={isMobile ? 22 : 26}
+                  color={colors.sidebar.text.secondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Body – scrollable form */}
+            <ScrollView
+              style={styles.glassModalBody}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 20 }}
             >
-              <View style={styles.glassModalHeader}>
-                <View style={styles.glassModalHeaderLeft}>
-                  <View
+              {/* Name */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                  Name *
+                </Text>
+                <FormTextInput
+                  inputStyle={styles.glassFormInput}
+                  placeholder='Enter full name'
+                  value={isEdit ? selectedUser?.name || '' : newUser.name}
+                  onChangeText={(text) =>
+                    isEdit
+                      ? setSelectedUser((prev) =>
+                          prev ? { ...prev, name: text } : null
+                        )
+                      : setNewUser({ ...newUser, name: text })
+                  }
+                />
+              </View>
+
+              {/* Surname */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                  Surname{' '}
+                  {(isEdit ? selectedUser?.role : newUser.role) === 'student'
+                    ? '*'
+                    : '(optional)'}
+                </Text>
+                <FormTextInput
+                  inputStyle={styles.glassFormInput}
+                  placeholder='Enter surname (e.g., Cajes)'
+                  value={isEdit ? selectedUser?.surname || '' : newUser.surname}
+                  onChangeText={(text) =>
+                    isEdit
+                      ? setSelectedUser((prev) =>
+                          prev ? { ...prev, surname: text } : null
+                        )
+                      : setNewUser({ ...newUser, surname: text })
+                  }
+                />
+                {(isEdit ? selectedUser?.role : newUser.role) !== 'student' && (
+                  <Text
                     style={[
-                      styles.glassModalIconContainer,
-                      isMobile && styles.glassModalIconContainerMobile,
+                      styles.glassFormHelperText,
+                      { color: colors.sidebar.text.muted },
                     ]}
                   >
-                    <Feather
-                      name={isEdit ? 'edit-2' : 'user-plus'}
-                      size={isMobile ? 16 : 20}
-                      color={colors.accent.primary}
-                    />
-                  </View>
-                  <View>
-                    <Text
-                      style={[styles.glassModalTitle, { color: colors.text }]}
-                    >
-                      {isEdit ? 'Edit User' : 'New User'}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.glassModalSubtitle,
-                        { color: colors.sidebar.text.secondary },
-                      ]}
-                    >
-                      {isEdit
-                        ? 'Update user details'
-                        : 'Create a new user account'}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={handleCloseForm}
-                  style={styles.glassModalCloseButton}
-                >
-                  <Ionicons
-                    name='close-circle'
-                    size={28}
-                    color={colors.accent.primary}
-                  />
-                </TouchableOpacity>
+                    Optional for admin accounts
+                  </Text>
+                )}
               </View>
-            </LinearGradient>
 
-            {/* Scrollable content */}
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.glassModalScrollContent}
-              style={{
-                backgroundColor: isDark
-                  ? 'rgba(15, 25, 35, 0.7)'
-                  : 'rgba(255, 255, 255, 0.7)',
-              }}
-            >
-              <View
-                style={[
-                  styles.glassModalFormSection,
-                  { borderColor: 'rgba(255,255,255,0.2)' },
-                ]}
-              >
-                {/* Name */}
-                <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                    Name *
-                  </Text>
-                  <FormTextInput
-                    inputStyle={styles.glassFormInput}
-                    placeholder='Enter full name'
-                    value={isEdit ? selectedUser?.name || '' : newUser.name}
-                    onChangeText={(text) =>
-                      isEdit
-                        ? setSelectedUser((prev) =>
-                            prev ? { ...prev, name: text } : null
-                          )
-                        : setNewUser({ ...newUser, name: text })
-                    }
-                  />
-                </View>
+              {/* Username */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                  Username *
+                </Text>
+                <FormTextInput
+                  inputStyle={styles.glassFormInput}
+                  placeholder='Enter username'
+                  value={
+                    isEdit ? selectedUser?.username || '' : newUser.username
+                  }
+                  onChangeText={(text) =>
+                    isEdit
+                      ? setSelectedUser((prev) =>
+                          prev ? { ...prev, username: text } : null
+                        )
+                      : setNewUser({ ...newUser, username: text })
+                  }
+                  autoCapitalize='none'
+                  autoCorrect={false}
+                />
+              </View>
 
-                {/* Surname */}
-                <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                    Surname{' '}
-                    {(isEdit ? selectedUser?.role : newUser.role) === 'student'
-                      ? '*'
-                      : '(optional)'}
-                  </Text>
-                  <FormTextInput
-                    inputStyle={styles.glassFormInput}
-                    placeholder='Enter surname (e.g., Cajes)'
-                    value={
-                      isEdit ? selectedUser?.surname || '' : newUser.surname
-                    }
-                    onChangeText={(text) =>
-                      isEdit
-                        ? setSelectedUser((prev) =>
-                            prev ? { ...prev, surname: text } : null
-                          )
-                        : setNewUser({ ...newUser, surname: text })
-                    }
-                  />
-                  {(isEdit ? selectedUser?.role : newUser.role) !==
-                    'student' && (
-                    <Text
-                      style={[
-                        styles.glassFormHelperText,
-                        { color: colors.sidebar.text.muted },
-                      ]}
-                    >
-                      Optional for admin accounts
-                    </Text>
-                  )}
-                </View>
+              {/* Email */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                  Email *
+                </Text>
+                <FormTextInput
+                  inputStyle={styles.glassFormInput}
+                  placeholder='Enter email address'
+                  value={isEdit ? selectedUser?.email || '' : newUser.email}
+                  onChangeText={(text) =>
+                    isEdit
+                      ? setSelectedUser((prev) =>
+                          prev ? { ...prev, email: text } : null
+                        )
+                      : setNewUser({ ...newUser, email: text })
+                  }
+                  keyboardType='email-address'
+                  autoCapitalize='none'
+                />
+              </View>
 
-                {/* Username */}
-                <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                    Username *
-                  </Text>
-                  <FormTextInput
-                    inputStyle={styles.glassFormInput}
-                    placeholder='Enter username'
-                    value={
-                      isEdit ? selectedUser?.username || '' : newUser.username
-                    }
-                    onChangeText={(text) =>
-                      isEdit
-                        ? setSelectedUser((prev) =>
-                            prev ? { ...prev, username: text } : null
-                          )
-                        : setNewUser({ ...newUser, username: text })
-                    }
-                    autoCapitalize='none'
-                    autoCorrect={false}
-                  />
-                </View>
-
-                {/* Email */}
-                <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                    Email *
-                  </Text>
-                  <FormTextInput
-                    inputStyle={styles.glassFormInput}
-                    placeholder='Enter email address'
-                    value={isEdit ? selectedUser?.email || '' : newUser.email}
-                    onChangeText={(text) =>
-                      isEdit
-                        ? setSelectedUser((prev) =>
-                            prev ? { ...prev, email: text } : null
-                          )
-                        : setNewUser({ ...newUser, email: text })
-                    }
-                    keyboardType='email-address'
-                    autoCapitalize='none'
-                  />
-                </View>
-
-                {/* Role */}
-                <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                    Role *
-                  </Text>
-                  <View style={styles.modernRoleSelector}>
-                    {(
-                      ['student', 'assistant_admin', 'main_admin'] as const
-                    ).map((role) => (
+              {/* Role */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                  Role *
+                </Text>
+                <View style={styles.modernRoleSelector}>
+                  {(['student', 'assistant_admin', 'main_admin'] as const).map(
+                    (role) => (
                       <TouchableOpacity
                         key={role}
                         style={[
@@ -1856,284 +1585,278 @@ export default function UserManagement() {
                           {role.replace('_', ' ').toUpperCase()}
                         </Text>
                       </TouchableOpacity>
-                    ))}
-                  </View>
+                    )
+                  )}
                 </View>
+              </View>
 
-                {/* Student-specific fields */}
-                {(isEdit ? selectedUser?.role : newUser.role) === 'student' && (
-                  <>
-                    <View style={styles.glassFormGroup}>
+              {/* Student-specific fields */}
+              {(isEdit ? selectedUser?.role : newUser.role) === 'student' && (
+                <>
+                  <View style={styles.glassFormGroup}>
+                    <Text
+                      style={[styles.glassFormLabel, { color: colors.text }]}
+                    >
+                      Student ID *
+                    </Text>
+                    <FormTextInput
+                      inputStyle={styles.glassFormInput}
+                      placeholder='Enter student ID'
+                      value={
+                        isEdit
+                          ? selectedUser?.studentID || ''
+                          : newUser.studentID
+                      }
+                      onChangeText={(text) =>
+                        isEdit
+                          ? setSelectedUser((prev) =>
+                              prev ? { ...prev, studentID: text } : null
+                            )
+                          : setNewUser({ ...newUser, studentID: text })
+                      }
+                    />
+                    {!isEdit && (
                       <Text
-                        style={[styles.glassFormLabel, { color: colors.text }]}
+                        style={[
+                          styles.glassFormHelperText,
+                          { color: colors.sidebar.text.muted },
+                        ]}
                       >
-                        Student ID *
+                        This will be used as the password
                       </Text>
-                      <FormTextInput
-                        inputStyle={styles.glassFormInput}
-                        placeholder='Enter student ID'
-                        value={
-                          isEdit
-                            ? selectedUser?.studentID || ''
-                            : newUser.studentID
-                        }
-                        onChangeText={(text) =>
-                          isEdit
-                            ? setSelectedUser((prev) =>
-                                prev ? { ...prev, studentID: text } : null
-                              )
-                            : setNewUser({ ...newUser, studentID: text })
-                        }
-                      />
-                      {!isEdit && (
-                        <Text
+                    )}
+                  </View>
+
+                  <View style={styles.glassFormGroup}>
+                    <Text
+                      style={[styles.glassFormLabel, { color: colors.text }]}
+                    >
+                      Course *
+                    </Text>
+                    <CourseSelector
+                      value={
+                        isEdit ? selectedUser?.course || '' : newUser.course
+                      }
+                      onSelect={(course) =>
+                        isEdit
+                          ? setSelectedUser((prev) =>
+                              prev ? { ...prev, course } : null
+                            )
+                          : setNewUser({ ...newUser, course })
+                      }
+                      isMobile={isMobile}
+                    />
+                  </View>
+
+                  <View style={styles.glassFormGroup}>
+                    <Text
+                      style={[styles.glassFormLabel, { color: colors.text }]}
+                    >
+                      Year Level *
+                    </Text>
+                    <View style={styles.modernRoleSelector}>
+                      {(
+                        [
+                          '1st Year',
+                          '2nd Year',
+                          '3rd Year',
+                          '4th Year',
+                        ] as const
+                      ).map((year) => (
+                        <TouchableOpacity
+                          key={year}
                           style={[
-                            styles.glassFormHelperText,
-                            { color: colors.sidebar.text.muted },
+                            styles.modernRoleOption,
+                            (isEdit
+                              ? selectedUser?.yearLevel
+                              : newUser.yearLevel) === year &&
+                              styles.modernRoleOptionSelected,
                           ]}
+                          onPress={() =>
+                            isEdit
+                              ? setSelectedUser((prev) =>
+                                  prev ? { ...prev, yearLevel: year } : null
+                                )
+                              : setNewUser({ ...newUser, yearLevel: year })
+                          }
                         >
-                          This will be used as the password
-                        </Text>
-                      )}
-                    </View>
-
-                    <View style={styles.glassFormGroup}>
-                      <Text
-                        style={[styles.glassFormLabel, { color: colors.text }]}
-                      >
-                        Course *
-                      </Text>
-                      <CourseSelector
-                        value={
-                          isEdit ? selectedUser?.course || '' : newUser.course
-                        }
-                        onSelect={(course) =>
-                          isEdit
-                            ? setSelectedUser((prev) =>
-                                prev ? { ...prev, course } : null
-                              )
-                            : setNewUser({ ...newUser, course })
-                        }
-                        isMobile={isMobile}
-                      />
-                    </View>
-
-                    <View style={styles.glassFormGroup}>
-                      <Text
-                        style={[styles.glassFormLabel, { color: colors.text }]}
-                      >
-                        Year Level *
-                      </Text>
-                      <View style={styles.modernRoleSelector}>
-                        {(
-                          [
-                            '1st Year',
-                            '2nd Year',
-                            '3rd Year',
-                            '4th Year',
-                          ] as const
-                        ).map((year) => (
-                          <TouchableOpacity
-                            key={year}
+                          <Text
                             style={[
-                              styles.modernRoleOption,
+                              styles.modernRoleOptionText,
                               (isEdit
                                 ? selectedUser?.yearLevel
                                 : newUser.yearLevel) === year &&
-                                styles.modernRoleOptionSelected,
+                                styles.modernRoleOptionTextSelected,
                             ]}
-                            onPress={() =>
-                              isEdit
-                                ? setSelectedUser((prev) =>
-                                    prev ? { ...prev, yearLevel: year } : null
-                                  )
-                                : setNewUser({ ...newUser, yearLevel: year })
-                            }
                           >
-                            <Text
-                              style={[
-                                styles.modernRoleOptionText,
-                                (isEdit
-                                  ? selectedUser?.yearLevel
-                                  : newUser.yearLevel) === year &&
-                                  styles.modernRoleOptionTextSelected,
-                              ]}
-                            >
-                              {year}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
+                            {year}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
                     </View>
+                  </View>
 
-                    <View style={styles.glassFormGroup}>
-                      <Text
-                        style={[styles.glassFormLabel, { color: colors.text }]}
-                      >
-                        Block *
-                      </Text>
-                      <FormTextInput
-                        inputStyle={styles.glassFormInput}
-                        placeholder='Enter block (e.g., 1, 2, 3)'
-                        value={
-                          isEdit ? selectedUser?.block || '' : newUser.block
-                        }
-                        onChangeText={(text) =>
-                          isEdit
-                            ? setSelectedUser((prev) =>
-                                prev ? { ...prev, block: text } : null
-                              )
-                            : setNewUser({ ...newUser, block: text })
-                        }
-                      />
-                    </View>
+                  <View style={styles.glassFormGroup}>
+                    <Text
+                      style={[styles.glassFormLabel, { color: colors.text }]}
+                    >
+                      Block *
+                    </Text>
+                    <FormTextInput
+                      inputStyle={styles.glassFormInput}
+                      placeholder='Enter block (e.g., 1, 2, 3)'
+                      value={isEdit ? selectedUser?.block || '' : newUser.block}
+                      onChangeText={(text) =>
+                        isEdit
+                          ? setSelectedUser((prev) =>
+                              prev ? { ...prev, block: text } : null
+                            )
+                          : setNewUser({ ...newUser, block: text })
+                      }
+                    />
+                  </View>
 
-                    <View style={styles.glassFormGroup}>
-                      <Text
-                        style={[styles.glassFormLabel, { color: colors.text }]}
-                      >
-                        Gender *
-                      </Text>
-                      <View style={styles.modernRoleSelector}>
-                        {(['Male', 'Female'] as const).map((gender) => (
-                          <TouchableOpacity
-                            key={gender}
+                  <View style={styles.glassFormGroup}>
+                    <Text
+                      style={[styles.glassFormLabel, { color: colors.text }]}
+                    >
+                      Gender *
+                    </Text>
+                    <View style={styles.modernRoleSelector}>
+                      {(['Male', 'Female'] as const).map((gender) => (
+                        <TouchableOpacity
+                          key={gender}
+                          style={[
+                            styles.modernRoleOption,
+                            (isEdit ? selectedUser?.gender : newUser.gender) ===
+                              gender && styles.modernRoleOptionSelected,
+                          ]}
+                          onPress={() =>
+                            isEdit
+                              ? setSelectedUser((prev) =>
+                                  prev ? { ...prev, gender } : null
+                                )
+                              : setNewUser({ ...newUser, gender })
+                          }
+                        >
+                          <Text
                             style={[
-                              styles.modernRoleOption,
+                              styles.modernRoleOptionText,
                               (isEdit
                                 ? selectedUser?.gender
                                 : newUser.gender) === gender &&
-                                styles.modernRoleOptionSelected,
+                                styles.modernRoleOptionTextSelected,
                             ]}
-                            onPress={() =>
-                              isEdit
-                                ? setSelectedUser((prev) =>
-                                    prev ? { ...prev, gender } : null
-                                  )
-                                : setNewUser({ ...newUser, gender })
-                            }
                           >
-                            <Text
-                              style={[
-                                styles.modernRoleOptionText,
-                                (isEdit
-                                  ? selectedUser?.gender
-                                  : newUser.gender) === gender &&
-                                  styles.modernRoleOptionTextSelected,
-                              ]}
-                            >
-                              {gender}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
+                            {gender}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
                     </View>
-                  </>
+                  </View>
+                </>
+              )}
+
+              {!isEdit &&
+                (newUser.role === 'assistant_admin' ||
+                  newUser.role === 'main_admin') && (
+                  <View style={styles.glassFormGroup}>
+                    <Text
+                      style={[styles.glassFormLabel, { color: colors.text }]}
+                    >
+                      Password *
+                    </Text>
+                    <FormTextInput
+                      inputStyle={styles.glassFormInput}
+                      placeholder='Enter password'
+                      value={newUser.password}
+                      onChangeText={(text) =>
+                        setNewUser({ ...newUser, password: text })
+                      }
+                      secureTextEntry
+                    />
+                  </View>
                 )}
 
-                {/* Password for admins (only on create) */}
-                {!isEdit &&
-                  (newUser.role === 'assistant_admin' ||
-                    newUser.role === 'main_admin') && (
-                    <View style={styles.glassFormGroup}>
-                      <Text
-                        style={[styles.glassFormLabel, { color: colors.text }]}
-                      >
-                        Password *
-                      </Text>
-                      <FormTextInput
-                        inputStyle={styles.glassFormInput}
-                        placeholder='Enter password'
-                        value={newUser.password}
-                        onChangeText={(text) =>
-                          setNewUser({ ...newUser, password: text })
-                        }
-                        secureTextEntry
-                      />
-                    </View>
-                  )}
-
-                {/* Optional Student ID for admins (on edit) */}
-                {isEdit &&
-                  (selectedUser?.role === 'assistant_admin' ||
-                    selectedUser?.role === 'main_admin') && (
-                    <View style={styles.glassFormGroup}>
-                      <Text
-                        style={[styles.glassFormLabel, { color: colors.text }]}
-                      >
-                        Student ID (Optional)
-                      </Text>
-                      <FormTextInput
-                        inputStyle={styles.glassFormInput}
-                        placeholder='Enter student ID if applicable'
-                        value={selectedUser?.studentID || ''}
-                        onChangeText={(text) =>
-                          setSelectedUser((prev) =>
-                            prev ? { ...prev, studentID: text } : null
-                          )
-                        }
-                      />
-                    </View>
-                  )}
-
-                {/* Actions */}
-                <View
-                  style={[
-                    styles.glassFormActions,
-                    isMobile && styles.glassFormActionsMobile,
-                  ]}
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.glassSubmitButton,
-                      modalLoading && styles.glassSubmitButtonDisabled,
-                      isMobile && styles.glassSubmitButtonMobile,
-                    ]}
-                    onPress={isEdit ? handleUpdateUser : handleCreateUser}
-                    disabled={modalLoading}
-                  >
-                    {modalLoading ? (
-                      <ActivityIndicator size='small' color='#ffffff' />
-                    ) : (
-                      <>
-                        <Feather
-                          name={isEdit ? 'check-circle' : 'plus-circle'}
-                          size={isMobile ? 16 : 18}
-                          color='#ffffff'
-                        />
-                        <Text
-                          style={[
-                            styles.glassSubmitButtonText,
-                            isMobile && styles.glassSubmitButtonTextMobile,
-                          ]}
-                        >
-                          {isEdit ? 'Update' : 'Create'}
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.glassCancelButton,
-                      isMobile && styles.glassCancelButtonMobile,
-                    ]}
-                    onPress={handleCloseForm}
-                  >
+              {isEdit &&
+                (selectedUser?.role === 'assistant_admin' ||
+                  selectedUser?.role === 'main_admin') && (
+                  <View style={styles.glassFormGroup}>
                     <Text
-                      style={[
-                        styles.glassCancelButtonText,
-                        isMobile && styles.glassCancelButtonTextMobile,
-                      ]}
+                      style={[styles.glassFormLabel, { color: colors.text }]}
                     >
-                      Cancel
+                      Student ID (Optional)
                     </Text>
-                  </TouchableOpacity>
-                </View>
+                    <FormTextInput
+                      inputStyle={styles.glassFormInput}
+                      placeholder='Enter student ID if applicable'
+                      value={selectedUser?.studentID || ''}
+                      onChangeText={(text) =>
+                        setSelectedUser((prev) =>
+                          prev ? { ...prev, studentID: text } : null
+                        )
+                      }
+                    />
+                  </View>
+                )}
+
+              {/* Actions */}
+              <View
+                style={[
+                  styles.glassFormActions,
+                  isMobile && styles.glassFormActionsMobile,
+                ]}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.glassSubmitButton,
+                    modalLoading && styles.glassSubmitButtonDisabled,
+                    isMobile && styles.glassSubmitButtonMobile,
+                  ]}
+                  onPress={isEdit ? handleUpdateUser : handleCreateUser}
+                  disabled={modalLoading}
+                >
+                  {modalLoading ? (
+                    <ActivityIndicator size='small' color='#ffffff' />
+                  ) : (
+                    <>
+                      <Feather
+                        name={isEdit ? 'check-circle' : 'plus-circle'}
+                        size={isMobile ? 16 : 18}
+                        color='#ffffff'
+                      />
+                      <Text
+                        style={[
+                          styles.glassSubmitButtonText,
+                          isMobile && styles.glassSubmitButtonTextMobile,
+                        ]}
+                      >
+                        {isEdit ? 'Update' : 'Create'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.glassCancelButton,
+                    isMobile && styles.glassCancelButtonMobile,
+                  ]}
+                  onPress={handleCloseForm}
+                >
+                  <Text
+                    style={[
+                      styles.glassCancelButtonText,
+                      isMobile && styles.glassCancelButtonTextMobile,
+                    ]}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
               </View>
             </ScrollView>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
     )
   }
@@ -2143,7 +1866,6 @@ export default function UserManagement() {
     : (['#ffffff', '#f5f9ff', '#eaf2ff'] as const)
   return (
     <View style={styles.container}>
-      {/* Header with Gradient */}
       <LinearGradient
         colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
@@ -2236,7 +1958,6 @@ export default function UserManagement() {
             </Text>
           </View>
           <View style={styles.headerActions}>
-            {/* Theme Toggle Button */}
             <TouchableOpacity
               style={[
                 styles.headerAction,
@@ -2302,7 +2023,7 @@ export default function UserManagement() {
 
       {/* Main Content Grid */}
       <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
-        {/* Left Grid - Paginated Users */}
+        {/* Left Grid */}
         <View style={[styles.leftGrid, isMobile && styles.leftGridMobile]}>
           <View
             style={[styles.leftHeader, isMobile && styles.leftHeaderMobile]}
@@ -2675,10 +2396,8 @@ export default function UserManagement() {
         </View>
       </View>
 
-      {/* Create/Edit Modal */}
       {renderForm(showEditModal)}
 
-      {/* Glassmorphism User Details Modal */}
       <Modal
         visible={selectedUserId !== null}
         transparent={true}
@@ -2698,7 +2417,6 @@ export default function UserManagement() {
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <View style={styles.glassModalHeader}>
               <Text
                 style={[
@@ -2720,7 +2438,6 @@ export default function UserManagement() {
               </TouchableOpacity>
             </View>
 
-            {/* Body */}
             <View style={styles.glassModalBody}>
               {selectedUserId &&
                 renderSelectedDetail(
@@ -2730,6 +2447,24 @@ export default function UserManagement() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      {/* Toast Notification */}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onDismiss={hideToast}
+      />
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        visible={confirmState.visible}
+        title={confirmState.options.title}
+        message={confirmState.options.message}
+        confirmLabel={confirmState.options.confirmLabel}
+        cancelLabel={confirmState.options.cancelLabel}
+        confirmDestructive={confirmState.options.confirmDestructive}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </View>
   )
 }

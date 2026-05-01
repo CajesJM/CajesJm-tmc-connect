@@ -1,7 +1,6 @@
-import { Feather, FontAwesome6, Ionicons } from '@expo/vector-icons'
+import { Feather, FontAwesome6 } from '@expo/vector-icons'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
-import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import {
@@ -20,13 +19,11 @@ import {
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   FlatList,
   Image,
   Modal,
-  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -36,17 +33,13 @@ import {
 } from 'react-native'
 import { useAuth } from '../../src/Controller/context/AuthContext'
 import { useTheme } from '../../src/Controller/context/ThemeContext'
+import { useConfirm } from '../../src/Controller/hooks/useConfirm'
+import { useToast } from '../../src/Controller/hooks/useToast'
 import { notificationService } from '../../src/Controller/utils/notifications'
 import { db } from '../../src/Model/lib/firebaseConfig'
+import { ConfirmDialog } from '../../src/View/components/ConfirmDialog'
+import { Toast } from '../../src/View/components/Toast'
 import { createAnnouncementStyles } from '../../src/View/styles/main-admin/announcementStyles'
-
-const showAlert = (title: string, message?: string) => {
-  if (Platform.OS === 'web') {
-    window.alert(message ? `${title}\n${message}` : title)
-  } else {
-    Alert.alert(title, message)
-  }
-}
 
 dayjs.extend(relativeTime)
 
@@ -357,6 +350,8 @@ export default function MainAdminAnnouncements() {
   const [priority, setPriority] = useState<'normal' | 'important' | 'urgent'>(
     'normal'
   )
+  const { toast, showToast, hideToast } = useToast()
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm()
   const MAX_MESSAGE_LENGTH = 500
 
   useEffect(() => {
@@ -456,7 +451,7 @@ export default function MainAdminAnnouncements() {
 
   const handleAddAnnouncement = async () => {
     if (!title.trim() || !message.trim()) {
-      showAlert('Validation Error', 'Please fill in both title and message')
+      showToast('Please fill in both title and message', 'error')
       return
     }
 
@@ -498,10 +493,10 @@ export default function MainAdminAnnouncements() {
       await Promise.all(notificationPromises)
 
       resetForm()
-      showAlert('Success', 'Announcement created and notifications sent!')
+      showToast('Announcement created!', 'success')
     } catch (error) {
       console.error(error)
-      showAlert('Error', 'Failed to create announcement')
+      showToast('Failed to create announcement', 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -564,53 +559,32 @@ export default function MainAdminAnnouncements() {
       await Promise.all(notificationPromises)
 
       resetForm()
-      showAlert('Success', 'Announcement updated and notifications sent!')
+      showToast('Announcement updated!', 'success')
     } catch (error) {
-      showAlert('Error', 'Failed to update announcement')
+      showToast('Failed to update announcement', 'error')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   const handleDelete = async (id: string, announcementTitle: string) => {
-    if (Platform.OS === 'web') {
-      const isConfirmed = window.confirm(
-        `Are you sure you want to delete "${announcementTitle}"?`
-      )
-      if (isConfirmed) {
-        try {
-          await deleteDoc(doc(db, 'announcements', id))
-          if (selectedAnnouncement === id) {
-            setSelectedAnnouncement(null)
-          }
-          showAlert('Success', 'Announcement deleted successfully!')
-        } catch (error) {
-          showAlert('Error', 'Failed to delete announcement')
-        }
+    const confirmed = await confirm({
+      title: 'Delete Announcement',
+      message: `Are you sure you want to delete "${announcementTitle}"?`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      confirmDestructive: true,
+    })
+    if (!confirmed) return
+
+    try {
+      await deleteDoc(doc(db, 'announcements', id))
+      if (selectedAnnouncement === id) {
+        setSelectedAnnouncement(null)
       }
-    } else {
-      Alert.alert(
-        'Delete Announcement',
-        `Are you sure you want to delete "${announcementTitle}"?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await deleteDoc(doc(db, 'announcements', id))
-                if (selectedAnnouncement === id) {
-                  setSelectedAnnouncement(null)
-                }
-                showAlert('Success', 'Announcement deleted successfully!')
-              } catch (error) {
-                showAlert('Error', 'Failed to delete announcement')
-              }
-            },
-          },
-        ]
-      )
+      showToast('Announcement deleted successfully!', 'success')
+    } catch (error) {
+      showToast('Failed to delete announcement', 'error')
     }
   }
 
@@ -1811,283 +1785,260 @@ export default function MainAdminAnnouncements() {
         </View>
       </View>
 
-      {/* Create/Edit Modal */}
       <Modal
         visible={showCreateForm}
         transparent={true}
         animationType='fade'
         onRequestClose={resetForm}
       >
-        {/* Outer overlay with blur (glass background) */}
-        <BlurView
-          intensity={80}
-          tint={isDark ? 'dark' : 'light'}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        <TouchableOpacity
+          style={styles.glassModalOverlay}
+          activeOpacity={1}
+          onPress={resetForm}
         >
           <TouchableOpacity
-            style={styles.glassModalOverlayTouch}
-            activeOpacity={1}
-            onPress={resetForm}
-          />
-        </BlurView>
-
-        {/* Modal container */}
-        <View style={styles.glassModalCentered}>
-          <View
             style={[
-              styles.glassModalContainer,
-              { borderColor: 'rgba(255,255,255,0.3)' },
+              styles.glassModalContent,
+              isMobile && styles.glassModalContentMobile,
             ]}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
           >
-            {/* Gradient header */}
-            <LinearGradient
-              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.glassModalGradientHeader}
-            >
-              <View style={styles.glassModalHeader}>
-                <View style={styles.glassModalHeaderLeft}>
-                  <View
-                    style={[
-                      styles.glassModalIconContainer,
-                      isMobile && styles.glassModalIconContainerMobile,
-                    ]}
-                  >
-                    <FontAwesome6
-                      name={editingId ? 'pen-to-square' : 'bullhorn'}
-                      size={isMobile ? 16 : 20}
-                      color={colors.accent.primary}
-                    />
-                  </View>
-                  <View>
-                    <Text
-                      style={[styles.glassModalTitle, { color: colors.text }]}
-                    >
-                      {editingId ? 'Edit Announcement' : 'New Announcement'}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.glassModalSubtitle,
-                        { color: colors.sidebar.text.secondary },
-                      ]}
-                    >
-                      {editingId ? 'Update details' : 'Create announcement'}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={resetForm}
-                  style={styles.glassModalCloseButton}
-                >
-                  <Ionicons
-                    name='close-circle'
-                    size={28}
+            {/* Header */}
+            <View style={styles.glassModalHeader}>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                {editingId ? (
+                  <Feather
+                    name='arrow-right'
+                    size={20}
                     color={colors.accent.primary}
                   />
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-
-            {/* Scrollable content */}
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.glassModalScrollContent}
-              style={{
-                backgroundColor: isDark
-                  ? 'rgba(15, 25, 35, 0.7)'
-                  : 'rgba(255, 255, 255, 0.7)',
-              }}
-            >
-              <View
-                style={[
-                  styles.glassModalFormSection,
-                  { borderColor: 'rgba(255,255,255,0.2)' },
-                ]}
-              >
-                {/* Priority */}
-                <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                    Priority
-                  </Text>
-                  <View
-                    style={[
-                      styles.glassPriorityContainer,
-                      isMobile && styles.glassPriorityContainerMobile,
-                    ]}
-                  >
-                    {[
-                      {
-                        value: 'normal',
-                        label: 'Normal',
-                        color: colors.accent.primary,
-                        activeColor: 'normal',
-                      },
-                      {
-                        value: 'important',
-                        label: 'Important',
-                        color: '#f59e0b',
-                        activeColor: 'important',
-                      },
-                      {
-                        value: 'urgent',
-                        label: 'Urgent',
-                        color: '#ef4444',
-                        activeColor: 'urgent',
-                      },
-                    ].map((option) => (
-                      <TouchableOpacity
-                        key={option.value}
-                        style={[
-                          styles.glassPriorityButton,
-                          priority === option.value && {
-                            backgroundColor: `${option.color}20`,
-                            borderColor: option.color,
-                          },
-                          isMobile && styles.glassPriorityButtonMobile,
-                        ]}
-                        onPress={() => setPriority(option.value as any)}
-                      >
-                        <View
-                          style={[
-                            styles.glassPriorityIndicator,
-                            { backgroundColor: option.color },
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.glassPriorityButtonText,
-                            {
-                              color:
-                                priority === option.value
-                                  ? option.color
-                                  : colors.sidebar.text.secondary,
-                            },
-                            isMobile && styles.glassPriorityButtonTextMobile,
-                          ]}
-                        >
-                          {option.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {/* Title */}
-                <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                    Title
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.glassFormInput,
-                      isMobile && styles.glassFormInputMobile,
-                    ]}
-                    placeholder='Enter title'
-                    placeholderTextColor={colors.sidebar.text.muted}
-                    value={title}
-                    onChangeText={setTitle}
+                ) : (
+                  <Feather
+                    name='arrow-right'
+                    size={20}
+                    color={colors.accent.primary}
                   />
-                </View>
-
-                {/* Message */}
-                <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                    Message
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.glassFormInput,
-                      styles.glassTextArea,
-                      isMobile && styles.glassFormInputMobile,
-                    ]}
-                    placeholder='Write message...'
-                    placeholderTextColor={colors.sidebar.text.muted}
-                    value={message}
-                    onChangeText={setMessage}
-                    multiline
-                    numberOfLines={isMobile ? 4 : 6}
-                    textAlignVertical='top'
-                    maxLength={MAX_MESSAGE_LENGTH}
-                  />
-                  {/* Character counter */}
-                  <View style={styles.characterCounterContainer}>
-                    <Text
-                      style={[
-                        styles.characterCounterText,
-                        { color: colors.sidebar.text.muted },
-                      ]}
-                    >
-                      {message.length}/{MAX_MESSAGE_LENGTH} characters
-                    </Text>
-                    {message.length >= MAX_MESSAGE_LENGTH && (
-                      <Text style={styles.characterCounterWarning}>
-                        Limit reached
-                      </Text>
-                    )}
-                  </View>
-                </View>
-
-                {/* Actions */}
-                <View
+                )}
+                <Text
                   style={[
-                    styles.glassFormActions,
-                    isMobile && styles.glassFormActionsMobile,
+                    styles.glassModalTitle,
+                    isMobile && styles.glassModalTitleMobile,
                   ]}
                 >
-                  <TouchableOpacity
-                    style={[
-                      styles.glassSubmitButton,
-                      (!title.trim() || !message.trim() || isSubmitting) &&
-                        styles.glassSubmitButtonDisabled,
-                      isMobile && styles.glassSubmitButtonMobile,
-                    ]}
-                    onPress={editingId ? handleSaveEdit : handleAddAnnouncement}
-                    disabled={!title.trim() || !message.trim() || isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <ActivityIndicator size='small' color='#ffffff' />
-                    ) : (
-                      <>
-                        <Feather
-                          name={editingId ? 'check-circle' : 'send'}
-                          size={isMobile ? 16 : 18}
-                          color='#ffffff'
-                        />
-                        <Text
-                          style={[
-                            styles.glassSubmitButtonText,
-                            isMobile && styles.glassSubmitButtonTextMobile,
-                          ]}
-                        >
-                          {editingId ? 'Save Changes' : 'Publish Announcement'}
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                  {editingId ? 'Edit Announcement' : 'New Announcement'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={resetForm}
+                style={styles.glassModalClose}
+              >
+                <Feather
+                  name='x'
+                  size={isMobile ? 22 : 26}
+                  color={colors.sidebar.text.secondary}
+                />
+              </TouchableOpacity>
+            </View>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.glassCancelButton,
-                      isMobile && styles.glassCancelButtonMobile,
-                    ]}
-                    onPress={resetForm}
-                  >
-                    <Text
+            <View style={styles.glassModalBody}>
+              {/* Priority */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                  Priority
+                </Text>
+                <View
+                  style={[
+                    styles.glassPriorityContainer,
+                    isMobile && styles.glassPriorityContainerMobile,
+                  ]}
+                >
+                  {[
+                    {
+                      value: 'normal',
+                      label: 'Normal',
+                      color: colors.accent.primary,
+                    },
+                    {
+                      value: 'important',
+                      label: 'Important',
+                      color: '#f59e0b',
+                    },
+                    {
+                      value: 'urgent',
+                      label: 'Urgent',
+                      color: '#ef4444',
+                    },
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
                       style={[
-                        styles.glassCancelButtonText,
-                        isMobile && styles.glassCancelButtonTextMobile,
+                        styles.glassPriorityButton,
+                        priority === option.value && {
+                          backgroundColor: `${option.color}20`,
+                          borderColor: option.color,
+                        },
+                        isMobile && styles.glassPriorityButtonMobile,
                       ]}
+                      onPress={() => setPriority(option.value as any)}
                     >
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
+                      <View
+                        style={[
+                          styles.glassPriorityIndicator,
+                          { backgroundColor: option.color },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.glassPriorityButtonText,
+                          {
+                            color:
+                              priority === option.value
+                                ? option.color
+                                : colors.sidebar.text.secondary,
+                          },
+                          isMobile && styles.glassPriorityButtonTextMobile,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
-            </ScrollView>
-          </View>
-        </View>
+
+              {/* Title */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                  Title
+                </Text>
+                <TextInput
+                  style={[
+                    styles.glassFormInput,
+                    isMobile && styles.glassFormInputMobile,
+                  ]}
+                  placeholder='Enter title'
+                  placeholderTextColor={colors.sidebar.text.muted}
+                  value={title}
+                  onChangeText={setTitle}
+                />
+              </View>
+
+              {/* Message */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                  Message
+                </Text>
+                <TextInput
+                  style={[
+                    styles.glassFormInput,
+                    styles.glassTextArea,
+
+                    isMobile && styles.glassFormInputMobile,
+                  ]}
+                  placeholder='Write message...'
+                  placeholderTextColor={colors.sidebar.text.muted}
+                  value={message}
+                  onChangeText={setMessage}
+                  multiline
+                  numberOfLines={isMobile ? 4 : 6}
+                  textAlignVertical='top'
+                  maxLength={MAX_MESSAGE_LENGTH}
+                />
+                <View style={styles.characterCounterContainer}>
+                  <Text
+                    style={[
+                      styles.characterCounterText,
+                      { color: colors.sidebar.text.muted },
+                    ]}
+                  >
+                    {message.length}/{MAX_MESSAGE_LENGTH} characters
+                  </Text>
+                  {message.length >= MAX_MESSAGE_LENGTH && (
+                    <Text style={styles.characterCounterWarning}>
+                      Limit reached
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Actions */}
+              <View
+                style={[
+                  styles.glassFormActions,
+                  isMobile && styles.glassFormActionsMobile,
+                ]}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.glassSubmitButton,
+                    (!title.trim() || !message.trim() || isSubmitting) &&
+                      styles.glassSubmitButtonDisabled,
+                    isMobile && styles.glassSubmitButtonMobile,
+                  ]}
+                  onPress={editingId ? handleSaveEdit : handleAddAnnouncement}
+                  disabled={!title.trim() || !message.trim() || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size='small' color='#ffffff' />
+                  ) : (
+                    <>
+                      <Feather
+                        name={editingId ? 'check-circle' : 'send'}
+                        size={isMobile ? 16 : 18}
+                        color='#ffffff'
+                      />
+                      <Text
+                        style={[
+                          styles.glassSubmitButtonText,
+                          isMobile && styles.glassSubmitButtonTextMobile,
+                        ]}
+                      >
+                        {editingId ? 'Save Changes' : 'Publish Announcement'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.glassCancelButton,
+                    isMobile && styles.glassCancelButtonMobile,
+                  ]}
+                  onPress={resetForm}
+                >
+                  <Text
+                    style={[
+                      styles.glassCancelButtonText,
+                      isMobile && styles.glassCancelButtonTextMobile,
+                    ]}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onDismiss={hideToast}
+      />
+      <ConfirmDialog
+        visible={confirmState.visible}
+        title={confirmState.options.title}
+        message={confirmState.options.message}
+        confirmLabel={confirmState.options.confirmLabel}
+        cancelLabel={confirmState.options.cancelLabel}
+        confirmDestructive={confirmState.options.confirmDestructive}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </View>
   )
 }

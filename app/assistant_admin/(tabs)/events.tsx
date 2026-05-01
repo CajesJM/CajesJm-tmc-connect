@@ -9,12 +9,15 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   Timestamp,
   updateDoc,
+  where,
 } from 'firebase/firestore'
 import React, { useEffect, useMemo, useState } from 'react'
 import {
@@ -562,37 +565,82 @@ export default function AssistantAdminEvents() {
 
   const handleDeleteEvent = (id: string, eventTitle: string) => {
     if (Platform.OS === 'web') {
-      if (window.confirm(`Delete "${eventTitle}"?`)) {
-        deleteDoc(doc(db, 'events', id))
-          .then(() => {
-            if (selectedEvent?.id === id) setShowDetailModal(false)
-          })
-          .catch((err) => {
-            console.error(err)
-            Alert.alert('Error', 'Delete failed.')
-          })
+      if (
+        window.confirm(
+          `Delete "${eventTitle}"? This will also delete all associated penalties and remove them from user profiles.`
+        )
+      ) {
+        deleteEventWithPenalties(id, eventTitle)
       }
     } else {
-      Alert.alert('Delete Event', `Delete "${eventTitle}"?`, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteDoc(doc(db, 'events', id))
-              if (selectedEvent?.id === id) setShowDetailModal(false)
-              Alert.alert('Success', 'Event deleted.')
-            } catch (error) {
-              console.error(error)
-              Alert.alert('Error', 'Delete failed.')
-            }
+      Alert.alert(
+        'Delete Event',
+        `Delete "${eventTitle}"? This will also delete all associated penalties and remove them from user profiles.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => deleteEventWithPenalties(id, eventTitle),
           },
-        },
-      ])
+        ]
+      )
     }
   }
 
+  const deleteEventWithPenalties = async (
+    eventId: string,
+    eventTitle: string
+  ) => {
+    setIsSubmitting(true)
+    try {
+      await deleteDoc(doc(db, 'events', eventId))
+
+      const penaltiesQuery = query(
+        collection(db, 'penalties'),
+        where('eventId', '==', eventId)
+      )
+      const penaltiesSnapshot = await getDocs(penaltiesQuery)
+      const affectedStudentIds: string[] = []
+
+      const updateUserPromises = penaltiesSnapshot.docs.map(
+        async (penaltyDoc) => {
+          const penaltyData = penaltyDoc.data()
+          const studentId = penaltyData.studentId
+          if (studentId) {
+            affectedStudentIds.push(studentId)
+            const userRef = doc(db, 'users', studentId)
+            const userSnap = await getDoc(userRef)
+            if (userSnap.exists()) {
+              const userData = userSnap.data()
+              const existingPenalties = userData.penalties || []
+              const updatedPenalties = existingPenalties.filter(
+                (p: any) => p.eventId !== eventId
+              )
+              await updateDoc(userRef, { penalties: updatedPenalties })
+            }
+          }
+        }
+      )
+      await Promise.all(updateUserPromises)
+
+      const deletePromises = penaltiesSnapshot.docs.map((doc) =>
+        deleteDoc(doc.ref)
+      )
+      await Promise.all(deletePromises)
+      if (selectedEvent?.id === eventId) setShowDetailModal(false)
+
+      Alert.alert(
+        'Success',
+        `"${eventTitle}" and its associated penalties deleted successfully. Removed from ${affectedStudentIds.length} user profile(s).`
+      )
+    } catch (error) {
+      console.error('Delete event error:', error)
+      Alert.alert('Error', 'Failed to delete event and penalties.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
   const handleEditStart = (event: Event) => {
     setEditingId(event.id)
     setTitle(event.title)

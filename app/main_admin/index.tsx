@@ -26,7 +26,6 @@ import React, {
 } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   Image,
@@ -46,6 +45,8 @@ import { PieChart } from 'react-native-gifted-charts'
 import Svg, { Line, Polyline } from 'react-native-svg'
 import { useAuth } from '../../src/Controller/context/AuthContext'
 import { useTheme } from '../../src/Controller/context/ThemeContext'
+import { useConfirm } from '../../src/Controller/hooks/useConfirm'
+import { useToast } from '../../src/Controller/hooks/useToast'
 import {
   Notification,
   notificationService,
@@ -56,7 +57,9 @@ import {
 } from '../../src/Controller/utils/pdfGenerator'
 import { auth, db } from '../../src/Model/lib/firebaseConfig'
 import { AnimatedStatCard } from '../../src/View/components/AnimatedStatCard'
+import { ConfirmDialog } from '../../src/View/components/ConfirmDialog'
 import { NotificationModal } from '../../src/View/components/NotificationModal'
+import { Toast } from '../../src/View/components/Toast'
 import { createDashboardStyles } from '../../src/View/styles/main-admin/dashboardStyles'
 import MainAdminAnnouncements from './announcements'
 import MainAdminAttendance from './attendance'
@@ -64,14 +67,6 @@ import MainAdminEvents from './events'
 import MainAdminProfile from './profile'
 import UserManagement from './users'
 dayjs.extend(relativeTime)
-
-const showAlert = (title: string, message?: string) => {
-  if (Platform.OS === 'web') {
-    window.alert(message ? `${title}\n${message}` : title)
-  } else {
-    Alert.alert(title, message)
-  }
-}
 
 interface Activity {
   id: string
@@ -681,7 +676,6 @@ const AnalyticsLineChart = memo(function AnalyticsLineChart({
         )}
 
         <View style={styles.chartSummary}>
-          {/* Total Events Card */}
           <TouchableOpacity
             style={[styles.summaryCard, { flex: 1 }]}
             activeOpacity={0.8}
@@ -739,7 +733,6 @@ const AnalyticsLineChart = memo(function AnalyticsLineChart({
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Attendance Δ Card */}
           <TouchableOpacity
             style={[styles.summaryCard, { flex: 1 }]}
             activeOpacity={0.8}
@@ -875,9 +868,8 @@ const MonthlyActivityChart = memo(function MonthlyActivityChart({
               containerPageX,
               containerPageY
             ) => {
-              // Calculate relative position inside the chart container
               const relativeLeft = barPageX - containerPageX + barWidth / 2
-              const relativeTop = barPageY - containerPageY - 10 // 10px above bar
+              const relativeTop = barPageY - containerPageY - 10
               setTooltipPosition({ left: relativeLeft, top: relativeTop })
             }
           )
@@ -1058,14 +1050,13 @@ const MonthlyActivityChart = memo(function MonthlyActivityChart({
         </ScrollView>
       )}
 
-      {/* Tooltip - rendered inside the chart container with absolute positioning */}
       {hoveredIndex !== null && yearlyStats[hoveredIndex] && (
         <View
           pointerEvents='none'
           style={{
             position: 'absolute',
-            left: tooltipPosition.left - 65, // center horizontally (half of 130px width)
-            top: tooltipPosition.top - 50, // adjust to sit above the bar
+            left: tooltipPosition.left - 65,
+            top: tooltipPosition.top - 50,
             zIndex: 1000,
           }}
         >
@@ -1159,6 +1150,8 @@ const MonthlyActivityChart = memo(function MonthlyActivityChart({
 })
 
 export default function MainAdminDashboard() {
+  const { toast, showToast, hideToast } = useToast()
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm()
   const [dashboardStats, setDashboardStats] = useState({
     totalUsers: 0,
     totalEvents: 0,
@@ -1317,9 +1310,12 @@ export default function MainAdminDashboard() {
       const total = users.length
       if (total === 0) return
 
-      // A user is inactive if active === false (explicit flag)
-      const inactiveUsers = users.filter((u) => u.active === false)
-      const activeUsers = users.filter((u) => u.active !== false)
+      const inactiveUsers = users.filter(
+        (u) => u.status === 'inactive' || u.active === false
+      )
+      const activeUsers = users.filter(
+        (u) => u.status !== 'inactive' && u.active !== false
+      )
 
       const roleCounts: Record<string, number> = {
         student: activeUsers.filter((u) => u.role === 'student' || !u.role)
@@ -1336,14 +1332,7 @@ export default function MainAdminDashboard() {
           count: roleCounts[role.role] ?? 0,
           percentage: Math.round(((roleCounts[role.role] ?? 0) / total) * 100),
         }))
-
-        const hasChanges = prev.some(
-          (role, idx) =>
-            role.count !== newStats[idx].count ||
-            role.percentage !== newStats[idx].percentage
-        )
-
-        return hasChanges ? newStats : prev
+        return newStats
       })
     } catch (error) {
       console.error('fetchUserRoleStats error:', error)
@@ -1368,7 +1357,6 @@ export default function MainAdminDashboard() {
     attendance: 0,
   })
 
-  // Theme toggle animation state
   const [isThemeToggling, setIsThemeToggling] = useState(false)
   const themeSpinAnim = useRef(new Animated.Value(0)).current
 
@@ -1562,7 +1550,7 @@ export default function MainAdminDashboard() {
         )
       }
 
-      // Build chart data for PieChart
+      // PieChart
       const chartData = userRoleStats.map((role) => ({
         value: role.count,
         color: role.color,
@@ -1585,20 +1573,7 @@ export default function MainAdminDashboard() {
       }
 
       const navigateToUsers = () => {
-        // Navigate to the user management screen (adjust route as needed)
-        // Assuming router is available; we'll need to pass it or use useRouter
-        // For simplicity, we'll call a navigation function passed from parent.
-        // Since DonutChart is inside MainAdminDashboard, we can use the navigateTo function from props or context.
-        // We'll add a prop `onExplore` or use a global router.
-        // For now, we'll assume the parent passes a `onNavigate` callback.
-        // Actually we can use the router from the outer scope because this component is defined inside MainAdminDashboard.
-        // However, because it's memoized and defined inside the same file, we can capture the router from the outer function.
-        // We'll add a `navigation` prop to DonutChart or simply use the parent's navigateTo function.
-        // To keep it simple, we'll pass `onExplore` as a prop.
         if (selectedSlice !== null) {
-          // Navigate to users page, optionally with a filter
-          // For now just go to users
-          // We'll need to get the router instance. We'll pass it as a prop.
         }
       }
 
@@ -1687,7 +1662,6 @@ export default function MainAdminDashboard() {
               />
             </View>
 
-            {/* Interactive Legend */}
             <View style={styles.interactiveLegendContainer}>
               {chartData.map((item, index) => (
                 <Pressable
@@ -1735,7 +1709,6 @@ export default function MainAdminDashboard() {
               ))}
             </View>
 
-            {/* Selected Item Details - with default fallback */}
             {selectedSlice !== null ? (
               <Animated.View style={styles.selectedDetailsContainer}>
                 <LinearGradient
@@ -1810,7 +1783,6 @@ export default function MainAdminDashboard() {
       )
     },
     (prevProps, nextProps) => {
-      // Custom comparison to avoid unnecessary re-renders
       if (prevProps.totalUsers !== nextProps.totalUsers) return false
       if (prevProps.isDark !== nextProps.isDark) return false
       const prevStats = prevProps.userRoleStats
@@ -1995,14 +1967,12 @@ export default function MainAdminDashboard() {
         approval.type === 'announcement' ? 'announcements' : 'events'
       const docRef = doc(db, collectionName, approval.id)
 
-      // 1. Update status to approved
       await updateDoc(docRef, {
         status: 'approved',
         approvedAt: new Date(),
         approvedBy: userData?.email,
       })
 
-      // 2. Notify the creator (assistant admin) that it's approved
       if (approval.data?.createdBy) {
         await notificationService.createNotification({
           userId: approval.data.createdBy,
@@ -2014,8 +1984,6 @@ export default function MainAdminDashboard() {
         })
       }
 
-      // 3. 🔥 NEW: Notify ALL students
-      // Fetch all student userIds from the 'users' collection
       const studentsQuery = query(
         collection(db, 'users'),
         where('role', '==', 'student')
@@ -2024,7 +1992,6 @@ export default function MainAdminDashboard() {
       const studentIds = studentSnap.docs.map((doc) => doc.id)
 
       if (studentIds.length > 0) {
-        // Prepare notification data based on type
         const notificationPromises = studentIds.map((studentId) =>
           notificationService.createNotification({
             userId: studentId,
@@ -2037,7 +2004,7 @@ export default function MainAdminDashboard() {
                 ? approval.data?.message || approval.description
                 : approval.data?.description ||
                   `${approval.title} is happening soon!`,
-            type: approval.type, // 'announcement' or 'event'
+            type: approval.type,
             timestamp: new Date(),
             priority:
               approval.data?.priority === 'urgent'
@@ -2054,48 +2021,25 @@ export default function MainAdminDashboard() {
         await Promise.all(notificationPromises)
       }
 
-      // Success feedback (web or native)
-      if (Platform.OS === 'web') {
-        window.alert(
-          `${approval.type} approved and ${studentIds.length} student(s) notified!`
-        )
-      } else {
-        Alert.alert(
-          'Success',
-          `${approval.type} approved and ${studentIds.length} student(s) notified!`
-        )
-      }
+      showToast(
+        `${approval.type} approved and ${studentIds.length} student(s) notified!`,
+        'success'
+      )
     } catch (error) {
       console.error('Approval error:', error)
-      if (Platform.OS === 'web') {
-        window.alert('Failed to approve. Please try again.')
-      } else {
-        Alert.alert('Error', 'Failed to approve. Please try again.')
-      }
+      showToast('Failed to approve. Please try again.', 'error')
     }
   }
-  const handleReject = (approval: PendingApproval) => {
-    if (Platform.OS === 'web') {
-      const confirmed = window.confirm(
-        `Are you sure you want to reject "${approval.title}"?`
-      )
-      if (confirmed) {
-        performReject(approval)
-      }
-    } else {
-      Alert.alert(
-        'Reject Request',
-        `Are you sure you want to reject "${approval.title}"?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Reject',
-            style: 'destructive',
-            onPress: () => performReject(approval),
-          },
-        ]
-      )
-    }
+  const handleReject = async (approval: PendingApproval) => {
+    const confirmed = await confirm({
+      title: 'Reject Request',
+      message: `Are you sure you want to reject "${approval.title}"?`,
+      confirmLabel: 'Reject',
+      cancelLabel: 'Cancel',
+      confirmDestructive: true,
+    })
+    if (!confirmed) return
+    performReject(approval)
   }
 
   const performReject = async (approval: PendingApproval) => {
@@ -2123,17 +2067,9 @@ export default function MainAdminDashboard() {
         } catch (notifyError) {}
       }
 
-      if (Platform.OS === 'web') {
-        window.alert(`${approval.type} has been rejected.`)
-      } else {
-        Alert.alert('Rejected', `${approval.type} has been rejected.`)
-      }
+      showToast(`${approval.type} has been rejected.`, 'success')
     } catch (error) {
-      if (Platform.OS === 'web') {
-        window.alert('Failed to reject. Check console for details.')
-      } else {
-        Alert.alert('Error', 'Failed to reject. Check console for details.')
-      }
+      showToast('Failed to reject. Check console for details.', 'error')
     }
   }
 
@@ -2476,14 +2412,10 @@ export default function MainAdminDashboard() {
       const fileUri = await generateDashboardPDF(pdfData)
       await sharePDF(fileUri)
       if (Platform.OS !== 'web') {
-        Alert.alert('Success', '✅ Report generated successfully!', [
-          { text: 'OK' },
-        ])
+        showToast('Report generated successfully!', 'success')
       }
     } catch (error) {
-      Alert.alert('Error', '❌ Failed to generate report. Please try again.', [
-        { text: 'OK' },
-      ])
+      showToast('Failed to generate report. Please try again.', 'error')
     } finally {
       setDownloadLoading(false)
     }
@@ -2544,11 +2476,7 @@ export default function MainAdminDashboard() {
         const permissionResult =
           await ImagePicker.requestMediaLibraryPermissionsAsync()
         if (permissionResult.granted === false) {
-          Alert.alert(
-            'Permission Required',
-            'Permission to access camera roll is required!',
-            [{ text: 'OK' }]
-          )
+          showToast('Permission to access camera roll is required!', 'error')
           return
         }
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -2562,9 +2490,7 @@ export default function MainAdminDashboard() {
         }
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick image. Please try again.', [
-        { text: 'OK' },
-      ])
+      showToast('Failed to pick image. Please try again.', 'error')
     }
   }
 
@@ -2623,10 +2549,10 @@ export default function MainAdminDashboard() {
 
       await refreshUserData()
 
-      showAlert('Success', 'Profile image updated successfully!')
+      showToast('Profile image updated successfully!', 'success')
     } catch (error) {
       console.error('Upload error:', error)
-      showAlert('Error', 'Failed to upload image. Please try again.')
+      showToast('Failed to upload image. Please try again.', 'error')
     } finally {
       setUploadingImage(false)
     }
@@ -2890,7 +2816,6 @@ export default function MainAdminDashboard() {
 
   const renderChartsSection = () => (
     <View style={styles.chartsGrid}>
-      {/* COL 1: use the memoized component instead of the inline duplicate */}
       <View style={[styles.chartColumn, styles.lineChartColumn]}>
         <AnalyticsLineChart
           monthlyStats={monthlyStats}
@@ -2940,7 +2865,6 @@ export default function MainAdminDashboard() {
           />
         }
       >
-        {/* Header Gradient */}
         <LinearGradient
           colors={dynamic.headerGradient}
           start={{ x: 0, y: 0 }}
@@ -3021,7 +2945,6 @@ export default function MainAdminDashboard() {
               </Text>
             </View>
             <View style={styles.headerActions}>
-              {/* Theme Toggle Button */}
               <TouchableOpacity
                 style={[
                   styles.headerAction,
@@ -3132,7 +3055,6 @@ export default function MainAdminDashboard() {
           approvalCount={approvalCount}
         />
 
-        {/* Profile Menu Modal */}
         <Modal
           visible={showProfileMenu}
           transparent
@@ -3159,7 +3081,7 @@ export default function MainAdminDashboard() {
                 style={styles.profileMenuItem}
                 onPress={() => {
                   setShowProfileMenu(false)
-                  handleProfileImagePress() // your existing upload function
+                  handleProfileImagePress()
                 }}
               >
                 <Feather name='camera' size={20} color={colors.text} />
@@ -3169,7 +3091,6 @@ export default function MainAdminDashboard() {
           </TouchableOpacity>
         </Modal>
 
-        {/* Full-screen image viewer */}
         <Modal
           visible={showImageViewer}
           transparent={false}
@@ -3220,7 +3141,6 @@ export default function MainAdminDashboard() {
             />
           </View>
 
-          {/* Right Side - Stats Grid (2x2) */}
           <View style={[styles.column, styles.statsColumn]}>
             <View
               style={[
@@ -3233,7 +3153,6 @@ export default function MainAdminDashboard() {
               ]}
             >
               <View style={styles.interactiveLegendContainer}>
-                {/* Total Users */}
                 <Pressable
                   style={[styles.interactiveLegendItem, { minWidth: '45%' }]}
                   onPress={() => navigateTo('users')}
@@ -3465,6 +3384,23 @@ export default function MainAdminDashboard() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.contentArea}>{renderContent()}</View>
+
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onDismiss={hideToast}
+      />
+      <ConfirmDialog
+        visible={confirmState.visible}
+        title={confirmState.options.title}
+        message={confirmState.options.message}
+        confirmLabel={confirmState.options.confirmLabel}
+        cancelLabel={confirmState.options.cancelLabel}
+        confirmDestructive={confirmState.options.confirmDestructive}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </View>
   )
 }

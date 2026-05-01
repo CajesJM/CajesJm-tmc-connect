@@ -316,6 +316,13 @@ export default function SuperAdminLogin() {
     if (password) animateLabel(passwordAnim, 1)
   }
 
+  const isOnline = (): boolean => {
+    if (typeof navigator !== 'undefined') {
+      return navigator.onLine
+    }
+    return true
+  }
+
   const handleLogin = async () => {
     forceLabelsUp()
     if (busy || authLoading) return
@@ -337,6 +344,15 @@ export default function SuperAdminLogin() {
 
     setBusy(true)
     setLoadingMessage('Verifying credentials')
+
+    const online = isOnline()
+    if (!online) {
+      setError(
+        'No internet connection. Please check your network and try again.'
+      )
+      setBusy(false)
+      return
+    }
 
     try {
       const usersCollection = collection(db, 'users')
@@ -384,6 +400,22 @@ export default function SuperAdminLogin() {
         setBusy(false)
       }
     } catch (err: any) {
+      const isNetworkError =
+        err?.code === 'unavailable' ||
+        err?.code === 'failed-precondition' ||
+        err?.message?.toLowerCase().includes('network') ||
+        err?.message?.toLowerCase().includes('offline') ||
+        err?.message?.toLowerCase().includes('fetch') ||
+        (err?.name === 'FirebaseError' && err?.code === 'unavailable')
+
+      if (isNetworkError) {
+        setError(
+          'No internet connection. Please check your network and try again.'
+        )
+        setBusy(false)
+        return
+      }
+
       const newAttempts = failedAttempts + 1
       setFailedAttempts(newAttempts)
 
@@ -404,7 +436,6 @@ export default function SuperAdminLogin() {
       setBusy(false)
     }
   }
-
   const isValidEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/
     return emailRegex.test(email)

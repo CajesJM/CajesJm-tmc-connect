@@ -1,5 +1,4 @@
-import { Feather, Ionicons } from '@expo/vector-icons'
-import { BlurView } from 'expo-blur'
+import { Feather } from '@expo/vector-icons'
 import * as FileSystem from 'expo-file-system'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as Print from 'expo-print'
@@ -21,7 +20,6 @@ import {
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   FlatList,
@@ -38,18 +36,14 @@ import {
 import QRCode from 'react-native-qrcode-svg'
 import { useAuth } from '../../src/Controller/context/AuthContext'
 import { useTheme } from '../../src/Controller/context/ThemeContext'
+import { useConfirm } from '../../src/Controller/hooks/useConfirm'
+import { useToast } from '../../src/Controller/hooks/useToast'
 import { notificationService } from '../../src/Controller/utils/notifications'
 import { auth, db } from '../../src/Model/lib/firebaseConfig'
+import { ConfirmDialog } from '../../src/View/components/ConfirmDialog'
 import PenaltyAnnouncementModal from '../../src/View/components/PenaltyAnnouncementModal'
+import { Toast } from '../../src/View/components/Toast'
 import { createAttendanceStyles } from '../../src/View/styles/main-admin/attendanceStyles'
-
-const showAlert = (title: string, message?: string) => {
-  if (Platform.OS === 'web') {
-    window.alert(message ? `${title}\n${message}` : title)
-  } else {
-    Alert.alert(title, message)
-  }
-}
 
 interface PenaltyStatus {
   status: 'pending' | 'paid' | 'completed' | 'cancelled'
@@ -292,6 +286,8 @@ const AnimatedBlock = memo(function AnimatedBlock({
 })
 
 export default function MainAdminAttendance() {
+  const { toast, showToast, hideToast } = useToast()
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm()
   const { user, userData } = useAuth()
   const router = useRouter()
   const { width: screenWidth } = useWindowDimensions()
@@ -320,7 +316,6 @@ export default function MainAdminAttendance() {
   const [selectedBlock, setSelectedBlock] = useState<string>('all')
   const [showExpirationModal, setShowExpirationModal] = useState<boolean>(false)
   const [customExpiration, setCustomExpiration] = useState<string>('')
-  const [showStopConfirmModal, setShowStopConfirmModal] = useState(false)
   const [timeLeft, setTimeLeft] = useState<string>('')
   const [qrValue, setQrValue] = useState<string>('')
   const [isCustomDatePickerVisible, setCustomDatePickerVisible] =
@@ -360,14 +355,9 @@ export default function MainAdminAttendance() {
   const [completedStudentIds, setCompletedStudentIds] = useState<Set<string>>(
     new Set()
   )
-  const [showCompleteConfirmModal, setShowCompleteConfirmModal] =
-    useState(false)
-  const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false)
-  const [selectedStudentForAction, setSelectedStudentForAction] =
-    useState<Student | null>(null)
+
   const [processingAction, setProcessingAction] = useState<string | null>(null)
-  const [selectedEventForAction, setSelectedEventForAction] =
-    useState<Event | null>(null)
+
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
 
   const [isThemeToggling, setIsThemeToggling] = useState(false)
@@ -469,7 +459,7 @@ export default function MainAdminAttendance() {
         })
         setEvents(sortEventsByUpcoming(eventsList))
       } catch (error) {
-        showAlert('Error', 'Failed to load events')
+        showToast('Failed to load events', 'error')
       } finally {
         setLoading(false)
       }
@@ -724,12 +714,12 @@ export default function MainAdminAttendance() {
         penaltiesCount: studentIds.length,
       })
 
-      showAlert(
-        'Success',
-        `Penalty announcements sent to ${studentIds.length} students.`
+      showToast(
+        `Penalty announcements sent to ${studentIds.length} students.`,
+        'success'
       )
     } catch (error) {
-      showAlert('Error', 'Failed to record penalty announcement.')
+      showToast('Failed to record penalty announcement.', 'error')
     }
   }
   const getEventDateISO = (date: any): string => {
@@ -755,18 +745,12 @@ export default function MainAdminAttendance() {
     )
     const existingPenalties = await getDocs(penaltiesQuery)
     if (existingPenalties.size > 0) {
-      showAlert(
-        'Already Sent',
-        'Penalties have already been sent for this event.'
-      )
+      showToast('Penalties have already been sent for this event.', 'error')
       return
     }
 
     if (missingAttendees.length === 0) {
-      showAlert(
-        'No Students',
-        'There are no missing students to send penalties to.'
-      )
+      showToast('There are no missing students to send penalties to.', 'error')
       return
     }
 
@@ -845,13 +829,13 @@ export default function MainAdminAttendance() {
 
       setSentPenaltyEvents((prev) => new Set([...prev, selectedEvent.id]))
       setShowPenaltyModal(false)
-      showAlert(
-        'Success',
-        `Penalties sent to ${studentIds.length} students and notifications created successfully!`
+      showToast(
+        `Penalties sent to ${studentIds.length} students and notifications created successfully!`,
+        'success'
       )
     } catch (error) {
       console.error(error)
-      showAlert('Error', 'Failed to send penalties. Please try again.')
+      showToast('Failed to send penalties. Please try again.', 'error')
     } finally {
       setLoading(false)
     }
@@ -902,27 +886,27 @@ export default function MainAdminAttendance() {
     }
   }, [selectedEvent])
 
-  const stopAttendance = () => {
+  const stopAttendance = async () => {
     if (!selectedEvent) return
     if (selectedEvent.isActive === false) {
-      showAlert('Info', 'Attendance is already stopped for this event')
+      showToast('Attendance is already stopped for this event', 'info')
       return
     }
-    setShowStopConfirmModal(true)
-  }
-
-  const confirmStopAttendance = async () => {
-    if (!selectedEvent) return
+    const confirmed = await confirm({
+      title: 'Stop Attendance',
+      message:
+        'This will immediately expire the QR code. Students will no longer be able to mark their attendance.',
+      confirmLabel: 'Stop Attendance',
+      cancelLabel: 'Cancel',
+      confirmDestructive: true,
+    })
+    if (!confirmed) return
 
     setIsSaving(true)
     try {
       const now = new Date().toISOString()
       const eventRef = doc(db, 'events', selectedEvent.id)
-      await updateDoc(eventRef, {
-        isActive: false,
-        qrExpiration: now,
-      })
-
+      await updateDoc(eventRef, { isActive: false, qrExpiration: now })
       const updatedEvent = {
         ...selectedEvent,
         isActive: false,
@@ -932,11 +916,9 @@ export default function MainAdminAttendance() {
       setEvents((prev) =>
         prev.map((e) => (e.id === selectedEvent.id ? updatedEvent : e))
       )
-
-      setShowStopConfirmModal(false)
-      showAlert('Success', 'Attendance stopped successfully!')
+      showToast('Attendance stopped successfully!', 'success')
     } catch (error) {
-      showAlert('Error', 'Failed to stop attendance. Please try again.')
+      showToast('Failed to stop attendance. Please try again.', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -977,20 +959,18 @@ export default function MainAdminAttendance() {
   const setManualExpiration = async () => {
     if (!selectedEvent || !customExpiration) return
 
-    // Validation first – no isSaving set yet
     if (!isValidDate(customExpiration)) {
-      showAlert('Error', 'Please enter a valid date and time')
+      showToast('Please enter a valid date and time', 'error')
       return
     }
 
     const expirationDate = new Date(customExpiration)
     const now = new Date()
     if (expirationDate <= now) {
-      showAlert('Error', 'Expiration date must be in the future')
+      showToast('Expiration date must be in the future', 'error')
       return
     }
 
-    // Only now start saving
     setIsSaving(true)
     try {
       const eventRef = doc(db, 'events', selectedEvent.id)
@@ -1024,10 +1004,10 @@ export default function MainAdminAttendance() {
       setCustomExpirationDate(null)
       setCustomExpiration('')
 
-      showAlert('Success', 'Expiration date set successfully!')
+      showToast('Expiration date set successfully!', 'success')
       setShowExpirationModal(false)
     } catch (error) {
-      showAlert('Error', 'Failed to set expiration date')
+      showToast('Failed to set expiration date', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -1042,7 +1022,7 @@ export default function MainAdminAttendance() {
         qrExpiration: null,
       })
 
-      showAlert('Success', 'Expiration date cleared!')
+      showToast('Expiration date cleared!', 'success')
 
       const updatedEvent = { ...selectedEvent, qrExpiration: null }
       setSelectedEvent(updatedEvent as Event)
@@ -1051,7 +1031,7 @@ export default function MainAdminAttendance() {
         prev.map((e) => (e.id === selectedEvent.id ? updatedEvent : e))
       )
     } catch (error) {
-      showAlert('Error', 'Failed to clear expiration date')
+      showToast('Failed to clear expiration date', 'error')
     }
   }
 
@@ -1132,10 +1112,8 @@ export default function MainAdminAttendance() {
         createdAt: new Date().toISOString(),
       }
 
-      // Create/update the penalty record
       await setDoc(penaltyRef, penaltyData)
 
-      // Also update the user's profile penalties array
       const userRef = doc(db, 'users', student.id)
       const userDoc = await getDoc(userRef)
 
@@ -1143,14 +1121,12 @@ export default function MainAdminAttendance() {
         const userData = userDoc.data()
         const existingPenalties = userData.penalties || []
 
-        // Check if penalty for this event already exists
         const penaltyIndex = existingPenalties.findIndex(
           (p: any) => p.eventId === selectedEvent.id
         )
 
         let updatedPenalties
         if (penaltyIndex >= 0) {
-          // Update existing penalty to paid
           updatedPenalties = [...existingPenalties]
           updatedPenalties[penaltyIndex] = {
             ...updatedPenalties[penaltyIndex],
@@ -1159,7 +1135,6 @@ export default function MainAdminAttendance() {
             paidBy: user.uid,
           }
         } else {
-          // Add new penalty record as paid
           updatedPenalties = [
             ...existingPenalties,
             {
@@ -1177,35 +1152,32 @@ export default function MainAdminAttendance() {
         await updateDoc(userRef, { penalties: updatedPenalties })
       }
 
-      showAlert(
-        'Success',
-        `${student.name} has been marked as paid for ${selectedEvent.title}.`
+      showToast(
+        `${student.name} has been marked as paid for ${selectedEvent.title}.`,
+        'success'
       )
 
-      // Optimistically update local state
       setPaidStudentIds((prev) => new Set([...prev, student.id]))
     } catch (error) {
-      showAlert('Error', 'Failed to mark as paid. Please try again.')
+      showToast('Failed to mark as paid. Please try again.', 'error')
     } finally {
       setProcessingPayment(null)
     }
   }
 
   const handleCompletePenalty = async (student: Student, event: Event) => {
-    // Fallback: try auth.currentUser if context user is null
     let currentUser = user
     if (!currentUser && auth.currentUser) {
       currentUser = auth.currentUser
     }
     if (!currentUser) {
-      showAlert('Error', 'You must be logged in to perform this action.')
+      showToast('You must be logged in to perform this action.', 'error')
       return
     }
 
     try {
       setProcessingAction(student.id)
 
-      // Query for the penalty document using studentId and eventId
       const penaltiesQuery = query(
         collection(db, 'penalties'),
         where('studentId', '==', student.id),
@@ -1215,14 +1187,11 @@ export default function MainAdminAttendance() {
       const snapshot = await getDocs(penaltiesQuery)
 
       if (snapshot.empty) {
-        showAlert(
-          'Error',
-          'Penalty record not found. Please ensure a penalty was sent for this student.'
+        showToast(
+          'Penalty record not found. Please ensure a penalty was sent for this student.',
+          'error'
         )
         setProcessingAction(null)
-        setShowCompleteConfirmModal(false)
-        setSelectedStudentForAction(null)
-        setSelectedEventForAction(null)
         return
       }
 
@@ -1237,7 +1206,6 @@ export default function MainAdminAttendance() {
         updatedAt: serverTimestamp(),
       })
 
-      // Also update user's penalties array
       const userRef = doc(db, 'users', student.id)
       const userDoc = await getDoc(userRef)
 
@@ -1258,20 +1226,16 @@ export default function MainAdminAttendance() {
         await updateDoc(userRef, { penalties: updatedPenalties })
       }
 
-      // Update local state
       setCompletedStudentIds((prev) => new Set([...prev, student.id]))
 
-      showAlert(
-        'Success',
-        `${student.name}'s penalty has been marked as completed.`
+      showToast(
+        `${student.name}'s penalty has been marked as completed.`,
+        'success'
       )
     } catch (error) {
-      showAlert('Error', 'Failed to complete penalty. Please try again.')
+      showToast('Failed to complete penalty. Please try again.', 'error')
     } finally {
       setProcessingAction(null)
-      setShowCompleteConfirmModal(false)
-      setSelectedStudentForAction(null)
-      setSelectedEventForAction(null)
     }
   }
 
@@ -1281,7 +1245,7 @@ export default function MainAdminAttendance() {
       currentUser = auth.currentUser
     }
     if (!currentUser) {
-      showAlert('Error', 'You must be logged in.')
+      showToast('You must be logged in.', 'error')
       return
     }
 
@@ -1296,7 +1260,7 @@ export default function MainAdminAttendance() {
       const snapshot = await getDocs(penaltiesQuery)
 
       if (snapshot.empty) {
-        showAlert('Error', 'Penalty record not found.')
+        showToast('Penalty record not found.', 'error')
         return
       }
 
@@ -1334,30 +1298,26 @@ export default function MainAdminAttendance() {
         return newSet
       })
 
-      showAlert('Success', `${student.name}'s completion has been cancelled.`)
+      showToast(`${student.name}'s completion has been cancelled.`, 'success')
     } catch (error) {
-      showAlert('Error', 'Failed to cancel completion. Please try again.')
+      showToast('Failed to cancel completion. Please try again.', 'error')
     } finally {
       setProcessingAction(null)
-      setShowCancelConfirmModal(false)
-      setSelectedStudentForAction(null)
-      setSelectedEventForAction(null)
     }
   }
 
   const captureAndSaveQR = async () => {
     if (!qrCodeRef.current) {
-      showAlert('Error', 'QR code reference not found')
+      showToast('QR code reference not found', 'error')
       return
     }
 
     if (!qrValue || !selectedEvent) {
-      showAlert('Error', 'No QR code data or event selected.')
+      showToast('No QR code data or event selected.', 'error')
       return
     }
 
     try {
-      // 1. Get QR code data URL with proper prefix
       const getDataURL = (): Promise<string> => {
         return new Promise((resolve, reject) => {
           setTimeout(() => {
@@ -1386,7 +1346,6 @@ export default function MainAdminAttendance() {
 
       const qrDataUrl = await getDataURL()
 
-      // 2. Prepare event details
       const eventTitle = selectedEvent.title || 'Untitled Event'
       const eventDate = selectedEvent.date
         ? formatDate(selectedEvent.date)
@@ -1397,7 +1356,6 @@ export default function MainAdminAttendance() {
         : 'No expiration set'
       const generatedTime = new Date().toLocaleString()
 
-      // 3. Build HTML for PDF
       const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -1499,22 +1457,17 @@ export default function MainAdminAttendance() {
       </html>
     `
 
-      // 4. Generate PDF and share / print
       if (Platform.OS === 'web') {
-        // Web: open print window (user can save as PDF)
         const printWindow = window.open('', '_blank')
         if (!printWindow) {
-          showAlert(
-            'Popup Blocked',
-            'Please allow popups to print the QR code.'
-          )
+          showToast('Please allow popups to print the QR code.', 'info')
           return
         }
         printWindow.document.write(htmlContent)
         printWindow.document.close()
         printWindow.focus()
         printWindow.print()
-        showAlert('Print Ready', 'Use the print dialog to save as PDF.')
+        showToast('Use the print dialog to save as PDF.', 'info')
       } else {
         // Native: generate PDF file and share
         const { uri } = await Print.printToFileAsync({
@@ -1530,7 +1483,7 @@ export default function MainAdminAttendance() {
             UTI: 'com.adobe.pdf',
           })
         } else {
-          showAlert('Error', 'Sharing is not available on this device.')
+          showToast('Sharing is not available on this device.', 'error')
         }
 
         // Clean up temp file
@@ -1542,7 +1495,7 @@ export default function MainAdminAttendance() {
       console.error('Error generating PDF:', error)
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to generate QR PDF.'
-      showAlert('Error', errorMessage)
+      showToast(errorMessage, 'error')
     }
   }
 
@@ -2051,7 +2004,7 @@ export default function MainAdminAttendance() {
 
   const generateMissingReceipt = async () => {
     if (!selectedEvent) {
-      showAlert('No Event', 'Please select an event first.')
+      showToast('Please select an event first.', 'error')
       return
     }
     if (isGeneratingPDF) return
@@ -2155,10 +2108,7 @@ export default function MainAdminAttendance() {
           printWindow.print()
           printWindow.onafterprint = () => printWindow.close()
         } else {
-          showAlert(
-            'Popup Blocked',
-            'Please allow popups to generate the receipt.'
-          )
+          showToast('Please allow popups to generate the receipt.', 'error')
         }
         setIsGeneratingPDF(false)
         return
@@ -2173,11 +2123,11 @@ export default function MainAdminAttendance() {
           UTI: 'com.adobe.pdf',
         })
       } else {
-        showAlert('Error', 'Sharing is not available on this device')
+        showToast('Sharing is not available on this device.', 'error')
       }
     } catch (error) {
       console.error('PDF generation error:', error)
-      showAlert('Error', 'Could not generate receipt. Please try again.')
+      showToast('Could not generate receipt. Please try again.', 'error')
     } finally {
       setIsGeneratingPDF(false)
     }
@@ -2204,9 +2154,9 @@ export default function MainAdminAttendance() {
         ]}
         onPress={() => {
           if (!isApproved) {
-            showAlert(
-              'Event Not Approved',
-              `This event is ${item.status}. Only approved events can be used for attendance.`
+            showToast(
+              `This event is ${item.status}. Only approved events can be used for attendance.`,
+              'error'
             )
             return
           }
@@ -2403,7 +2353,6 @@ export default function MainAdminAttendance() {
 
   return (
     <View style={styles.container}>
-      {/* Header with Gradient */}
       <LinearGradient
         colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
@@ -2912,9 +2861,9 @@ export default function MainAdminAttendance() {
                   ]}
                   onPress={() => {
                     if (hasPenaltyBeenSent(selectedEvent.id)) {
-                      showAlert(
-                        'Already Sent',
-                        'Penalties have already been sent for this event.'
+                      showToast(
+                        'Penalties have already been sent for this event.',
+                        'error'
                       )
                       return
                     }
@@ -3649,10 +3598,22 @@ export default function MainAdminAttendance() {
                                   justifyContent: 'center',
                                   minWidth: 100,
                                 }}
-                                onPress={() => {
-                                  setSelectedStudentForAction(item)
-                                  setSelectedEventForAction(selectedEvent)
-                                  setShowCompleteConfirmModal(true)
+                                onPress={async () => {
+                                  const displayName = item.surname
+                                    ? `${item.surname}, ${item.name}`
+                                    : item.name
+                                  const confirmed = await confirm({
+                                    title: 'Complete Penalty',
+                                    message: `Mark ${displayName}'s penalty as completed? This will remove it from their profile.`,
+                                    confirmLabel: 'Complete',
+                                    cancelLabel: 'Cancel',
+                                    confirmDestructive: false,
+                                  })
+                                  if (!confirmed) return
+                                  await handleCompletePenalty(
+                                    item,
+                                    selectedEvent
+                                  )
                                 }}
                                 disabled={isProcessing}
                               >
@@ -3698,10 +3659,22 @@ export default function MainAdminAttendance() {
                                   justifyContent: 'center',
                                   minWidth: 100,
                                 }}
-                                onPress={() => {
-                                  setSelectedStudentForAction(item)
-                                  setSelectedEventForAction(selectedEvent)
-                                  setShowCancelConfirmModal(true)
+                                onPress={async () => {
+                                  const displayName = item.surname
+                                    ? `${item.surname}, ${item.name}`
+                                    : item.name
+                                  const confirmed = await confirm({
+                                    title: 'Cancel Completion',
+                                    message: `Revert ${displayName}'s penalty back to pending?`,
+                                    confirmLabel: 'Yes, Cancel',
+                                    cancelLabel: 'Keep Completed',
+                                    confirmDestructive: true,
+                                  })
+                                  if (!confirmed) return
+                                  await handleCancelCompletion(
+                                    item,
+                                    selectedEvent
+                                  )
                                 }}
                                 disabled={isProcessing}
                               >
@@ -3852,354 +3825,193 @@ export default function MainAdminAttendance() {
         </View>
       </ScrollView>
 
-      {/* Modals (unchanged but use theme where appropriate) */}
       <Modal
         visible={showEventModal}
         transparent={true}
         animationType='fade'
         onRequestClose={() => setShowEventModal(false)}
       >
-        <BlurView
-          intensity={80}
-          tint={isDark ? 'dark' : 'light'}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        <TouchableOpacity
+          style={styles.glassModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowEventModal(false)}
         >
           <TouchableOpacity
-            style={styles.glassModalOverlayTouch}
-            activeOpacity={1}
-            onPress={() => setShowEventModal(false)}
-          />
-        </BlurView>
-
-        <View style={styles.glassModalCentered}>
-          <View
             style={[
-              styles.glassModalContainer,
-              { borderColor: 'rgba(255,255,255,0.3)' },
+              styles.glassModalContent,
+              isMobile && styles.glassModalContentMobile,
             ]}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
           >
-            <LinearGradient
-              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.glassModalGradientHeader}
+            {/* Header */}
+            <View style={styles.glassModalHeader}>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                <Feather
+                  name='arrow-right'
+                  size={20}
+                  color={colors.accent.primary}
+                />
+                <Text
+                  style={[
+                    styles.glassModalTitle,
+                    isMobile && styles.glassModalTitleMobile,
+                  ]}
+                >
+                  Select Event
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowEventModal(false)}
+                style={styles.glassModalClose}
+              >
+                <Feather
+                  name='x'
+                  size={isMobile ? 22 : 26}
+                  color={colors.sidebar.text.secondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Body */}
+            <ScrollView
+              style={styles.glassModalBody}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 20 }}
             >
-              <View style={styles.glassModalHeader}>
-                <View style={styles.glassModalHeaderLeft}>
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator
+                    size='large'
+                    color={colors.accent.primary}
+                  />
+                  <Text
+                    style={[
+                      styles.loadingText,
+                      isMobile && styles.loadingTextMobile,
+                    ]}
+                  >
+                    Loading events...
+                  </Text>
+                </View>
+              ) : events.length === 0 ? (
+                <View
+                  style={[
+                    styles.emptyState,
+                    isMobile && styles.emptyStateMobile,
+                  ]}
+                >
                   <View
                     style={[
-                      styles.glassModalIconContainer,
-                      isMobile && styles.glassModalIconContainerMobile,
+                      styles.emptyStateIcon,
+                      isMobile && styles.emptyStateIconMobile,
                     ]}
                   >
                     <Feather
                       name='calendar'
-                      size={isMobile ? 16 : 20}
-                      color={colors.accent.primary}
+                      size={isMobile ? 32 : 40}
+                      color={colors.sidebar.text.muted}
                     />
                   </View>
-                  <View>
-                    <Text
-                      style={[styles.glassModalTitle, { color: colors.text }]}
-                    >
-                      Select Event
-                    </Text>
-                    <Text
-                      style={[
-                        styles.glassModalSubtitle,
-                        { color: colors.sidebar.text.secondary },
-                      ]}
-                    >
-                      Choose an event to generate QR code
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setShowEventModal(false)}
-                  style={styles.glassModalCloseButton}
-                >
-                  <Ionicons
-                    name='close-circle'
-                    size={28}
-                    color={colors.accent.primary}
-                  />
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.glassModalScrollContent}
-              style={{
-                backgroundColor: isDark
-                  ? 'rgba(15, 25, 35, 0.7)'
-                  : 'rgba(255, 255, 255, 0.7)',
-              }}
-            >
-              <View
-                style={[
-                  styles.glassModalFormSection,
-                  { borderColor: 'rgba(255,255,255,0.2)' },
-                ]}
-              >
-                {loading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator
-                      size='large'
-                      color={colors.accent.primary}
-                    />
-                    <Text
-                      style={[
-                        styles.loadingText,
-                        isMobile && styles.loadingTextMobile,
-                      ]}
-                    >
-                      Loading events...
-                    </Text>
-                  </View>
-                ) : events.length === 0 ? (
-                  <View
-                    style={[
-                      styles.emptyState,
-                      isMobile && styles.emptyStateMobile,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.emptyStateIcon,
-                        isMobile && styles.emptyStateIconMobile,
-                      ]}
-                    >
-                      <Feather
-                        name='calendar'
-                        size={isMobile ? 32 : 40}
-                        color={colors.sidebar.text.muted}
-                      />
-                    </View>
-                    <Text
-                      style={[
-                        styles.emptyStateTitle,
-                        isMobile && styles.emptyStateTitleMobile,
-                      ]}
-                    >
-                      No events available
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    {paginatedEvents.map((item, idx) => (
-                      <React.Fragment key={item.id || idx}>
-                        {renderEventItem({ item })}
-                      </React.Fragment>
-                    ))}
-                    {totalEventPages > 1 && (
-                      <View
-                        style={[
-                          styles.paginationContainer,
-                          isMobile && styles.paginationContainerMobile,
-                          { marginTop: 16 },
-                        ]}
-                      >
-                        <TouchableOpacity
-                          style={[
-                            styles.paginationButton,
-                            eventPage === 1 && styles.paginationButtonDisabled,
-                          ]}
-                          onPress={() =>
-                            setEventPage((prev) => Math.max(1, prev - 1))
-                          }
-                          disabled={eventPage === 1}
-                        >
-                          <Feather
-                            name='chevron-left'
-                            size={16}
-                            color={
-                              eventPage === 1
-                                ? colors.sidebar.text.muted
-                                : colors.accent.primary
-                            }
-                          />
-                          <Text
-                            style={[
-                              styles.paginationButtonText,
-                              eventPage === 1 &&
-                                styles.paginationButtonTextDisabled,
-                            ]}
-                          >
-                            Prev
-                          </Text>
-                        </TouchableOpacity>
-                        <View style={styles.pageInfo}>
-                          <Text style={styles.pageInfoText}>
-                            {eventPage}/{totalEventPages}
-                          </Text>
-                        </View>
-                        <TouchableOpacity
-                          style={[
-                            styles.paginationButton,
-                            eventPage === totalEventPages &&
-                              styles.paginationButtonDisabled,
-                          ]}
-                          onPress={() =>
-                            setEventPage((prev) =>
-                              Math.min(totalEventPages, prev + 1)
-                            )
-                          }
-                          disabled={eventPage === totalEventPages}
-                        >
-                          <Text
-                            style={[
-                              styles.paginationButtonText,
-                              eventPage === totalEventPages &&
-                                styles.paginationButtonTextDisabled,
-                            ]}
-                          >
-                            Next
-                          </Text>
-                          <Feather
-                            name='chevron-right'
-                            size={16}
-                            color={
-                              eventPage === totalEventPages
-                                ? colors.sidebar.text.muted
-                                : colors.accent.primary
-                            }
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </>
-                )}
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={showStopConfirmModal}
-        transparent={true}
-        animationType='fade'
-        onRequestClose={() => setShowStopConfirmModal(false)}
-      >
-        <BlurView
-          intensity={80}
-          tint={isDark ? 'dark' : 'light'}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        >
-          <TouchableOpacity
-            style={styles.glassModalOverlayTouch}
-            activeOpacity={1}
-            onPress={() => setShowStopConfirmModal(false)}
-          />
-        </BlurView>
-
-        <View style={styles.glassModalCentered}>
-          <View
-            style={[
-              styles.glassModalContainer,
-              { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 },
-            ]}
-          >
-            <LinearGradient
-              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.glassModalGradientHeader}
-            >
-              <View style={styles.glassModalHeader}>
-                <View style={styles.glassModalHeaderLeft}>
-                  <View
-                    style={[
-                      styles.glassModalIconContainer,
-                      { backgroundColor: '#ef444415' },
-                    ]}
-                  >
-                    <Feather name='alert-triangle' size={20} color='#ef4444' />
-                  </View>
-                  <View>
-                    <Text
-                      style={[styles.glassModalTitle, { color: colors.text }]}
-                    >
-                      Stop Attendance?
-                    </Text>
-                    <Text
-                      style={[
-                        styles.glassModalSubtitle,
-                        { color: colors.sidebar.text.secondary },
-                      ]}
-                    >
-                      This action cannot be undone
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setShowStopConfirmModal(false)}
-                  style={styles.glassModalCloseButton}
-                >
-                  <Ionicons
-                    name='close-circle'
-                    size={28}
-                    color={colors.accent.primary}
-                  />
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-
-            <View style={[styles.glassModalScrollContent, { padding: 20 }]}>
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: colors.sidebar.text.secondary,
-                  marginBottom: 20,
-                  lineHeight: 20,
-                }}
-              >
-                This will immediately expire the QR code. Students will no
-                longer be able to mark their attendance for this event.
-              </Text>
-              <View
-                style={[
-                  styles.glassFormActions,
-                  isMobile && styles.glassFormActionsMobile,
-                ]}
-              >
-                <TouchableOpacity
-                  style={styles.glassCancelButton}
-                  onPress={() => setShowStopConfirmModal(false)}
-                >
                   <Text
                     style={[
-                      styles.glassCancelButtonText,
-                      isMobile && styles.glassCancelButtonTextMobile,
+                      styles.emptyStateTitle,
+                      isMobile && styles.emptyStateTitleMobile,
                     ]}
                   >
-                    Cancel
+                    No events available
                   </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.glassSubmitButton,
-                    { backgroundColor: '#ef4444' },
-                  ]}
-                  onPress={confirmStopAttendance}
-                  disabled={isSaving}
-                >
-                  {isSaving ? (
-                    <ActivityIndicator size='small' color='#ffffff' />
-                  ) : (
-                    <>
-                      <Feather name='stop-circle' size={18} color='#ffffff' />
-                      <Text style={styles.glassSubmitButtonText}>
-                        Stop Attendance
-                      </Text>
-                    </>
+                </View>
+              ) : (
+                <>
+                  {paginatedEvents.map((item, idx) => (
+                    <React.Fragment key={item.id || idx}>
+                      {renderEventItem({ item })}
+                    </React.Fragment>
+                  ))}
+                  {totalEventPages > 1 && (
+                    <View
+                      style={[
+                        styles.paginationContainer,
+                        isMobile && styles.paginationContainerMobile,
+                        { marginTop: 16 },
+                      ]}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.paginationButton,
+                          eventPage === 1 && styles.paginationButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          setEventPage((prev) => Math.max(1, prev - 1))
+                        }
+                        disabled={eventPage === 1}
+                      >
+                        <Feather
+                          name='chevron-left'
+                          size={16}
+                          color={
+                            eventPage === 1
+                              ? colors.sidebar.text.muted
+                              : colors.accent.primary
+                          }
+                        />
+                        <Text
+                          style={[
+                            styles.paginationButtonText,
+                            eventPage === 1 &&
+                              styles.paginationButtonTextDisabled,
+                          ]}
+                        >
+                          Prev
+                        </Text>
+                      </TouchableOpacity>
+                      <View style={styles.pageInfo}>
+                        <Text style={styles.pageInfoText}>
+                          {eventPage}/{totalEventPages}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[
+                          styles.paginationButton,
+                          eventPage === totalEventPages &&
+                            styles.paginationButtonDisabled,
+                        ]}
+                        onPress={() =>
+                          setEventPage((prev) =>
+                            Math.min(totalEventPages, prev + 1)
+                          )
+                        }
+                        disabled={eventPage === totalEventPages}
+                      >
+                        <Text
+                          style={[
+                            styles.paginationButtonText,
+                            eventPage === totalEventPages &&
+                              styles.paginationButtonTextDisabled,
+                          ]}
+                        >
+                          Next
+                        </Text>
+                        <Feather
+                          name='chevron-right'
+                          size={16}
+                          color={
+                            eventPage === totalEventPages
+                              ? colors.sidebar.text.muted
+                              : colors.accent.primary
+                          }
+                        />
+                      </TouchableOpacity>
+                    </View>
                   )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
+                </>
+              )}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
 
       <Modal
@@ -4208,321 +4020,150 @@ export default function MainAdminAttendance() {
         animationType='fade'
         onRequestClose={() => setShowExpirationModal(false)}
       >
-        <BlurView
-          intensity={80}
-          tint={isDark ? 'dark' : 'light'}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        <TouchableOpacity
+          style={styles.glassModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowExpirationModal(false)}
         >
           <TouchableOpacity
-            style={styles.glassModalOverlayTouch}
-            activeOpacity={1}
-            onPress={() => setShowExpirationModal(false)}
-          />
-        </BlurView>
-
-        <View style={styles.glassModalCentered}>
-          <View
             style={[
-              styles.glassModalContainer,
-              { borderColor: 'rgba(255,255,255,0.3)', maxHeight: '85%' },
+              styles.glassModalContent,
+              isMobile && styles.glassModalContentMobile,
             ]}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
           >
-            <LinearGradient
-              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.glassModalGradientHeader}
-            >
-              <View style={styles.glassModalHeader}>
-                <View style={styles.glassModalHeaderLeft}>
-                  <View
-                    style={[
-                      styles.glassModalIconContainer,
-                      isMobile && styles.glassModalIconContainerMobile,
-                    ]}
-                  >
-                    <Feather
-                      name='clock'
-                      size={isMobile ? 16 : 20}
-                      color='#f59e0b'
-                    />
-                  </View>
-                  <View>
-                    <Text
-                      style={[styles.glassModalTitle, { color: colors.text }]}
-                    >
-                      Set QR Expiration
-                    </Text>
-                    <Text
-                      style={[
-                        styles.glassModalSubtitle,
-                        { color: colors.sidebar.text.secondary },
-                      ]}
-                    >
-                      For: {selectedEvent?.title}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setShowExpirationModal(false)}
-                  style={styles.glassModalCloseButton}
-                >
-                  <Ionicons
-                    name='close-circle'
-                    size={28}
-                    color={colors.accent.primary}
-                  />
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.glassModalScrollContent}
-              style={{
-                backgroundColor: isDark
-                  ? 'rgba(15, 25, 35, 0.7)'
-                  : 'rgba(255, 255, 255, 0.7)',
-              }}
-            >
+            {/* Header */}
+            <View style={styles.glassModalHeader}>
               <View
-                style={[
-                  styles.glassModalFormSection,
-                  { borderColor: 'rgba(255,255,255,0.2)' },
-                ]}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
               >
-                {/* Quick options */}
-                <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                    Quick Options
-                  </Text>
-                  <View style={styles.expirationOptions}>
-                    {quickOptions.map((option, index) => {
-                      const isSelected = customExpiration === option.value
-                      return (
-                        <TouchableOpacity
-                          key={index}
-                          style={[
-                            styles.expirationOption,
-                            isMobile && styles.expirationOptionMobile,
-                            isSelected && styles.expirationOptionActive,
-                          ]}
-                          onPress={() => setCustomExpiration(option.value)}
-                        >
-                          <Text
-                            style={[
-                              styles.expirationOptionText,
-                              isMobile && styles.expirationOptionTextMobile,
-                              isSelected && styles.expirationOptionTextActive,
-                            ]}
-                          >
-                            {option.label}
-                          </Text>
-                          {isSelected && (
-                            <Feather name='check' size={16} color='#ffffff' />
-                          )}
-                        </TouchableOpacity>
-                      )
-                    })}
-                  </View>
-                </View>
-
-                {/* Custom date */}
-
-                <View style={styles.glassFormGroup}>
-                  <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                    Custom Date & Time
-                  </Text>
-
-                  {/* Web: datetime-local input */}
-                  {Platform.OS === 'web' ? (
-                    <input
-                      type='datetime-local'
-                      value={
-                        customExpirationDate
-                          ? formatDateForWebInput(customExpirationDate)
-                          : ''
-                      }
-                      onChange={handleWebDateChange}
-                      style={{
-                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                        border: `1px solid ${colors.sidebar.border}`,
-                        borderRadius: 8,
-                        padding: '12px 16px',
-                        fontSize: 14,
-                        color: colors.text,
-                        width: '100%',
-                        marginBottom: 16,
-                        outline: 'none',
-                      }}
-                    />
-                  ) : (
-                    /* Native: placeholder for a real picker (could be replaced with DateTimePicker) */
-                    <TouchableOpacity
-                      style={[styles.glassFormInput, { marginBottom: 16 }]}
-                      onPress={() => setCustomDatePickerVisible(true)}
-                    >
-                      <Text style={{ color: colors.text }}>
-                        {customExpirationDate
-                          ? customExpirationDate.toLocaleString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : 'Select custom date & time'}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: colors.sidebar.text.muted,
-                          marginTop: 2,
-                        }}
-                      >
-                        {customExpirationDate
-                          ? 'Tap to change'
-                          : 'Choose expiration date'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                {/* Actions */}
-                <View
+                <Feather
+                  name='arrow-right'
+                  size={20}
+                  color={colors.accent.primary}
+                />
+                <Text
                   style={[
-                    styles.glassFormActions,
-                    isMobile && styles.glassFormActionsMobile,
+                    styles.glassModalTitle,
+                    isMobile && styles.glassModalTitleMobile,
                   ]}
                 >
-                  <TouchableOpacity
-                    style={styles.glassCancelButton}
-                    onPress={() => setShowExpirationModal(false)}
-                  >
-                    <Text
-                      style={[
-                        styles.glassCancelButtonText,
-                        isMobile && styles.glassCancelButtonTextMobile,
-                      ]}
-                    >
-                      Cancel
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.glassSubmitButton,
-                      !customExpiration && styles.glassSubmitButtonDisabled,
-                    ]}
-                    onPress={setManualExpiration}
-                    disabled={!customExpiration || isSaving}
-                  >
-                    <Feather
-                      name='check'
-                      size={isMobile ? 16 : 18}
-                      color='#ffffff'
-                    />
-                    <Text
-                      style={[
-                        styles.glassSubmitButtonText,
-                        isMobile && styles.glassSubmitButtonTextMobile,
-                      ]}
-                    >
-                      Set Expiration
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Complete Confirmation Modal - MOVED OUTSIDE */}
-      <Modal
-        visible={showCompleteConfirmModal}
-        transparent={true}
-        animationType='fade'
-        onRequestClose={() => setShowCompleteConfirmModal(false)}
-      >
-        <BlurView
-          intensity={80}
-          tint={isDark ? 'dark' : 'light'}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        >
-          <TouchableOpacity
-            style={styles.glassModalOverlayTouch}
-            activeOpacity={1}
-            onPress={() => setShowCompleteConfirmModal(false)}
-          />
-        </BlurView>
-
-        <View style={styles.glassModalCentered}>
-          <View
-            style={[
-              styles.glassModalContainer,
-              { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 },
-            ]}
-          >
-            <LinearGradient
-              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.glassModalGradientHeader}
-            >
-              <View style={styles.glassModalHeader}>
-                <View style={styles.glassModalHeaderLeft}>
-                  <View
-                    style={[
-                      styles.glassModalIconContainer,
-                      { backgroundColor: '#10b98115' },
-                    ]}
-                  >
-                    <Feather name='check-circle' size={20} color='#10b981' />
-                  </View>
-                  <View>
-                    <Text
-                      style={[styles.glassModalTitle, { color: colors.text }]}
-                    >
-                      Complete Penalty?
-                    </Text>
-                    <Text
-                      style={[
-                        styles.glassModalSubtitle,
-                        { color: colors.sidebar.text.secondary },
-                      ]}
-                    >
-                      This will mark the penalty as resolved
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setShowCompleteConfirmModal(false)}
-                  style={styles.glassModalCloseButton}
-                >
-                  <Ionicons
-                    name='close-circle'
-                    size={28}
-                    color={colors.accent.primary}
-                  />
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-
-            <View style={[styles.glassModalScrollContent, { padding: 20 }]}>
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: colors.sidebar.text.secondary,
-                  marginBottom: 20,
-                  lineHeight: 20,
-                }}
-              >
-                Are you sure you want to mark{' '}
-                <Text style={{ fontWeight: '600', color: colors.text }}>
-                  {selectedStudentForAction?.name}
+                  Set QR Expiration
                 </Text>
-                's penalty as completed? This will remove the penalty from their
-                profile.
-              </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowExpirationModal(false)}
+                style={styles.glassModalClose}
+              >
+                <Feather
+                  name='x'
+                  size={isMobile ? 22 : 26}
+                  color={colors.sidebar.text.secondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Body */}
+            <ScrollView
+              style={styles.glassModalBody}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 20 }}
+            >
+              {/* Quick options */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                  Quick Options
+                </Text>
+                <View style={styles.expirationOptions}>
+                  {quickOptions.map((option, index) => {
+                    const isSelected = customExpiration === option.value
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.expirationOption,
+                          isMobile && styles.expirationOptionMobile,
+                          isSelected && styles.expirationOptionActive,
+                        ]}
+                        onPress={() => setCustomExpiration(option.value)}
+                      >
+                        <Text
+                          style={[
+                            styles.expirationOptionText,
+                            isMobile && styles.expirationOptionTextMobile,
+                            isSelected && styles.expirationOptionTextActive,
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                        {isSelected && (
+                          <Feather name='check' size={16} color='#ffffff' />
+                        )}
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              </View>
+
+              {/* Custom date */}
+              <View style={styles.glassFormGroup}>
+                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                  Custom Date & Time
+                </Text>
+                {Platform.OS === 'web' ? (
+                  <input
+                    type='datetime-local'
+                    value={
+                      customExpirationDate
+                        ? formatDateForWebInput(customExpirationDate)
+                        : ''
+                    }
+                    onChange={handleWebDateChange}
+                    style={{
+                      backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                      border: `1px solid ${colors.sidebar.border}`,
+                      borderRadius: 8,
+                      padding: '12px 16px',
+                      fontSize: 14,
+                      color: colors.text,
+                      width: '100%',
+                      marginBottom: 16,
+                      outline: 'none',
+                    }}
+                  />
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.glassFormInput, { marginBottom: 16 }]}
+                    onPress={() => setCustomDatePickerVisible(true)}
+                  >
+                    <Text style={{ color: colors.text }}>
+                      {customExpirationDate
+                        ? customExpirationDate.toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : 'Select custom date & time'}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: colors.sidebar.text.muted,
+                        marginTop: 2,
+                      }}
+                    >
+                      {customExpirationDate
+                        ? 'Tap to change'
+                        : 'Choose expiration date'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Actions */}
               <View
                 style={[
                   styles.glassFormActions,
@@ -4531,7 +4172,7 @@ export default function MainAdminAttendance() {
               >
                 <TouchableOpacity
                   style={styles.glassCancelButton}
-                  onPress={() => setShowCompleteConfirmModal(false)}
+                  onPress={() => setShowExpirationModal(false)}
                 >
                   <Text
                     style={[
@@ -4545,162 +4186,47 @@ export default function MainAdminAttendance() {
                 <TouchableOpacity
                   style={[
                     styles.glassSubmitButton,
-                    { backgroundColor: '#10b981' },
+                    !customExpiration && styles.glassSubmitButtonDisabled,
                   ]}
-                  onPress={() => {
-                    if (selectedStudentForAction && selectedEventForAction) {
-                      handleCompletePenalty(
-                        selectedStudentForAction,
-                        selectedEventForAction
-                      )
-                    } else {
-                      showAlert('Error', 'Missing data. Please try again.')
-                      setShowCompleteConfirmModal(false)
-                    }
-                  }}
+                  onPress={setManualExpiration}
+                  disabled={!customExpiration || isSaving}
                 >
-                  <Feather name='check-circle' size={18} color='#ffffff' />
-                  <Text style={styles.glassSubmitButtonText}>
-                    Confirm Complete
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      {/* Cancel Completion Confirmation Modal - MOVED OUTSIDE */}
-      <Modal
-        visible={showCancelConfirmModal}
-        transparent={true}
-        animationType='fade'
-        onRequestClose={() => setShowCancelConfirmModal(false)}
-      >
-        <BlurView
-          intensity={80}
-          tint={isDark ? 'dark' : 'light'}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        >
-          <TouchableOpacity
-            style={styles.glassModalOverlayTouch}
-            activeOpacity={1}
-            onPress={() => setShowCancelConfirmModal(false)}
-          />
-        </BlurView>
-
-        <View style={styles.glassModalCentered}>
-          <View
-            style={[
-              styles.glassModalContainer,
-              { borderColor: 'rgba(255,255,255,0.3)', maxWidth: 400 },
-            ]}
-          >
-            <LinearGradient
-              colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.glassModalGradientHeader}
-            >
-              <View style={styles.glassModalHeader}>
-                <View style={styles.glassModalHeaderLeft}>
-                  <View
-                    style={[
-                      styles.glassModalIconContainer,
-                      { backgroundColor: '#ef444415' },
-                    ]}
-                  >
-                    <Feather name='x-circle' size={20} color='#ef4444' />
-                  </View>
-                  <View>
-                    <Text
-                      style={[styles.glassModalTitle, { color: colors.text }]}
-                    >
-                      Cancel Completion?
-                    </Text>
-                    <Text
-                      style={[
-                        styles.glassModalSubtitle,
-                        { color: colors.sidebar.text.secondary },
-                      ]}
-                    >
-                      This will revert the penalty to pending
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setShowCancelConfirmModal(false)}
-                  style={styles.glassModalCloseButton}
-                >
-                  <Ionicons
-                    name='close-circle'
-                    size={28}
-                    color={colors.accent.primary}
+                  <Feather
+                    name='check'
+                    size={isMobile ? 16 : 18}
+                    color='#ffffff'
                   />
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-
-            <View style={[styles.glassModalScrollContent, { padding: 20 }]}>
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: colors.sidebar.text.secondary,
-                  marginBottom: 20,
-                  lineHeight: 20,
-                }}
-              >
-                Are you sure you want to cancel the completion for{' '}
-                <Text style={{ fontWeight: '600', color: colors.text }}>
-                  {selectedStudentForAction?.name}
-                </Text>
-                ? The penalty will reappear on their profile as pending.
-              </Text>
-              <View
-                style={[
-                  styles.glassFormActions,
-                  isMobile && styles.glassFormActionsMobile,
-                ]}
-              >
-                <TouchableOpacity
-                  style={styles.glassCancelButton}
-                  onPress={() => setShowCancelConfirmModal(false)}
-                >
                   <Text
                     style={[
-                      styles.glassCancelButtonText,
-                      isMobile && styles.glassCancelButtonTextMobile,
+                      styles.glassSubmitButtonText,
+                      isMobile && styles.glassSubmitButtonTextMobile,
                     ]}
                   >
-                    Keep Completed
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.glassSubmitButton,
-                    { backgroundColor: '#ef4444' },
-                  ]}
-                  onPress={() => {
-                    if (selectedStudentForAction && selectedEventForAction) {
-                      handleCancelCompletion(
-                        selectedStudentForAction,
-                        selectedEventForAction
-                      )
-                    } else {
-                      showAlert('Error', 'Missing data. Please try again.')
-                      setShowCancelConfirmModal(false)
-                    }
-                  }}
-                >
-                  <Feather name='x-circle' size={18} color='#ffffff' />
-                  <Text style={styles.glassSubmitButtonText}>
-                    Confirm Cancel
+                    Set Expiration
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
-        </View>
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
+
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onDismiss={hideToast}
+      />
+      <ConfirmDialog
+        visible={confirmState.visible}
+        title={confirmState.options.title}
+        message={confirmState.options.message}
+        confirmLabel={confirmState.options.confirmLabel}
+        cancelLabel={confirmState.options.cancelLabel}
+        confirmDestructive={confirmState.options.confirmDestructive}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </View>
   )
 }

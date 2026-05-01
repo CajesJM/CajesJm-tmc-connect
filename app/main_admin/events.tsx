@@ -1,5 +1,4 @@
-import { Feather, Ionicons } from '@expo/vector-icons'
-import { BlurView } from 'expo-blur'
+import { Feather } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as Location from 'expo-location'
 import { useRouter } from 'expo-router'
@@ -8,6 +7,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
@@ -19,7 +19,6 @@ import {
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   FlatList,
@@ -37,21 +36,17 @@ import {
 import DateTimePickerModal from 'react-native-modal-datetime-picker'
 import { useAuth } from '../../src/Controller/context/AuthContext'
 import { useTheme } from '../../src/Controller/context/ThemeContext'
+import { useConfirm } from '../../src/Controller/hooks/useConfirm'
+import { useToast } from '../../src/Controller/hooks/useToast'
 import { notificationService } from '../../src/Controller/utils/notifications'
 import {
   CAMPUS_LOCATIONS,
   CampusLocation,
 } from '../../src/Model/constants/campusLocations'
 import { db } from '../../src/Model/lib/firebaseConfig'
+import { ConfirmDialog } from '../../src/View/components/ConfirmDialog'
+import { Toast } from '../../src/View/components/Toast'
 import { createEventsStyles } from '../../src/View/styles/main-admin/eventsStyles'
-
-const showAlert = (title: string, message?: string) => {
-  if (Platform.OS === 'web') {
-    window.alert(message ? `${title}\n${message}` : title)
-  } else {
-    Alert.alert(title, message)
-  }
-}
 
 const FormTextInput = ({
   style,
@@ -351,6 +346,8 @@ export default function MainAdminEvents() {
   const [checkingSelectedEventLocation, setCheckingSelectedEventLocation] =
     useState(false)
   const { colors, isDark, toggleTheme } = useTheme()
+  const { toast, showToast, hideToast } = useToast()
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isThemeToggling, setIsThemeToggling] = useState(false)
   const themeSpinAnim = useRef(new Animated.Value(0)).current
@@ -434,7 +431,7 @@ export default function MainAdminEvents() {
         setRefreshing(false)
       },
       (error: unknown) => {
-        showAlert('Error', 'Failed to load events')
+        showToast('Failed to load events', 'error')
         setLoading(false)
         setRefreshing(false)
       }
@@ -544,9 +541,9 @@ export default function MainAdminEvents() {
 
       if (status !== 'granted') {
         setLocationLoading(false)
-        showAlert(
-          'Permission Required',
-          'Location permission is needed to automatically detect your location. You can enter coordinates manually instead.'
+        showToast(
+          'Location permission is needed to automatically detect your location. You can enter coordinates manually instead.',
+          'error'
         )
         return
       }
@@ -565,9 +562,9 @@ export default function MainAdminEvents() {
 
       setLocationLoading(false)
 
-      showAlert(
-        'Location Found',
-        `Coordinates set to:\nLat: ${latitude.toFixed(6)}\nLng: ${longitude.toFixed(6)}`
+      showToast(
+        `Coordinates set to:\nLat: ${latitude.toFixed(6)}\nLng: ${longitude.toFixed(6)}`,
+        'success'
       )
     } catch (error: unknown) {
       setLocationLoading(false)
@@ -576,7 +573,7 @@ export default function MainAdminEvents() {
         'Failed to get current location. Please try again or enter coordinates manually.'
 
       setLocationError(errorMessage)
-      showAlert('Location Error', errorMessage)
+      showToast(errorMessage, 'error')
     }
   }
 
@@ -638,9 +635,9 @@ export default function MainAdminEvents() {
       Linking.openURL(url)
     }
 
-    showAlert(
-      'Google Maps Opened',
-      'Find your event location on Google Maps, then long-press to get coordinates. Come back here to enter them manually.'
+    showToast(
+      'Google Maps opened. Find your event location on the map.',
+      'info'
     )
   }
 
@@ -650,24 +647,18 @@ export default function MainAdminEvents() {
     const radius = eventCoordinates.radius.trim()
 
     if (!lat || !lng || !radius) {
-      showAlert(
-        'Missing Information',
-        'Please fill in all coordinates and radius fields.'
-      )
+      showToast('Please fill in all coordinates and radius fields.', 'error')
       return
     }
 
     if (!validateCoordinates(lat, lng)) {
-      showAlert(
-        'Invalid Coordinates',
-        'Please enter valid decimal coordinates.\n\n• Latitude: -90 to 90\n• Longitude: -180 to 180\n• Example: 14.599512, 120.984219'
-      )
+      showToast('Please enter valid decimal coordinates...', 'error')
       return
     }
     if (!validateRadius(radius)) {
-      showAlert(
-        'Invalid Radius',
-        'Please enter a valid positive number for the verification radius (e.g., 100).'
+      showToast(
+        'Please enter a valid positive number for the verification radius (e.g., 100).',
+        'error'
       )
       return
     }
@@ -680,7 +671,7 @@ export default function MainAdminEvents() {
 
     setNewEvent((prev) => ({ ...prev, coordinates }))
     setShowCoordinatesModal(false)
-    showAlert('Success', 'Location verification coordinates saved!')
+    showToast('Location verification coordinates saved!', 'success')
   }
   const calculateDistance = (
     lat1: number,
@@ -742,16 +733,16 @@ export default function MainAdminEvents() {
         await Linking.openURL(url)
       }
     } catch (error) {
-      showAlert('Error', 'Could not open maps application')
+      showToast('Could not open maps application', 'error')
     }
   }
 
   const checkSelectedEventLocation = async (selectedEventId: string) => {
     const selected = events.find((e) => e.id === selectedEventId)
     if (!selected?.coordinates) {
-      showAlert(
-        'No Location Set',
-        'This event does not have a verification location set.'
+      showToast(
+        'This event does not have a verification location set.',
+        'error'
       )
       return
     }
@@ -761,9 +752,9 @@ export default function MainAdminEvents() {
 
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') {
-        showAlert(
-          'Permission Denied',
-          'Location permission is required to check attendance range.'
+        showToast(
+          'Location permission is required to check attendance range.',
+          'error'
         )
         setCheckingSelectedEventLocation(false)
         return
@@ -789,14 +780,12 @@ export default function MainAdminEvents() {
       const withinRange = distance <= selected.coordinates.radius
       setIsSelectedEventWithinRange(withinRange)
 
-      showAlert(
-        withinRange
-          ? '✅ You are within range!'
-          : '❌ You are outside the range',
-        `Your distance: ${Math.round(distance)}m\nAllowed radius: ${selected.coordinates.radius}m`
+      showToast(
+        `${withinRange ? '✅' : '❌'} You are ${withinRange ? 'within' : 'outside'} the range. Distance: ${Math.round(distance)}m (allowed: ${selected.coordinates.radius}m)`,
+        withinRange ? 'success' : 'error'
       )
     } catch (error) {
-      showAlert('Error', 'Failed to get your location. Please try again.')
+      showToast('Failed to get your location. Please try again.', 'error')
     } finally {
       setCheckingSelectedEventLocation(false)
     }
@@ -808,7 +797,7 @@ export default function MainAdminEvents() {
       !newEvent.description?.trim() ||
       !newEvent.location?.trim()
     ) {
-      showAlert('Error', 'Please fill in all required fields')
+      showToast('Please fill in all required fields', 'error')
       return
     }
 
@@ -821,7 +810,6 @@ export default function MainAdminEvents() {
         ? selectedCampusLocation.id
         : ''
 
-      // 1. Create the event document
       const eventData = {
         title: newEvent.title.trim(),
         description: newEvent.description.trim(),
@@ -833,12 +821,11 @@ export default function MainAdminEvents() {
         createdAt: Timestamp.now(),
         attendees: [],
         coordinates: newEvent.coordinates || null,
-        status: 'approved', // Main admin creates approved events directly
+        status: 'approved',
       }
 
       const docRef = await addDoc(collection(db, 'events'), eventData)
 
-      // 2. Notify all students
       const studentsQuery = query(
         collection(db, 'users'),
         where('role', '==', 'student')
@@ -863,13 +850,10 @@ export default function MainAdminEvents() {
 
       resetForm()
       setShowCreateForm(false)
-      showAlert(
-        'Success',
-        `Event created and ${studentIds.length} student(s) notified!`
-      )
+      showToast(`Event created!`, 'success')
     } catch (error: unknown) {
       console.error(error)
-      showAlert('Error', 'Failed to create event')
+      showToast('Failed to create event', 'error')
     } finally {
       setLoading(false)
       setIsSubmitting(false)
@@ -934,10 +918,7 @@ export default function MainAdminEvents() {
       }
 
       if (localDate > maxFutureDate) {
-        showAlert(
-          'Invalid Date',
-          'Date cannot be more than 5 years in the future'
-        )
+        showToast('Date cannot be more than 5 years in the future', 'error')
         return
       }
 
@@ -961,7 +942,7 @@ export default function MainAdminEvents() {
       !newEvent.description.trim() ||
       !newEvent.location.trim()
     ) {
-      showAlert('Error', 'Please fill in all required fields')
+      showToast('Please fill in all required fields', 'error')
       return
     }
 
@@ -992,7 +973,6 @@ export default function MainAdminEvents() {
 
       await updateDoc(eventRef, updateData)
 
-      // 🔔 Notify all students about the update
       const studentsQuery = query(
         collection(db, 'users'),
         where('role', '==', 'student')
@@ -1018,13 +998,10 @@ export default function MainAdminEvents() {
       resetForm()
       setShowEditForm(false)
       setEditingEvent(null)
-      showAlert(
-        'Success',
-        `Event updated and ${studentIds.length} student(s) notified!`
-      )
+      showToast(`Event updated!`, 'success')
     } catch (error: unknown) {
       console.error(error)
-      showAlert('Error', 'Failed to update event')
+      showToast('Failed to update event', 'error')
     } finally {
       setLoading(false)
       setIsSubmitting(false)
@@ -1073,64 +1050,66 @@ export default function MainAdminEvents() {
 
       setShowEditForm(true)
     } catch (error: unknown) {
-      showAlert('Error', 'Failed to load event for editing')
+      showToast('Failed to load event for editing', 'error')
     }
   }
 
   const handleDeleteEvent = async (eventId: string, eventTitle: string) => {
-    const confirmDelete = () => {
-      if (Platform.OS === 'web') {
-        return window.confirm(
-          `Are you sure you want to delete "${eventTitle}"?`
-        )
-      } else {
-        return new Promise<boolean>((resolve) => {
-          Alert.alert(
-            'Delete Event',
-            `Are you sure you want to delete "${eventTitle}"? This will also delete all associated penalties.`,
-            [
-              {
-                text: 'Cancel',
-                style: 'cancel',
-                onPress: () => resolve(false),
-              },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => resolve(true),
-              },
-            ]
-          )
-        })
-      }
-    }
-
-    const confirmed =
-      Platform.OS === 'web' ? confirmDelete() : await confirmDelete()
+    const confirmed = await confirm({
+      title: 'Delete Event',
+      message: `Are you sure you want to delete "${eventTitle}"? This will also delete all associated penalties and remove them from user profiles.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      confirmDestructive: true,
+    })
     if (!confirmed) return
 
     try {
       const eventRef = doc(db, 'events', eventId)
       await deleteDoc(eventRef)
+
       const penaltiesQuery = query(
         collection(db, 'penalties'),
         where('eventId', '==', eventId)
       )
       const penaltiesSnapshot = await getDocs(penaltiesQuery)
+      const penaltyIds = penaltiesSnapshot.docs.map((doc) => doc.id)
+      const affectedStudentIds: string[] = []
+
+      const updateUserPromises = penaltiesSnapshot.docs.map(
+        async (penaltyDoc) => {
+          const penaltyData = penaltyDoc.data()
+          const studentId = penaltyData.studentId
+          if (studentId) {
+            affectedStudentIds.push(studentId)
+            const userRef = doc(db, 'users', studentId)
+            const userSnap = await getDoc(userRef)
+            if (userSnap.exists()) {
+              const userData = userSnap.data()
+              const existingPenalties = userData.penalties || []
+              const updatedPenalties = existingPenalties.filter(
+                (p: any) => p.eventId !== eventId
+              )
+              await updateDoc(userRef, { penalties: updatedPenalties })
+            }
+          }
+        }
+      )
+
+      await Promise.all(updateUserPromises)
+
       const deletePromises = penaltiesSnapshot.docs.map((doc) =>
         deleteDoc(doc.ref)
       )
       await Promise.all(deletePromises)
 
-      showAlert(
-        'Success',
-        `"${eventTitle}" and its associated penalties deleted successfully!`
+      showToast(
+        `"${eventTitle}" and its associated penalties deleted successfully. Removed from ${affectedStudentIds.length} user profile(s).`,
+        'success'
       )
-    } catch (error: unknown) {
-      showAlert(
-        'Error',
-        'Failed to delete event. Please check console for details.'
-      )
+    } catch (error) {
+      console.error('Delete event error:', error)
+      showToast('Failed to delete event. Please try again.', 'error')
     }
   }
 
@@ -1144,7 +1123,7 @@ export default function MainAdminEvents() {
       }))
       setShowLocationPicker(false)
     } else {
-      showAlert('Error', 'Please enter a location name')
+      showToast('Please enter a location name', 'error')
     }
   }
 
@@ -1309,7 +1288,6 @@ export default function MainAdminEvents() {
         </View>
 
         <View style={styles.paginatedInfo}>
-          {/* Title + Badges row */}
           <View
             style={{
               flexDirection: 'row',
@@ -1336,7 +1314,6 @@ export default function MainAdminEvents() {
                 justifyContent: 'flex-end',
               }}
             >
-              {/* Status badge */}
               {item.status && (
                 <View
                   style={[
@@ -1350,7 +1327,6 @@ export default function MainAdminEvents() {
                 </View>
               )}
 
-              {/* Event date badge */}
               {(() => {
                 const badge = getEventStatusBadge(item.date)
                 return (
@@ -1367,7 +1343,6 @@ export default function MainAdminEvents() {
             </View>
           </View>
 
-          {/* Date and location (unchanged) */}
           <View style={styles.paginatedMeta}>
             <Text
               style={[
@@ -1390,7 +1365,6 @@ export default function MainAdminEvents() {
           </View>
         </View>
 
-        {/* Action buttons (unchanged) */}
         <View style={styles.paginatedActions}>
           <TouchableOpacity
             style={[
@@ -1871,358 +1845,319 @@ export default function MainAdminEvents() {
     )
   }
 
-  const renderForm = (isEdit: boolean = false) => (
+  const renderForm = (isEdit: boolean) => (
     <Modal
       visible={showCreateForm || showEditForm}
       transparent={true}
       animationType='fade'
       onRequestClose={handleCloseForm}
     >
-      {/* Outer blur overlay */}
-      <BlurView
-        intensity={80}
-        tint={isDark ? 'dark' : 'light'}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      <TouchableOpacity
+        style={styles.glassModalOverlay}
+        activeOpacity={1}
+        onPress={handleCloseForm}
       >
         <TouchableOpacity
-          style={styles.glassModalOverlayTouch}
-          activeOpacity={1}
-          onPress={handleCloseForm}
-        />
-      </BlurView>
-
-      {/* Modal container */}
-      <View style={styles.glassModalCentered}>
-        <View
           style={[
-            styles.glassModalContainer,
-            { borderColor: 'rgba(255,255,255,0.3)' },
+            styles.glassModalContent,
+            isMobile && styles.glassModalContentMobile,
           ]}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
         >
-          {/* Gradient header */}
-          <LinearGradient
-            colors={isDark ? ['#1e293b', '#0f172a'] : ['#f8fafc', '#e2e8f0']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.glassModalGradientHeader}
+          {/* Header - same as announcements */}
+          <View style={styles.glassModalHeader}>
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            >
+              <Feather
+                name='arrow-right'
+                size={20}
+                color={colors.accent.primary}
+              />
+              <Text
+                style={[
+                  styles.glassModalTitle,
+                  isMobile && styles.glassModalTitleMobile,
+                ]}
+              >
+                {isEdit ? 'Edit Event' : 'New Event'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleCloseForm}
+              style={styles.glassModalClose}
+            >
+              <Feather
+                name='x'
+                size={isMobile ? 22 : 26}
+                color={colors.sidebar.text.secondary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Scrollable form body */}
+          <ScrollView
+            style={styles.glassModalBody}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
           >
-            <View style={styles.glassModalHeader}>
-              <View style={styles.glassModalHeaderLeft}>
-                <View
+            {/* Campus Image Selection */}
+            <View style={styles.glassFormGroup}>
+              <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                Campus Image *
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginBottom: 8 }}
+              >
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {CAMPUS_LOCATIONS.map((location) => (
+                    <TouchableOpacity
+                      key={location.id}
+                      style={[
+                        {
+                          width: 80,
+                          height: 80,
+                          borderRadius: 12,
+                          overflow: 'hidden',
+                          borderWidth: 2,
+                          borderColor:
+                            selectedCampusLocation?.id === location.id
+                              ? colors.accent.primary
+                              : colors.border,
+                        },
+                        isMobile && { width: 60, height: 60 },
+                      ]}
+                      onPress={() => handleSelectCampusImage(location)}
+                    >
+                      <Image
+                        source={location.image}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode='cover'
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+              {selectedCampusLocation && (
+                <Text
                   style={[
-                    styles.glassModalIconContainer,
-                    isMobile && styles.glassModalIconContainerMobile,
+                    styles.glassFormHelperText,
+                    { color: colors.sidebar.text.muted },
                   ]}
                 >
-                  <Feather
-                    name={isEdit ? 'edit-2' : 'calendar'}
-                    size={isMobile ? 16 : 20}
-                    color={colors.accent.primary}
-                  />
-                </View>
-                <View>
-                  <Text
-                    style={[styles.glassModalTitle, { color: colors.text }]}
-                  >
-                    {isEdit ? 'Edit Event' : 'New Event'}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.glassModalSubtitle,
-                      { color: colors.sidebar.text.secondary },
-                    ]}
-                  >
-                    {isEdit ? 'Update event details' : 'Create a new event'}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={handleCloseForm}
-                style={styles.glassModalCloseButton}
-              >
-                <Ionicons
-                  name='close-circle'
-                  size={28}
-                  color={colors.accent.primary}
-                />
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
-
-          {/* Scrollable content */}
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.glassModalScrollContent}
-            style={{
-              backgroundColor: isDark
-                ? 'rgba(15, 25, 35, 0.7)'
-                : 'rgba(255, 255, 255, 0.7)',
-            }}
-          >
-            <View
-              style={[
-                styles.glassModalFormSection,
-                { borderColor: 'rgba(255,255,255,0.2)' },
-              ]}
-            >
-              {/* Campus Image Selection */}
-              <View style={styles.glassFormGroup}>
-                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                  Campus Image *
+                  Selected: {selectedCampusLocation.name}
                 </Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={{ marginBottom: 8 }}
+              )}
+            </View>
+
+            {/* Title */}
+            <View style={styles.glassFormGroup}>
+              <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                Title *
+              </Text>
+              <FormTextInput
+                inputStyle={[
+                  styles.glassFormInput,
+                  isMobile && styles.glassFormInputMobile,
+                ]}
+                placeholder='Enter event title'
+                placeholderTextColor={colors.sidebar.text.muted}
+                value={newEvent.title}
+                onChangeText={(text) =>
+                  setNewEvent({ ...newEvent, title: text })
+                }
+              />
+            </View>
+
+            {/* Description (scrollEnabled={false} hides vertical indicator) */}
+            <View style={styles.glassFormGroup}>
+              <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                Description *
+              </Text>
+              <FormTextInput
+                style={[
+                  styles.glassFormInput,
+                  styles.glassTextArea,
+                  isMobile && styles.glassFormInputMobile,
+                ]}
+                placeholder='Describe your event...'
+                placeholderTextColor={colors.sidebar.text.muted}
+                value={newEvent.description}
+                onChangeText={(text) =>
+                  setNewEvent({ ...newEvent, description: text })
+                }
+                multiline
+                numberOfLines={4}
+                textAlignVertical='top'
+                maxLength={MAX_DESCRIPTION_LENGTH}
+                scrollEnabled={false}
+              />
+              <View style={styles.characterCounterContainer}>
+                <Text
+                  style={[
+                    styles.characterCounterText,
+                    { color: colors.sidebar.text.muted },
+                  ]}
                 >
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    {CAMPUS_LOCATIONS.map((location) => (
-                      <TouchableOpacity
-                        key={location.id}
-                        style={[
-                          {
-                            width: 80,
-                            height: 80,
-                            borderRadius: 12,
-                            overflow: 'hidden',
-                            borderWidth: 2,
-                            borderColor:
-                              selectedCampusLocation?.id === location.id
-                                ? colors.accent.primary
-                                : colors.border,
-                          },
-                          isMobile && { width: 60, height: 60 },
-                        ]}
-                        onPress={() => handleSelectCampusImage(location)}
-                      >
-                        <Image
-                          source={location.image}
-                          style={{ width: '100%', height: '100%' }}
-                          resizeMode='cover'
-                        />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </ScrollView>
-                {selectedCampusLocation && (
-                  <Text
-                    style={[
-                      styles.glassFormHelperText,
-                      { color: colors.sidebar.text.muted },
-                    ]}
-                  >
-                    Selected: {selectedCampusLocation.name}
+                  {newEvent.description.length}/{MAX_DESCRIPTION_LENGTH}{' '}
+                  characters
+                </Text>
+                {newEvent.description.length >= MAX_DESCRIPTION_LENGTH && (
+                  <Text style={styles.characterCounterWarning}>
+                    Limit reached
                   </Text>
                 )}
               </View>
+            </View>
 
-              {/* Title */}
-              <View style={styles.glassFormGroup}>
-                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                  Title *
-                </Text>
-                <FormTextInput
-                  inputStyle={[
-                    styles.glassFormInput,
-                    isMobile && styles.glassFormInputMobile,
-                  ]}
-                  placeholder='Enter event title'
-                  placeholderTextColor={colors.sidebar.text.muted}
-                  value={newEvent.title}
-                  onChangeText={(text) =>
-                    setNewEvent({ ...newEvent, title: text })
-                  }
-                />
-              </View>
-
-              {/* Description */}
-              <View style={styles.glassFormGroup}>
-                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                  Description *
-                </Text>
-                <FormTextInput
-                  style={[
-                    styles.glassFormInput,
-                    styles.glassTextArea,
-                    isMobile && styles.glassFormInputMobile,
-                  ]}
-                  placeholder='Describe your event...'
-                  placeholderTextColor={colors.sidebar.text.muted}
-                  value={newEvent.description}
-                  onChangeText={(text) =>
-                    setNewEvent({ ...newEvent, description: text })
-                  }
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical='top'
-                  maxLength={MAX_DESCRIPTION_LENGTH}
-                />
-                {/* Character counter */}
-                <View style={styles.characterCounterContainer}>
-                  <Text
-                    style={[
-                      styles.characterCounterText,
-                      { color: colors.sidebar.text.muted },
-                    ]}
-                  >
-                    {newEvent.description.length}/{MAX_DESCRIPTION_LENGTH}{' '}
-                    characters
-                  </Text>
-                  {newEvent.description.length >= MAX_DESCRIPTION_LENGTH && (
-                    <Text style={styles.characterCounterWarning}>
-                      Limit reached
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* Date & Time */}
-              <View style={styles.glassFormGroup}>
-                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                  Date & Time *
-                </Text>
-                <TouchableOpacity
-                  style={styles.glassFormInput}
-                  onPress={showDatePickerModal}
-                >
-                  <Text style={{ color: colors.text }}>
-                    {formatDate(newEvent.date)}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: colors.sidebar.text.muted,
-                      marginTop: 2,
-                    }}
-                  >
-                    Tap to change date and time
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Location */}
-              <View style={styles.glassFormGroup}>
-                <Text style={[styles.glassFormLabel, { color: colors.text }]}>
-                  Location *
-                </Text>
-                <TouchableOpacity
-                  style={styles.glassFormInput}
-                  onPress={() => setShowLocationPicker(true)}
-                >
-                  <Text style={{ color: colors.text }}>
-                    {newEvent.location || 'Set location'}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: colors.sidebar.text.muted,
-                      marginTop: 2,
-                    }}
-                  >
-                    {newEvent.location
-                      ? 'Tap to modify'
-                      : 'Enter location details'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Coordinates */}
-              <View style={styles.glassFormGroup}>
-                <TouchableOpacity
-                  style={[styles.glassFormInput, { marginBottom: 20 }]}
-                  onPress={() => setShowCoordinatesModal(true)}
-                >
-                  <Text style={{ color: colors.text }}>
-                    {newEvent.coordinates
-                      ? 'Verification Location Set'
-                      : 'Set Verification Location'}
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: colors.sidebar.text.muted,
-                      marginTop: 2,
-                    }}
-                  >
-                    {newEvent.coordinates
-                      ? `Lat: ${newEvent.coordinates.latitude.toFixed(4)}, Lng: ${newEvent.coordinates.longitude.toFixed(4)}`
-                      : 'Add coordinates for attendance verification'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Actions */}
-              <View
-                style={[
-                  styles.glassFormActions,
-                  isMobile && styles.glassFormActionsMobile,
-                ]}
+            {/* Date & Time */}
+            <View style={styles.glassFormGroup}>
+              <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                Date & Time *
+              </Text>
+              <TouchableOpacity
+                style={styles.glassFormInput}
+                onPress={showDatePickerModal}
               >
-                <TouchableOpacity
-                  style={[
-                    styles.glassSubmitButton,
-                    (!newEvent.title.trim() ||
-                      !newEvent.description.trim() ||
-                      !newEvent.location.trim() ||
-                      isSubmitting) &&
-                      styles.glassSubmitButtonDisabled,
-                    isMobile && styles.glassSubmitButtonMobile,
-                  ]}
-                  onPress={isEdit ? handleUpdateEvent : handleCreateEvent}
-                  disabled={
-                    !newEvent.title.trim() ||
+                <Text style={{ color: colors.text }}>
+                  {formatDate(newEvent.date)}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: colors.sidebar.text.muted,
+                    marginTop: 2,
+                  }}
+                >
+                  Tap to change date and time
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Location */}
+            <View style={styles.glassFormGroup}>
+              <Text style={[styles.glassFormLabel, { color: colors.text }]}>
+                Location *
+              </Text>
+              <TouchableOpacity
+                style={styles.glassFormInput}
+                onPress={() => setShowLocationPicker(true)}
+              >
+                <Text style={{ color: colors.text }}>
+                  {newEvent.location || 'Set location'}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: colors.sidebar.text.muted,
+                    marginTop: 2,
+                  }}
+                >
+                  {newEvent.location
+                    ? 'Tap to modify'
+                    : 'Enter location details'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Coordinates */}
+            <View style={styles.glassFormGroup}>
+              <TouchableOpacity
+                style={[styles.glassFormInput, { marginBottom: 20 }]}
+                onPress={() => setShowCoordinatesModal(true)}
+              >
+                <Text style={{ color: colors.text }}>
+                  {newEvent.coordinates
+                    ? 'Verification Location Set'
+                    : 'Set Verification Location'}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: colors.sidebar.text.muted,
+                    marginTop: 2,
+                  }}
+                >
+                  {newEvent.coordinates
+                    ? `Lat: ${newEvent.coordinates.latitude.toFixed(4)}, Lng: ${newEvent.coordinates.longitude.toFixed(4)}`
+                    : 'Add coordinates for attendance verification'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Actions */}
+            <View
+              style={[
+                styles.glassFormActions,
+                isMobile && styles.glassFormActionsMobile,
+              ]}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.glassSubmitButton,
+                  (!newEvent.title.trim() ||
                     !newEvent.description.trim() ||
                     !newEvent.location.trim() ||
-                    isSubmitting
-                  }
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator size='small' color='#ffffff' />
-                  ) : (
-                    <>
-                      <Feather
-                        name={isEdit ? 'check-circle' : 'plus-circle'}
-                        size={isMobile ? 16 : 18}
-                        color='#ffffff'
-                      />
-                      <Text
-                        style={[
-                          styles.glassSubmitButtonText,
-                          isMobile && styles.glassSubmitButtonTextMobile,
-                        ]}
-                      >
-                        {isEdit ? 'Update Event' : 'Create Event'}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                    isSubmitting) &&
+                    styles.glassSubmitButtonDisabled,
+                  isMobile && styles.glassSubmitButtonMobile,
+                ]}
+                onPress={isEdit ? handleUpdateEvent : handleCreateEvent}
+                disabled={
+                  !newEvent.title.trim() ||
+                  !newEvent.description.trim() ||
+                  !newEvent.location.trim() ||
+                  isSubmitting
+                }
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size='small' color='#ffffff' />
+                ) : (
+                  <>
+                    <Feather
+                      name={isEdit ? 'check-circle' : 'plus-circle'}
+                      size={isMobile ? 16 : 18}
+                      color='#ffffff'
+                    />
+                    <Text
+                      style={[
+                        styles.glassSubmitButtonText,
+                        isMobile && styles.glassSubmitButtonTextMobile,
+                      ]}
+                    >
+                      {isEdit ? 'Update Event' : 'Create Event'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
 
-                <TouchableOpacity
+              <TouchableOpacity
+                style={[
+                  styles.glassCancelButton,
+                  isMobile && styles.glassCancelButtonMobile,
+                ]}
+                onPress={handleCloseForm}
+              >
+                <Text
                   style={[
-                    styles.glassCancelButton,
-                    isMobile && styles.glassCancelButtonMobile,
+                    styles.glassCancelButtonText,
+                    isMobile && styles.glassCancelButtonTextMobile,
                   ]}
-                  onPress={handleCloseForm}
                 >
-                  <Text
-                    style={[
-                      styles.glassCancelButtonText,
-                      isMobile && styles.glassCancelButtonTextMobile,
-                    ]}
-                  >
-                    Cancel
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
             </View>
           </ScrollView>
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   )
   return (
     <View style={styles.container}>
-      {/* Header with Gradient */}
       <LinearGradient
         colors={headerGradientColors}
         start={{ x: 0, y: 0 }}
@@ -2314,7 +2249,6 @@ export default function MainAdminEvents() {
             </Text>
           </View>
           <View style={styles.headerActions}>
-            {/* Theme Toggle Button */}
             <TouchableOpacity
               style={[
                 styles.headerAction,
@@ -2355,7 +2289,6 @@ export default function MainAdminEvents() {
               </Animated.View>
             </TouchableOpacity>
 
-            {/* Create Event Button */}
             <TouchableOpacity
               style={[
                 styles.headerAction,
@@ -2380,7 +2313,6 @@ export default function MainAdminEvents() {
 
       {/* Main Content Grid */}
       <View style={[styles.mainContent, isMobile && styles.mainContentMobile]}>
-        {/* Left Grid - Paginated Events */}
         <View style={[styles.leftGrid, isMobile && styles.leftGridMobile]}>
           <View
             style={[styles.leftHeader, isMobile && styles.leftHeaderMobile]}
@@ -2587,13 +2519,11 @@ export default function MainAdminEvents() {
                 />
               </View>
 
-              {/* Pagination */}
               {renderPagination()}
             </>
           )}
         </View>
 
-        {/* Right Grid - Search */}
         <View style={[styles.rightGrid, isMobile && styles.rightGridMobile]}>
           <View
             style={[styles.rightHeader, isMobile && styles.rightHeaderMobile]}
@@ -2751,7 +2681,6 @@ export default function MainAdminEvents() {
         </View>
       </View>
 
-      {/* Create/Edit Modal */}
       {renderForm(showEditForm)}
 
       {Platform.OS === 'web' ? (
@@ -2889,7 +2818,6 @@ export default function MainAdminEvents() {
         />
       )}
 
-      {/* Location Picker Modal */}
       <Modal
         visible={showLocationPicker}
         transparent={true}
@@ -2964,7 +2892,6 @@ export default function MainAdminEvents() {
               ]}
               showsVerticalScrollIndicator={false}
             >
-              {/* Location Name */}
               <View style={styles.modernFormGroup}>
                 <Text
                   style={[
@@ -2984,7 +2911,6 @@ export default function MainAdminEvents() {
                 />
               </View>
 
-              {/* Location Description */}
               <View style={styles.modernFormGroup}>
                 <Text
                   style={[
@@ -3031,7 +2957,6 @@ export default function MainAdminEvents() {
                 </View>
               </View>
 
-              {/* Image Selection */}
               <View style={styles.modernFormGroup}>
                 <Text
                   style={[
@@ -3075,7 +3000,6 @@ export default function MainAdminEvents() {
                 )}
               </View>
 
-              {/* Save Button */}
               <View
                 style={[
                   styles.modernFormActions,
@@ -3106,7 +3030,6 @@ export default function MainAdminEvents() {
         </View>
       </Modal>
 
-      {/* Image Picker Modal */}
       <Modal
         visible={showImagePicker}
         transparent={true}
@@ -3229,7 +3152,6 @@ export default function MainAdminEvents() {
         </View>
       </Modal>
 
-      {/* Coordinates Modal */}
       <Modal
         visible={showCoordinatesModal}
         transparent={true}
@@ -3434,7 +3356,6 @@ export default function MainAdminEvents() {
         </View>
       </Modal>
 
-      {/* Glassmorphism Event Detail Modal */}
       <Modal
         visible={selectedEvent !== null}
         transparent={true}
@@ -3514,6 +3435,22 @@ export default function MainAdminEvents() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onDismiss={hideToast}
+      />
+      <ConfirmDialog
+        visible={confirmState.visible}
+        title={confirmState.options.title}
+        message={confirmState.options.message}
+        confirmLabel={confirmState.options.confirmLabel}
+        cancelLabel={confirmState.options.cancelLabel}
+        confirmDestructive={confirmState.options.confirmDestructive}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </View>
   )
 }

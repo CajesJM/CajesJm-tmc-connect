@@ -58,7 +58,10 @@ import {
 import { auth, db } from '../../src/Model/lib/firebaseConfig'
 import { AnimatedStatCard } from '../../src/View/components/AnimatedStatCard'
 import { ConfirmDialog } from '../../src/View/components/ConfirmDialog'
-import { NotificationModal } from '../../src/View/components/NotificationModal'
+import {
+  NotificationModal,
+  PendingApproval,
+} from '../../src/View/components/NotificationModal'
 import { Toast } from '../../src/View/components/Toast'
 import { createDashboardStyles } from '../../src/View/styles/main-admin/dashboardStyles'
 import MainAdminAnnouncements from './announcements'
@@ -85,15 +88,7 @@ interface MonthlyStats {
   attendance: number
   announcements: number
 }
-interface PendingApproval {
-  id: string
-  type: 'announcement' | 'event'
-  title: string
-  description: string
-  requestedBy: string
-  requestedAt: Date
-  data: any
-}
+
 interface AnimatedActivityItemProps {
   activity: Activity
   index: number
@@ -1819,7 +1814,11 @@ export default function MainAdminDashboard() {
           id: doc.id,
           type: 'announcement' as const,
           title: doc.data().title || 'New Announcement',
-          description: `Created by ${doc.data().createdByName || doc.data().createdBy || 'Assistant Admin'}`,
+          description:
+            doc.data().content ||
+            doc.data().message ||
+            doc.data().description ||
+            'No description',
           requestedBy:
             doc.data().createdByName ||
             doc.data().createdBy ||
@@ -1837,7 +1836,7 @@ export default function MainAdminDashboard() {
         id: doc.id,
         type: 'event' as const,
         title: doc.data().title || 'New Event',
-        description: `Created by ${doc.data().createdByName || doc.data().createdBy || 'Assistant Admin'}`,
+        description: doc.data().description || 'No description',
         requestedBy:
           doc.data().createdByName || doc.data().createdBy || 'Assistant Admin',
         requestedAt: doc.data().createdAt?.toDate() || new Date(),
@@ -2021,10 +2020,7 @@ export default function MainAdminDashboard() {
         await Promise.all(notificationPromises)
       }
 
-      showToast(
-        `${approval.type} approved and ${studentIds.length} student(s) notified!`,
-        'success'
-      )
+      showToast(`${approval.type} approved!`, 'success')
     } catch (error) {
       console.error('Approval error:', error)
       showToast('Failed to approve. Please try again.', 'error')

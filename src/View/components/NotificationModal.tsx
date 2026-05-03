@@ -7,6 +7,7 @@ import {
   Dimensions,
   Modal,
   PanResponder,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,14 +20,18 @@ import { useTheme } from '../../Controller/context/ThemeContext'
 
 const { height: screenHeight } = Dimensions.get('window')
 
-interface PendingApproval {
+export interface PendingApproval {
   id: string
   type: 'announcement' | 'event'
   title: string
-  description: string
+  description?: string
   requestedBy: string
   requestedAt: Date
-  data: any
+  data: {
+    message?: string
+    priority?: 'normal' | 'important' | 'urgent'
+    [key: string]: any
+  }
 }
 
 interface NotificationModalProps {
@@ -63,12 +68,27 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   )
   const [refreshing, setRefreshing] = useState(false)
   const [snackbarVisible, setSnackbarVisible] = useState(false)
+  const [selectedApproval, setSelectedApproval] =
+    useState<PendingApproval | null>(null)
+  const [detailVisible, setDetailVisible] = useState(false)
 
   const slideAnim = useRef(new Animated.Value(screenHeight)).current
   const overlayOpacity = useRef(new Animated.Value(0)).current
-  const tabTranslateX = useRef(
-    new Animated.Value(activeTab === 'approvals' ? 0 : 1)
-  ).current
+  const detailSlide = useRef(new Animated.Value(300)).current
+  const detailOpacity = useRef(new Animated.Value(0)).current
+
+  // Priority helpers (matching announcement.tsx)
+  const getPriorityColor = (priority?: string) => {
+    if (priority === 'urgent') return '#ef4444'
+    if (priority === 'important') return '#f59e0b'
+    return '#3b82f6' // normal -> blue
+  }
+
+  const getPriorityLabel = (priority?: string) => {
+    if (priority === 'urgent') return 'URGENT'
+    if (priority === 'important') return 'IMPORTANT'
+    return 'NORMAL'
+  }
 
   const panResponder = useRef(
     PanResponder.create({
@@ -131,17 +151,60 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     }
   }, [visible])
 
-  useEffect(() => {
-    Animated.spring(tabTranslateX, {
-      toValue: activeTab === 'approvals' ? 0 : 1,
-      tension: 65,
-      friction: 11,
-      useNativeDriver: true,
-    }).start()
-  }, [activeTab])
+  const openDetail = (approval: PendingApproval) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    setSelectedApproval(approval)
+    setDetailVisible(true)
+    detailSlide.setValue(300)
+    detailOpacity.setValue(0)
+    Animated.parallel([
+      Animated.spring(detailSlide, {
+        toValue: 0,
+        tension: 65,
+        friction: 11,
+        useNativeDriver: true,
+      }),
+      Animated.timing(detailOpacity, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }
+
+  const closeDetail = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    Animated.parallel([
+      Animated.timing(detailSlide, {
+        toValue: 300,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(detailOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setDetailVisible(false)
+      setSelectedApproval(null)
+    })
+  }
+
+  const handleApproveFromDetail = (approval: PendingApproval) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    onApprove?.(approval)
+    closeDetail()
+  }
+
+  const handleRejectFromDetail = (approval: PendingApproval) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    onReject?.(approval)
+    closeDetail()
+  }
 
   const unreadCount = notifications.filter((n) => !n.read).length
-  const modalWidth = Math.min(width * 0.9, 400)
+  const modalWidth = Math.min(width * 0.92, 420)
 
   const withHaptic = (callback: () => void) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -164,90 +227,76 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     })
   }
 
-  const getNotificationStyles = () => ({
-    overlay: isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
-    modalBg: colors.card,
-    headerBorder: colors.border,
-    tabBg: isDark ? '#0f172a' : '#f8fafc',
-    tabBorder: colors.border,
-    activeTabBg: colors.accent.primary,
-    inactiveTabBg: isDark ? '#1e293b' : '#f1f5f9',
-    textPrimary: colors.text,
-    textSecondary: colors.sidebar.text.secondary,
-    textMuted: colors.sidebar.text.muted,
-    iconBg: isDark ? 'rgba(255,255,255,0.1)' : '#f1f5f9',
-    unreadBg: isDark ? '#0ea5e915' : '#f0f9ff',
-    unreadBorder: isDark ? '#0ea5e930' : '#bae6fd',
-    badgeBg: '#ef4444',
-    approvalBadgeBg: '#f59e0b',
-  })
+  const d = {
+    overlay: isDark ? 'rgba(0,0,0,0.75)' : 'rgba(15,23,42,0.55)',
+    modalBg: isDark ? '#0f172a' : '#ffffff',
+    headerBg: isDark ? '#0f172a' : '#ffffff',
+    surfaceBg: isDark ? '#1e293b' : '#f8fafc',
+    cardBg: isDark ? '#1e293b' : '#ffffff',
+    cardBorder: isDark ? '#334155' : '#e2e8f0',
+    tabBg: isDark ? '#1e293b' : '#f1f5f9',
+    activeTabBg: isDark ? '#0ea5e9' : '#0284c7',
+    textPrimary: isDark ? '#f1f5f9' : '#0f172a',
+    textSecondary: isDark ? '#94a3b8' : '#475569',
+    textMuted: isDark ? '#64748b' : '#94a3b8',
+    accent: '#0ea5e9',
+    accentGlow: isDark ? 'rgba(14,165,233,0.15)' : 'rgba(2,132,199,0.08)',
+    unreadBg: isDark ? '#1e3a5f' : '#e0f2fe',
+    unreadBorder: isDark ? '#3b82f6' : '#7dd3fc',
+    dangerBg: isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.07)',
+    dangerBorder: isDark ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.2)',
+    successBg: isDark ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.07)',
+    warnBg: isDark ? 'rgba(245,158,11,0.15)' : 'rgba(245,158,11,0.08)',
+    divider: isDark ? '#1e293b' : '#f1f5f9',
+    shimmer: isDark ? '#334155' : '#e2e8f0',
+  }
 
-  const dynamic = getNotificationStyles()
-
-  const SkeletonItem = () => (
-    <View style={[styles.skeletonItem, { backgroundColor: dynamic.iconBg }]}>
-      <View
-        style={[styles.skeletonIcon, { backgroundColor: dynamic.textMuted }]}
-      />
-      <View style={styles.skeletonContent}>
-        <View
-          style={[
-            styles.skeletonLine,
-            { width: '70%', backgroundColor: dynamic.textMuted },
-          ]}
-        />
-        <View
-          style={[
-            styles.skeletonLine,
-            { width: '90%', marginTop: 8, backgroundColor: dynamic.textMuted },
-          ]}
-        />
-        <View
-          style={[
-            styles.skeletonLine,
-            { width: '40%', marginTop: 8, backgroundColor: dynamic.textMuted },
-          ]}
-        />
-      </View>
-    </View>
-  )
+  const typeConfig = (type: 'announcement' | 'event') =>
+    ({
+      announcement: {
+        label: 'Announcement',
+        icon: 'alert-circle' as const, // FIXED: replaced 'megaphone'
+        bg: isDark ? 'rgba(245,158,11,0.15)' : 'rgba(245,158,11,0.1)',
+        color: isDark ? '#fbbf24' : '#d97706',
+        iconBg: isDark ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.12)',
+      },
+      event: {
+        label: 'Event',
+        icon: 'calendar' as const,
+        bg: isDark ? 'rgba(14,165,233,0.15)' : 'rgba(14,165,233,0.1)',
+        color: isDark ? '#38bdf8' : '#0284c7',
+        iconBg: isDark ? 'rgba(14,165,233,0.2)' : 'rgba(14,165,233,0.12)',
+      },
+    })[type]
 
   const renderTabs = () => (
     <View
       style={[
-        styles.tabContainer,
-        {
-          backgroundColor: dynamic.tabBg,
-          borderBottomColor: dynamic.tabBorder,
-        },
+        styles.tabWrapper,
+        { backgroundColor: d.surfaceBg, borderBottomColor: d.cardBorder },
       ]}
     >
-      <TouchableOpacity
-        style={[
-          styles.tab,
-          {
-            backgroundColor:
-              activeTab === 'approvals'
-                ? dynamic.activeTabBg
-                : dynamic.inactiveTabBg,
-          },
-        ]}
-        onPress={() => setActiveTab('approvals')}
-        activeOpacity={0.7}
-      >
-        <View style={styles.tabContent}>
+      <View style={[styles.tabPill, { backgroundColor: d.tabBg }]}>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'approvals' && [
+              styles.activeTab,
+              { backgroundColor: d.activeTabBg },
+            ],
+          ]}
+          onPress={() => withHaptic(() => setActiveTab('approvals'))}
+          activeOpacity={0.8}
+        >
           <FontAwesome6
             name='clipboard-check'
-            size={14}
-            color={activeTab === 'approvals' ? '#ffffff' : dynamic.textPrimary}
+            size={13}
+            color={activeTab === 'approvals' ? '#fff' : d.textSecondary}
           />
           <Text
             style={[
               styles.tabText,
-              {
-                color:
-                  activeTab === 'approvals' ? '#ffffff' : dynamic.textPrimary,
-              },
+              { color: activeTab === 'approvals' ? '#fff' : d.textSecondary },
             ]}
           >
             Approvals
@@ -255,265 +304,201 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
           {approvalCount > 0 && (
             <View
               style={[
-                styles.badge,
-                { backgroundColor: dynamic.approvalBadgeBg },
+                styles.tabBadge,
+                {
+                  backgroundColor:
+                    activeTab === 'approvals'
+                      ? 'rgba(255,255,255,0.25)'
+                      : '#f59e0b',
+                },
               ]}
             >
-              <Text style={styles.badgeText}>{approvalCount}</Text>
+              <Text style={styles.tabBadgeText}>{approvalCount}</Text>
             </View>
           )}
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[
-          styles.tab,
-          {
-            backgroundColor:
-              activeTab === 'notifications'
-                ? dynamic.activeTabBg
-                : dynamic.inactiveTabBg,
-          },
-        ]}
-        onPress={() => setActiveTab('notifications')}
-        activeOpacity={0.7}
-      >
-        <View style={styles.tabContent}>
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'notifications' && [
+              styles.activeTab,
+              { backgroundColor: d.activeTabBg },
+            ],
+          ]}
+          onPress={() => withHaptic(() => setActiveTab('notifications'))}
+          activeOpacity={0.8}
+        >
           <Feather
             name='bell'
-            size={14}
-            color={
-              activeTab === 'notifications' ? '#ffffff' : dynamic.textPrimary
-            }
+            size={13}
+            color={activeTab === 'notifications' ? '#fff' : d.textSecondary}
           />
           <Text
             style={[
               styles.tabText,
               {
-                color:
-                  activeTab === 'notifications'
-                    ? '#ffffff'
-                    : dynamic.textPrimary,
+                color: activeTab === 'notifications' ? '#fff' : d.textSecondary,
               },
             ]}
           >
             Notifications
           </Text>
           {unreadCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: dynamic.badgeBg }]}>
-              <Text style={styles.badgeText}>{unreadCount}</Text>
+            <View
+              style={[
+                styles.tabBadge,
+                {
+                  backgroundColor:
+                    activeTab === 'notifications'
+                      ? 'rgba(255,255,255,0.25)'
+                      : '#ef4444',
+                },
+              ]}
+            >
+              <Text style={styles.tabBadgeText}>{unreadCount}</Text>
             </View>
           )}
-        </View>
-      </TouchableOpacity>
-
-      {/* Animated indicator */}
-      <Animated.View
-        style={[
-          styles.tabIndicator,
-          {
-            transform: [
-              {
-                translateX: tabTranslateX.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, modalWidth / 2 - 20],
-                }),
-              },
-            ],
-            backgroundColor: dynamic.activeTabBg,
-          },
-        ]}
-      />
+        </TouchableOpacity>
+      </View>
     </View>
   )
+
+  const renderApprovalCard = (approval: PendingApproval) => {
+    const cfg = typeConfig(approval.type)
+    const priority = approval.data?.priority || 'normal'
+    const priorityColor = getPriorityColor(priority)
+
+    const messageText =
+      approval.type === 'event'
+        ? approval.description || 'No description'
+        : approval.data?.message ||
+          approval.description ||
+          'No additional message'
+    return (
+      <TouchableOpacity
+        key={approval.id}
+        style={[
+          styles.approvalCard,
+          { backgroundColor: d.cardBg, borderColor: d.cardBorder },
+        ]}
+        onPress={() => openDetail(approval)}
+        activeOpacity={0.75}
+      >
+        <View style={[styles.approvalStripe, { backgroundColor: cfg.color }]} />
+
+        <View style={styles.approvalCardInner}>
+          <View style={styles.approvalTopRow}>
+            <View
+              style={[styles.approvalTypeIcon, { backgroundColor: cfg.iconBg }]}
+            >
+              <Feather name={cfg.icon} size={14} color={cfg.color} />
+            </View>
+            <View
+              style={[styles.approvalTypeBadge, { backgroundColor: cfg.bg }]}
+            >
+              <Text
+                style={[styles.approvalTypeBadgeText, { color: cfg.color }]}
+              >
+                {cfg.label}
+              </Text>
+            </View>
+            {/* Priority Badge */}
+            <View
+              style={[styles.priorityBadge, { backgroundColor: priorityColor }]}
+            >
+              <Text style={styles.priorityBadgeText}>
+                {getPriorityLabel(priority)}
+              </Text>
+            </View>
+            <View style={styles.flex1} />
+            <Text style={[styles.approvalTime, { color: d.textMuted }]}>
+              {formatTime(approval.requestedAt)}
+            </Text>
+            <Feather
+              name='chevron-right'
+              size={14}
+              color={d.textMuted}
+              style={{ marginLeft: 4 }}
+            />
+          </View>
+
+          {/* Title */}
+          <Text
+            style={[styles.approvalTitle, { color: d.textPrimary }]}
+            numberOfLines={2}
+          >
+            {approval.title}
+          </Text>
+
+          <Text
+            style={[styles.approvalPreview, { color: d.textSecondary }]}
+            numberOfLines={2}
+          >
+            {messageText}
+          </Text>
+
+          {/* Footer */}
+          <View style={styles.approvalFooter}>
+            <View style={styles.requestedByRow}>
+              <View
+                style={[styles.avatarSmall, { backgroundColor: d.accentGlow }]}
+              >
+                <Feather name='user' size={10} color={d.accent} />
+              </View>
+              <Text style={[styles.requestedByText, { color: d.textMuted }]}>
+                {approval.requestedBy}
+              </Text>
+            </View>
+            <View style={styles.approvalQuickActions}>
+              <TouchableOpacity
+                style={[
+                  styles.quickAction,
+                  styles.quickReject,
+                  { backgroundColor: d.dangerBg, borderColor: d.dangerBorder },
+                ]}
+                onPress={() => withHaptic(() => onReject?.(approval))}
+              >
+                <Feather name='x' size={12} color='#ef4444' />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.quickAction,
+                  styles.quickApprove,
+                  { backgroundColor: d.successBg },
+                ]}
+                onPress={() => withHaptic(() => onApprove?.(approval))}
+              >
+                <Feather name='check' size={12} color='#10b981' />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    )
+  }
 
   const renderApprovalsList = () => {
     if (pendingApprovals.length === 0) {
       return (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingHorizontal: 20,
-          }}
-        >
+        <View style={styles.emptyContainer}>
           <View
             style={[
-              styles.emptyIconContainer,
-              { backgroundColor: isDark ? '#10b98120' : '#f0fdf4' },
-            ]}
-          >
-            <Feather name='check-circle' size={32} color='#10b981' />
-          </View>
-          <Text style={[styles.emptyTitle, { color: dynamic.textPrimary }]}>
-            All caught up!
-          </Text>
-          <Text
-            style={[styles.emptySubtitle, { color: dynamic.textSecondary }]}
-          >
-            No pending approvals. Assistant admin requests will appear here.
-          </Text>
-        </View>
-      )
-    }
-
-    return (
-      <ScrollView
-        style={styles.notificationsList}
-        showsVerticalScrollIndicator={false}
-      >
-        {pendingApprovals.map((approval) => (
-          <View
-            key={approval.id}
-            style={[
-              styles.notificationItem,
-              styles.approvalItem,
+              styles.emptyIconWrap,
               {
-                backgroundColor: dynamic.modalBg,
-                borderColor: colors.border,
-                shadowColor: isDark ? '#000' : '#000',
-                shadowOpacity: isDark ? 0.3 : 0.1,
+                backgroundColor: isDark
+                  ? 'rgba(16,185,129,0.12)'
+                  : 'rgba(16,185,129,0.08)',
               },
             ]}
           >
-            <View style={styles.approvalContent}>
-              <View style={styles.notificationHeader}>
-                <Text
-                  style={[
-                    styles.notificationTitle,
-                    { color: dynamic.textPrimary },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {approval.title}
-                </Text>
-                <View
-                  style={[
-                    styles.typeBadge,
-                    {
-                      backgroundColor:
-                        approval.type === 'announcement'
-                          ? isDark
-                            ? '#f59e0b30'
-                            : '#fef3c7'
-                          : isDark
-                            ? '#0ea5e930'
-                            : '#dbeafe',
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.typeBadgeText,
-                      {
-                        color:
-                          approval.type === 'announcement'
-                            ? isDark
-                              ? '#fbbf24'
-                              : '#d97706'
-                            : isDark
-                              ? '#38bdf8'
-                              : '#0369a1',
-                      },
-                    ]}
-                  >
-                    {approval.type === 'announcement'
-                      ? 'Announcement'
-                      : 'Event'}
-                  </Text>
-                </View>
-              </View>
-
-              <Text
-                style={[
-                  styles.notificationMessage,
-                  { color: dynamic.textSecondary },
-                ]}
-                numberOfLines={1}
-              >
-                Requested by {approval.requestedBy}
-              </Text>
-
-              <Text
-                style={[styles.notificationTime, { color: dynamic.textMuted }]}
-              >
-                {formatTime(approval.requestedAt)}
-              </Text>
-
-              <View
-                style={[
-                  styles.approvalActions,
-                  { borderTopColor: colors.border },
-                ]}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    styles.rejectButton,
-                    { backgroundColor: isDark ? '#ef444420' : '#fef2f2' },
-                  ]}
-                  onPress={() => withHaptic(() => onReject?.(approval))}
-                >
-                  <Feather name='x' size={14} color='#dc2626' />
-                  <Text style={styles.rejectButtonText}>Reject</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    styles.approveButton,
-                    { backgroundColor: '#0ea5e9' },
-                  ]}
-                  onPress={() => withHaptic(() => onApprove?.(approval))}
-                >
-                  <Feather name='check' size={14} color='#ffffff' />
-                  <Text style={styles.approveButtonText}>Approve</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            <Feather name='check-circle' size={28} color='#10b981' />
           </View>
-        ))}
-      </ScrollView>
-    )
-  }
-
-  const renderNotificationsList = () => {
-    if (loading) {
-      return (
-        <View
-          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-        >
-          <ActivityIndicator size='large' color={colors.accent.primary} />
-        </View>
-      )
-    }
-
-    if (notifications.length === 0) {
-      return (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingHorizontal: 20,
-          }}
-        >
-          <View
-            style={[
-              styles.emptyIconContainer,
-              { backgroundColor: dynamic.iconBg },
-            ]}
-          >
-            <Feather name='bell-off' size={32} color={dynamic.textMuted} />
-          </View>
-          <Text style={[styles.emptyTitle, { color: dynamic.textPrimary }]}>
-            All quiet here
+          <Text style={[styles.emptyTitle, { color: d.textPrimary }]}>
+            All clear!
           </Text>
-          <Text
-            style={[styles.emptySubtitle, { color: dynamic.textSecondary }]}
-          >
-            You'll see notifications when something new arrives.
+          <Text style={[styles.emptySubtitle, { color: d.textSecondary }]}>
+            No pending approvals right now. Admin requests will show up here.
           </Text>
         </View>
       )
@@ -522,70 +507,282 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     return (
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.sectionLabel, { color: d.textMuted }]}>
+          {pendingApprovals.length} PENDING REVIEW
+        </Text>
+        {pendingApprovals.map(renderApprovalCard)}
+      </ScrollView>
+    )
+  }
+
+  const renderNotificationsList = () => {
+    if (loading) {
+      return (
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size='large' color={d.accent} />
+        </View>
+      )
+    }
+
+    if (notifications.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <View style={[styles.emptyIconWrap, { backgroundColor: d.tabBg }]}>
+            <Feather name='bell-off' size={28} color={d.textMuted} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: d.textPrimary }]}>
+            All quiet
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: d.textSecondary }]}>
+            You'll be notified when something new arrives.
+          </Text>
+        </View>
+      )
+    }
+
+    return (
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           onRefresh ? (
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={[colors.accent.primary]}
-              tintColor={colors.accent.primary}
+              colors={[d.accent]}
+              tintColor={d.accent}
             />
           ) : undefined
         }
       >
-        {notifications.map((item) => (
+        {notifications.map((item, index) => (
           <TouchableOpacity
             key={item.id}
             style={[
-              styles.notificationItem,
+              styles.notifCard,
               {
-                backgroundColor: item.read ? dynamic.modalBg : dynamic.unreadBg,
-                borderColor: item.read ? colors.border : dynamic.unreadBorder,
+                backgroundColor: item.read ? d.cardBg : d.unreadBg,
+                borderColor: item.read ? d.cardBorder : d.unreadBorder,
+                marginTop: index === 0 ? 12 : 0,
               },
             ]}
             onPress={() => withHaptic(() => onNotificationPress(item))}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
           >
-            <View style={styles.notificationContent}>
-              <View style={styles.notificationHeader}>
+            {!item.read && (
+              <View
+                style={[styles.notifStripe, { backgroundColor: d.accent }]}
+              />
+            )}
+            <View style={styles.notifInner}>
+              <View style={styles.notifHeader}>
                 <Text
-                  style={[
-                    styles.notificationTitle,
-                    { color: dynamic.textPrimary },
-                  ]}
+                  style={[styles.notifTitle, { color: d.textPrimary }]}
                   numberOfLines={1}
                 >
                   {item.title}
                 </Text>
                 {!item.read && (
                   <View
-                    style={[
-                      styles.unreadDot,
-                      { backgroundColor: colors.accent.primary },
-                    ]}
+                    style={[styles.unreadDot, { backgroundColor: d.accent }]}
                   />
                 )}
               </View>
               <Text
-                style={[
-                  styles.notificationMessage,
-                  { color: dynamic.textSecondary },
-                ]}
+                style={[styles.notifMessage, { color: d.textSecondary }]}
                 numberOfLines={2}
               >
                 {item.message}
               </Text>
-              <Text
-                style={[styles.notificationTime, { color: dynamic.textMuted }]}
-              >
+              <Text style={[styles.notifTime, { color: d.textMuted }]}>
                 {formatTime(item.timestamp)}
               </Text>
             </View>
           </TouchableOpacity>
         ))}
       </ScrollView>
+    )
+  }
+
+  const renderApprovalDetail = () => {
+    if (!selectedApproval) return null
+    const cfg = typeConfig(selectedApproval.type)
+    const priority = selectedApproval.data?.priority || 'normal'
+    const priorityColor = getPriorityColor(priority)
+    const messageText =
+      selectedApproval.type === 'event'
+        ? selectedApproval.description || 'No description'
+        : selectedApproval.data?.message ||
+          selectedApproval.description ||
+          'No additional message'
+
+    return (
+      <Animated.View
+        style={[
+          styles.detailOverlay,
+          {
+            opacity: detailOpacity,
+            backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(15,23,42,0.4)',
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={closeDetail}
+          activeOpacity={1}
+        />
+        <Animated.View
+          style={[
+            styles.detailSheet,
+            {
+              backgroundColor: d.modalBg,
+              transform: [{ translateY: detailSlide }],
+              width: modalWidth,
+            },
+          ]}
+        >
+          {/* Detail Header */}
+          <View
+            style={[styles.detailHeader, { borderBottomColor: d.cardBorder }]}
+          >
+            <TouchableOpacity
+              style={[styles.detailBackBtn, { backgroundColor: d.tabBg }]}
+              onPress={closeDetail}
+            >
+              <Feather name='arrow-left' size={16} color={d.textPrimary} />
+            </TouchableOpacity>
+            <Text style={[styles.detailHeaderTitle, { color: d.textPrimary }]}>
+              Review Request
+            </Text>
+            <View style={[styles.detailTypePill, { backgroundColor: cfg.bg }]}>
+              <Text style={[styles.detailTypePillText, { color: cfg.color }]}>
+                {cfg.label}
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView
+            contentContainerStyle={{ padding: 20, paddingBottom: 32 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Priority Badge (prominent) */}
+            <View
+              style={[
+                styles.detailPriorityContainer,
+                {
+                  backgroundColor: priorityColor + '20',
+                  borderColor: priorityColor,
+                },
+              ]}
+            >
+              <Text
+                style={[styles.detailPriorityLabel, { color: priorityColor }]}
+              >
+                {getPriorityLabel(priority)}
+              </Text>
+            </View>
+
+            {/* Requester info */}
+            <View
+              style={[
+                styles.detailRequesterCard,
+                { backgroundColor: d.surfaceBg, borderColor: d.cardBorder },
+              ]}
+            >
+              <View
+                style={[styles.detailAvatar, { backgroundColor: d.accentGlow }]}
+              >
+                <Feather name='user' size={18} color={d.accent} />
+              </View>
+              <View>
+                <Text
+                  style={[styles.detailRequesterLabel, { color: d.textMuted }]}
+                >
+                  Requested by
+                </Text>
+                <Text
+                  style={[styles.detailRequesterName, { color: d.textPrimary }]}
+                >
+                  {selectedApproval.requestedBy}
+                </Text>
+              </View>
+              <View style={styles.flex1} />
+              <Text
+                style={[styles.detailRequesterTime, { color: d.textMuted }]}
+              >
+                {formatTime(selectedApproval.requestedAt)}
+              </Text>
+            </View>
+
+            {/* Title & Message */}
+            <View style={styles.detailSection}>
+              <Text style={[styles.detailSectionLabel, { color: d.textMuted }]}>
+                TITLE
+              </Text>
+              <Text
+                style={[styles.detailContentTitle, { color: d.textPrimary }]}
+              >
+                {selectedApproval.title}
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.detailSection,
+                styles.detailDivider,
+                { borderTopColor: d.divider },
+              ]}
+            >
+              <Text style={[styles.detailSectionLabel, { color: d.textMuted }]}>
+                MESSAGE
+              </Text>
+              <Text
+                style={[styles.detailContentBody, { color: d.textSecondary }]}
+              >
+                {messageText}
+              </Text>
+            </View>
+          </ScrollView>
+
+          {/* Action Buttons */}
+          <View
+            style={[
+              styles.detailActions,
+              { borderTopColor: d.cardBorder, backgroundColor: d.modalBg },
+            ]}
+          >
+            <TouchableOpacity
+              style={[
+                styles.detailActionBtn,
+                styles.detailRejectBtn,
+                { backgroundColor: d.dangerBg, borderColor: d.dangerBorder },
+              ]}
+              onPress={() => handleRejectFromDetail(selectedApproval)}
+              activeOpacity={0.8}
+            >
+              <Feather name='x-circle' size={17} color='#ef4444' />
+              <Text style={[styles.detailActionText, { color: '#ef4444' }]}>
+                Reject
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.detailActionBtn, styles.detailApproveBtn]}
+              onPress={() => handleApproveFromDetail(selectedApproval)}
+              activeOpacity={0.8}
+            >
+              <Feather name='check-circle' size={17} color='#fff' />
+              <Text style={[styles.detailActionText, { color: '#fff' }]}>
+                Approve
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
     )
   }
 
@@ -599,121 +796,134 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
       <Animated.View
         style={[
           styles.modalOverlay,
-          { backgroundColor: dynamic.overlay, opacity: overlayOpacity },
+          { backgroundColor: d.overlay, opacity: overlayOpacity },
         ]}
-        {...panResponder.panHandlers}
       >
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={() => withHaptic(onClose)}
+          activeOpacity={1}
+        />
+
         <Animated.View
           style={[
             styles.modalContainer,
             {
               width: modalWidth,
-              backgroundColor: dynamic.modalBg,
+              backgroundColor: d.modalBg,
               transform: [{ translateY: slideAnim }],
-              shadowColor: isDark ? '#000' : '#000',
-              shadowOpacity: isDark ? 0.5 : 0.25,
+              shadowColor: '#000',
+              shadowOpacity: isDark ? 0.6 : 0.18,
             },
           ]}
         >
-          {/* Modal Header */}
+          {/* Drag handle */}
+          <View {...panResponder.panHandlers} style={styles.dragHandleArea}>
+            <View
+              style={[
+                styles.dragHandle,
+                { backgroundColor: isDark ? '#334155' : '#e2e8f0' },
+              ]}
+            />
+          </View>
+
+          {/* Header */}
           <View
             style={[
               styles.modalHeader,
-              {
-                borderBottomColor: dynamic.headerBorder,
-                backgroundColor: dynamic.modalBg,
-              },
+              { borderBottomColor: d.cardBorder, backgroundColor: d.headerBg },
             ]}
           >
-            <View style={styles.headerTitleContainer}>
-              <Feather name='bell' size={20} color={colors.accent.primary} />
-              <Text style={[styles.modalTitle, { color: dynamic.textPrimary }]}>
-                Notifications
-              </Text>
-              {unreadCount + approvalCount > 0 && (
-                <View
-                  style={[
-                    styles.unreadBadge,
-                    { backgroundColor: colors.accent.primary },
-                  ]}
-                >
-                  <Text style={styles.unreadBadgeText}>
-                    {unreadCount + approvalCount}
+            <View style={styles.headerLeft}>
+              <View
+                style={[
+                  styles.headerIconWrap,
+                  { backgroundColor: d.accentGlow },
+                ]}
+              >
+                <Feather name='bell' size={17} color={d.accent} />
+              </View>
+              <View>
+                <Text style={[styles.modalTitle, { color: d.textPrimary }]}>
+                  Notifications
+                </Text>
+                {unreadCount + approvalCount > 0 && (
+                  <Text style={[styles.modalSubtitle, { color: d.textMuted }]}>
+                    {unreadCount + approvalCount} need
+                    {unreadCount + approvalCount === 1 ? 's' : ''} attention
                   </Text>
-                </View>
-              )}
+                )}
+              </View>
             </View>
             <TouchableOpacity
-              style={[styles.closeButton, { backgroundColor: dynamic.iconBg }]}
+              style={[styles.closeBtn, { backgroundColor: d.tabBg }]}
               onPress={() => withHaptic(onClose)}
             >
-              <Feather name='x' size={20} color={dynamic.textSecondary} />
+              <Feather name='x' size={17} color={d.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          {/* Tabs (only show if approvals exist) */}
+          {/* Tabs */}
           {(approvalCount > 0 || pendingApprovals.length > 0) && renderTabs()}
 
-          {/* Mark All Read Button */}
+          {/* Mark all read */}
           {activeTab === 'notifications' && unreadCount > 0 && (
             <View
               style={[
-                styles.markAllContainer,
+                styles.markAllRow,
                 {
-                  borderBottomColor: dynamic.headerBorder,
-                  backgroundColor: dynamic.tabBg,
+                  backgroundColor: d.surfaceBg,
+                  borderBottomColor: d.cardBorder,
                 },
               ]}
             >
               <TouchableOpacity
-                style={[
-                  styles.markAllButton,
-                  {
-                    backgroundColor: dynamic.modalBg,
-                    borderColor: colors.border,
-                  },
-                ]}
+                style={styles.markAllBtn}
                 onPress={handleMarkAllRead}
+                activeOpacity={0.7}
               >
-                <Feather
-                  name='check-circle'
-                  size={16}
-                  color={colors.accent.primary}
-                />
-                <Text
-                  style={[styles.markAllText, { color: colors.accent.primary }]}
-                >
+                <Feather name='check-circle' size={13} color={d.accent} />
+                <Text style={[styles.markAllText, { color: d.accent }]}>
                   Mark all as read
                 </Text>
               </TouchableOpacity>
+              <Text style={[styles.markAllCount, { color: d.textMuted }]}>
+                {unreadCount} unread
+              </Text>
             </View>
           )}
 
-          {/* Cross‑fade content container – removed transform scale */}
+          {/* Content */}
           <View style={{ flex: 1 }}>
             {activeTab === 'approvals'
               ? renderApprovalsList()
               : renderNotificationsList()}
           </View>
+
+          {/* Approval Detail Overlay — inside the modal */}
+          {detailVisible && renderApprovalDetail()}
         </Animated.View>
       </Animated.View>
 
-      {/* Snackbar for confirmation */}
       <Snackbar
         visible={snackbarVisible}
         onDismiss={() => setSnackbarVisible(false)}
         duration={2000}
         style={{
-          backgroundColor: isDark ? '#1e293b' : '#fff',
+          backgroundColor: isDark ? '#1e293b' : '#0f172a',
           position: 'absolute',
           bottom: 20,
           left: 20,
           right: 20,
+          borderRadius: 12,
         }}
       >
-        <Text style={{ color: dynamic.textPrimary }}>
-          All notifications marked as read
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Feather name='check-circle' size={14} color='#10b981' />
+          <Text style={{ color: '#f1f5f9', fontSize: 13 }}>
+            All notifications marked as read
+          </Text>
+        </View>
       </Snackbar>
     </Modal>
   )
@@ -724,7 +934,6 @@ const formatTime = (timestamp: any) => {
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
   const now = new Date()
   const diff = Math.floor((now.getTime() - date.getTime()) / 1000)
-
   if (diff < 60) return `${diff}s ago`
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
@@ -733,6 +942,8 @@ const formatTime = (timestamp: any) => {
 }
 
 const styles = StyleSheet.create({
+  flex1: { flex: 1 },
+
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
@@ -740,252 +951,489 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     borderRadius: 28,
-    maxHeight: '80%',
-    minHeight: 500,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 24,
-    elevation: 24,
+    maxHeight: '82%',
+    minHeight: 520,
+    shadowOffset: { width: 0, height: 16 },
+    shadowRadius: 32,
+    elevation: 32,
     overflow: 'hidden',
   },
+  dragHandleArea: {
+    paddingTop: 10,
+    paddingBottom: 6,
+    alignItems: 'center',
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+  },
+
+  // Header
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
-  headerTitleContainer: {
+  headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  unreadBadge: {
+  headerIconWrap: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    minWidth: 24,
-    alignItems: 'center',
-  },
-  unreadBadgeText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  tabContainer: {
-    flexDirection: 'row',
-    padding: 12,
-    gap: 8,
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Tabs
+  tabWrapper: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    position: 'relative',
+  },
+  tabPill: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 3,
+    gap: 3,
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  tabContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+  },
+  activeTab: {
+    shadowColor: '#0ea5e9',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
   },
   tabText: {
     fontSize: 13,
     fontWeight: '600',
   },
-  tabIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    height: 3,
-    width: '50%',
-    borderRadius: 3,
-    marginBottom: -1,
-  },
-  badge: {
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+  tabBadge: {
+    borderRadius: 8,
+    minWidth: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
   },
-  badgeText: {
-    color: '#ffffff',
-    fontSize: 11,
+  tabBadgeText: {
+    color: '#fff',
+    fontSize: 10,
     fontWeight: '700',
   },
-  markAllContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  markAllButton: {
+
+  // Mark all read
+  markAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 8,
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  markAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   markAllText: {
     fontSize: 13,
     fontWeight: '600',
   },
-  contentContainer: {
-    flex: 1,
-    minHeight: 400,
+  markAllCount: {
+    fontSize: 12,
+    fontWeight: '500',
   },
-  notificationsList: {
-    padding: 16,
+
+  // Section label
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 10,
   },
-  notificationItem: {
+
+  // Approval cards
+  approvalCard: {
     flexDirection: 'row',
-    padding: 16,
-    borderRadius: 20,
-    marginBottom: 12,
+    borderRadius: 16,
     borderWidth: 1,
+    marginBottom: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
-  approvalItem: {
-    flexDirection: 'column',
-    gap: 12,
+  approvalStripe: {
+    width: 4,
   },
-  notificationContent: {
+  approvalCardInner: {
     flex: 1,
+    padding: 14,
+    gap: 6,
   },
-  approvalContent: {
-    flex: 1,
-    marginLeft: 0,
-  },
-  notificationHeader: {
+  approvalTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    gap: 8,
   },
-  notificationTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    flex: 1,
+  approvalTypeIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  typeBadge: {
+  approvalTypeBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginLeft: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  typeBadgeText: {
+  approvalTypeBadgeText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
-  notificationMessage: {
-    fontSize: 13,
-    marginBottom: 4,
-    lineHeight: 18,
-  },
-  notificationTime: {
+  approvalTime: {
     fontSize: 11,
     fontWeight: '500',
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 8,
+  approvalTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    lineHeight: 20,
   },
-  approvalActions: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
+  approvalPreview: {
+    fontSize: 12,
+    lineHeight: 17,
   },
-  actionButton: {
-    flex: 1,
+  approvalFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  requestedByRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
-    paddingVertical: 10,
+  },
+  avatarSmall: {
+    width: 20,
+    height: 20,
     borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  rejectButton: {
+  requestedByText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  approvalQuickActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  quickAction: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickReject: {
     borderWidth: 1,
-    borderColor: '#fecaca',
   },
-  rejectButtonText: {
-    color: '#dc2626',
-    fontSize: 13,
+  quickApprove: {},
+
+  // Priority badge (new)
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  priorityBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  detailPriorityContainer: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  detailPriorityLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+
+  // Notification cards
+  notifCard: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  notifStripe: {
+    width: 3,
+  },
+  notifInner: {
+    flex: 1,
+    padding: 14,
+  },
+  notifHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  notifTitle: {
+    fontSize: 14,
     fontWeight: '600',
+    flex: 1,
+    letterSpacing: -0.2,
   },
-  approveButton: {
-    backgroundColor: '#0ea5e9',
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginLeft: 8,
   },
-  approveButtonText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '600',
+  notifMessage: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 4,
   },
-  emptyIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  notifTime: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // Empty state
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 40,
+  },
+  emptyIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '700',
+    marginBottom: 6,
+    letterSpacing: -0.3,
   },
   emptySubtitle: {
     fontSize: 13,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 19,
   },
-  skeletonItem: {
+
+  // Approval Detail Sheet
+  detailOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  detailSheet: {
+    borderRadius: 24,
+    maxHeight: '95%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 20,
+    marginBottom: 8,
+  },
+  detailHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     padding: 16,
-    borderRadius: 20,
-    marginBottom: 12,
-    backgroundColor: '#f1f5f9',
+    paddingBottom: 14,
+    borderBottomWidth: 1,
   },
-  skeletonIcon: {
-    width: 44,
-    height: 44,
+  detailBackBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    flex: 1,
+    letterSpacing: -0.3,
+  },
+  detailTypePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  detailTypePillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  detailRequesterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
+  detailAvatar: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
-    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  skeletonContent: {
+  detailRequesterLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  detailRequesterName: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  detailRequesterTime: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  detailSection: {
+    marginBottom: 16,
+  },
+  detailDivider: {
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
+  detailSectionLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+  detailContentTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    lineHeight: 26,
+  },
+  detailContentBody: {
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  detailDataRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 6,
+    gap: 12,
+  },
+  detailDataKey: {
+    fontSize: 13,
+    fontWeight: '500',
     flex: 1,
   },
-  skeletonLine: {
-    height: 14,
-    borderRadius: 4,
-    backgroundColor: '#e2e8f0',
+  detailDataVal: {
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'right',
+    flex: 1,
+  },
+  detailActions: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 16,
+    borderTopWidth: 1,
+  },
+  detailActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  detailRejectBtn: {
+    borderWidth: 1,
+  },
+  detailApproveBtn: {
+    backgroundColor: '#0ea5e9',
+    shadowColor: '#0ea5e9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  detailActionText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
 })
-
-// Helper components (not used directly but kept for reference)
-const RefreshControl = require('react-native').RefreshControl

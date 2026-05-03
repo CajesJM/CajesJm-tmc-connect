@@ -1,4 +1,4 @@
-import { Feather, FontAwesome6 } from '@expo/vector-icons'
+import { Feather, FontAwesome6, Ionicons } from '@expo/vector-icons'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -34,6 +34,7 @@ import {
 import { useAuth } from '../../../src/Controller/context/AuthContext'
 import { useTheme } from '../../../src/Controller/context/ThemeContext'
 import { db } from '../../../src/Model/lib/firebaseConfig'
+import AnimatedListItem from '../../../src/View/components/AnimatedListItem'
 import { createAssistantAnnouncementStyles } from '../../../src/View/styles/assistant-admin/announcementStyles'
 
 dayjs.extend(relativeTime)
@@ -52,6 +53,14 @@ interface Announcement {
 export default function AssistantAdminAnnouncements() {
   const { width: screenWidth } = useWindowDimensions()
   const { colors, isDark } = useTheme()
+
+  const renderFooter = () => {
+    if (totalPages > 1) {
+      return renderPagination()
+    }
+
+    return <View style={{ height: 80 }} />
+  }
 
   const isMobile = screenWidth < 640
   const isTablet = screenWidth >= 640 && screenWidth < 1024
@@ -538,7 +547,19 @@ export default function AssistantAdminAnnouncements() {
                 ? `${userData.surname}, ${userData.name}`
                 : userData?.name || 'Assistant'}
             </Text>
-            <Text style={styles.role}>Assistant Admin</Text>
+            <View style={styles.roleBadge}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                style={styles.roleGradient}
+              >
+                <Ionicons
+                  name='shield-checkmark-outline'
+                  size={12}
+                  color='#ffffff'
+                />
+                <Text style={styles.roleText}>Assistant Admin</Text>
+              </LinearGradient>
+            </View>
           </View>
           <TouchableOpacity
             style={styles.profileButton}
@@ -580,39 +601,6 @@ export default function AssistantAdminAnnouncements() {
         </View>
       </LinearGradient>
 
-      {/* Stats Row */}
-      {/*<View style={styles.statsContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statsScroll}
-        >
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: `${colors.accent.primary}15` }]}>
-              <Ionicons name="document-text" size={18} color={colors.accent.primary} />
-            </View>
-            <Text style={styles.statNumber}>{stats.total}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#10b98115' }]}>
-              <Feather name="sun" size={18} color="#10b981" />
-            </View>
-            <Text style={styles.statNumber}>{stats.today}</Text>
-            <Text style={styles.statLabel}>Today</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#ef444415' }]}>
-              <MaterialIcons name="priority-high" size={18} color="#ef4444" />
-            </View>
-            <Text style={styles.statNumber}>{stats.priority}</Text>
-            <Text style={styles.statLabel}>Priority</Text>
-          </View>
-        </ScrollView>
-      </View> */}
-
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <View style={styles.searchBar}>
@@ -635,7 +623,7 @@ export default function AssistantAdminAnnouncements() {
         </View>
       </View>
 
-      {/* Filter Chips */}
+      {/* Filter */}
       <View style={styles.filterSection}>
         <ScrollView
           horizontal
@@ -675,11 +663,15 @@ export default function AssistantAdminAnnouncements() {
         </Text>
       </View>
 
-      {/* Announcements List with Pagination */}
+      {/* Announcements List */}
       <FlatList
         data={paginatedAnnouncements}
         keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => renderAnnouncementCard(item, index)}
+        renderItem={({ item, index }) => (
+          <AnimatedListItem index={index}>
+            {renderAnnouncementCard(item, index)}
+          </AnimatedListItem>
+        )}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -690,7 +682,7 @@ export default function AssistantAdminAnnouncements() {
           />
         }
         ListEmptyComponent={renderEmptyState}
-        ListFooterComponent={renderPagination}
+        ListFooterComponent={renderFooter}
         ListFooterComponentStyle={styles.paginationWrapper}
       />
 
@@ -739,7 +731,7 @@ export default function AssistantAdminAnnouncements() {
               style={styles.modalContent}
               showsVerticalScrollIndicator={false}
             >
-              {/* Priority Selector */}
+              {/* Priority Badge */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Priority Level</Text>
                 <View style={styles.priorityContainer}>
@@ -859,7 +851,7 @@ export default function AssistantAdminAnnouncements() {
                 <Text style={styles.characterCount}>{message.length}/500</Text>
               </View>
 
-              {/* Action Buttons */}
+              {/* Buttons */}
               <View style={styles.formActions}>
                 <TouchableOpacity
                   style={[
@@ -880,7 +872,7 @@ export default function AssistantAdminAnnouncements() {
                         color='#ffffff'
                       />
                       <Text style={styles.submitButtonText}>
-                        {editingId ? 'Save Changes' : 'Submit for Approval'}
+                        {editingId ? 'Save Changes' : 'Submit Announcement'}
                       </Text>
                     </>
                   )}

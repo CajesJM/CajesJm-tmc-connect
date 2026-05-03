@@ -28,7 +28,7 @@ export const createStudentAnnouncementStyles = (
     },
     greeting: {
       fontSize: isMobile ? 12 : 14,
-      color: colors.sidebar.text.muted,
+      color: 'rgba(255,255,255,0.8)',
       marginBottom: 2,
     },
     userName: {
@@ -37,10 +37,25 @@ export const createStudentAnnouncementStyles = (
       color: '#ffffff',
       marginBottom: 2,
     },
-    role: {
-      fontSize: isMobile ? 12 : 14,
-      color: colors.sidebar.text.muted,
-      fontWeight: '500',
+    roleBadge: {
+      marginTop: 2,
+      marginBottom: 2,
+      alignSelf: 'flex-start',
+    },
+    roleGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
+    roleText: {
+      fontSize: isMobile ? 12 : 13,
+      color: '#ffffff',
+      fontWeight: '600',
     },
     profileButton: {
       width: isMobile ? 44 : 48,
@@ -130,6 +145,7 @@ export const createStudentAnnouncementStyles = (
     searchSection: {
       paddingHorizontal: isMobile ? 16 : 24,
       marginBottom: isMobile ? 12 : 16,
+      marginTop: isMobile ? 5 : 8,
     },
     searchBar: {
       flexDirection: 'row',

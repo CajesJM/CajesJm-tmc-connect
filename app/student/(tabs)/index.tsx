@@ -46,6 +46,7 @@ import {
 } from '../../../src/Controller/utils/notifications'
 import { auth, db } from '../../../src/Model/lib/firebaseConfig'
 import AutoSlidingStats from '../../../src/View/components/AutoSlidingStats-Stu'
+import BarkieFloat from '../../../src/View/components/BarkieFloat'
 import { NotificationModal } from '../../../src/View/components/NotificationModal'
 import { StudentActivityModal } from '../../../src/View/components/StudentActivityModal'
 import { WeatherWidget } from '../../../src/View/components/WeatherWidget'
@@ -227,6 +228,9 @@ export default function StudentDashboard() {
   const animatedAnnouncements = useAnimatedCounter(
     studentStats.totalAnnouncements
   )
+  const animatedDonutUpcoming = useAnimatedCounter(donutData.upcomingEvents)
+  const animatedDonutPast = useAnimatedCounter(donutData.pastEvents)
+  const animatedDonutAnnouncements = useAnimatedCounter(donutData.announcements)
 
   useEffect(() => {
     Animated.parallel([
@@ -904,7 +908,13 @@ export default function StudentDashboard() {
             {icon}
           </Animated.View>
         </View>
-        <Text style={[styles.statNumber, { color }]}>{value}</Text>
+        <Text style={[styles.statNumber, { color }]}>
+          {value === studentStats.eventsAttended
+            ? animatedEventsAttended
+            : value === studentStats.upcomingEvents
+              ? animatedUpcomingEvents
+              : animatedAnnouncements}
+        </Text>
         <Text style={styles.statLabel}>{title}</Text>
       </Animated.View>
     )
@@ -1040,7 +1050,13 @@ export default function StudentDashboard() {
                           { color: chartData[selectedSlice].color },
                         ]}
                       >
-                        {chartData[selectedSlice].value}
+                        {
+                          [
+                            animatedDonutUpcoming,
+                            animatedDonutPast,
+                            animatedDonutAnnouncements,
+                          ][selectedSlice]
+                        }
                       </Text>
                       <Text style={styles.donutCenterText}>
                         {chartData[selectedSlice].label.split(' ')[0]}
@@ -1048,7 +1064,11 @@ export default function StudentDashboard() {
                     </>
                   ) : (
                     <>
-                      <Text style={styles.donutCenterValue}>{total}</Text>
+                      <Text style={styles.donutCenterValue}>
+                        {animatedDonutUpcoming +
+                          animatedDonutPast +
+                          animatedDonutAnnouncements}
+                      </Text>
                       <Text style={styles.donutCenterText}>Total Items</Text>
                     </>
                   )}
@@ -1088,7 +1108,16 @@ export default function StudentDashboard() {
                       <Text style={styles.legendPercent}>{item.text}</Text>
                     </View>
                     <Text style={styles.legendLabel}>{item.label}</Text>
-                    <Text style={styles.legendCount}>{item.value} items</Text>
+                    <Text style={styles.legendCount}>
+                      {
+                        [
+                          animatedDonutUpcoming,
+                          animatedDonutPast,
+                          animatedDonutAnnouncements,
+                        ][index]
+                      }{' '}
+                      items
+                    </Text>
                   </View>
                   {selectedSlice === index && (
                     <View style={styles.selectedIndicator}>
@@ -1748,6 +1777,8 @@ export default function StudentDashboard() {
           </View>
         </Animated.View>
       </ScrollView>
+      {/* Barkie AI */}
+      <BarkieFloat />
     </>
   )
 

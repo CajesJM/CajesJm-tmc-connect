@@ -41,8 +41,8 @@ export const createAttendanceStyles = (
     },
     greetingText: {
       fontSize: isMobile ? 12 : 14,
-      color: colors.sidebar.text.muted,
-      marginBottom: 4,
+      color: 'rgba(255,255,255,0.8)',
+      marginBottom: 2,
     },
     userName: {
       fontSize: isMobile ? 20 : 22,
@@ -55,9 +55,25 @@ export const createAttendanceStyles = (
       color: colors.sidebar.text.muted,
       fontWeight: '500',
     },
+    roleBadge: {
+      marginTop: 4,
+      marginBottom: 2,
+      alignSelf: 'flex-start',
+    },
+    roleGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
     roleText: {
-      fontSize: isMobile ? 10 : 12,
-      color: colors.sidebar.text.muted,
+      fontSize: isMobile ? 12 : 13,
+      color: '#ffffff',
+      fontWeight: '600',
     },
     profileButton: {
       width: isMobile ? 44 : 48,
@@ -1016,7 +1032,7 @@ export const createAttendanceStyles = (
       paddingHorizontal: 10,
       paddingVertical: 6,
       borderRadius: 20,
-      marginTop: -10,
+      marginTop: -13.5,
     },
     dateText: {
       fontSize: isMobile ? 10 : 12,

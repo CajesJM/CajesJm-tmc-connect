@@ -33,20 +33,35 @@ export const createAssistantAnnouncementStyles = (
       marginBottom: 16,
     },
     greeting: {
-      fontSize: isMobile ? 12 : 13,
-      color: colors.sidebar.text.muted,
+      fontSize: isMobile ? 12 : 14,
+      color: 'rgba(255,255,255,0.8)',
       marginBottom: 2,
     },
     userName: {
-      fontSize: isMobile ? 20 : 22,
+      fontSize: isMobile ? 20 : 24,
       fontWeight: '700',
       color: '#ffffff',
       marginBottom: 2,
     },
-    role: {
-      fontSize: isMobile ? 11 : 12,
-      color: colors.sidebar.text.muted,
-      fontWeight: '500',
+    roleBadge: {
+      marginTop: 2,
+      marginBottom: 2,
+      alignSelf: 'flex-start',
+    },
+    roleGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
+    roleText: {
+      fontSize: isMobile ? 12 : 13,
+      color: '#ffffff',
+      fontWeight: '600',
     },
     profileButton: {
       width: isMobile ? 44 : 48,
@@ -154,6 +169,7 @@ export const createAssistantAnnouncementStyles = (
     searchSection: {
       paddingHorizontal: isMobile ? 16 : 24,
       marginBottom: isMobile ? 12 : 16,
+      marginTop: isMobile ? 5 : 8,
     },
     searchBar: {
       flexDirection: 'row',
@@ -591,6 +607,7 @@ export const createAssistantAnnouncementStyles = (
       borderRadius: 12,
       borderWidth: 1,
       borderColor: colors.border,
+      marginBottom: 40,
     },
     detailDeleteButtonText: {
       fontSize: 14,

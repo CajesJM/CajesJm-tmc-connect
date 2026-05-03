@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useFocusEffect, useRouter } from 'expo-router'
@@ -333,6 +333,60 @@ const BarChartItem = ({ data, index, maxValue, colors, isDark }: any) => {
       )}
     </View>
   )
+}
+function useCountUp(
+  target: number,
+  duration: number = 800,
+  isLoading: boolean = false
+) {
+  const [count, setCount] = useState(0)
+  const prevTarget = useRef(0)
+
+  useEffect(() => {
+    if (isLoading || target === 0) {
+      setCount(0)
+      return
+    }
+
+    const startValue = prevTarget.current
+    const diff = target - startValue
+    const steps = 30
+    const stepDuration = duration / steps
+    let currentStep = 0
+
+    const timer = setInterval(() => {
+      currentStep++
+      const progress = currentStep / steps
+      const easedProgress = 1 - Math.pow(1 - progress, 3)
+      setCount(Math.round(startValue + diff * easedProgress))
+
+      if (currentStep >= steps) {
+        clearInterval(timer)
+        setCount(target)
+        prevTarget.current = target
+      }
+    }, stepDuration)
+
+    return () => clearInterval(timer)
+  }, [target, isLoading])
+
+  return count
+}
+
+function AnimatedStat({
+  value,
+  isLoading,
+  color,
+  style,
+}: {
+  value: number
+  isLoading: boolean
+  color: string
+  style?: any
+}) {
+  const count = useCountUp(value, 800, isLoading)
+  if (isLoading) return <ActivityIndicator size='small' color={color} />
+  return <Text style={style}>{count}</Text>
 }
 
 export default function StudentProfile() {
@@ -3430,7 +3484,15 @@ export default function StudentProfile() {
                 ? `${userData.name} ${userData.surname}`
                 : userData?.name || 'Student'}
             </Text>
-            <Text style={styles.role}>Student</Text>
+            <View style={styles.roleBadge}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                style={styles.roleGradient}
+              >
+                <Ionicons name='school-outline' size={12} color='#ffffff' />
+                <Text style={styles.roleText}>Student</Text>
+              </LinearGradient>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -3473,11 +3535,6 @@ export default function StudentProfile() {
               })}
             </Text>
           </View>
-
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Feather name='log-out' size={18} color='#ef4444' />
-            <Text style={styles.logoutButtonText}>Logout</Text>
-          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -3583,10 +3640,19 @@ export default function StudentProfile() {
                     color={stat.color}
                   />
                 </View>
-                {loading ? (
-                  <ActivityIndicator size='small' color={stat.color} />
+                {stat.label === 'Attendance' ? (
+                  loading ? (
+                    <ActivityIndicator size='small' color={stat.color} />
+                  ) : (
+                    <Text style={styles.statValue}>{stat.value}</Text>
+                  )
                 ) : (
-                  <Text style={styles.statValue}>{stat.value}</Text>
+                  <AnimatedStat
+                    value={stat.value as number}
+                    isLoading={loading}
+                    color={stat.color}
+                    style={styles.statValue}
+                  />
                 )}
                 <Text style={styles.statLabel}>{stat.label}</Text>
               </View>
@@ -3615,9 +3681,12 @@ export default function StudentProfile() {
                 Attended
               </Text>
               <View style={[styles.badge, { backgroundColor: '#10B98120' }]}>
-                <Text style={[styles.badgeText, { color: '#10B981' }]}>
-                  {attendedEvents.length}
-                </Text>
+                <AnimatedStat
+                  value={attendedEvents.length}
+                  isLoading={loading}
+                  color='#10B981'
+                  style={[styles.badgeText, { color: '#10B981' }]}
+                />
               </View>
             </TouchableOpacity>
             <TouchableOpacity
@@ -3638,9 +3707,12 @@ export default function StudentProfile() {
                 Missed
               </Text>
               <View style={[styles.badge, { backgroundColor: '#DC262620' }]}>
-                <Text style={[styles.badgeText, { color: '#DC2626' }]}>
-                  {missedEvents.length}
-                </Text>
+                <AnimatedStat
+                  value={missedEvents.length}
+                  isLoading={loading}
+                  color='#DC2626'
+                  style={[styles.badgeText, { color: '#DC2626' }]}
+                />
               </View>
             </TouchableOpacity>
           </View>
@@ -3864,9 +3936,12 @@ export default function StudentProfile() {
                 <Text style={styles.menuItemText}>My Penalties</Text>
                 {pendingPenaltiesCount > 0 && (
                   <View style={styles.menuBadge}>
-                    <Text style={styles.menuBadgeText}>
-                      {pendingPenaltiesCount}
-                    </Text>
+                    <AnimatedStat
+                      value={pendingPenaltiesCount}
+                      isLoading={loading}
+                      color='#EF4444'
+                      style={styles.menuBadgeText}
+                    />
                   </View>
                 )}
               </View>

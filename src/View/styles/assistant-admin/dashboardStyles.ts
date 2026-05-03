@@ -48,6 +48,16 @@ export const styles = StyleSheet.create({
     marginTop: 8,
     alignSelf: 'flex-start',
   },
+  roleGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
   roleText: {
     fontSize: isMobile ? 12 : 13,
     color: '#ffffff',
@@ -602,7 +612,8 @@ export const styles = StyleSheet.create({
     borderRadius: 20,
   },
   dateText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 14,
+    fontSize: isMobile ? 12 : 14,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '500',
   },
 })

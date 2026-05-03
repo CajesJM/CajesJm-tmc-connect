@@ -1104,7 +1104,7 @@ export default function MainAdminEvents() {
       await Promise.all(deletePromises)
 
       showToast(
-        `"${eventTitle}" and its associated penalties deleted successfully. Removed from ${affectedStudentIds.length} user profile(s).`,
+        `"${eventTitle}" and its associated penalties deleted successfully.`,
         'success'
       )
     } catch (error) {
@@ -2903,7 +2903,7 @@ export default function MainAdminEvents() {
                 </Text>
                 <FormTextInput
                   inputStyle={styles.modernFormInput}
-                  placeholder='e.g., Main Hall, Room 101'
+                  placeholder='e.g., Main Campus'
                   value={newEvent.location}
                   onChangeText={(text) =>
                     setNewEvent((prev) => ({ ...prev, location: text }))

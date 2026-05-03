@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -30,6 +30,7 @@ import { useAuth } from '../../../src/Controller/context/AuthContext'
 import { useNotifications } from '../../../src/Controller/context/NotificationContext'
 import { useTheme } from '../../../src/Controller/context/ThemeContext'
 import { auth, db } from '../../../src/Model/lib/firebaseConfig'
+import AnimatedListItem from '../../../src/View/components/AnimatedListItem'
 import { createStudentAnnouncementStyles } from '../../../src/View/styles/student/announcementStyle'
 
 dayjs.extend(relativeTime)
@@ -82,7 +83,7 @@ export default function StudentAnnouncements() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const { clearUnread } = useNotifications()
-  const itemsPerPage = 8
+  const itemsPerPage = 10
   const [refreshKey, setRefreshKey] = useState(0)
 
   const isFocused = useRef(true)
@@ -313,6 +314,14 @@ export default function StudentAnnouncements() {
     }, 5000)
   }
   const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage)
+
+  const renderFooter = () => {
+    if (totalPages > 1) {
+      return renderPagination()
+    }
+    return <View style={{ height: 80 }} />
+  }
+
   const paginatedAnnouncements = filteredAnnouncements.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -594,7 +603,15 @@ export default function StudentAnnouncements() {
                   ? `${userData.name} ${userData.surname}`
                   : userData?.name || 'Student'}
               </Text>
-              <Text style={styles.role}>Student</Text>
+              <View style={styles.roleBadge}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                  style={styles.roleGradient}
+                >
+                  <Ionicons name='school-outline' size={12} color='#ffffff' />
+                  <Text style={styles.roleText}>Student</Text>
+                </LinearGradient>
+              </View>
             </View>
             <TouchableOpacity
               style={styles.profileButton}
@@ -656,7 +673,15 @@ export default function StudentAnnouncements() {
                 ? `${userData.name} ${userData.surname}`
                 : userData?.name || 'Student'}
             </Text>
-            <Text style={styles.role}>Student</Text>
+            <View style={styles.roleBadge}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                style={styles.roleGradient}
+              >
+                <Ionicons name='school-outline' size={12} color='#ffffff' />
+                <Text style={styles.roleText}>Student</Text>
+              </LinearGradient>
+            </View>
           </View>
           <TouchableOpacity
             style={styles.profileButton}
@@ -696,41 +721,6 @@ export default function StudentAnnouncements() {
 
       {isUserAuthenticated ? (
         <>
-          {/* Stats */}
-          {/*
-          <View style={styles.statsContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsScroll}>
-              <View style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: `${colors.accent.primary}15` }]}>
-                  <Icon name="file-document" size={18} color={colors.accent.primary} />
-                </View>
-                <Text style={styles.statNumber}>{stats.total}</Text>
-                <Text style={styles.statLabel}>Total</Text>
-              </View>
-              <View style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: '#10b98115' }]}>
-                  <Feather name="sun" size={18} color="#10b981" />
-                </View>
-                <Text style={styles.statNumber}>{stats.today}</Text>
-                <Text style={styles.statLabel}>Today</Text>
-              </View>
-              <View style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: '#f59e0b15' }]}>
-                  <Icon name="flag" size={18} color="#f59e0b" />
-                </View>
-                <Text style={styles.statNumber}>{stats.important}</Text>
-                <Text style={styles.statLabel}>Important</Text>
-              </View>
-              <View style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: '#ef444415' }]}>
-                  <Icon name="alert-circle" size={18} color="#ef4444" />
-                </View>
-                <Text style={styles.statNumber}>{stats.urgent}</Text>
-                <Text style={styles.statLabel}>Urgent</Text>
-              </View>
-            </ScrollView>
-          </View>  
-        */}
           {/* Search Bar */}
           <View style={styles.searchSection}>
             <View style={styles.searchBar}>
@@ -810,9 +800,11 @@ export default function StudentAnnouncements() {
             <FlatList
               data={paginatedAnnouncements}
               keyExtractor={(item) => item.id}
-              renderItem={({ item, index }) =>
-                renderAnnouncementCard(item, index)
-              }
+              renderItem={({ item, index }) => (
+                <AnimatedListItem index={index}>
+                  {renderAnnouncementCard(item, index)}
+                </AnimatedListItem>
+              )}
               contentContainerStyle={styles.listContainer}
               showsVerticalScrollIndicator={false}
               refreshControl={
@@ -841,7 +833,7 @@ export default function StudentAnnouncements() {
                   </Text>
                 </View>
               }
-              ListFooterComponent={renderPagination}
+              ListFooterComponent={renderFooter}
               ListFooterComponentStyle={styles.paginationWrapper}
             />
           )}

@@ -1,4 +1,4 @@
-import { Feather, FontAwesome6 } from '@expo/vector-icons'
+import { Feather, FontAwesome6, Ionicons } from '@expo/vector-icons'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -46,6 +46,7 @@ import {
   CampusLocation,
 } from '../../../src/Model/constants/campusLocations'
 import { db } from '../../../src/Model/lib/firebaseConfig'
+import AnimatedListItem from '../../../src/View/components/AnimatedListItem'
 import { createAssistantEventsStyles } from '../../../src/View/styles/assistant-admin/eventStyles'
 
 dayjs.extend(relativeTime)
@@ -98,7 +99,13 @@ export default function AssistantAdminEvents() {
       ? `${userData.surname}, ${userData.name}`
       : userData?.name || 'Assistant'
 
-  // Data state
+  const renderFooter = () => {
+    if (totalPages > 1) {
+      return renderPagination()
+    }
+    return <View style={{ height: 80 }} />
+  }
+  const [mapLoading, setMapLoading] = useState(false)
   const [events, setEvents] = useState<Event[]>([])
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -107,7 +114,6 @@ export default function AssistantAdminEvents() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Form state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [title, setTitle] = useState('')
@@ -120,10 +126,8 @@ export default function AssistantAdminEvents() {
   const [descriptionLength, setDescriptionLength] = useState(0)
   const [showCharWarning, setShowCharWarning] = useState(false)
 
-  // Date picker
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false)
 
-  // Location & coordinates modals
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   const [showCoordinatesModal, setShowCoordinatesModal] = useState(false)
   const [showManualCoordinates, setShowManualCoordinates] = useState(false)
@@ -142,9 +146,8 @@ export default function AssistantAdminEvents() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 5
+  const itemsPerPage = 10
 
-  // Location check state
   const [checkingLocation, setCheckingLocation] = useState(false)
   const [userLocation, setUserLocation] = useState<{
     latitude: number
@@ -153,7 +156,6 @@ export default function AssistantAdminEvents() {
   const [distance, setDistance] = useState<number | null>(null)
   const [isWithinRange, setIsWithinRange] = useState<boolean | null>(null)
 
-  // --- Firestore listener ---
   useEffect(() => {
     const q = query(collection(db, 'events'), orderBy('date', 'desc'))
     const unsubscribe = onSnapshot(
@@ -885,7 +887,19 @@ export default function AssistantAdminEvents() {
           <View>
             <Text style={styles.greeting}>Events Dashboard,</Text>
             <Text style={styles.userName}>{displayName}</Text>
-            <Text style={styles.role}>Assistant Admin</Text>
+            <View style={styles.roleBadge}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                style={styles.roleGradient}
+              >
+                <Ionicons
+                  name='shield-checkmark-outline'
+                  size={12}
+                  color='#ffffff'
+                />
+                <Text style={styles.roleText}>Assistant Admin</Text>
+              </LinearGradient>
+            </View>
           </View>
           <TouchableOpacity
             style={styles.profileButton}
@@ -926,40 +940,6 @@ export default function AssistantAdminEvents() {
         </View>
       </LinearGradient>
 
-      {/* Stats Row */}
-      {/*
-      <View style={styles.statsContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statsScroll}
-        >
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: `${colors.accent.primary}15` }]}>
-              <Ionicons name="calendar" size={18} color={colors.accent.primary} />
-            </View>
-            <Text style={styles.statNumber}>{stats.total}</Text>
-            <Text style={styles.statLabel}>Total</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#f59e0b15' }]}>
-              <Feather name="clock" size={18} color="#f59e0b" />
-            </View>
-            <Text style={styles.statNumber}>{stats.upcoming}</Text>
-            <Text style={styles.statLabel}>Upcoming</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <View style={[styles.statIcon, { backgroundColor: '#f59e0b15' }]}>
-              <MaterialIcons name="pending" size={18} color="#f59e0b" />
-            </View>
-            <Text style={styles.statNumber}>{stats.pending}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-          </View>
-        </ScrollView>
-      </View>
-    */}
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <View style={styles.searchBar}>
@@ -1024,7 +1004,11 @@ export default function AssistantAdminEvents() {
       <FlatList
         data={paginatedEvents}
         keyExtractor={(item) => item.id}
-        renderItem={renderEventCard}
+        renderItem={({ item, index }) => (
+          <AnimatedListItem index={index}>
+            {renderEventCard({ item, index })}
+          </AnimatedListItem>
+        )}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -1038,7 +1022,7 @@ export default function AssistantAdminEvents() {
           />
         }
         ListEmptyComponent={renderEmptyState}
-        ListFooterComponent={renderPagination}
+        ListFooterComponent={renderFooter}
         ListFooterComponentStyle={styles.paginationWrapper}
       />
 
@@ -1215,11 +1199,6 @@ export default function AssistantAdminEvents() {
                       style={styles.datePickerButton}
                       onPress={showDatePicker}
                     >
-                      <Feather
-                        name='calendar'
-                        size={18}
-                        color={colors.accent.primary}
-                      />
                       <Text style={styles.datePickerText}>
                         {dayjs(date).format('MMM D, YYYY • h:mm A')}
                       </Text>
@@ -1243,11 +1222,6 @@ export default function AssistantAdminEvents() {
                   style={styles.locationPickerButton}
                   onPress={() => setShowLocationPicker(true)}
                 >
-                  <Feather
-                    name='map-pin'
-                    size={18}
-                    color={colors.accent.primary}
-                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.locationPickerTitle}>
                       {location || 'Set location'}
@@ -1308,7 +1282,7 @@ export default function AssistantAdminEvents() {
                         color='#ffffff'
                       />
                       <Text style={styles.submitButtonText}>
-                        {editingId ? 'Save Changes' : 'Submit for Approval'}
+                        {editingId ? 'Save Changes' : 'Submit Event'}
                       </Text>
                     </>
                   )}
@@ -1893,18 +1867,37 @@ export default function AssistantAdminEvents() {
                           </TouchableOpacity>
 
                           <TouchableOpacity
-                            style={[styles.detailActionButton, { flex: 1 }]}
-                            onPress={() =>
-                              openLocationInMaps(
-                                selectedEvent.location,
-                                selectedEvent.coordinates
-                              )
-                            }
+                            style={[
+                              styles.detailActionButton,
+                              { flex: 1 },
+                              mapLoading && { opacity: 0.7 },
+                            ]}
+                            onPress={async () => {
+                              if (mapLoading) return
+                              setMapLoading(true)
+                              try {
+                                await openLocationInMaps(
+                                  selectedEvent.location,
+                                  selectedEvent.coordinates
+                                )
+                              } catch (e) {
+                                console.error('Map opening failed:', e)
+                              } finally {
+                                setMapLoading(false)
+                              }
+                            }}
+                            disabled={mapLoading}
                           >
-                            <Feather name='map' size={16} color='#10b981' />
-                            <Text style={styles.detailActionButtonText}>
-                              View on map
-                            </Text>
+                            {mapLoading ? (
+                              <ActivityIndicator size='small' color='#10b981' />
+                            ) : (
+                              <>
+                                <Feather name='map' size={16} color='#10b981' />
+                                <Text style={styles.detailActionButtonText}>
+                                  View on map
+                                </Text>
+                              </>
+                            )}
                           </TouchableOpacity>
                         </View>
 

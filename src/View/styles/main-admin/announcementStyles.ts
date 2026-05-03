@@ -96,7 +96,7 @@ export const createAnnouncementStyles = (
       alignItems: 'center',
       borderTopWidth: 1,
       borderTopColor: 'rgba(255,255,255,0.08)',
-      paddingTop: 16,
+      paddingTop: 2,
       gap: 12,
       marginTop: 0,
     },

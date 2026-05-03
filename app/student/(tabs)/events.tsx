@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -28,6 +28,7 @@ import { useNotifications } from '../../../src/Controller/context/NotificationCo
 import { useTheme } from '../../../src/Controller/context/ThemeContext'
 import { CAMPUS_LOCATIONS } from '../../../src/Model/constants/campusLocations'
 import { db } from '../../../src/Model/lib/firebaseConfig'
+import AnimatedListItem from '../../../src/View/components/AnimatedListItem'
 import { createEventStyles } from '../../../src/View/styles/student/eventStyles'
 
 dayjs.extend(relativeTime)
@@ -52,6 +53,7 @@ interface Event {
 }
 
 export default function StudentEventsScreen() {
+  const [mapLoading, setMapLoading] = useState(false)
   const { user, userData } = useAuth()
   const currentUserId = user?.uid
   const router = useRouter()
@@ -81,7 +83,7 @@ export default function StudentEventsScreen() {
   const [searchQuery, setSearchQuery] = useState('')
 
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 5
+  const itemsPerPage = 10
 
   const [checkingLocation, setCheckingLocation] = useState(false)
   const [userLocation, setUserLocation] = useState<{
@@ -650,6 +652,13 @@ export default function StudentEventsScreen() {
     )
   }
 
+  const renderFooter = () => {
+    if (totalPages > 1) {
+      return renderPagination()
+    }
+    return <View style={{ height: 80 }} />
+  }
+
   const renderDetailModal = () => (
     <Modal
       visible={showDetailModal}
@@ -849,32 +858,58 @@ export default function StudentEventsScreen() {
                             </>
                           )}
                         </TouchableOpacity>
-
                         <TouchableOpacity
-                          style={[styles.detailActionButton, { flex: 1 }]}
-                          onPress={() =>
-                            openLocationInMaps(
-                              selectedEvent.location,
-                              selectedEvent.coordinates
-                            )
-                          }
+                          style={[
+                            styles.detailActionButton,
+                            { flex: 1 },
+                            mapLoading && { opacity: 0.7 },
+                          ]}
+                          onPress={async () => {
+                            if (mapLoading) return
+                            setMapLoading(true)
+                            try {
+                              await openLocationInMaps(
+                                selectedEvent.location,
+                                selectedEvent.coordinates
+                              )
+                            } catch (e) {
+                              console.error('Map opening failed:', e)
+                            } finally {
+                              setMapLoading(false)
+                            }
+                          }}
+                          disabled={mapLoading}
                         >
-                          <Feather name='map' size={16} color='#10b981' />
-                          <Text style={styles.detailActionButtonText}>
-                            View on map
-                          </Text>
+                          {mapLoading ? (
+                            <ActivityIndicator size='small' color='#10b981' />
+                          ) : (
+                            <>
+                              <Feather name='map' size={16} color='#10b981' />
+                              <Text style={styles.detailActionButtonText}>
+                                View on map
+                              </Text>
+                            </>
+                          )}
                         </TouchableOpacity>
                       </View>
 
-                      <View style={styles.detailMetaItem}>
-                        <Feather name='map-pin' size={14} color='#f59e0b' />
+                      <View style={styles.detailMetaItem1}>
+                        <Feather
+                          name='map-pin'
+                          size={14}
+                          color={colors.sidebar.text.muted}
+                        />
                         <Text style={styles.detailMetaText}>
                           {selectedEvent.coordinates.latitude.toFixed(4)},{' '}
                           {selectedEvent.coordinates.longitude.toFixed(4)}
                         </Text>
                       </View>
-                      <View style={styles.detailMetaItem}>
-                        <Feather name='radio' size={14} color='#f59e0b' />
+                      <View style={styles.detailMetaItem1}>
+                        <Feather
+                          name='radio'
+                          size={14}
+                          color={colors.sidebar.text.muted}
+                        />
                         <Text style={styles.detailMetaText}>
                           Radius: {selectedEvent.coordinates.radius}m
                         </Text>
@@ -1012,7 +1047,15 @@ export default function StudentEventsScreen() {
                 ? `${userData.name} ${userData.surname}`
                 : userData?.name || 'Student'}
             </Text>
-            <Text style={styles.role}>Student</Text>
+            <View style={styles.roleBadge}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                style={styles.roleGradient}
+              >
+                <Ionicons name='school-outline' size={12} color='#ffffff' />
+                <Text style={styles.roleText}>Student</Text>
+              </LinearGradient>
+            </View>
           </View>
           <TouchableOpacity
             style={styles.profileButton}
@@ -1159,7 +1202,11 @@ export default function StudentEventsScreen() {
       <FlatList
         data={paginatedEvents}
         keyExtractor={(item) => item.id}
-        renderItem={renderEventCard}
+        renderItem={({ item, index }) => (
+          <AnimatedListItem index={index}>
+            {renderEventCard({ item, index })}
+          </AnimatedListItem>
+        )}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -1170,7 +1217,7 @@ export default function StudentEventsScreen() {
           />
         }
         ListEmptyComponent={renderEmptyState}
-        ListFooterComponent={renderPagination}
+        ListFooterComponent={renderFooter}
         ListFooterComponentStyle={styles.paginationWrapper}
       />
 

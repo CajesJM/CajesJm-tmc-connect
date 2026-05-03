@@ -110,7 +110,7 @@ export const createEventsStyles = (
       alignItems: 'center',
       borderTopWidth: 1,
       borderTopColor: 'rgba(255,255,255,0.08)',
-      paddingTop: 16,
+      paddingTop: 2,
       gap: 12,
       marginTop: 0,
     },
@@ -680,6 +680,7 @@ export const createEventsStyles = (
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
+      marginBottom: 12,
     },
     modernLocationButtonText: {
       flex: 1,

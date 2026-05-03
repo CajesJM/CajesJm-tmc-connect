@@ -1509,11 +1509,7 @@ const TMCConnectLanding: React.FC = () => {
             <Text style={styles.footerDivider}>·</Text>
             <Text
               style={styles.footerLink}
-              onPress={() =>
-                Linking.openURL(
-                  'https://github.com/CajesJM/CajesJm-tmc-connect'
-                )
-              }
+              onPress={() => Linking.openURL('https://github.com/CajesJM')}
             >
               GitHub
             </Text>

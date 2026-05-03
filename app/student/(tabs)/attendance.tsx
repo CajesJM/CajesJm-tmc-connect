@@ -773,11 +773,7 @@ export default function StudentAttendance() {
         <LinearGradient colors={headerGradientColors} style={styles.header}>
           <View style={styles.headerTop}>
             <View style={styles.headerIcon}>
-              <Feather
-                name='check-square'
-                size={28}
-                color={colors.accent.primary}
-              />
+              <Feather name='check-square' size={28} color='#fff' />
             </View>
             <View>
               <Text style={styles.greeting}>Attendance</Text>

@@ -68,7 +68,6 @@ const TabIconWithBadge = ({
   )
 }
 
-// Inner component that uses the notification context and theme
 function TabsContent() {
   const { unreadCounts } = useNotifications()
   const { colors, isDark } = useTheme()
@@ -150,7 +149,6 @@ function TabsContent() {
     [colors.card, colors.accent.primary, isDark]
   )
 
-  // Gradient colors for the QR button
   const qrGradientColors = useMemo(
     () => [colors.accent.primary, '#0284c7'] as const,
     [colors.accent.primary]
@@ -204,7 +202,7 @@ function TabsContent() {
           }}
         />
 
-        {/* QR Code Generation – Center Floating Button */}
+        {/* QR Code Generation Tab */}
         <Tabs.Screen
           name='attendance'
           options={{
@@ -310,7 +308,6 @@ function TabsContent() {
   )
 }
 
-// Main layout – wraps everything with the NotificationProvider and ThemeProvider
 export default function AdminTabsLayout() {
   return (
     <NotificationProvider>
@@ -319,7 +316,6 @@ export default function AdminTabsLayout() {
   )
 }
 
-// Styles – reused from student tabs
 const styles = StyleSheet.create({
   iconContainer: {
     width: 44,
@@ -329,9 +325,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     position: 'relative',
   },
-  activeIconContainer: {
-    // background applied inline
-  },
+  activeIconContainer: {},
   activeIndicator: {
     position: 'absolute',
     bottom: 4,
@@ -346,7 +340,7 @@ const styles = StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#ef4444', // keep red for badge
+    backgroundColor: '#ef4444',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
@@ -358,7 +352,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
-  // QR Button Styles
+  // QR Button
   qrButtonContainer: {
     alignItems: 'center',
     justifyContent: 'center',

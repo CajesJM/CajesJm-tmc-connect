@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
@@ -22,7 +22,7 @@ import {
   ref,
   uploadBytes,
 } from 'firebase/storage'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -62,6 +62,61 @@ function getInitials(name?: string, email?: string): string {
   }
   if (email) return email[0].toUpperCase()
   return 'A'
+}
+
+function useCountUp(
+  target: number,
+  duration: number = 800,
+  isLoading: boolean = false
+) {
+  const [count, setCount] = useState(0)
+  const prevTarget = useRef(0)
+
+  useEffect(() => {
+    if (isLoading || target === 0) {
+      setCount(0)
+      return
+    }
+
+    const startValue = prevTarget.current
+    const diff = target - startValue
+    const steps = 30
+    const stepDuration = duration / steps
+    let currentStep = 0
+
+    const timer = setInterval(() => {
+      currentStep++
+      const progress = currentStep / steps
+      const easedProgress = 1 - Math.pow(1 - progress, 3)
+      setCount(Math.round(startValue + diff * easedProgress))
+
+      if (currentStep >= steps) {
+        clearInterval(timer)
+        setCount(target)
+        prevTarget.current = target
+      }
+    }, stepDuration)
+
+    return () => clearInterval(timer)
+  }, [target, isLoading])
+
+  return count
+}
+function AnimatedStat({
+  value,
+  isLoading,
+  color,
+  style,
+}: {
+  value: number
+  isLoading: boolean
+  color: string
+  style?: any
+}) {
+  const count = useCountUp(value, 800, isLoading)
+
+  if (isLoading) return <ActivityIndicator size='small' color={color} />
+  return <Text style={style}>{count}</Text>
 }
 
 export default function AssistantAdminProfile() {
@@ -1244,7 +1299,19 @@ export default function AssistantAdminProfile() {
           <View>
             <Text style={styles.greeting}>My Profile</Text>
             <Text style={styles.userName}>{displayName}</Text>
-            <Text style={styles.role}>Assistant Admin</Text>
+            <View style={styles.roleBadge}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                style={styles.roleGradient}
+              >
+                <Ionicons
+                  name='shield-checkmark-outline'
+                  size={12}
+                  color='#ffffff'
+                />
+                <Text style={styles.roleText}>Assistant Admin</Text>
+              </LinearGradient>
+            </View>
           </View>
 
           <TouchableOpacity
@@ -1280,7 +1347,7 @@ export default function AssistantAdminProfile() {
           </View>
 
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Feather name='log-out' size={18} color='#ef4444' />
+            <Feather name='log-out' size={18} color='#fa0b0b' />
             <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
         </View>
@@ -1376,11 +1443,12 @@ export default function AssistantAdminProfile() {
                     color={stat.color}
                   />
                 </View>
-                {loadingStats ? (
-                  <ActivityIndicator size='small' color={stat.color} />
-                ) : (
-                  <Text style={styles.statValue}>{stat.value}</Text>
-                )}
+                <AnimatedStat
+                  value={stat.value}
+                  isLoading={loadingStats}
+                  color={stat.color}
+                  style={styles.statValue}
+                />
                 <Text style={styles.statLabel}>{stat.label}</Text>
               </View>
             ))}
@@ -1496,9 +1564,12 @@ export default function AssistantAdminProfile() {
                     { backgroundColor: `${s.color}15` },
                   ]}
                 >
-                  <Text style={[styles.statusValue, { color: s.color }]}>
-                    {loadingStats ? '—' : s.value}
-                  </Text>
+                  <AnimatedStat
+                    value={s.value}
+                    isLoading={loadingStats}
+                    color={s.color}
+                    style={[styles.statusValue, { color: s.color }]}
+                  />
                   <Text style={[styles.statusLabel, { color: s.color }]}>
                     {s.label}
                   </Text>

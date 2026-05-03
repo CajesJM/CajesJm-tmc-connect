@@ -53,7 +53,63 @@ function getInitials(name?: string, email?: string): string {
   if (email) return email[0].toUpperCase()
   return 'A'
 }
+function useCountUp(
+  target: number,
+  duration: number = 800,
+  isLoading: boolean = false
+) {
+  const [count, setCount] = useState(0)
+  const prevTarget = useRef(0)
 
+  useEffect(() => {
+    if (isLoading || target === 0) {
+      setCount(0)
+      return
+    }
+
+    const startValue = prevTarget.current
+    const diff = target - startValue
+    const steps = 30
+    const stepDuration = duration / steps
+    let currentStep = 0
+
+    const timer = setInterval(() => {
+      currentStep++
+      const progress = currentStep / steps
+      const easedProgress = 1 - Math.pow(1 - progress, 3)
+      setCount(Math.round(startValue + diff * easedProgress))
+
+      if (currentStep >= steps) {
+        clearInterval(timer)
+        setCount(target)
+        prevTarget.current = target
+      }
+    }, stepDuration)
+
+    return () => clearInterval(timer)
+  }, [target, isLoading])
+
+  return count
+}
+
+function AnimatedStat({
+  value,
+  isLoading,
+  color,
+  style,
+}: {
+  value: number
+  isLoading: boolean
+  color: string
+  style?: any
+}) {
+  const count = useCountUp(value, 800, isLoading)
+  if (isLoading)
+    return (
+      <ActivityIndicator size='small' color={color} style={{ marginTop: 8 }} />
+    )
+  return <Text style={style}>{count}</Text>
+}
 export default function MainAdminProfile() {
   const { logout, userData, refreshUserData } = useAuth()
   const router = useRouter()
@@ -1126,15 +1182,12 @@ export default function MainAdminProfile() {
                     color={stat.color}
                   />
                 </View>
-                {loadingStats ? (
-                  <ActivityIndicator
-                    size='small'
-                    color={stat.color}
-                    style={{ marginTop: 8 }}
-                  />
-                ) : (
-                  <Text style={styles.statValue}>{stat.value}</Text>
-                )}
+                <AnimatedStat
+                  value={stat.value}
+                  isLoading={loadingStats}
+                  color={stat.color}
+                  style={styles.statValue}
+                />
                 <Text style={styles.statLabel}>{stat.label}</Text>
               </View>
             ))}
@@ -1339,9 +1392,12 @@ export default function MainAdminProfile() {
                   {loadingStats ? (
                     <ActivityIndicator color='#ffffff' />
                   ) : (
-                    <Text style={[styles.metricValue, { color: '#ffffff' }]}>
-                      {stats.totalAttendance}
-                    </Text>
+                    <AnimatedStat
+                      value={stats.totalAttendance}
+                      isLoading={loadingStats}
+                      color='#ffffff'
+                      style={[styles.metricValue, { color: '#ffffff' }]}
+                    />
                   )}
                   <Text style={[styles.metricLabel, { color: '#ffffffcc' }]}>
                     Total Attendance
@@ -1395,9 +1451,12 @@ export default function MainAdminProfile() {
                   {loadingStats ? (
                     <ActivityIndicator color='#ffffff' />
                   ) : (
-                    <Text style={[styles.metricValue, { color: '#ffffff' }]}>
-                      {stats.totalEvents + stats.totalAnnouncements}
-                    </Text>
+                    <AnimatedStat
+                      value={stats.totalEvents + stats.totalAnnouncements}
+                      isLoading={loadingStats}
+                      color='#ffffff'
+                      style={[styles.metricValue, { color: '#ffffff' }]}
+                    />
                   )}
                   <Text style={[styles.metricLabel, { color: '#ffffffcc' }]}>
                     Total Posts
@@ -1428,9 +1487,12 @@ export default function MainAdminProfile() {
               >
                 <View style={styles.statusHeader}>
                   <Feather name='check-circle' size={14} color='#ffffff' />
-                  <Text style={[styles.statusValue, { color: '#ffffff' }]}>
-                    {loadingStats ? '—' : stats.combinedApproved}
-                  </Text>
+                  <AnimatedStat
+                    value={stats.combinedApproved}
+                    isLoading={loadingStats}
+                    color='#ffffff'
+                    style={[styles.statusValue, { color: '#ffffff' }]}
+                  />
                 </View>
                 <Text style={[styles.statusLabel, { color: '#ffffffcc' }]}>
                   Approved
@@ -1446,9 +1508,12 @@ export default function MainAdminProfile() {
               >
                 <View style={styles.statusHeader}>
                   <Feather name='clock' size={14} color='#ffffff' />
-                  <Text style={[styles.statusValue, { color: '#ffffff' }]}>
-                    {loadingStats ? '—' : stats.combinedPending}
-                  </Text>
+                  <AnimatedStat
+                    value={stats.combinedPending}
+                    isLoading={loadingStats}
+                    color='#ffffff'
+                    style={[styles.statusValue, { color: '#ffffff' }]}
+                  />
                 </View>
                 <Text style={[styles.statusLabel, { color: '#ffffffcc' }]}>
                   Pending
@@ -1464,9 +1529,12 @@ export default function MainAdminProfile() {
               >
                 <View style={styles.statusHeader}>
                   <Feather name='x-circle' size={14} color='#ffffff' />
-                  <Text style={[styles.statusValue, { color: '#ffffff' }]}>
-                    {loadingStats ? '—' : stats.combinedRejected}
-                  </Text>
+                  <AnimatedStat
+                    value={stats.combinedRejected}
+                    isLoading={loadingStats}
+                    color='#ffffff'
+                    style={[styles.statusValue, { color: '#ffffff' }]}
+                  />
                 </View>
                 <Text style={[styles.statusLabel, { color: '#ffffffcc' }]}>
                   Rejected

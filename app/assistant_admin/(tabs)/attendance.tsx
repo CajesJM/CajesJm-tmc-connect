@@ -1,4 +1,4 @@
-import { Feather } from '@expo/vector-icons'
+import { Feather, Ionicons } from '@expo/vector-icons'
 import * as FileSystem from 'expo-file-system/legacy'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as Print from 'expo-print'
@@ -212,8 +212,6 @@ export default function MainAdminAttendance() {
   const [selectedEventForAction, setSelectedEventForAction] =
     useState<Event | null>(null)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
-
-  // Pagination for missing list
   const [missingPage, setMissingPage] = useState(1)
   const missingItemsPerPage = 10
 
@@ -629,11 +627,11 @@ export default function MainAdminAttendance() {
         const penaltyData = {
           eventId: selectedEvent.id,
           eventTitle: selectedEvent.title,
-          eventDate: getEventDateISO(selectedEvent.date), // ✅ Added
+          eventDate: getEventDateISO(selectedEvent.date),
           studentId: student.id,
           studentName: student.name,
-          studentID: student.studentID, // ✅ Add back if needed
-          status: 'pending', // ✅ Must be 'pending'
+          studentID: student.studentID,
+          status: 'pending',
           createdAt: timestamp,
           sentBy: user.uid,
           sentAt: timestamp,
@@ -642,7 +640,6 @@ export default function MainAdminAttendance() {
 
         batch.set(penaltyRef, penaltyData)
 
-        // Also add to user's penalties array
         const userRef = doc(db, 'users', student.id)
         const userDoc = await getDoc(userRef)
         if (userDoc.exists()) {
@@ -660,7 +657,6 @@ export default function MainAdminAttendance() {
         }
       }
 
-      // Update event document
       const eventRef = doc(db, 'events', selectedEvent.id)
       batch.update(eventRef, {
         penaltiesSent: true,
@@ -967,22 +963,18 @@ export default function MainAdminAttendance() {
       // Create/update the penalty record
       await setDoc(penaltyRef, penaltyData)
 
-      // Also update the user's profile penalties array
       const userRef = doc(db, 'users', student.id)
       const userDoc = await getDoc(userRef)
 
       if (userDoc.exists()) {
         const userData = userDoc.data()
         const existingPenalties = userData.penalties || []
-
-        // Check if penalty for this event already exists
         const penaltyIndex = existingPenalties.findIndex(
           (p: any) => p.eventId === selectedEvent.id
         )
 
         let updatedPenalties
         if (penaltyIndex >= 0) {
-          // Update existing penalty to paid
           updatedPenalties = [...existingPenalties]
           updatedPenalties[penaltyIndex] = {
             ...updatedPenalties[penaltyIndex],
@@ -991,7 +983,6 @@ export default function MainAdminAttendance() {
             paidBy: user.uid,
           }
         } else {
-          // Add new penalty record as paid
           updatedPenalties = [
             ...existingPenalties,
             {
@@ -1014,7 +1005,6 @@ export default function MainAdminAttendance() {
         `${student.name} has been marked as paid for ${selectedEvent.title}.`
       )
 
-      // Optimistically update local state
       setPaidStudentIds((prev) => new Set([...prev, student.id]))
     } catch (error) {
       console.error('Error marking as paid:', error)
@@ -1196,7 +1186,6 @@ export default function MainAdminAttendance() {
     }
     setIsSavingQR(true)
     try {
-      // 1. Get QR code data URL
       const getDataURL = (): Promise<string> => {
         return new Promise((resolve, reject) => {
           setTimeout(() => {
@@ -1225,7 +1214,6 @@ export default function MainAdminAttendance() {
 
       const qrDataUrl = await getDataURL()
 
-      // 2. Prepare event details
       const eventTitle = selectedEvent.title || 'Untitled Event'
       const eventDate = selectedEvent.date
         ? formatDate(selectedEvent.date)
@@ -1236,7 +1224,6 @@ export default function MainAdminAttendance() {
         : 'No expiration set'
       const generatedTime = new Date().toLocaleString()
 
-      // 3. Build HTML for PDF
       const htmlContent = `
       <!DOCTYPE html>
       <html>
@@ -1338,9 +1325,7 @@ export default function MainAdminAttendance() {
       </html>
     `
 
-      // 4. Generate PDF and share
       if (Platform.OS === 'web') {
-        // Web: open print window (user can save as PDF)
         const printWindow = window.open('', '_blank')
         if (!printWindow) {
           showAlert(
@@ -1355,7 +1340,6 @@ export default function MainAdminAttendance() {
         printWindow.print()
         showAlert('Print Ready', 'Use the print dialog to save as PDF.')
       } else {
-        // Native: generate PDF file and share
         const { uri } = await Print.printToFileAsync({
           html: htmlContent,
           base64: false,
@@ -1372,7 +1356,6 @@ export default function MainAdminAttendance() {
           showAlert('Error', 'Sharing is not available on this device.')
         }
 
-        // Clean up temp file (optional, but good practice)
         try {
           await FileSystem.deleteAsync(uri, { idempotent: true })
         } catch {}
@@ -1890,12 +1873,10 @@ export default function MainAdminAttendance() {
     setIsGeneratingPDF(true)
 
     try {
-      // Build a set of attended student IDs
       const attendedIds = new Set(
         attendanceRecords.map((r) => String(r.studentID).trim().toLowerCase())
       )
 
-      // Prepare data for all students with attendance status
       const allStudents = students.map((student) => {
         const attended = attendedIds.has(
           String(student.studentID).trim().toLowerCase()
@@ -1906,7 +1887,7 @@ export default function MainAdminAttendance() {
         }
       })
 
-      // Sort by block number (numeric), with non‑numeric blocks at the end
+      // Sort by block number
       const sortedStudents = [...allStudents].sort((a, b) => {
         const blockA = a.block?.toString() || ''
         const blockB = b.block?.toString() || ''
@@ -1921,12 +1902,11 @@ export default function MainAdminAttendance() {
         return blockA.localeCompare(blockB)
       })
 
-      // Build table rows
       const studentRows = sortedStudents
         .map((s) => {
           const remarkCell = s.attended
             ? `<span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background-color: #10b98120; color: #10b981;">✓ Attended</span>`
-            : '' // empty for absent
+            : ''
 
           return `
           <tr>
@@ -2284,7 +2264,19 @@ export default function MainAdminAttendance() {
                 ? `${userData.surname}, ${userData.name}`
                 : userData?.name || 'Assistant'}
             </Text>
-            <Text style={styles.role}>Assistant Admin</Text>
+            <View style={styles.roleBadge}>
+              <LinearGradient
+                colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
+                style={styles.roleGradient}
+              >
+                <Ionicons
+                  name='shield-checkmark-outline'
+                  size={12}
+                  color='#ffffff'
+                />
+                <Text style={styles.roleText}>Assistant Admin</Text>
+              </LinearGradient>
+            </View>
           </View>
           <TouchableOpacity
             style={styles.profileButton}
@@ -2454,12 +2446,7 @@ export default function MainAdminAttendance() {
                       <Text style={styles.eventDetailText}>
                         {formatDate(selectedEvent.date)}
                       </Text>
-                      <View style={styles.bullet} />
-                      <Feather
-                        name='map-pin'
-                        size={12}
-                        color={colors.sidebar.text.secondary}
-                      />
+
                       <Text style={styles.eventDetailText}>
                         {selectedEvent.location}
                       </Text>
@@ -2474,7 +2461,7 @@ export default function MainAdminAttendance() {
                     )}
                   </View>
 
-                  {/* QR Code Frame with ref for capture */}
+                  {/* QR Code Frame */}
                   <View ref={qrWrapperRef} style={styles.qrFrame}>
                     <View style={styles.qrCodeWrapper}>
                       {!isCurrentQRExpired ? (
@@ -2806,7 +2793,6 @@ export default function MainAdminAttendance() {
               style={[styles.rightGrid, isMobile && styles.rightGridMobile]}
             >
               {mode === 'qr' ? (
-                // Attended view
                 <>
                   <View
                     style={[
@@ -3280,7 +3266,6 @@ export default function MainAdminAttendance() {
                         selectedEvent?.id || ''
                       )
 
-                      // Determine button visibility
                       const showCompleteButton =
                         penaltySent && !isCompleted && !isPaid
                       const showCancelButton = isCompleted
@@ -3647,7 +3632,7 @@ export default function MainAdminAttendance() {
         </View>
       </ScrollView>
 
-      {/* Modals (unchanged but use theme where appropriate) */}
+      {/* Modals */}
       <Modal
         visible={showEventModal}
         transparent
@@ -4081,11 +4066,6 @@ export default function MainAdminAttendance() {
                   style={[styles.modernLocationButton, { marginBottom: 16 }]}
                   onPress={() => setCustomDatePickerVisible(true)}
                 >
-                  <Feather
-                    name='calendar'
-                    size={20}
-                    color={colors.accent.primary}
-                  />
                   <View style={styles.modernLocationButtonText}>
                     <Text style={styles.modernLocationButtonTitle}>
                       {customExpirationDate
@@ -4399,7 +4379,6 @@ export default function MainAdminAttendance() {
         </View>
       </Modal>
 
-      {/* Cancel Completion Confirmation Modal - MOVED OUTSIDE */}
       <Modal
         visible={showCancelConfirmModal}
         transparent

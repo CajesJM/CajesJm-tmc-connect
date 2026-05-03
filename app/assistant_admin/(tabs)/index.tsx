@@ -53,6 +53,7 @@ import {
 } from '../../../src/Controller/utils/pdfGenerator'
 import { auth, db } from '../../../src/Model/lib/firebaseConfig'
 import AutoSlidingStats from '../../../src/View/components/AutoSlidingStats-AssAd'
+import BarkieFloat from '../../../src/View/components/BarkieFloat'
 import { NotificationModal } from '../../../src/View/components/NotificationModal'
 import { WeatherWidget } from '../../../src/View/components/WeatherWidget'
 import { styles } from '../../../src/View/styles/assistant-admin/dashboardStyles'
@@ -1533,6 +1534,8 @@ export default function AssistantAdminDashboard() {
       const eventsSnap = await getDocs(collection(db, 'events'))
       eventsSnap.docs.forEach((doc) => {
         const data = doc.data()
+        if (data.status === 'rejected') return
+
         const eventDate = data.date?.toDate()
         if (
           eventDate &&
@@ -2030,12 +2033,20 @@ export default function AssistantAdminDashboard() {
                       : userData?.name || 'Assistant'}
                   </Text>
                   <View style={styles.roleBadge}>
-                    <Ionicons
-                      name='shield-checkmark-outline'
-                      size={12}
-                      color='#ffffff'
-                    />
-                    <Text style={styles.roleText}>Assistant Admin</Text>
+                    <LinearGradient
+                      colors={[
+                        'rgba(255,255,255,0.2)',
+                        'rgba(255,255,255,0.1)',
+                      ]}
+                      style={styles.roleGradient}
+                    >
+                      <Ionicons
+                        name='shield-checkmark-outline'
+                        size={12}
+                        color='#ffffff'
+                      />
+                      <Text style={styles.roleText}>Assistant Admin</Text>
+                    </LinearGradient>
                   </View>
                 </View>
               </View>
@@ -2341,6 +2352,9 @@ export default function AssistantAdminDashboard() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Barkie AI */}
+      <BarkieFloat />
 
       <NotificationModal
         visible={notificationModalVisible}

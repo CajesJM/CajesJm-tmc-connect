@@ -663,7 +663,7 @@ export default function SuperAdminLogin() {
       >
         <View style={styles.container}>
           <LinearGradient
-            colors={['#0f2b4db7', '#0d2e4f', '#0b0732']}
+            colors={['#0b0732', '#0d2e4f', '#0d3667b7']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.leftColumn, { flex: 1.15 }]}

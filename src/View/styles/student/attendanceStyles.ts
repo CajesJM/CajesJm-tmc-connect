@@ -134,7 +134,7 @@ export const createAttendanceStyles = (
       alignItems: 'center',
     },
     greeting: {
-      color: colors.sidebar.text.muted,
+      color: 'rgba(255,255,255,0.8)',
       fontSize: 13,
       fontWeight: '500',
       textTransform: 'uppercase',
@@ -146,13 +146,12 @@ export const createAttendanceStyles = (
       fontWeight: '700',
     },
     headerSubtitle: {
-      color: colors.sidebar.text.muted,
+      color: 'rgba(255,255,255,0.8)',
       fontSize: isMobile ? 13 : 14,
       lineHeight: 20,
     },
     scanCard: {
       margin: isMobile ? 16 : 20,
-      marginTop: -20,
       borderRadius: 20,
       overflow: 'hidden',
       shadowColor: colors.accent.primary,

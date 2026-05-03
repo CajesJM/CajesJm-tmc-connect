@@ -34,14 +34,12 @@ export const createAssistantProfileStyles = (colors: any, isDark: boolean) =>
       marginBottom: 16,
     },
     greeting: {
-      fontSize: isMobile ? 12 : 13,
-      color:
-        colors.sidebar?.text?.muted ||
-        (isDark ? '#94a3b8' : 'rgba(255,255,255,0.75)'),
+      fontSize: isMobile ? 12 : 14,
+      color: 'rgba(255,255,255,0.8)',
       marginBottom: 2,
     },
     userName: {
-      fontSize: isMobile ? 20 : 22,
+      fontSize: isMobile ? 20 : 24,
       fontWeight: '700',
       color: '#ffffff',
       marginBottom: 2,
@@ -107,7 +105,7 @@ export const createAssistantProfileStyles = (colors: any, isDark: boolean) =>
       marginTop: -18,
     },
     logoutButtonText: {
-      color: '#ef4444',
+      color: '#ffffff',
       fontSize: isMobile ? 12 : 13,
       fontWeight: '600',
     },
@@ -124,12 +122,25 @@ export const createAssistantProfileStyles = (colors: any, isDark: boolean) =>
       marginBottom: 2,
       color: isDark ? 'rgba(148,163,184,0.85)' : 'rgba(255,255,255,0.75)',
     },
+    roleBadge: {
+      marginTop: 2,
+      marginBottom: 2,
+      alignSelf: 'flex-start',
+    },
+    roleGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
     roleText: {
-      fontSize: 11,
+      fontSize: isMobile ? 12 : 13,
+      color: '#ffffff',
       fontWeight: '600',
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
-      color: isDark ? 'rgba(148,163,184,0.6)' : 'rgba(255,255,255,0.65)',
     },
     headerActions: { flexDirection: 'row', gap: 8 },
     headerAction: {

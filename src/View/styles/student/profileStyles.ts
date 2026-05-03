@@ -786,7 +786,7 @@ export const createProfileStyles = (
     },
     greeting: {
       fontSize: isMobile ? 12 : 14,
-      color: colors.sidebar.text.muted,
+      color: 'rgba(255,255,255,0.8)',
       marginBottom: 2,
     },
     userName: {
@@ -795,10 +795,25 @@ export const createProfileStyles = (
       color: '#ffffff',
       marginBottom: 2,
     },
-    role: {
-      fontSize: isMobile ? 12 : 14,
-      color: colors.sidebar.text.muted,
-      fontWeight: '500',
+    roleBadge: {
+      marginTop: 2,
+      marginBottom: 2,
+      alignSelf: 'flex-start',
+    },
+    roleGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+    },
+    roleText: {
+      fontSize: isMobile ? 12 : 13,
+      color: '#ffffff',
+      fontWeight: '600',
     },
     profileButton: {
       width: isMobile ? 44 : 48,
@@ -833,7 +848,7 @@ export const createProfileStyles = (
       gap: 4,
       paddingHorizontal: isMobile ? 8 : 10,
       paddingVertical: isMobile ? 4 : 6,
-      marginTop: -45,
+      marginTop: -20,
       marginLeft: -6,
     },
     dateText: {
@@ -853,7 +868,7 @@ export const createProfileStyles = (
       marginTop: -10,
     },
     logoutButtonText: {
-      color: '#ef4444',
+      color: '#ffffff',
       fontSize: isMobile ? 12 : 13,
       fontWeight: '600',
     },

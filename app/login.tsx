@@ -112,6 +112,7 @@ export default function Login() {
   // Forgot password state
   const [forgotModalVisible, setForgotModalVisible] = useState(false)
   const [forgotUsername, setForgotUsername] = useState('')
+  const [forgotStudentId, setForgotStudentId] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
   const [forgotMessage, setForgotMessage] = useState<string | null>(null)
   const [forgotCooldownUntil, setForgotCooldownUntil] = useState<number | null>(
@@ -450,8 +451,16 @@ export default function Login() {
   }
 
   const handleForgotPassword = async () => {
+    const normaliseId = (id: any) =>
+      String(id ?? '')
+        .replace(/\s+/g, '')
+        .toLowerCase()
     if (!forgotUsername.trim()) {
       setForgotMessage('Please enter your username')
+      return
+    }
+    if (!forgotStudentId.trim()) {
+      setForgotMessage('Please enter your Student ID')
       return
     }
     if (forgotCooldownUntil && forgotCooldownUntil > Date.now()) {
@@ -475,47 +484,93 @@ export default function Login() {
         return
       }
 
-      const userDoc = querySnapshot.docs[0]
-      const userData = userDoc.data()
-      const accountStatus = userData.status || 'active'
-      if (accountStatus !== 'active') {
-        setBusy(false)
-        setError(
-          'Your account has been deactivated. Please contact an administrator.'
+      const validDocs = querySnapshot.docs.filter((userDoc) => {
+        const userData = userDoc.data()
+        const role = userData.role
+        const status = userData.status || 'active'
+        const storedId =
+          userData.studentID || userData.studentId || userData.student_id || ''
+        return (
+          (role === 'student' || role === 'assistant_admin') &&
+          status === 'active' &&
+          normaliseId(storedId) === normaliseId(forgotStudentId)
         )
-        Alert.alert(
-          'Account Inactive',
-          'Your account has been deactivated. Please contact an administrator.'
-        )
-        return
-      }
+      })
 
-      if (userData.role !== 'student' && userData.role !== 'assistant_admin') {
-        setForgotMessage('Account type not supported for password reset here.')
+      if (validDocs.length === 0) {
+        const usernameExists = querySnapshot.docs.some(
+          (d) =>
+            d.data().role === 'student' || d.data().role === 'assistant_admin'
+        )
+        const allInactive = querySnapshot.docs.every(
+          (d) => (d.data().status || 'active') !== 'active'
+        )
+
+        if (allInactive) {
+          setForgotMessage(
+            'Your account has been deactivated. Please contact an administrator.'
+          )
+        } else if (usernameExists) {
+          // Username exists but student ID didn't match
+          setForgotMessage('Student ID does not match our records.')
+        } else {
+          setForgotMessage(
+            'Account type not supported for password reset here.'
+          )
+        }
         setForgotLoading(false)
         return
       }
-      const email = userData.email
 
-      if (!email) {
-        setForgotMessage(
-          'No email address associated with this account. Please contact support.'
-        )
-        setForgotLoading(false)
-        return
-      }
-
-      if (!isValidEmail(email)) {
-        setForgotMessage(
-          'The email address on file is invalid. Please contact support.'
-        )
-        setForgotLoading(false)
-        return
-      }
-
+      // Should be exactly 1 match now (unique username + studentId combo)
       const auth = getAuth()
-      await sendPasswordResetEmail(auth, email)
+      let sentCount = 0
+      let invalidEmailFound = false
+      let missingEmailFound = false
 
+      for (const userDoc of validDocs) {
+        const userData = userDoc.data()
+        const email = userData.email
+
+        if (!email) {
+          missingEmailFound = true
+          continue
+        }
+
+        if (!isValidEmail(email)) {
+          invalidEmailFound = true
+          continue
+        }
+
+        try {
+          await sendPasswordResetEmail(auth, email)
+          sentCount++
+        } catch (err: any) {
+          if (
+            err.code === 'auth/user-not-found' ||
+            err.code === 'auth/invalid-email'
+          ) {
+            continue
+          }
+          throw err
+        }
+      }
+
+      if (sentCount === 0) {
+        if (missingEmailFound || invalidEmailFound) {
+          setForgotMessage(
+            'No valid email address found on this account. Please contact support.'
+          )
+        } else {
+          setForgotMessage(
+            'Failed to send reset email. Please contact support.'
+          )
+        }
+        setForgotLoading(false)
+        return
+      }
+
+      // Success — apply cooldown
       const cooldownTime = Date.now() + 60 * 1000
       setForgotCooldownUntil(cooldownTime)
       setForgotCooldownSeconds(60)
@@ -526,13 +581,12 @@ export default function Login() {
       setForgotLoading(false)
     } catch (error: any) {
       let errorMessage = 'Failed to send reset email. Please try again later.'
-      if (error.code === 'auth/user-not-found')
-        errorMessage =
-          'No account found with that email. Please contact support.'
-      else if (error.code === 'auth/invalid-email')
-        errorMessage = 'Invalid email address. Please contact support.'
-      else if (error.code === 'auth/too-many-requests')
+      if (error.code === 'auth/too-many-requests') {
         errorMessage = 'Too many requests. Please try again later.'
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage =
+          'No internet connection. Please check your network and try again.'
+      }
       setForgotMessage(errorMessage)
       setForgotLoading(false)
     }
@@ -591,10 +645,11 @@ export default function Login() {
         return
       }
 
-      const userDoc = querySnapshot.docs[0]
-      const userData = userDoc.data()
+      const validDocs = querySnapshot.docs.filter(
+        (d) => d.data().role !== 'main_admin'
+      )
 
-      if (userData.role === 'main_admin') {
+      if (validDocs.length === 0) {
         setBusy(false)
         setError('Main administrators must use the Admin Portal')
         Alert.alert(
@@ -604,21 +659,70 @@ export default function Login() {
         return
       }
 
-      const accountStatus = userData.status || 'active'
-      if (accountStatus !== 'active') {
-        setBusy(false)
-        setError(
-          'Your account has been deactivated. Please contact an administrator.'
-        )
-        Alert.alert(
-          'Account Inactive',
-          'Your account has been deactivated. Please contact an administrator.'
-        )
-        return
+      let loggedInUser = null
+      let inactiveAccountFound = false
+      let lastError: any = null
+
+      for (const userDoc of validDocs) {
+        const userData = userDoc.data()
+
+        const accountStatus = userData.status || 'active'
+        if (accountStatus !== 'active') {
+          inactiveAccountFound = true
+          continue
+        }
+
+        try {
+          setLoadingMessage('Authenticating')
+          const result = await login(userData.email, password)
+          loggedInUser = { ...result, role: userData.role }
+          break
+        } catch (err: any) {
+          lastError = err
+
+          const isNetworkError =
+            err?.code === 'auth/network-request-failed' ||
+            err?.code === 'unavailable' ||
+            err?.message?.toLowerCase().includes('network') ||
+            err?.message?.toLowerCase().includes('offline') ||
+            err?.message?.toLowerCase().includes('fetch')
+
+          if (isNetworkError) {
+            setBusy(false)
+            setError(
+              'No internet connection. Please check your network and try again.'
+            )
+            triggerShake()
+            return
+          }
+          continue
+        }
       }
 
-      setLoadingMessage('Authenticating')
-      const loggedInUser = await login(userData.email, password)
+      if (!loggedInUser) {
+        setBusy(false)
+
+        if (inactiveAccountFound && !lastError) {
+          setError(
+            'Your account has been deactivated. Please contact an administrator.'
+          )
+          Alert.alert(
+            'Account Inactive',
+            'Your account has been deactivated. Please contact an administrator.'
+          )
+          return
+        }
+
+        if (lastError?.code === 'auth/too-many-requests') {
+          handleFailedAttempt(
+            'Too many failed attempts. Please try again later.'
+          )
+          return
+        }
+
+        handleFailedAttempt('Invalid username or password.')
+        return
+      }
 
       let targetRoute = '/student'
       if (loggedInUser.role === 'assistant_admin')
@@ -742,8 +846,8 @@ export default function Login() {
                   lineHeight: 18,
                 }}
               >
-                Enter your username and we'll send a reset link to your
-                registered email.
+                Enter your username and Student ID to receive a password reset
+                link.
               </Text>
             </View>
 
@@ -765,6 +869,27 @@ export default function Login() {
               value={forgotUsername}
               onChangeText={setForgotUsername}
               autoCapitalize='none'
+              editable={!forgotLoading}
+            />
+            <TextInput
+              style={{
+                borderWidth: 1.5,
+                borderColor: isDark ? '#1E2A4A' : '#D0D4F5',
+                borderRadius: 14,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                fontSize: 15,
+                color: isDark ? '#F1F5FF' : '#0F172A',
+                backgroundColor: isDark ? '#131929' : '#F5F6FF',
+                marginBottom: 14,
+                letterSpacing: 0.2,
+              }}
+              placeholder='Enter your Student ID'
+              placeholderTextColor={isDark ? '#3D4E78' : '#A0A3B5'}
+              value={forgotStudentId}
+              onChangeText={setForgotStudentId}
+              autoCapitalize='none'
+              autoCorrect={false}
               editable={!forgotLoading}
             />
 
@@ -824,6 +949,7 @@ export default function Login() {
                   setForgotModalVisible(false)
                   setForgotMessage(null)
                   setForgotUsername('')
+                  setForgotStudentId('')
                 }}
                 disabled={forgotLoading}
               >

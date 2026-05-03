@@ -188,8 +188,12 @@ const AnimatedUserItem = memo(function AnimatedUserItem({
               {item.surname ? `${item.surname}, ${item.name}` : item.name}
             </Text>
             {item.status !== 'active' && (
-              <View style={styles.inactiveBadge}>
-                <Text style={styles.inactiveBadgeText}>INACTIVE</Text>
+              <View
+                style={[styles.paginatedBadge, { backgroundColor: '#6b7280' }]}
+              >
+                <Text style={[styles.paginatedBadgeText, { color: '#ffffff' }]}>
+                  INACTIVE
+                </Text>
               </View>
             )}
           </View>
@@ -206,12 +210,9 @@ const AnimatedUserItem = memo(function AnimatedUserItem({
               {item.email}
             </Text>
             <View
-              style={[
-                styles.paginatedBadge,
-                { backgroundColor: getRoleBgColor(item.role) },
-              ]}
+              style={[styles.paginatedBadge, { backgroundColor: roleColor }]}
             >
-              <Text style={[styles.paginatedBadgeText, { color: roleColor }]}>
+              <Text style={[styles.paginatedBadgeText, { color: '#ffffff' }]}>
                 {item.role.replace('_', ' ').toUpperCase()}
               </Text>
             </View>
@@ -499,6 +500,19 @@ export default function UserManagement() {
       if (!newUser.studentID?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the Student ID.' }
       }
+      const studentIDTrimmed = newUser.studentID.trim()
+      if (!/^[\d-]+$/.test(studentIDTrimmed)) {
+        return {
+          isValid: false,
+          errorMessage: 'Student ID must contain only numbers and hyphens.',
+        }
+      }
+      if (studentIDTrimmed.startsWith('-') || studentIDTrimmed.endsWith('-')) {
+        return {
+          isValid: false,
+          errorMessage: 'Student ID cannot start or end with a hyphen.',
+        }
+      }
       if (!newUser.course?.trim()) {
         return {
           isValid: false,
@@ -512,6 +526,12 @@ export default function UserManagement() {
         return {
           isValid: false,
           errorMessage: 'Please enter the block (e.g., 1, 2, 3).',
+        }
+      }
+      if (!/^\d+$/.test(newUser.block.trim())) {
+        return {
+          isValid: false,
+          errorMessage: 'Block must contain only numbers.',
         }
       }
       if (!newUser.gender?.trim()) {
@@ -651,20 +671,30 @@ export default function UserManagement() {
       }
     }
 
-    // Username validation
     if (!selectedUser.username?.trim()) {
       return { isValid: false, errorMessage: 'Please enter a username.' }
     }
 
-    // Role required
     if (!selectedUser.role) {
       return { isValid: false, errorMessage: 'Please select a role.' }
     }
 
-    // Student-specific fields
     if (selectedUser.role === 'student') {
       if (!selectedUser.studentID?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the Student ID.' }
+      }
+      const studentIDTrimmed = selectedUser.studentID.trim()
+      if (!/^[\d-]+$/.test(studentIDTrimmed)) {
+        return {
+          isValid: false,
+          errorMessage: 'Student ID must contain only numbers and hyphens.',
+        }
+      }
+      if (studentIDTrimmed.startsWith('-') || studentIDTrimmed.endsWith('-')) {
+        return {
+          isValid: false,
+          errorMessage: 'Student ID cannot start or end with a hyphen.',
+        }
       }
       if (!selectedUser.course?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the course.' }
@@ -674,6 +704,12 @@ export default function UserManagement() {
       }
       if (!selectedUser.block?.trim()) {
         return { isValid: false, errorMessage: 'Please enter the block.' }
+      }
+      if (!/^\d+$/.test(selectedUser.block.trim())) {
+        return {
+          isValid: false,
+          errorMessage: 'Block must contain only numbers.',
+        }
       }
       if (!selectedUser.gender?.trim()) {
         return { isValid: false, errorMessage: 'Please select the gender.' }
@@ -892,11 +928,11 @@ export default function UserManagement() {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'main_admin':
-        return '#1d4ed8'
+        return '#8b5cf6'
       case 'assistant_admin':
-        return '#7c3aed'
+        return '#f59e0b'
       case 'student':
-        return '#15803d'
+        return '#0ea5e9'
       default:
         return colors.accent.primary
     }
@@ -955,20 +991,24 @@ export default function UserManagement() {
                 <View
                   style={[
                     styles.searchResultBadge,
-                    { backgroundColor: colors.sidebar.text.muted },
+                    { backgroundColor: '#6b7280' },
                   ]}
                 >
-                  <Text style={styles.searchResultBadgeText}>INACTIVE</Text>
+                  <Text
+                    style={[styles.searchResultBadgeText, { color: '#ffffff' }]}
+                  >
+                    INACTIVE
+                  </Text>
                 </View>
               )}
               <View
                 style={[
                   styles.searchResultBadge,
-                  { backgroundColor: getRoleBgColor(item.role) },
+                  { backgroundColor: roleColor },
                 ]}
               >
                 <Text
-                  style={[styles.searchResultBadgeText, { color: roleColor }]}
+                  style={[styles.searchResultBadgeText, { color: '#ffffff' }]}
                 >
                   {item.role.replace('_', ' ').toUpperCase()}
                 </Text>
@@ -1148,10 +1188,13 @@ export default function UserManagement() {
           <View
             style={[
               styles.paginatedBadge,
-              { backgroundColor: getRoleBgColor(selected.role) },
+              {
+                backgroundColor:
+                  selected.status === 'active' ? '#10b981' : '#6b7280',
+              },
             ]}
           >
-            <Text style={[styles.paginatedBadgeText, { color: roleColor }]}>
+            <Text style={[styles.paginatedBadgeText, { color: '#ffffff' }]}>
               {selected.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
             </Text>
           </View>
@@ -1602,18 +1645,22 @@ export default function UserManagement() {
                     <FormTextInput
                       inputStyle={styles.glassFormInput}
                       placeholder='Enter student ID'
+                      keyboardType='default'
                       value={
                         isEdit
                           ? selectedUser?.studentID || ''
                           : newUser.studentID
                       }
-                      onChangeText={(text) =>
-                        isEdit
-                          ? setSelectedUser((prev) =>
-                              prev ? { ...prev, studentID: text } : null
-                            )
-                          : setNewUser({ ...newUser, studentID: text })
-                      }
+                      onChangeText={(text) => {
+                        const filtered = text.replace(/[^0-9-]/g, '')
+                        if (isEdit) {
+                          setSelectedUser((prev) =>
+                            prev ? { ...prev, studentID: filtered } : null
+                          )
+                        } else {
+                          setNewUser({ ...newUser, studentID: filtered })
+                        }
+                      }}
                     />
                     {!isEdit && (
                       <Text
@@ -1705,14 +1752,18 @@ export default function UserManagement() {
                     <FormTextInput
                       inputStyle={styles.glassFormInput}
                       placeholder='Enter block (e.g., 1, 2, 3)'
+                      keyboardType='numeric'
                       value={isEdit ? selectedUser?.block || '' : newUser.block}
-                      onChangeText={(text) =>
-                        isEdit
-                          ? setSelectedUser((prev) =>
-                              prev ? { ...prev, block: text } : null
-                            )
-                          : setNewUser({ ...newUser, block: text })
-                      }
+                      onChangeText={(text) => {
+                        const filtered = text.replace(/[^0-9]/g, '')
+                        if (isEdit) {
+                          setSelectedUser((prev) =>
+                            prev ? { ...prev, block: filtered } : null
+                          )
+                        } else {
+                          setNewUser({ ...newUser, block: filtered })
+                        }
+                      }}
                     />
                   </View>
 

@@ -1,50 +1,47 @@
-# Welcome to your Expo app 👋
+# TMC Connect v2.0 🎓
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Campus Digital Hub — Attendance Reimagined for Campus Life**
 
-## Get started
+TMC Connect is a cross-platform campus attendance and event management system built with [Expo](https://expo.dev) (React Native) and [Firebase](https://firebase.google.com). It replaces outdated paper-based attendance with QR code check-ins, GPS location verification, and real-time analytics — designed specifically for Philippine campuses.
 
-1. Install dependencies
+🌐 **Live Web App**: [cajes-jm-tmc-connect.vercel.app](https://cajes-jm-tmc-connect.vercel.app)
 
-   ```bash
-   npm install
-   ```
+---
 
-2. Start the app
+## ✨ Features
 
-   ```bash
-   npx expo start
-   ```
+- **QR Code Check-In** — Generate and scan unique QR codes for instant event check-ins directly from mobile devices.
+- **Geolocation Attendance** — Verify student presence at campus events with precise GPS-based location checks — no more proxy attendance.
+- **Event Management** — Discover, register, and track campus events all in one place — from academic seminars to org activities.
+- **Real-Time Analytics** — Organizers get instant attendance reports and participation insights.
+- **Secure Authentication** — Role-based access for students, faculty, and administrators backed by Firebase Auth.
+- **Cross-Platform** — Works flawlessly on iOS, Android, and the web — one app for every device on campus.
+- **Offline Resilience** — Designed to handle intermittent campus WiFi with AsyncStorage persistence.
 
-In the output, you'll find options to open the app in a
+---
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 🧑‍🤝‍🧑 User Roles
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+| Role                | Description                                                                             |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| **Student**         | Browse events, register, scan QR codes for attendance, view personal attendance history |
+| **Assistant Admin** | Manage events, view attendance records, send announcements                              |
+| **Main Admin**      | Full system control — user management, all event oversight, system configuration        |
 
-## Get a fresh project
+---
 
-When you're ready, run:
+## 🏗️ Tech Stack
 
-```bash
-npm run reset-project
-```
+| Category               | Technology                                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------------- |
+| **Frontend Framework** | [Expo](https://expo.dev) (React Native) + [Expo Router](https://docs.expo.dev/router/introduction/) |
+| **Language**           | TypeScript (99.1%)                                                                                  |
+| **Backend / Database** | [Firebase](https://firebase.google.com) (Firestore, Auth, Storage)                                  |
+| **UI Libraries**       | React Native Paper, React Native Reanimated, Linear Gradient, React Native SVG                      |
+| **Maps & Location**    | React Native Maps, Expo Location                                                                    |
+| **Charts**             | React Native Chart Kit, React Native Gifted Charts                                                  |
+| **QR Code**            | React Native QRCode SVG                                                                             |
+| **Web Deployment**     | [Vercel](https://vercel.com)                                                                        |
+| **Mobile Deployment**  | [EAS Build](https://docs.expo.dev/build/introduction/)                                              |
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+---

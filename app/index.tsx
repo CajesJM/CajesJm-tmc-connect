@@ -19,11 +19,10 @@ const EASE_OUT_CUBIC = Easing.out(Easing.cubic)
 const EASE_IN_OUT = Easing.inOut(Easing.cubic)
 const EASE_OUT_BACK = Easing.out(Easing.back(1.4))
 
-// ── Tiny decorative star particles ──────────────────────────────
 const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
   id: i,
-  x: Math.random() * 100, // percent of width
-  y: Math.random() * 70, // percent of height
+  x: Math.random() * 100,
+  y: Math.random() * 70,
   r: Math.random() * 1.5 + 0.5,
   delay: Math.random() * 1200,
 }))
@@ -80,7 +79,6 @@ function StarParticle({
   )
 }
 
-// ── Animated pulsing ring behind logo ───────────────────────────
 function PulseRing({ delay = 0 }: { delay?: number }) {
   const scale = useRef(new Animated.Value(1)).current
   const opacity = useRef(new Animated.Value(0.5)).current
@@ -138,7 +136,6 @@ function PulseRing({ delay = 0 }: { delay?: number }) {
   )
 }
 
-// ── Loading badge dot blink ──────────────────────────────────────
 function BlinkDot() {
   const opacity = useRef(new Animated.Value(1)).current
   useEffect(() => {
@@ -176,7 +173,6 @@ export default function Landing() {
   const transitionTimerRef = useRef<number | null>(null)
   const entranceTimerRef = useRef<number | null>(null)
 
-  // ── Animated values ─────────────────────────────────────────────
   const logoOpacity = useRef(new Animated.Value(0)).current
   const logoScale = useRef(new Animated.Value(0.5)).current
   const logoRotate = useRef(new Animated.Value(0)).current
@@ -212,10 +208,9 @@ export default function Landing() {
   const logoExitScale = useRef(new Animated.Value(1)).current
   const logoExitTranslate = useRef(new Animated.Value(0)).current
 
-  // ── Stars entrance ──────────────────────────────────────────────
   const starsOpacity = useRef(new Animated.Value(0)).current
 
-  // ── Auth redirect ────────────────────────────────────────────────
+  // ── Auth redirect
   useEffect(() => {
     if (!isAuthenticated) return
     if (userData?.role === 'main_admin') router.replace('/main_admin')
@@ -225,7 +220,6 @@ export default function Landing() {
       router.replace('/student/(tabs)/announcements')
   }, [isAuthenticated, userData, router])
 
-  // ── Reset ────────────────────────────────────────────────────────
   const resetAnimations = useCallback(() => {
     const allValues = [
       logoOpacity,
@@ -301,12 +295,11 @@ export default function Landing() {
     entranceTimerRef.current = null
   }, [])
 
-  // ── Progress ticker ──────────────────────────────────────────────
+  // ── Progress ticker
   const startProgressTicker = useCallback(() => {
     setProgress(0)
     progressIntervalRef.current = setInterval(() => {
       setProgress((prev) => {
-        // Ease-out curve: slower near 100
         const remaining = 100 - prev
         const step = Math.max(1, remaining * 0.1)
         const next = prev + step
@@ -320,7 +313,6 @@ export default function Landing() {
     }, 80) as unknown as number
   }, [])
 
-  // ── Exit animation ───────────────────────────────────────────────
   const startTransitionAnimation = useCallback(() => {
     if (isAnimating) return
     setIsAnimating(true)
@@ -332,7 +324,6 @@ export default function Landing() {
     setProgress(100)
 
     Animated.parallel([
-      // Logo drifts up + shrinks
       Animated.timing(logoExitTranslate, {
         toValue: -60,
         duration: 650,
@@ -345,7 +336,7 @@ export default function Landing() {
         easing: EASE_IN_OUT,
         useNativeDriver: true,
       }),
-      // Text fades quickly
+
       Animated.timing(textOpacity, {
         toValue: 0,
         duration: 300,
@@ -363,7 +354,7 @@ export default function Landing() {
         duration: 250,
         useNativeDriver: true,
       }),
-      // Progress + badge fade
+
       Animated.timing(progressOpacity, {
         toValue: 0,
         duration: 280,
@@ -375,7 +366,7 @@ export default function Landing() {
         duration: 250,
         useNativeDriver: true,
       }),
-      // Orbs fade
+
       Animated.timing(orb1Opacity, {
         toValue: 0,
         duration: 500,
@@ -401,7 +392,7 @@ export default function Landing() {
         duration: 400,
         useNativeDriver: true,
       }),
-      // Screen fades out with slight scale-down for depth
+
       Animated.sequence([
         Animated.delay(420),
         Animated.parallel([
@@ -424,10 +415,9 @@ export default function Landing() {
     })
   }, [isAnimating])
 
-  // ── Entrance animation ───────────────────────────────────────────
+  // ── Entrance animation
   const playEntranceAnimation = useCallback(() => {
     Animated.sequence([
-      // Phase 1 — ambient orbs bloom in softly
       Animated.parallel([
         Animated.timing(orb1Opacity, {
           toValue: 1,
@@ -484,7 +474,6 @@ export default function Landing() {
         }),
       ]),
 
-      // Phase 2 — outer halo ring blooms
       Animated.parallel([
         Animated.timing(haloOpacity, {
           toValue: 0.6,
@@ -500,7 +489,6 @@ export default function Landing() {
         }),
       ]),
 
-      // Phase 3 — glow ring + logo spring in with rotation
       Animated.parallel([
         Animated.timing(ringOpacity, {
           toValue: 1,
@@ -534,7 +522,6 @@ export default function Landing() {
         }),
       ]),
 
-      // Phase 4 — eyebrow label slides up
       Animated.parallel([
         Animated.timing(eyebrowOpacity, {
           toValue: 1,
@@ -550,7 +537,6 @@ export default function Landing() {
         }),
       ]),
 
-      // Phase 5 — brand text slides up with slight delay
       Animated.parallel([
         Animated.timing(textOpacity, {
           toValue: 1,
@@ -566,7 +552,6 @@ export default function Landing() {
         }),
       ]),
 
-      // Phase 6 — dots + progress/badge
       Animated.parallel([
         Animated.timing(dotsOpacity, {
           toValue: 1,
@@ -602,7 +587,6 @@ export default function Landing() {
     })
   }, [startProgressTicker, startTransitionAnimation])
 
-  // ── Lifecycle ────────────────────────────────────────────────────
   useEffect(() => {
     entranceTimerRef.current = setTimeout(
       playEntranceAnimation,
@@ -626,7 +610,6 @@ export default function Landing() {
     }, [resetAnimations, playEntranceAnimation])
   )
 
-  // ── Derived ──────────────────────────────────────────────────────
   const logoRotateDeg = logoRotate.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],

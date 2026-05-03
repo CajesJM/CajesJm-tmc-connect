@@ -1106,7 +1106,7 @@ const QuickActionButton = ({
   )
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Main Component
 
 export default function AssistantAdminDashboard() {
   const [showImageOptions, setShowImageOptions] = useState(false)
@@ -1563,7 +1563,6 @@ export default function AssistantAdminDashboard() {
   }
   useEffect(() => {
     if (!userData) {
-      // User signed out – clear dashboard data and stop here
       setDashboardStats({
         myEvents: 0,
         myAnnouncements: 0,
@@ -1590,7 +1589,6 @@ export default function AssistantAdminDashboard() {
       return
     }
 
-    // User is authenticated – fetch data and set up listeners
     fetchDashboardStats()
     fetchAdminDonutData()
     const u1 = setupRealtimeActivities()
@@ -1610,7 +1608,6 @@ export default function AssistantAdminDashboard() {
       )
     }
 
-    // Cleanup runs when userData changes (i.e. sign out) or component unmounts
     return () => {
       u1()
       u2()
@@ -1638,18 +1635,15 @@ export default function AssistantAdminDashboard() {
   }, [])
 
   const handleDownloadReport = async () => {
-    // Prevent double clicks
     if (downloadLoading) return
 
     setDownloadLoading(true)
 
     try {
-      // Validate essential data
       if (!userData?.email) {
         throw new Error('User session expired. Please log in again.')
       }
 
-      // Race against a 15-second timeout
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(
           () =>
@@ -1661,14 +1655,12 @@ export default function AssistantAdminDashboard() {
       const generatePromise = (async () => {
         const freshMonthlyStats = await calculateMonthlyStats()
 
-        // Ensure we have at least some data – optional check
         const totalEvents =
           adminDonutData.upcoming +
           adminDonutData.past +
           adminDonutData.pending +
           adminDonutData.rejected
         if (totalEvents === 0 && adminDonutData.announcements === 0) {
-          // Warn but still allow PDF (it will show zeros)
           console.warn('Generating PDF with zero events/announcements')
         }
 
@@ -1700,7 +1692,6 @@ export default function AssistantAdminDashboard() {
 
       Alert.alert('Success', 'Report generated and ready to share!')
     } catch (error: unknown) {
-      // Extract a useful error message
       let errorMessage = 'An unexpected error occurred.'
       if (error instanceof Error) {
         errorMessage = error.message

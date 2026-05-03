@@ -1,7 +1,12 @@
 import * as SecureStore from 'expo-secure-store'
-import { signInWithEmailAndPassword, signOut, User } from 'firebase/auth'
-import { doc, getDoc, onSnapshot } from 'firebase/firestore'
-import React, { createContext, useContext, useState } from 'react'
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  User,
+} from 'firebase/auth'
+import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import { Alert, Platform } from 'react-native'
 import { auth, db } from '../../Model/lib/firebaseConfig'
 
@@ -34,7 +39,7 @@ interface AuthContextValue {
   role: Role
   loading: boolean
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<UserData>
+  login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   hasPermission: (permission: string) => boolean
   isMainAdmin: () => boolean
@@ -47,17 +52,12 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 async function storeUserData(userData: UserData | null) {
   if (Platform.OS === 'web') {
-    if (userData) {
-      localStorage.setItem(KEY_USER_DATA, JSON.stringify(userData))
-    } else {
-      localStorage.removeItem(KEY_USER_DATA)
-    }
+    if (userData) localStorage.setItem(KEY_USER_DATA, JSON.stringify(userData))
+    else localStorage.removeItem(KEY_USER_DATA)
   } else {
-    if (userData) {
+    if (userData)
       await SecureStore.setItemAsync(KEY_USER_DATA, JSON.stringify(userData))
-    } else {
-      await SecureStore.deleteItemAsync(KEY_USER_DATA)
-    }
+    else await SecureStore.deleteItemAsync(KEY_USER_DATA)
   }
 }
 
@@ -70,7 +70,7 @@ async function readUserData(): Promise<UserData | null> {
       const data = await SecureStore.getItemAsync(KEY_USER_DATA)
       return data ? JSON.parse(data) : null
     }
-  } catch (error) {
+  } catch {
     return null
   }
 }
@@ -78,159 +78,143 @@ async function readUserData(): Promise<UserData | null> {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true) // 🆕 start as true
 
-  React.useEffect(() => {
-    const initializeAuth = async () => {
-      const storedData = await readUserData()
-      if (storedData) {
-        setUserData(storedData)
-      }
-    }
-    initializeAuth()
+  useEffect(() => {
+    ;(async () => {
+      const stored = await readUserData()
+      if (stored) setUserData(stored)
+    })()
   }, [])
 
-  React.useEffect(() => {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
+          if (!userDoc.exists()) {
+            await signOut(auth)
+            setUser(null)
+            setUserData(null)
+            await storeUserData(null)
+          } else {
+            const data = userDoc.data() as UserData
+            const role = data.role as string
+            const status = data.status || 'active'
+            const active = data.active !== false
+
+            if (
+              (role === 'student' ||
+                role === 'assistant_admin' ||
+                role === 'main_admin') &&
+              status !== 'inactive' &&
+              active
+            ) {
+              const freshUser: UserData = {
+                ...data,
+                email: firebaseUser.email || data.email,
+                role: role as Role,
+                surname: data.surname || '',
+              }
+              setUser(firebaseUser)
+              setUserData(freshUser)
+              await storeUserData(freshUser)
+            } else {
+              await signOut(auth)
+              setUser(null)
+              setUserData(null)
+              await storeUserData(null)
+              Alert.alert(
+                'Account Deactivated',
+                'Your account has been deactivated.'
+              )
+            }
+          }
+        } catch (error) {
+          console.error('Error during auth state change:', error)
+          await signOut(auth).catch(() => {})
+          setUser(null)
+          setUserData(null)
+          await storeUserData(null)
+        }
+      } else {
+        setUser(null)
+        setUserData(null)
+        await storeUserData(null)
+      }
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  // ── 3. Realtime deactivation listener
+  useEffect(() => {
     if (!user) return
 
     const unsubscribe = onSnapshot(
       doc(db, 'users', user.uid),
       (docSnapshot) => {
         if (!docSnapshot.exists()) return
-
         const data = docSnapshot.data()
         const isStillActive =
           (data.status ? data.status !== 'inactive' : true) &&
           data.active !== false
 
         if (!isStillActive) {
+          signOut(auth).catch(console.error)
           setUser(null)
           setUserData(null)
           storeUserData(null)
-
-          signOut(auth).catch((e) =>
-            console.error('Sign out after deactivation failed:', e)
+          Alert.alert(
+            'Account Deactivated',
+            'Your account has been deactivated.'
           )
-
-          if (Platform.OS !== 'web') {
-            Alert.alert(
-              'Account Deactivated',
-              'Your account has been deactivated. You have been signed out.'
-            )
-          } else {
-            window.alert(
-              'Your account has been deactivated. You have been signed out.'
-            )
-          }
         }
       },
-      (error: any) => {
-        console.error('Error listening to user doc:', error)
-      }
+      (error) => console.error('Realtime listener error:', error)
     )
 
     return () => unsubscribe()
   }, [user])
 
-  const login = async (email: string, password: string): Promise<UserData> => {
-    try {
-      if (!email || !password) {
-        throw new Error('Email and password are required')
-      }
+  const login = async (email: string, password: string): Promise<void> => {
+    if (!email || !password) throw new Error('Email and password are required')
+    if (!email.includes('@')) throw new Error('Invalid email format')
 
-      if (!email.includes('@')) {
-        throw new Error('Invalid email format')
-      }
-
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      )
-      const firebaseUser = userCredential.user
-
-      // Get user data from Firestore (including role and active status)
-      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid))
-      if (!userDoc.exists()) {
-        throw new Error('User account not found in database.')
-      }
-
-      const userDataFromDB = userDoc.data() as UserData & { active?: boolean }
-
-      // Check if user is active
-      const isActive =
-        (userDataFromDB.status ? userDataFromDB.status !== 'inactive' : true) &&
-        userDataFromDB.active !== false
-
-      if (!isActive) {
-        await signOut(auth)
-        throw new Error(
-          'This account has been deactivated. Please contact an administrator.'
-        )
-      }
-
-      // Validate that role exists
-      if (!userDataFromDB.role) {
-        throw new Error('User role not assigned. Contact administrator.')
-      }
-
-      const completeUserData = {
-        ...userDataFromDB,
-        email: firebaseUser.email || userDataFromDB.email,
-        surname: userDataFromDB.surname || '',
-      }
-
-      setUser(firebaseUser)
-      setUserData(completeUserData)
-      await storeUserData(completeUserData)
-      setLoading(false)
-
-      return completeUserData
-    } catch (error: any) {
-      setUser(null)
-      setUserData(null)
-      await storeUserData(null)
-
-      // Error messages
-      if (error.code === 'auth/invalid-credential') {
-        throw new Error('Invalid email or password.')
-      } else if (error.code === 'auth/user-not-found') {
-        throw new Error('User not found.')
-      } else if (error.code === 'auth/wrong-password') {
-        throw new Error('Incorrect password.')
-      } else if (error.message.includes('deactivated')) {
-        throw error
-      } else {
-        throw error
-      }
-    }
+    await signInWithEmailAndPassword(auth, email, password)
   }
 
+  //  Logout ─
   const logout = async () => {
     try {
+      if (user) {
+        const userRef = doc(db, 'users', user.uid)
+        await updateDoc(userRef, { expoPushToken: null })
+      }
+
       await signOut(auth)
-      setUser(null)
-      setUserData(null)
-      await storeUserData(null)
     } catch (error) {
       throw error
     }
   }
-  const refreshUserData = async (): Promise<void> => {
+
+  //  Refresh user data
+  const refreshUserData = async () => {
     if (!user) return
     try {
       const userDoc = await getDoc(doc(db, 'users', user.uid))
       if (userDoc.exists()) {
-        const freshData = userDoc.data() as UserData
-        setUserData(freshData)
-        await storeUserData(freshData)
+        const fresh = userDoc.data() as UserData
+        setUserData(fresh)
+        await storeUserData(fresh)
       }
     } catch (error) {
       console.error('Failed to refresh user data:', error)
     }
   }
 
-  // Helper functions for role checking
+  // ── Permission helpers
   const hasPermission = (permission: string): boolean => {
     if (!userData) return false
     if (userData.role === 'main_admin') return true
@@ -240,13 +224,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     )
   }
 
-  const isMainAdmin = (): boolean => {
-    return userData?.role === 'main_admin'
-  }
-
-  const isAssistantAdmin = (): boolean => {
-    return userData?.role === 'assistant_admin'
-  }
+  const isMainAdmin = () => userData?.role === 'main_admin'
+  const isAssistantAdmin = () => userData?.role === 'assistant_admin'
 
   const value: AuthContextValue = {
     user,

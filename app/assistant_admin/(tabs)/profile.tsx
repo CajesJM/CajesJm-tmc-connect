@@ -331,14 +331,12 @@ export default function AssistantAdminProfile() {
   }, [])
 
   const computedStats = useMemo(() => {
-    // System-wide stats
     let totalEvents = eventsData.length
     let sysApprovedEvents = 0
     let sysPendingEvents = 0
     let sysRejectedEvents = 0
     let sysTotalAttendance = 0
 
-    // Personal stats for events
     let myApprovedEvents = 0
     let myPendingEvents = 0
     let myRejectedEvents = 0
@@ -374,20 +372,16 @@ export default function AssistantAdminProfile() {
       }
     })
 
-    // Users stats
     const activeStudents = usersData.filter(
       (d) => d.role === 'student' || !d.role
     ).length
 
-    // Penalties stats
     const pendingPenalties = penaltiesData.filter(
       (d) => d.status === 'pending'
     ).length
 
-    // Announcements stats
     const totalAnnouncements = announcementsData.length
 
-    // Personal stats from announcements (only count if not already counted as events)
     let myAnnouncementsApproved = 0
     let myAnnouncementsPending = 0
     let myAnnouncementsRejected = 0
@@ -410,7 +404,6 @@ export default function AssistantAdminProfile() {
       }
     })
 
-    // Combine personal stats (events + announcements)
     const totalMyApproved = myApprovedEvents + myAnnouncementsApproved
     const totalMyPending = myPendingEvents + myAnnouncementsPending
     const totalMyRejected = myRejectedEvents + myAnnouncementsRejected

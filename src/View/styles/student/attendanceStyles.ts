@@ -615,7 +615,7 @@ export const createAttendanceStyles = (
     permissionAlertCard: {
       backgroundColor: colors.card,
       margin: isMobile ? 16 : 20,
-      marginTop: -10,
+      marginTop: 5,
       borderRadius: 16,
       padding: 13,
       shadowColor: '#000',
@@ -623,7 +623,7 @@ export const createAttendanceStyles = (
       shadowOpacity: isDark ? 0.3 : 0.05,
       shadowRadius: 8,
       elevation: 2,
-      marginBottom: 20,
+      marginBottom: 0,
     },
     permissionAlertHeader: {
       flexDirection: 'row',

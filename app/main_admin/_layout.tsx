@@ -23,8 +23,6 @@ import { useTheme } from '../../src/Controller/context/ThemeContext'
 import { db } from '../../src/Model/lib/firebaseConfig'
 import LoadingScreen from '../../src/View/components/LoadingScreen'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 interface MenuItem {
   name: string
   title: string
@@ -41,7 +39,7 @@ interface UserStats {
   students: number
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Constants
 
 const SIDEBAR_FULL_WIDTH = 260
 const SIDEBAR_COLLAPSED_WIDTH = 72
@@ -92,12 +90,6 @@ const menuItems: MenuItem[] = [
   },
 ]
 
-// ─── Gradient Palettes ────────────────────────────────────────────────────────
-
-/**
- * Light mode: predominantly white with a subtle splash of sky-blue.
- * Dark mode:  predominantly near-black with a deep navy accent.
- */
 const SIDEBAR_GRADIENT_LIGHT = [
   '#ffffff',
   '#f0f6ff',
@@ -112,7 +104,7 @@ const SIDEBAR_GRADIENT_DARK = [
   '#0f2456',
 ] as const
 
-// ─── NavItem sub-component ────────────────────────────────────────────────────
+// ─── NavItem sub-component
 
 interface NavItemProps {
   item: MenuItem
@@ -162,7 +154,6 @@ const NavItem: React.FC<NavItemProps> = ({
     }).start()
   }
 
-  // Interpolated background color for pill highlight
   const pillBg = bgAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [
@@ -171,7 +162,6 @@ const NavItem: React.FC<NavItemProps> = ({
     ],
   })
 
-  // Icon / label colours
   const activeColor = accentColor
   const inactiveColor = isDark ? '#8ba3c7' : '#5c7aa8'
   const itemColor = isActive ? activeColor : inactiveColor
@@ -292,10 +282,8 @@ export default function MainAdminLayout() {
   const { userData, logout } = useAuth()
   const { colors, isDark, theme, setTheme, toggleTheme } = useTheme()
 
-  // Accent blue that works on both gradient styles
   const accentColor = isDark ? '#60a5fa' : '#2563eb'
 
-  // ── Sidebar collapse animation ─────────────────────────────────────────────
   useEffect(() => {
     Animated.parallel([
       Animated.timing(sidebarAnim, {
@@ -311,7 +299,6 @@ export default function MainAdminLayout() {
     ]).start()
   }, [collapsed])
 
-  // ── Mobile drawer animation ────────────────────────────────────────────────
   useEffect(() => {
     Animated.parallel([
       Animated.spring(mobileSlideAnim, {
@@ -328,13 +315,11 @@ export default function MainAdminLayout() {
     ]).start()
   }, [mobileMenuOpen])
 
-  // ── Layout ready delay ─────────────────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(() => setIsLayoutReady(true), 300)
     return () => clearTimeout(t)
   }, [])
 
-  // ── Firestore user stats ───────────────────────────────────────────────────
   useEffect(() => {
     const q = query(collection(db, 'users'))
     const unsub = onSnapshot(q, (snap) => {
@@ -365,7 +350,7 @@ export default function MainAdminLayout() {
     return () => unsub()
   }, [])
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Helpers
   const isRouteActive = (route: Href): boolean => {
     const r = route.toString()
     if (r === '/main_admin')
@@ -378,7 +363,7 @@ export default function MainAdminLayout() {
     if (!isWeb) setMobileMenuOpen(false)
   }
 
-  // ── Swipe-to-close gesture (mobile) ───────────────────────────────────────
+  // ── Swipe-to-close gesture
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => mobileMenuOpen && g.dx < -20,
@@ -399,14 +384,13 @@ export default function MainAdminLayout() {
     })
   ).current
 
-  // ─── Sidebar Component ─────────────────────────────────────────────────────
+  // ─── Sidebar Component
 
   const Sidebar = ({ isMobile = false }: { isMobile?: boolean }) => {
     const gradientColors = isDark
       ? SIDEBAR_GRADIENT_DARK
       : SIDEBAR_GRADIENT_LIGHT
 
-    // Border / divider colour based on mode
     const dividerColor = isDark
       ? 'rgba(255,255,255,0.08)'
       : 'rgba(37,99,235,0.12)'
@@ -418,7 +402,7 @@ export default function MainAdminLayout() {
         style={[
           styles.sidebarContainer,
           { width: isMobile ? MOBILE_SIDEBAR_WIDTH : sidebarAnim },
-          // Light mode: thin right border for separation
+
           !isDark && {
             borderRightWidth: 1,
             borderRightColor: 'rgba(37,99,235,0.12)',
@@ -432,7 +416,6 @@ export default function MainAdminLayout() {
           locations={isDark ? [0, 0.35, 0.65, 1] : [0, 0.45, 0.8, 1]}
           style={styles.sidebarGradient}
         >
-          {/* Shadow overlay for depth in dark mode */}
           {isDark && (
             <View style={StyleSheet.absoluteFill} pointerEvents='none'>
               <LinearGradient
@@ -445,7 +428,7 @@ export default function MainAdminLayout() {
           )}
 
           <View style={styles.sidebarContent}>
-            {/* ── Collapse toggle (web only) ── */}
+            {/* ── Collapse toggle */}
             {isWeb && !isMobile && (
               <TouchableOpacity
                 onPress={() => setCollapsed(!collapsed)}
@@ -531,7 +514,7 @@ export default function MainAdminLayout() {
               )}
             </View>
 
-            {/* ── Quick Stats (web, expanded) ── */}
+            {/* ── Quick Stats  */}
             {isWeb && !collapsed && (
               <Animated.View
                 style={[
@@ -570,7 +553,7 @@ export default function MainAdminLayout() {
               </Animated.View>
             )}
 
-            {/* ── Role breakdown (web, expanded) ── */}
+            {/* ── Role breakdown */}
             {isWeb && !collapsed && userStats.total > 0 && (
               <Animated.View
                 style={[styles.roleBreakdown, { opacity: contentOpacity }]}

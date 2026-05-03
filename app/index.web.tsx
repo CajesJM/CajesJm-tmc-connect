@@ -958,7 +958,6 @@ const ContactSection: React.FC = () => {
           <View style={contactStyles.contactItems}>
             <View style={contactStyles.contactItem}>
               <View style={contactStyles.contactItemIcon}>
-                {/* Mail icon */}
                 <View
                   style={{
                     width: 18,
@@ -1310,7 +1309,6 @@ const TMCConnectLanding: React.FC = () => {
       >
         <SystemBanner />
 
-        {/* ─── Hero ─── */}
         <View style={[styles.hero, isWide && styles.heroWide]} nativeID='hero'>
           <View style={styles.blob1} />
           <View style={styles.blob2} />
@@ -1402,7 +1400,6 @@ const TMCConnectLanding: React.FC = () => {
               </View>
 
               <View style={styles.cardGPSRow}>
-                {/* GPS dot */}
                 <View style={styles.gpsDot} />
                 <Text style={styles.cardGPS}>
                   Location confirmed — Main Campus
@@ -1412,7 +1409,6 @@ const TMCConnectLanding: React.FC = () => {
           </View>
         </View>
 
-        {/* ─── Stats ─── */}
         <View style={styles.statsBanner}>
           {STATS.map((s) => (
             <StatItem key={s.label} {...s} />

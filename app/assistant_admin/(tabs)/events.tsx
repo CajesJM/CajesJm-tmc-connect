@@ -664,7 +664,6 @@ export default function AssistantAdminEvents() {
     setShowCreateForm(true)
   }
 
-  // --- UI helpers ---
   const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'approved':
@@ -695,7 +694,6 @@ export default function AssistantAdminEvents() {
     return CAMPUS_LOCATIONS[0].image
   }
 
-  // --- Render card ---
   const renderEventCard = ({ item, index }: { item: Event; index: number }) => {
     const status = getStatusBadge(item.status)
     const days = getDaysUntilEvent(item.date)
@@ -962,7 +960,7 @@ export default function AssistantAdminEvents() {
         </View>
       </View>
 
-      {/* Filter Chips */}
+      {/* Filter */}
       <View style={styles.filterSection}>
         <ScrollView
           horizontal

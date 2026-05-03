@@ -400,12 +400,10 @@ export default function MainAdminAttendance() {
 
   const sortMissingStudents = (students: Student[]): Student[] => {
     return [...students].sort((a, b) => {
-      // Sort by year level (extract numeric part)
       const yearA = parseInt(String(a.yearLevel).match(/\d+/)?.[0] ?? '0')
       const yearB = parseInt(String(b.yearLevel).match(/\d+/)?.[0] ?? '0')
       if (yearA !== yearB) return yearA - yearB
 
-      // Then by surname
       const surnameA = getSurname(a.name).toLowerCase()
       const surnameB = getSurname(b.name).toLowerCase()
       return surnameA.localeCompare(surnameB)
@@ -546,7 +544,7 @@ export default function MainAdminAttendance() {
 
         const paidIds = new Set<string>()
         const completedIds = new Set<string>()
-        const pendingIds = new Set<string>() // Track pending penalties
+        const pendingIds = new Set<string>()
 
         penaltiesSnapshot.docs.forEach((doc) => {
           const data = doc.data()
@@ -562,7 +560,6 @@ export default function MainAdminAttendance() {
         setPaidStudentIds(paidIds)
         setCompletedStudentIds(completedIds)
 
-        // Check if any penalties have been sent (pending or paid or completed)
         const hasAnyPenalties = penaltiesSnapshot.size > 0
         if (hasAnyPenalties && !sentPenaltyEvents.has(selectedEvent.id)) {
           setSentPenaltyEvents((prev) => new Set([...prev, selectedEvent.id]))
@@ -572,7 +569,6 @@ export default function MainAdminAttendance() {
 
     fetchPenaltyStatuses()
 
-    // Real-time listener
     const penaltiesQuery = query(
       collection(db, 'penalties'),
       where('eventId', '==', selectedEvent.id)
@@ -597,7 +593,6 @@ export default function MainAdminAttendance() {
       setPaidStudentIds(paidIds)
       setCompletedStudentIds(completedIds)
 
-      // Update sent penalty status if any penalties exist
       const hasAnyPenalties = snapshot.size > 0
       if (hasAnyPenalties && selectedEvent) {
         setSentPenaltyEvents((prev) => new Set([...prev, selectedEvent.id]))
@@ -612,7 +607,6 @@ export default function MainAdminAttendance() {
 
     const fetchSentPenalties = async () => {
       try {
-        // Query penaltyAnnouncements collection to track what was sent
         const announcementsQuery = query(
           collection(db, 'penaltyAnnouncements'),
           where('sentBy', '==', user.uid)
@@ -672,14 +666,13 @@ export default function MainAdminAttendance() {
     return () => unsubscribe()
   }, [user?.uid])
 
-  // Check if penalty was sent for this event
   const hasPenaltyBeenSent = (eventId: string): boolean => {
     return sentPenaltyEvents.has(eventId)
   }
 
   const hasStudentReceivedPenalty = (studentId: string): boolean => {
     if (!selectedEvent) return false
-    // Check by looking at the penalty status sets
+
     return (
       paidStudentIds.has(studentId) ||
       completedStudentIds.has(studentId) ||
@@ -688,7 +681,6 @@ export default function MainAdminAttendance() {
     )
   }
 
-  // Record that penalties were sent (call this when sending penalty)
   const recordPenaltySent = async (eventId: string, studentIds: string[]) => {
     if (!user?.uid) return
 
@@ -705,7 +697,6 @@ export default function MainAdminAttendance() {
         count: studentIds.length,
       })
 
-      // Also update the event document to track that penalties were sent
       const eventRef = doc(db, 'events', eventId)
       await updateDoc(eventRef, {
         penaltiesSent: true,
@@ -781,7 +772,6 @@ export default function MainAdminAttendance() {
 
         batch.set(penaltyRef, penaltyData)
 
-        // Also add to user's penalties array
         const userRef = doc(db, 'users', student.id)
         const userDoc = await getDoc(userRef)
         if (userDoc.exists()) {
@@ -1469,7 +1459,6 @@ export default function MainAdminAttendance() {
         printWindow.print()
         showToast('Use the print dialog to save as PDF.', 'info')
       } else {
-        // Native: generate PDF file and share
         const { uri } = await Print.printToFileAsync({
           html: htmlContent,
           base64: false,
@@ -1486,7 +1475,6 @@ export default function MainAdminAttendance() {
           showToast('Sharing is not available on this device.', 'error')
         }
 
-        // Clean up temp file
         try {
           await FileSystem.deleteAsync(uri, { idempotent: true })
         } catch {}
@@ -2098,7 +2086,6 @@ export default function MainAdminAttendance() {
       </html>
     `
 
-      // 🌐 WEB: Open new window and print
       if (Platform.OS === 'web') {
         const printWindow = window.open('', '_blank')
         if (printWindow) {
@@ -2954,7 +2941,6 @@ export default function MainAdminAttendance() {
               style={[styles.rightGrid, isMobile && styles.rightGridMobile]}
             >
               {mode === 'qr' ? (
-                // Attended view
                 <>
                   <View
                     style={[
@@ -3435,7 +3421,6 @@ export default function MainAdminAttendance() {
                         selectedEvent?.id || ''
                       )
 
-                      // Determine button visibility
                       const showCompleteButton =
                         penaltySent && !isCompleted && !isPaid
                       const showCancelButton = isCompleted

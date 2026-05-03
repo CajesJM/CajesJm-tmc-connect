@@ -1,10 +1,9 @@
 import Constants from 'expo-constants'
 import * as Device from 'expo-device'
 import { useRouter } from 'expo-router'
-import { doc, updateDoc } from 'firebase/firestore'
+import { getFunctions, httpsCallable } from 'firebase/functions'
 import { useEffect, useRef, useState } from 'react'
 import { Platform } from 'react-native'
-import { db } from '../../Model/lib/firebaseConfig'
 import { useAuth } from '../context/AuthContext'
 
 export const usePushNotifications = () => {
@@ -16,6 +15,9 @@ export const usePushNotifications = () => {
   const notificationListener = useRef<any>(null)
   const responseListener = useRef<any>(null)
 
+  if (Platform.OS === 'web') {
+    return { expoPushToken: '', notification: null }
+  }
   const isExpoGo = Constants.appOwnership === 'expo'
 
   if (isExpoGo) {
@@ -68,10 +70,14 @@ export const usePushNotifications = () => {
             const token = pushTokenData.data
             if (isMounted) setExpoPushToken(token)
 
-            // Save token to Firestore
             if (user?.uid) {
-              const userRef = doc(db, 'users', user.uid)
-              await updateDoc(userRef, { expoPushToken: token })
+              const functions = getFunctions()
+              const registerToken = httpsCallable(
+                functions,
+                'registerPushToken'
+              )
+              await registerToken({ expoPushToken: token })
+              console.log('Push token registered with backend')
             }
           } catch (error) {
             console.error('Error getting push token:', error)

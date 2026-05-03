@@ -2430,7 +2430,7 @@ export default function StudentProfile() {
                     }
                   } catch (e) {
                     console.error('Failed to update notification preference', e)
-                    // revert to previous state
+
                     setNotificationsEnabled(!newValue)
                   }
                 }}
@@ -2640,7 +2640,6 @@ export default function StudentProfile() {
                 </View>
               ) : (
                 <>
-                  {/* Animated Summary Stats */}
                   <View
                     style={{
                       flexDirection: 'row',
@@ -2999,7 +2998,7 @@ export default function StudentProfile() {
                     )}
                   </Animated.View>
 
-                  {/* Animated Bar Chart - Using the component */}
+                  {/* Bar Chart - Using the component */}
                   {monthlyAttendanceData.length > 0 && (
                     <BarChartSection
                       monthlyAttendanceData={monthlyAttendanceData}
@@ -3056,7 +3055,6 @@ export default function StudentProfile() {
                         }
                         style={{ marginBottom: 8 }}
                       >
-                        {/* Background Bar */}
                         <View
                           style={{
                             width: '100%',
@@ -3066,7 +3064,6 @@ export default function StudentProfile() {
                             overflow: 'hidden',
                           }}
                         >
-                          {/* Animated Fill using scaleX */}
                           <Animated.View
                             style={{
                               width: '100%',
@@ -3091,7 +3088,6 @@ export default function StudentProfile() {
                           />
                         </View>
 
-                        {/* Floating Percentage Bubble */}
                         {progressBarWidth > 0 && (
                           <Animated.View
                             style={{
@@ -3138,7 +3134,7 @@ export default function StudentProfile() {
                             >
                               {attendedPercentage}%
                             </Text>
-                            {/* Pointer */}
+
                             <View
                               style={{
                                 position: 'absolute',

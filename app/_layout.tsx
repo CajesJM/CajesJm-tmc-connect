@@ -1,14 +1,18 @@
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { useEffect } from 'react'
-import { ActivityIndicator, Platform, View } from 'react-native'
+import { Platform } from 'react-native'
 import { AuthProvider, useAuth } from '../src/Controller/context/AuthContext'
 import { ThemeProvider, useTheme } from '../src/Controller/context/ThemeContext'
+import { usePushNotifications } from '../src/Controller/hooks/usePushNotifications'
+import LoadingScreen from '../src/View/components/LoadingScreen'
 
 function RootLayoutContent() {
   const { user, loading, userData } = useAuth()
   const { colors } = useTheme()
   const router = useRouter()
   const segments = useSegments()
+
+  usePushNotifications()
 
   useEffect(() => {
     if (loading) return
@@ -21,7 +25,6 @@ function RootLayoutContent() {
       : ['index', 'login', 'super-admin-login']
 
     const isPublic = publicRoutes.includes(currentRoute)
-
     const loginRoute = isWeb ? '/super-admin-login' : '/login'
 
     if (!user && !isPublic) {
@@ -39,16 +42,10 @@ function RootLayoutContent() {
 
   if (loading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: colors.background,
-        }}
-      >
-        <ActivityIndicator size='large' color={colors.accent.primary} />
-      </View>
+      <LoadingScreen
+        message='Restoring session…'
+        subMessage='Checking your saved account'
+      />
     )
   }
 

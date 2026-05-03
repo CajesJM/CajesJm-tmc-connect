@@ -1,8 +1,8 @@
 {
   "functions": [
     {
-      "source": "jmxtmcconnect",
-      "codebase": "jmxtmcconnect",
+      "source": "functions",
+      "codebase": "functions",
       "disallowLegacyRuntimeConfig": true,
       "ignore": [
         "node_modules",

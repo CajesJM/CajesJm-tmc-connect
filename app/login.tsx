@@ -108,8 +108,6 @@ export default function Login() {
   const [failedAttempts, setFailedAttempts] = useState(0)
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null)
   const [remainingLockoutSeconds, setRemainingLockoutSeconds] = useState(0)
-
-  // Forgot password state
   const [forgotModalVisible, setForgotModalVisible] = useState(false)
   const [forgotUsername, setForgotUsername] = useState('')
   const [forgotStudentId, setForgotStudentId] = useState('')
@@ -230,7 +228,7 @@ export default function Login() {
     }, 200)
   }, [])
 
-  // ─── Shake on error ───────────────────────────────────────────
+  //Shake on error
   const triggerShake = () => {
     shakeAnim.setValue(0)
     Animated.sequence([
@@ -262,7 +260,6 @@ export default function Login() {
     ]).start()
   }
 
-  // ─── Button press animation ───────────────────────────────────
   const onButtonPressIn = () => {
     Animated.spring(buttonScaleAnim, {
       toValue: 0.96,
@@ -286,7 +283,6 @@ export default function Login() {
     return emailRegex.test(email)
   }
 
-  // ─── Persistence helpers ──────────────────────────────────────
   const saveLockoutState = async (
     attempts: number,
     lockoutTime: number | null
@@ -511,7 +507,6 @@ export default function Login() {
             'Your account has been deactivated. Please contact an administrator.'
           )
         } else if (usernameExists) {
-          // Username exists but student ID didn't match
           setForgotMessage('Student ID does not match our records.')
         } else {
           setForgotMessage(
@@ -522,7 +517,6 @@ export default function Login() {
         return
       }
 
-      // Should be exactly 1 match now (unique username + studentId combo)
       const auth = getAuth()
       let sentCount = 0
       let invalidEmailFound = false
@@ -570,7 +564,6 @@ export default function Login() {
         return
       }
 
-      // Success — apply cooldown
       const cooldownTime = Date.now() + 60 * 1000
       setForgotCooldownUntil(cooldownTime)
       setForgotCooldownSeconds(60)
@@ -659,7 +652,7 @@ export default function Login() {
         return
       }
 
-      let loggedInUser = null
+      let loginSuccess = false
       let inactiveAccountFound = false
       let lastError: any = null
 
@@ -674,8 +667,8 @@ export default function Login() {
 
         try {
           setLoadingMessage('Authenticating')
-          const result = await login(userData.email, password)
-          loggedInUser = { ...result, role: userData.role }
+          await login(userData.email, password)
+          loginSuccess = true
           break
         } catch (err: any) {
           lastError = err
@@ -699,7 +692,7 @@ export default function Login() {
         }
       }
 
-      if (!loggedInUser) {
+      if (!loginSuccess) {
         setBusy(false)
 
         if (inactiveAccountFound && !lastError) {
@@ -724,19 +717,11 @@ export default function Login() {
         return
       }
 
-      let targetRoute = '/student'
-      if (loggedInUser.role === 'assistant_admin')
-        targetRoute = '/assistant_admin'
-
       setFailedAttempts(0)
       setLockoutUntil(null)
       setRemainingLockoutSeconds(0)
       setError(null)
       AsyncStorage.removeItem('studentLoginAttempts').catch(() => {})
-      setLoadingMessage('Redirecting to dashboard...')
-      setTimeout(() => {
-        router.replace(targetRoute as any)
-      }, 300)
     } catch (err: any) {
       setBusy(false)
 
@@ -812,7 +797,6 @@ export default function Login() {
               elevation: 16,
             }}
           >
-            {/* Modal header */}
             <View style={{ alignItems: 'center', marginBottom: 20 }}>
               <View
                 style={{
@@ -1012,14 +996,12 @@ export default function Login() {
 
       {/* ── Main Screen ── */}
       <View style={styles.root}>
-        {/* ── HEADER ── */}
         <LinearGradient
           colors={[gradientStart, gradientMid, gradientEnd]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.header}
         >
-          {/* Decorative circle accents */}
           <View
             style={{
               position: 'absolute',
@@ -1120,7 +1102,6 @@ export default function Login() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps='handled'
           >
-            {/* Title */}
             <View style={styles.titleRow}>
               <Text>
                 <Text style={styles.title}>Welcome </Text>
@@ -1132,7 +1113,6 @@ export default function Login() {
               Sign in to continue to TMC Connect
             </Text>
 
-            {/* ── Username ── */}
             <Animated.View
               style={{
                 transform: [{ translateX: shakeAnim }],
@@ -1217,7 +1197,6 @@ export default function Login() {
               </View>
             </Animated.View>
 
-            {/* ── Error Banner ── */}
             {error ? (
               <View style={styles.errorBanner}>
                 <Ionicons
@@ -1269,7 +1248,6 @@ export default function Login() {
               <Text style={styles.forgotText}>Forgot Password?</Text>
             </TouchableOpacity>
 
-            {/* ── Divider ── */}
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerLabel}>Secure Login</Text>

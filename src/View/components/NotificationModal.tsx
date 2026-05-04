@@ -77,11 +77,10 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   const detailSlide = useRef(new Animated.Value(300)).current
   const detailOpacity = useRef(new Animated.Value(0)).current
 
-  // Priority helpers (matching announcement.tsx)
   const getPriorityColor = (priority?: string) => {
     if (priority === 'urgent') return '#ef4444'
     if (priority === 'important') return '#f59e0b'
-    return '#3b82f6' // normal -> blue
+    return '#3b82f6'
   }
 
   const getPriorityLabel = (priority?: string) => {
@@ -255,7 +254,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     ({
       announcement: {
         label: 'Announcement',
-        icon: 'alert-circle' as const, // FIXED: replaced 'megaphone'
+        icon: 'alert-circle' as const,
         bg: isDark ? 'rgba(245,158,11,0.15)' : 'rgba(245,158,11,0.1)',
         color: isDark ? '#fbbf24' : '#d97706',
         iconBg: isDark ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.12)',
@@ -900,7 +899,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
               : renderNotificationsList()}
           </View>
 
-          {/* Approval Detail Overlay — inside the modal */}
           {detailVisible && renderApprovalDetail()}
         </Animated.View>
       </Animated.View>

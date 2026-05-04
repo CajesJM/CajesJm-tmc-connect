@@ -206,7 +206,7 @@ export default function AssistantAdminEvents() {
         filtered = filtered.filter((e) => e.date > now)
         break
       case 'past':
-        filtered = filtered.filter((e) => e.date <= now)
+        filtered = filtered.filter((e) => e.date < today)
         break
       case 'today':
         filtered = filtered.filter((e) => {

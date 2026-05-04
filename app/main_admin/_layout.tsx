@@ -39,8 +39,6 @@ interface UserStats {
   students: number
 }
 
-// ─── Constants
-
 const SIDEBAR_FULL_WIDTH = 260
 const SIDEBAR_COLLAPSED_WIDTH = 72
 const MOBILE_SIDEBAR_WIDTH = 280
@@ -103,8 +101,6 @@ const SIDEBAR_GRADIENT_DARK = [
   '#0d1e3d',
   '#0f2456',
 ] as const
-
-// ─── NavItem sub-component
 
 interface NavItemProps {
   item: MenuItem
@@ -239,7 +235,6 @@ const NavItem: React.FC<NavItemProps> = ({
             </Animated.Text>
           )}
 
-          {/* Right dot for active state (collapsed) */}
           {isActive && collapsed && (
             <View
               style={[
@@ -254,7 +249,7 @@ const NavItem: React.FC<NavItemProps> = ({
   )
 }
 
-// ─── Main Layout ──────────────────────────────────────────────────────────────
+// ─── Main Layout
 
 export default function MainAdminLayout() {
   const pathname = usePathname()
@@ -350,7 +345,6 @@ export default function MainAdminLayout() {
     return () => unsub()
   }, [])
 
-  // ── Helpers
   const isRouteActive = (route: Href): boolean => {
     const r = route.toString()
     if (r === '/main_admin')
@@ -363,7 +357,6 @@ export default function MainAdminLayout() {
     if (!isWeb) setMobileMenuOpen(false)
   }
 
-  // ── Swipe-to-close gesture
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => mobileMenuOpen && g.dx < -20,
@@ -383,8 +376,6 @@ export default function MainAdminLayout() {
       },
     })
   ).current
-
-  // ─── Sidebar Component
 
   const Sidebar = ({ isMobile = false }: { isMobile?: boolean }) => {
     const gradientColors = isDark
@@ -428,7 +419,6 @@ export default function MainAdminLayout() {
           )}
 
           <View style={styles.sidebarContent}>
-            {/* ── Collapse toggle */}
             {isWeb && !isMobile && (
               <TouchableOpacity
                 onPress={() => setCollapsed(!collapsed)}
@@ -463,7 +453,6 @@ export default function MainAdminLayout() {
               </TouchableOpacity>
             )}
 
-            {/* ── Logo / Brand ── */}
             <View
               style={[styles.brandRow, collapsed && styles.brandRowCollapsed]}
             >
@@ -602,7 +591,6 @@ export default function MainAdminLayout() {
               </Animated.Text>
             )}
 
-            {/* ── Nav Items ── */}
             <View style={styles.navList}>
               {menuItems.map((item) => (
                 <NavItem
@@ -623,7 +611,6 @@ export default function MainAdminLayout() {
             <View
               style={[styles.sidebarFooter, { borderTopColor: dividerColor }]}
             >
-              {/* Settings – now with hover */}
               <TouchableOpacity
                 style={[
                   styles.footerItem,
@@ -1090,12 +1077,9 @@ export default function MainAdminLayout() {
   )
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   root: { flex: 1 },
 
-  // ── Sidebar ──
   sidebarContainer: {
     height: '100%',
     position: 'fixed' as any,
@@ -1104,15 +1088,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 10,
     overflow: 'hidden',
-    // Subtle shadow on the right edge
     shadowColor: '#1e3a6e',
     shadowOffset: { width: 4, height: 0 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 4,
   },
   sidebarGradient: { flex: 1 },
-  sidebarContent: { flex: 1, paddingVertical: 4 },
+  sidebarContent: { flex: 1, paddingVertical: 2 },
 
   // Collapse button
   collapseBtn: {
@@ -1200,19 +1183,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1.2,
     marginHorizontal: 20,
-    marginBottom: 6,
-    marginTop: 4,
+    marginBottom: 4,
+    marginTop: 2,
   },
 
   // Nav list
   navList: { flex: 1, paddingHorizontal: 8 },
 
-  // Nav item
   navItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 2,
-    borderRadius: 14, // pill-ish shape
+    borderRadius: 14,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -1227,11 +1209,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   navItemActive: {
-    // extra left padding to accommodate the accent bar
     paddingLeft: 10,
   },
 
-  // Left accent bar (active state)
   activeBar: {
     position: 'absolute',
     left: 0,
@@ -1241,7 +1221,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // Collapsed active dot
   collapsedActiveDot: {
     position: 'absolute',
     bottom: 6,
@@ -1251,7 +1230,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
 
-  // Icon container (small rounded square)
   iconContainer: {
     width: 36,
     height: 36,
@@ -1268,7 +1246,7 @@ const styles = StyleSheet.create({
   // Footer
   sidebarFooter: {
     borderTopWidth: 1,
-    paddingTop: 12,
+    paddingTop: 10,
     paddingBottom: 20,
     paddingHorizontal: 8,
     marginTop: 8,

@@ -258,12 +258,16 @@ export default function StudentEventsScreen() {
     let filtered = [...events]
     const now = new Date()
 
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
     if (activeFilter === 'upcoming') {
       filtered = filtered.filter((e) => e.date > now)
+
+      filtered.sort((a, b) => a.date.getTime() - b.date.getTime())
     } else if (activeFilter === 'past') {
-      filtered = filtered.filter((e) => e.date <= now)
+      filtered = filtered.filter((e) => e.date < today)
     } else if (activeFilter === 'today') {
-      const today = new Date()
       filtered = filtered.filter((e) => {
         const d = e.date
         return (

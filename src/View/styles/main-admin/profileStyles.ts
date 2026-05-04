@@ -556,6 +556,7 @@ export const createProfileStyles = (
       padding: 12,
       alignItems: 'center',
       gap: 4,
+      overflow: 'hidden',
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
       backgroundColor: isDark
@@ -582,9 +583,7 @@ export const createProfileStyles = (
 
     // Chart Container
     chartContainer: {
-      backgroundColor: isDark
-        ? 'rgba(135, 206, 235, 0.12)'
-        : 'rgba(240, 249, 255, 0.85)',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc',
       borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
@@ -750,12 +749,12 @@ export const createProfileStyles = (
       color: isDark ? 'rgba(239,68,68,0.7)' : 'rgba(239,68,68,0.6)',
     },
 
-    // ─── Footer (Reduced) ───────────────────────────────────────────────────
+    // ─── Footer
     footer: {
       alignItems: 'center',
       paddingVertical: 20,
       gap: 4,
-      marginTop: -30,
+      marginTop: -50,
     },
     footerBrand: {
       fontSize: 13,
@@ -764,13 +763,14 @@ export const createProfileStyles = (
       letterSpacing: -0.2,
     },
     footerVersion: {
-      fontSize: 10,
-      fontWeight: '600',
+      fontSize: 8,
+      fontWeight: '400',
       color: colors.sidebar?.text?.muted || '#94a3b8',
       textTransform: 'uppercase',
       letterSpacing: 0.6,
+      marginTop: -20,
     },
-    // ─── Modal Styles (for Change Password) ─────────────────────────────────
+    // ─── Modal Styles
     modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.5)',
@@ -869,10 +869,10 @@ export const createProfileStyles = (
       alignItems: 'center',
     },
     logoImageButtom: {
-      width: 200,
-      height: 250,
-      marginBottom: -100,
-      marginTop: -70,
+      width: 100,
+      height: 100,
+      marginBottom: 0,
+      marginTop: 0,
     },
     profileMenuContainer: {
       backgroundColor: colors.card,

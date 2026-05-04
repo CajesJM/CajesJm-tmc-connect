@@ -22,95 +22,354 @@ import {
 import { useAuth } from '../src/Controller/context/AuthContext'
 import { db } from '../src/Model/lib/firebaseConfig'
 import LoadingScreen from '../src/View/components/LoadingScreen'
-import { styles } from '../src/View/styles/SuperAdminLogin'
 
-const modalStyles = StyleSheet.create({
+// ─── Forgot Password Modal ────────────────────────────────────────────────────
+const ForgotPasswordModal: React.FC<{
+  visible: boolean
+  onClose: () => void
+  forgotUsername: string
+  setForgotUsername: (v: string) => void
+  forgotLoading: boolean
+  forgotMessage: string | null
+  forgotCooldownUntil: number | null
+  forgotCooldownSeconds: number
+  onSubmit: () => void
+}> = ({
+  visible,
+  onClose,
+  forgotUsername,
+  setForgotUsername,
+  forgotLoading,
+  forgotMessage,
+  forgotCooldownUntil,
+  forgotCooldownSeconds,
+  onSubmit,
+}) => {
+  const slideAnim = useRef(new Animated.Value(60)).current
+  const fadeAnim = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          tension: 90,
+          friction: 14,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 60,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+      ]).start()
+    }
+  }, [visible])
+
+  const isSuccess = forgotMessage?.startsWith('✓')
+  const isCoolingDown = !!(
+    forgotCooldownUntil && forgotCooldownUntil > Date.now()
+  )
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType='none'
+      onRequestClose={onClose}
+    >
+      <Animated.View style={[forgotStyles.overlay, { opacity: fadeAnim }]}>
+        <Animated.View
+          style={[
+            forgotStyles.sheet,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          {/* Top accent bar */}
+          <View style={forgotStyles.accentBar} />
+
+          <View style={forgotStyles.iconWrap}>
+            <View style={forgotStyles.iconCircle}>
+              <Ionicons name='key-outline' size={26} color='#1D4ED8' />
+            </View>
+          </View>
+
+          <Text style={forgotStyles.title}>Reset Password</Text>
+          <Text style={forgotStyles.subtitle}>
+            Enter your admin username and we'll send a secure reset link to the
+            registered email.
+          </Text>
+
+          <View style={forgotStyles.inputWrap}>
+            <Ionicons
+              name='person-outline'
+              size={16}
+              color='#94A3B8'
+              style={forgotStyles.inputIcon}
+            />
+            <TextInput
+              style={forgotStyles.input}
+              placeholder='Admin username'
+              placeholderTextColor='#94A3B8'
+              value={forgotUsername}
+              onChangeText={setForgotUsername}
+              autoCapitalize='none'
+              editable={!forgotLoading}
+            />
+          </View>
+
+          {forgotMessage ? (
+            <View
+              style={[
+                forgotStyles.messageBox,
+                isSuccess ? forgotStyles.successBox : forgotStyles.errorBox,
+              ]}
+            >
+              <Ionicons
+                name={
+                  isSuccess
+                    ? 'checkmark-circle-outline'
+                    : 'alert-circle-outline'
+                }
+                size={15}
+                color={isSuccess ? '#16A34A' : '#DC2626'}
+              />
+              <Text
+                style={[
+                  forgotStyles.messageText,
+                  { color: isSuccess ? '#16A34A' : '#DC2626' },
+                ]}
+              >
+                {forgotMessage}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={forgotStyles.btnRow}>
+            <TouchableOpacity
+              style={forgotStyles.cancelBtn}
+              onPress={onClose}
+              disabled={forgotLoading}
+            >
+              <Text style={forgotStyles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                forgotStyles.submitBtn,
+                (forgotLoading || isCoolingDown) && forgotStyles.disabledBtn,
+              ]}
+              onPress={onSubmit}
+              disabled={forgotLoading || isCoolingDown}
+            >
+              {forgotLoading ? (
+                <ActivityIndicator size='small' color='#fff' />
+              ) : isCoolingDown ? (
+                <Text style={forgotStyles.submitText}>
+                  Wait {forgotCooldownSeconds}s
+                </Text>
+              ) : (
+                <Text style={forgotStyles.submitText}>Send Link</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  )
+}
+
+const forgotStyles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(15,23,42,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
-  container: {
-    width: '90%',
+  sheet: {
+    width: '100%',
     maxWidth: 400,
     backgroundColor: '#fff',
-    borderRadius: 32,
-    padding: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 24 },
     shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowRadius: 40,
+    elevation: 20,
+    paddingHorizontal: 28,
+    paddingBottom: 28,
+  },
+  accentBar: {
+    height: 4,
+    backgroundColor: '#1D4ED8',
+    marginHorizontal: -28,
+    marginBottom: 24,
+  },
+  iconWrap: { alignItems: 'center', marginBottom: 16 },
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginBottom: 8,
+    fontWeight: '800',
+    color: '#0F172A',
     textAlign: 'center',
+    letterSpacing: -0.4,
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginBottom: 20,
+    fontSize: 13,
+    color: '#64748B',
     textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 22,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#1e293b',
-    backgroundColor: '#f8fafc',
-    marginBottom: 12,
-  },
-  error: {
-    color: '#ef4444',
-    fontSize: 12,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  buttons: {
+  inputWrap: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+    marginBottom: 14,
   },
-  cancelButton: {
-    backgroundColor: '#f1f5f9',
+  inputIcon: { marginRight: 10 },
+  input: {
+    flex: 1,
+    paddingVertical: 13,
+    fontSize: 14,
+    color: '#0F172A',
   },
-  submitButton: {
-    backgroundColor: '#0ea5e9',
-    borderRadius: 40,
+  messageBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 18,
+    borderWidth: 1,
   },
-  cancelText: {
-    color: '#64748b',
-    fontWeight: '600',
+  successBox: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
+  errorBox: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  messageText: { fontSize: 12.5, flex: 1, lineHeight: 18, fontWeight: '500' },
+  btnRow: { flexDirection: 'row', gap: 10 },
+  cancelBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  submitText: {
-    color: '#fff',
-    fontWeight: '600',
+  cancelText: { color: '#64748B', fontWeight: '600', fontSize: 14 },
+  submitBtn: {
+    flex: 1.4,
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#1D4ED8',
+    alignItems: 'center',
+    shadowColor: '#1D4ED8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
-  disabled: {
-    opacity: 0.6,
+  submitText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  disabledBtn: { backgroundColor: '#93C5FD', shadowOpacity: 0 },
+})
+
+// ─── Left Panel Feature Item ──────────────────────────────────────────────────
+const FeaturePill: React.FC<{
+  icon: React.ComponentProps<typeof Ionicons>['name']
+  label: string
+  delay: number
+}> = ({ icon, label, delay }) => {
+  const anim = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 500,
+      delay,
+      useNativeDriver: true,
+    }).start()
+  }, [])
+  return (
+    <Animated.View
+      style={[
+        panelStyles.pill,
+        {
+          opacity: anim,
+          transform: [
+            {
+              translateX: anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-16, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <View style={panelStyles.pillIconBox}>
+        <Ionicons name={icon} size={14} color='#60A5FA' />
+      </View>
+      <Text style={panelStyles.pillLabel}>{label}</Text>
+    </Animated.View>
+  )
+}
+
+const panelStyles = StyleSheet.create({
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    flex: 1,
   },
-  success: {
-    color: '#10b981',
-    fontSize: 12,
-    marginBottom: 16,
-    textAlign: 'center',
+  pillIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(96,165,250,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pillLabel: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12.5,
+    fontWeight: '500',
   },
 })
 
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function SuperAdminLogin() {
   const router = useRouter()
   const { login, loading: authLoading } = useAuth()
@@ -132,50 +391,37 @@ export default function SuperAdminLogin() {
     null
   )
   const [forgotCooldownSeconds, setForgotCooldownSeconds] = useState(0)
-
-  // Lockout state
   const [failedAttempts, setFailedAttempts] = useState(0)
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null)
   const [remainingLockoutSeconds, setRemainingLockoutSeconds] = useState(0)
 
-  const usernameAnim = useRef(new Animated.Value(username ? 1 : 0)).current
-  const passwordAnim = useRef(new Animated.Value(password ? 1 : 0)).current
   const fadeAnim = useRef(new Animated.Value(0)).current
-  const slideAnim = useRef(new Animated.Value(24)).current
-
-  const animationDuration = 180
+  const slideAnim = useRef(new Animated.Value(32)).current
+  const shakeAnim = useRef(new Animated.Value(0)).current
 
   const saveLockoutState = (attempts: number, lockoutTime: number | null) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem(
         'superAdminLoginAttempts',
-        JSON.stringify({
-          failedAttempts: attempts,
-          lockoutUntil: lockoutTime,
-        })
+        JSON.stringify({ failedAttempts: attempts, lockoutUntil: lockoutTime })
       )
     }
   }
-
   const restoreLockoutState = () => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('superAdminLoginAttempts')
       if (stored) {
         try {
-          const {
-            failedAttempts: storedAttempts,
-            lockoutUntil: storedLockout,
-          } = JSON.parse(stored)
-          if (storedLockout && storedLockout > Date.now()) {
-            setFailedAttempts(storedAttempts)
-            setLockoutUntil(storedLockout)
+          const { failedAttempts: sa, lockoutUntil: sl } = JSON.parse(stored)
+          if (sl && sl > Date.now()) {
+            setFailedAttempts(sa)
+            setLockoutUntil(sl)
           } else {
             localStorage.removeItem('superAdminLoginAttempts')
             setFailedAttempts(0)
             setLockoutUntil(null)
           }
-        } catch (e) {
-          console.error('Failed to restore lockout state:', e)
+        } catch {
           localStorage.removeItem('superAdminLoginAttempts')
         }
       }
@@ -189,20 +435,19 @@ export default function SuperAdminLogin() {
       )
     }
   }
-
   const restoreForgotCooldown = () => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('superAdminForgotCooldown')
       if (stored) {
         try {
           const { cooldownUntil } = JSON.parse(stored)
-          if (cooldownUntil && cooldownUntil > Date.now()) {
+          if (cooldownUntil && cooldownUntil > Date.now())
             setForgotCooldownUntil(cooldownUntil)
-          } else {
+          else {
             localStorage.removeItem('superAdminForgotCooldown')
             setForgotCooldownUntil(null)
           }
-        } catch (e) {
+        } catch {
           localStorage.removeItem('superAdminForgotCooldown')
         }
       }
@@ -214,32 +459,17 @@ export default function SuperAdminLogin() {
     restoreForgotCooldown()
   }, [])
 
-  const animateLabel = (animValue: Animated.Value, toValue: number) => {
-    Animated.timing(animValue, {
-      toValue,
-      duration: animationDuration,
-      useNativeDriver: false,
-    }).start()
-  }
-
-  useEffect(() => {
-    animateLabel(usernameAnim, username ? 1 : 0)
-  }, [username])
-
-  useEffect(() => {
-    animateLabel(passwordAnim, password ? 1 : 0)
-  }, [password])
-
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 700,
         useNativeDriver: true,
       }),
-      Animated.timing(slideAnim, {
+      Animated.spring(slideAnim, {
         toValue: 0,
-        duration: 600,
+        tension: 70,
+        friction: 12,
         useNativeDriver: true,
       }),
     ]).start()
@@ -248,13 +478,10 @@ export default function SuperAdminLogin() {
   useEffect(() => {
     let interval: number
     if (lockoutUntil && lockoutUntil > Date.now()) {
-      const updateRemaining = () => {
-        const remaining = Math.max(
-          0,
-          Math.ceil((lockoutUntil - Date.now()) / 1000)
-        )
-        setRemainingLockoutSeconds(remaining)
-        if (remaining === 0) {
+      const update = () => {
+        const rem = Math.max(0, Math.ceil((lockoutUntil - Date.now()) / 1000))
+        setRemainingLockoutSeconds(rem)
+        if (rem === 0) {
           setLockoutUntil(null)
           setFailedAttempts(0)
           setRemainingLockoutSeconds(0)
@@ -262,8 +489,8 @@ export default function SuperAdminLogin() {
           setError(null)
         }
       }
-      updateRemaining()
-      interval = setInterval(updateRemaining, 1000)
+      update()
+      interval = setInterval(update, 1000)
       return () => clearInterval(interval)
     } else if (lockoutUntil && lockoutUntil <= Date.now()) {
       setLockoutUntil(null)
@@ -277,20 +504,20 @@ export default function SuperAdminLogin() {
   useEffect(() => {
     let interval: number
     if (forgotCooldownUntil && forgotCooldownUntil > Date.now()) {
-      const updateRemaining = () => {
-        const remaining = Math.max(
+      const update = () => {
+        const rem = Math.max(
           0,
           Math.ceil((forgotCooldownUntil - Date.now()) / 1000)
         )
-        setForgotCooldownSeconds(remaining)
-        if (remaining === 0) {
+        setForgotCooldownSeconds(rem)
+        if (rem === 0) {
           setForgotCooldownUntil(null)
           setForgotCooldownSeconds(0)
           localStorage.removeItem('superAdminForgotCooldown')
         }
       }
-      updateRemaining()
-      interval = window.setInterval(updateRemaining, 1000)
+      update()
+      interval = window.setInterval(update, 1000)
       return () => clearInterval(interval)
     } else if (forgotCooldownUntil && forgotCooldownUntil <= Date.now()) {
       setForgotCooldownUntil(null)
@@ -306,86 +533,94 @@ export default function SuperAdminLogin() {
       remainingLockoutSeconds > 0
     ) {
       setError(
-        `Too many failed attempts. Please wait ${remainingLockoutSeconds} second${remainingLockoutSeconds !== 1 ? 's' : ''} before trying again.`
+        `Too many failed attempts. Try again in ${remainingLockoutSeconds}s.`
       )
     }
   }, [remainingLockoutSeconds, lockoutUntil])
 
-  const forceLabelsUp = () => {
-    if (username) animateLabel(usernameAnim, 1)
-    if (password) animateLabel(passwordAnim, 1)
+  const triggerShake = () => {
+    shakeAnim.setValue(0)
+    Animated.sequence([
+      Animated.timing(shakeAnim, {
+        toValue: 10,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -10,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 8,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: -8,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shakeAnim, {
+        toValue: 0,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+    ]).start()
   }
 
-  const isOnline = (): boolean => {
-    if (typeof navigator !== 'undefined') {
-      return navigator.onLine
-    }
-    return true
-  }
+  const isOnline = (): boolean =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
 
   const handleLogin = async () => {
-    forceLabelsUp()
     if (busy || authLoading) return
     setError(null)
-
-    if (lockoutUntil && lockoutUntil > Date.now()) {
-      return
-    } else if (lockoutUntil && lockoutUntil <= Date.now()) {
+    if (lockoutUntil && lockoutUntil > Date.now()) return
+    else if (lockoutUntil && lockoutUntil <= Date.now()) {
       setLockoutUntil(null)
       setFailedAttempts(0)
       setRemainingLockoutSeconds(0)
       localStorage.removeItem('superAdminLoginAttempts')
     }
-
     if (!username || !password) {
-      setError('Please enter username and password')
+      setError('Please enter your username and password.')
+      triggerShake()
+      return
+    }
+    if (!isOnline()) {
+      setError('No internet connection. Please check your network.')
+      triggerShake()
       return
     }
 
     setBusy(true)
     setLoadingMessage('Verifying credentials')
 
-    const online = isOnline()
-    if (!online) {
-      setError(
-        'No internet connection. Please check your network and try again.'
-      )
-      setBusy(false)
-      return
-    }
-
     try {
       const usersCollection = collection(db, 'users')
       const q = query(usersCollection, where('username', '==', username))
       const querySnapshot = await getDocs(q)
-
-      if (querySnapshot.empty) {
-        throw new Error('Invalid username or password')
-      }
+      if (querySnapshot.empty) throw new Error('Invalid username or password')
 
       const userDoc = querySnapshot.docs[0]
       const userData = userDoc.data()
-
       const isActive =
         (userData.status ? userData.status !== 'inactive' : true) &&
         userData.active !== false
-
       if (!isActive) {
         setError(
-          'Your account has been deactivated. Please contact the system administrator.'
+          'Your account has been deactivated. Contact the system administrator.'
         )
         setBusy(false)
         return
       }
-
       if (userData.role !== 'main_admin') {
-        setError('Access denied. This portal is for administrators only.')
+        setError('Access denied. This portal is for main administrators only.')
         setBusy(false)
         return
       }
 
       await login(userData.email, password)
-
       setFailedAttempts(0)
       setLockoutUntil(null)
       setRemainingLockoutSeconds(0)
@@ -405,119 +640,101 @@ export default function SuperAdminLogin() {
         err?.code === 'failed-precondition' ||
         err?.message?.toLowerCase().includes('network') ||
         err?.message?.toLowerCase().includes('offline') ||
-        err?.message?.toLowerCase().includes('fetch') ||
-        (err?.name === 'FirebaseError' && err?.code === 'unavailable')
-
+        err?.message?.toLowerCase().includes('fetch')
       if (isNetworkError) {
-        setError(
-          'No internet connection. Please check your network and try again.'
-        )
+        setError('No internet connection. Please check your network.')
         setBusy(false)
+        triggerShake()
         return
       }
 
       const newAttempts = failedAttempts + 1
       setFailedAttempts(newAttempts)
-
       if (newAttempts >= 3) {
         const lockoutTime = Date.now() + 60 * 1000
         setLockoutUntil(lockoutTime)
         setRemainingLockoutSeconds(60)
         saveLockoutState(newAttempts, lockoutTime)
         setError(
-          `Too many failed attempts. Please wait 60 seconds before trying again.`
+          'Too many failed attempts. Please wait 60 seconds before trying again.'
         )
       } else {
         setError(
-          `Invalid username or password. ${3 - newAttempts} attempt(s) remaining.`
+          `Invalid username or password. ${3 - newAttempts} attempt${3 - newAttempts !== 1 ? 's' : ''} remaining.`
         )
       }
+      triggerShake()
     } finally {
       setBusy(false)
     }
   }
-  const isValidEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/
-    return emailRegex.test(email)
-  }
+
+  const isValidEmail = (email: string) =>
+    /^[^\s@]+@([^\s@]+\.)+[^\s@]+$/.test(email)
 
   const handleForgotPassword = async () => {
     if (!forgotUsername.trim()) {
-      setForgotMessage('Please enter your username')
+      setForgotMessage('Please enter your username.')
       return
     }
-
     if (forgotCooldownUntil && forgotCooldownUntil > Date.now()) {
       setForgotMessage(
-        `Please wait ${forgotCooldownSeconds} seconds before requesting again.`
+        `Please wait ${forgotCooldownSeconds}s before requesting again.`
       )
       return
     }
 
     setForgotLoading(true)
     setForgotMessage(null)
-
     try {
       const usersRef = collection(db, 'users')
       const q = query(usersRef, where('username', '==', forgotUsername.trim()))
       const querySnapshot = await getDocs(q)
-
       if (querySnapshot.empty) {
-        setForgotMessage('Username not found')
+        setForgotMessage('Username not found.')
         setForgotLoading(false)
         return
       }
 
-      const userDoc = querySnapshot.docs[0]
-      const userData = userDoc.data()
-
+      const userData = querySnapshot.docs[0].data()
       if (userData.role !== 'main_admin') {
         setForgotMessage('This account does not have admin privileges.')
         setForgotLoading(false)
         return
       }
-
-      const email = userData.email
-      if (!email) {
+      if (!userData.email) {
         setForgotMessage(
-          'No email address associated with this account. Please contact support.'
+          'No email associated with this account. Contact support.'
         )
         setForgotLoading(false)
         return
       }
-
-      if (!isValidEmail(email)) {
-        setForgotMessage(
-          'The email address on file is invalid. Please contact support.'
-        )
+      if (!isValidEmail(userData.email)) {
+        setForgotMessage('Email on file is invalid. Contact support.')
         setForgotLoading(false)
         return
       }
 
       const auth = getAuth()
-      await sendPasswordResetEmail(auth, email)
-
+      await sendPasswordResetEmail(auth, userData.email)
       const cooldownTime = Date.now() + 60 * 1000
       setForgotCooldownUntil(cooldownTime)
       setForgotCooldownSeconds(60)
       saveForgotCooldown(cooldownTime)
-
       setForgotMessage(
-        '✓ Reset email sent! The link expires in 1 hour. Check your inbox.'
+        '✓ Reset link sent! Check your inbox. The link expires in 1 hour.'
       )
-      setForgotLoading(false)
     } catch (error: any) {
-      console.error('Forgot password error:', error)
-      let errorMessage = 'Failed to send reset email. Please try again later.'
-      if (error.code === 'auth/user-not-found') {
-        errorMessage =
-          'No account found with that email. Please contact support.'
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address. Please contact support.'
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'Too many requests. Please try again later.'
-      }
-      setForgotMessage(errorMessage)
+      const msg =
+        error.code === 'auth/user-not-found'
+          ? 'No account found. Contact support.'
+          : error.code === 'auth/invalid-email'
+            ? 'Invalid email on file. Contact support.'
+            : error.code === 'auth/too-many-requests'
+              ? 'Too many requests. Try again later.'
+              : 'Failed to send reset email. Try again later.'
+      setForgotMessage(msg)
+    } finally {
       setForgotLoading(false)
     }
   }
@@ -525,51 +742,23 @@ export default function SuperAdminLogin() {
   const isLoading = busy || authLoading
   const isLockedOut = !!(lockoutUntil && lockoutUntil > Date.now())
 
-  const usernameLabelStyle = {
-    transform: [
-      {
-        translateY: usernameAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, -16],
-        }),
-      },
-      {
-        scale: usernameAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [1, 0.82],
-        }),
-      },
-    ],
-  }
-
-  const passwordLabelStyle = {
-    transform: [
-      {
-        translateY: passwordAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, -16],
-        }),
-      },
-      {
-        scale: passwordAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [1, 0.82],
-        }),
-      },
-    ],
-  }
-
-  const features = [
-    { icon: 'people-outline' as const, label: 'User Management' },
-    { icon: 'calendar-outline' as const, label: 'Event Scheduler' },
-    { icon: 'megaphone-outline' as const, label: 'Announcements' },
-    { icon: 'checkmark-circle-outline' as const, label: 'Attendance' },
-    { icon: 'bar-chart-outline' as const, label: 'Analytics' },
-    { icon: 'shield-checkmark-outline' as const, label: 'Admin Controls' },
+  const features: {
+    icon: React.ComponentProps<typeof Ionicons>['name']
+    label: string
+  }[] = [
+    { icon: 'people-outline', label: 'User Management' },
+    { icon: 'calendar-outline', label: 'Event Scheduler' },
+    { icon: 'megaphone-outline', label: 'Announcements' },
+    { icon: 'checkmark-circle-outline', label: 'Attendance' },
+    { icon: 'bar-chart-outline', label: 'Analytics' },
+    { icon: 'shield-checkmark-outline', label: 'Admin Controls' },
   ]
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
+    <ScrollView
+      contentContainerStyle={loginStyles.scrollContainer}
+      keyboardShouldPersistTaps='handled'
+    >
       <StatusBar barStyle='light-content' />
 
       {/* Loading Modal */}
@@ -581,365 +770,354 @@ export default function SuperAdminLogin() {
       </Modal>
 
       {/* Forgot Password Modal */}
-      <Modal
-        transparent
+      <ForgotPasswordModal
         visible={forgotModalVisible}
-        animationType='fade'
-        onRequestClose={() => setForgotModalVisible(false)}
-      >
-        <View style={modalStyles.overlay}>
-          <View style={modalStyles.container}>
-            <Text style={modalStyles.title}>Reset Password</Text>
-            <Text style={modalStyles.subtitle}>
-              Enter your username to receive a password reset email.
-            </Text>
-            <TextInput
-              style={modalStyles.input}
-              placeholder='Username'
-              placeholderTextColor='#94a3b8'
-              value={forgotUsername}
-              onChangeText={setForgotUsername}
-              autoCapitalize='none'
-              editable={!forgotLoading}
-            />
-            {forgotMessage && (
-              <Text
-                style={[
-                  modalStyles.error,
-                  forgotMessage.startsWith('✓') && modalStyles.success,
-                ]}
-              >
-                {forgotMessage}
-              </Text>
-            )}
-            <View style={modalStyles.buttons}>
-              <TouchableOpacity
-                style={[modalStyles.button, modalStyles.cancelButton]}
-                onPress={() => {
-                  setForgotModalVisible(false)
-                  setForgotMessage(null)
-                  setForgotUsername('')
-                }}
-                disabled={forgotLoading}
-              >
-                <Text style={modalStyles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  modalStyles.button,
-                  modalStyles.submitButton,
-                  forgotLoading ||
-                  (forgotCooldownUntil !== null &&
-                    forgotCooldownUntil > Date.now())
-                    ? modalStyles.disabled
-                    : {},
-                ]}
-                onPress={handleForgotPassword}
-                disabled={
-                  forgotLoading ||
-                  (forgotCooldownUntil !== null &&
-                    forgotCooldownUntil > Date.now())
-                }
-              >
-                {forgotLoading ? (
-                  <ActivityIndicator size='small' color='#fff' />
-                ) : forgotCooldownUntil !== null &&
-                  forgotCooldownUntil > Date.now() ? (
-                  <Text style={modalStyles.submitText}>
-                    Wait {forgotCooldownSeconds}s
-                  </Text>
-                ) : (
-                  <Text style={modalStyles.submitText}>Send Email</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => {
+          setForgotModalVisible(false)
+          setForgotMessage(null)
+          setForgotUsername('')
+        }}
+        forgotUsername={forgotUsername}
+        setForgotUsername={setForgotUsername}
+        forgotLoading={forgotLoading}
+        forgotMessage={forgotMessage}
+        forgotCooldownUntil={forgotCooldownUntil}
+        forgotCooldownSeconds={forgotCooldownSeconds}
+        onSubmit={handleForgotPassword}
+      />
 
       <KeyboardAvoidingView
-        style={styles.keyboardView}
+        style={loginStyles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.container}>
+        <View style={loginStyles.container}>
+          {/* ── LEFT PANEL ────────────────────────────────── */}
           <LinearGradient
-            colors={['#0b0732', '#0d2e4f', '#0d3667b7']}
+            colors={['#060D1F', '#0A1A3D', '#0D2966']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={[styles.leftColumn, { flex: 1.15 }]}
+            style={loginStyles.leftPanel}
           >
+            {/* Decorative blobs */}
             <View
-              style={{
-                position: 'absolute',
-                top: -80,
-                right: -80,
-                width: 360,
-                height: 360,
-                borderRadius: 180,
-                backgroundColor: 'rgba(14,165,233,0.06)',
-              }}
+              style={[
+                loginStyles.blob,
+                {
+                  width: 380,
+                  height: 380,
+                  top: -100,
+                  right: -100,
+                  backgroundColor: 'rgba(29,78,216,0.12)',
+                },
+              ]}
             />
             <View
-              style={{
-                position: 'absolute',
-                bottom: -60,
-                left: -40,
-                width: 260,
-                height: 260,
-                borderRadius: 130,
-                backgroundColor: 'rgba(14,165,233,0.04)',
-              }}
+              style={[
+                loginStyles.blob,
+                {
+                  width: 280,
+                  height: 280,
+                  bottom: -60,
+                  left: -60,
+                  backgroundColor: 'rgba(29,78,216,0.08)',
+                },
+              ]}
             />
             <View
-              style={{
-                position: 'absolute',
-                top: '20%',
-                left: -100,
-                width: 300,
-                height: 300,
-                borderRadius: 150,
-                backgroundColor: 'rgba(14,165,233,0.05)',
-              }}
-            />
-            <View
-              style={{
-                position: 'absolute',
-                bottom: '10%',
-                right: -50,
-                width: 200,
-                height: 200,
-                borderRadius: 100,
-                backgroundColor: 'rgba(14,165,233,0.08)',
-              }}
+              style={[
+                loginStyles.blob,
+                {
+                  width: 180,
+                  height: 180,
+                  bottom: '35%',
+                  right: -40,
+                  backgroundColor: 'rgba(96,165,250,0.07)',
+                },
+              ]}
             />
 
-            <View style={styles.logoContainer}>
+            {/* Horizontal separator line glow */}
+            <View style={loginStyles.glowLine} />
+
+            {/* Logo */}
+            <View style={loginStyles.leftLogoRow}>
               <Image
                 source={require('../assets/images/Logo/TMC_Connect.png')}
-                style={styles.logoImage}
+                style={loginStyles.leftLogoImage}
                 resizeMode='contain'
               />
               <View>
-                <Text style={styles.logoText}>TMC Connect</Text>
-                <Text style={styles.logoSub}>Admin Portal</Text>
+                <Text style={loginStyles.leftLogoTitle}>TMC Connect</Text>
+                <Text style={loginStyles.leftLogoSub}>Admin Portal</Text>
               </View>
             </View>
 
-            <View style={styles.headlineTag}>
-              <View style={styles.headlineTagDot} />
-              <Text style={styles.headlineTagText}>Main Administrator</Text>
+            {/* Badge */}
+            <View style={loginStyles.leftBadge}>
+              <View style={loginStyles.leftBadgeDot} />
+              <Text style={loginStyles.leftBadgeText}>Main Administrator</Text>
             </View>
 
-            <Text style={styles.welcomeTitle}>
-              Manage your{'\n'}
-              <Text style={styles.welcomeTitleAccent}>organization</Text>
+            {/* Headline */}
+            <Text style={loginStyles.leftHeadline}>
+              Command your{'\n'}campus{' '}
+              <Text style={loginStyles.leftHeadlineAccent}>operations</Text>
               {'\n'}from one place.
             </Text>
-            <Text style={styles.welcomeSubtitle}>
-              Access the full administrative suite — oversee users, events,
-              announcements, attendance, and system-wide approvals.
+
+            <Text style={loginStyles.leftSub}>
+              The full administrative suite for managing users, events,
+              attendance, announcements, and system-wide approvals.
             </Text>
 
-            <View style={styles.featuresGrid}>
-              {features.map((item, idx) => (
-                <View key={idx} style={styles.featureItem}>
-                  <View style={styles.featureIconBox}>
-                    <Ionicons name={item.icon} size={15} color='#0ea5e9' />
-                  </View>
-                  <Text style={styles.featureLabel}>{item.label}</Text>
+            {/* Feature pills grid — strict 3×2 */}
+            <View style={loginStyles.pillsGrid}>
+              {[0, 1].map((row) => (
+                <View key={row} style={loginStyles.pillsRow}>
+                  {features.slice(row * 3, row * 3 + 3).map((f, i) => (
+                    <FeaturePill
+                      key={f.label}
+                      icon={f.icon}
+                      label={f.label}
+                      delay={300 + (row * 3 + i) * 80}
+                    />
+                  ))}
                 </View>
               ))}
             </View>
+
+            {/* Bottom version badge */}
+            <View style={loginStyles.versionBadge}>
+              <Ionicons
+                name='shield-checkmark'
+                size={11}
+                color='rgba(96,165,250,0.7)'
+              />
+              <Text style={loginStyles.versionText}>
+                TMC Connect v2.0 · End-to-end encrypted
+              </Text>
+            </View>
           </LinearGradient>
 
+          {/* ── RIGHT PANEL ───────────────────────────────── */}
           <Animated.View
             style={[
-              styles.rightColumn,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
+              loginStyles.rightPanel,
+              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
             ]}
           >
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View style={styles.cardBadge}>
-                  <Image
-                    source={require('../assets/images/Logo/TMC-Coonect-V.2.png')}
-                    style={styles.logoImage1}
-                    resizeMode='contain'
-                  />
+            <View style={loginStyles.rightInner}>
+              {/* Card header */}
+              <View style={loginStyles.cardHeader}>
+                <Image
+                  source={require('../assets/images/Logo/TMC-Coonect-V.2.png')}
+                  style={loginStyles.cardLogo}
+                  resizeMode='contain'
+                />
+                <View style={loginStyles.secureTag}>
+                  <Ionicons name='lock-closed' size={9} color='#1D4ED8' />
+                  <Text style={loginStyles.secureTagText}>Secure Portal</Text>
                 </View>
-                <Text style={styles.title}>Administrator Login</Text>
-                <Text style={styles.subtitle}>
-                  Restricted to main administrators only
-                </Text>
               </View>
 
-              <View style={styles.divider} />
+              <Text style={loginStyles.cardTitle}>Administrator Login</Text>
+              <Text style={loginStyles.cardSubtitle}>
+                Restricted access · Main administrators only
+              </Text>
 
-              {/* Username */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Username</Text>
+              <View style={loginStyles.divider} />
+
+              {/* Username Field */}
+              <View style={loginStyles.fieldGroup}>
+                <Text style={loginStyles.fieldLabel}>Username</Text>
                 <View
                   style={[
-                    styles.inputContainer,
-                    usernameFocused && styles.inputContainerFocused,
+                    loginStyles.inputRow,
+                    usernameFocused && loginStyles.inputRowFocused,
+                    !!error && !usernameFocused && loginStyles.inputRowError,
                   ]}
                 >
                   <Ionicons
                     name='person-outline'
-                    size={17}
-                    color={usernameFocused ? '#0ea5e9' : '#94a3b8'}
-                    style={styles.inputIcon}
+                    size={16}
+                    color={usernameFocused ? '#1D4ED8' : '#94A3B8'}
+                    style={loginStyles.fieldIcon}
                   />
-                  <View style={styles.floatingLabelWrapper}>
-                    <Animated.Text
-                      style={[styles.floatingLabel, usernameLabelStyle]}
-                    >
-                      Enter your username
-                    </Animated.Text>
-                    <TextInput
-                      placeholder=''
-                      placeholderTextColor='transparent'
-                      value={username}
-                      onChangeText={setUsername}
-                      style={[styles.input, styles.inputWithIcon]}
-                      autoCapitalize='none'
-                      editable={!isLoading && !isLockedOut}
-                      onFocus={() => {
-                        setUsernameFocused(true)
-                        animateLabel(usernameAnim, 1)
-                      }}
-                      onBlur={() => {
-                        setUsernameFocused(false)
-                        if (!username) animateLabel(usernameAnim, 0)
-                      }}
-                    />
-                  </View>
+                  <TextInput
+                    style={loginStyles.textInput}
+                    placeholder='Enter your username'
+                    placeholderTextColor='#94A3B8'
+                    value={username}
+                    onChangeText={setUsername}
+                    autoCapitalize='none'
+                    editable={!isLoading && !isLockedOut}
+                    onFocus={() => setUsernameFocused(true)}
+                    onBlur={() => setUsernameFocused(false)}
+                  />
                 </View>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Password</Text>
+              {/* Password Field */}
+              <View style={loginStyles.fieldGroup}>
+                <Text style={loginStyles.fieldLabel}>Password</Text>
                 <View
                   style={[
-                    styles.inputContainer,
-                    passwordFocused && styles.inputContainerFocused,
+                    loginStyles.inputRow,
+                    passwordFocused && loginStyles.inputRowFocused,
+                    !!error && !passwordFocused && loginStyles.inputRowError,
                   ]}
                 >
                   <Ionicons
                     name='lock-closed-outline'
-                    size={17}
-                    color={passwordFocused ? '#0ea5e9' : '#94a3b8'}
-                    style={styles.inputIcon}
+                    size={16}
+                    color={passwordFocused ? '#1D4ED8' : '#94A3B8'}
+                    style={loginStyles.fieldIcon}
                   />
-                  <View style={styles.floatingLabelWrapper}>
-                    <Animated.Text
-                      style={[styles.floatingLabel, passwordLabelStyle]}
-                    >
-                      Enter your password
-                    </Animated.Text>
-                    <TextInput
-                      placeholder=''
-                      placeholderTextColor='transparent'
-                      value={password}
-                      onChangeText={setPassword}
-                      style={[styles.input, styles.inputWithIcon]}
-                      secureTextEntry={!showPassword}
-                      editable={!isLoading && !isLockedOut}
-                      onFocus={() => {
-                        setPasswordFocused(true)
-                        animateLabel(passwordAnim, 1)
-                      }}
-                      onBlur={() => {
-                        setPasswordFocused(false)
-                        if (!password) animateLabel(passwordAnim, 0)
-                      }}
-                    />
-                  </View>
+                  <TextInput
+                    style={loginStyles.textInput}
+                    placeholder='Enter your password'
+                    placeholderTextColor='#94A3B8'
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    editable={!isLoading && !isLockedOut}
+                    onFocus={() => setPasswordFocused(true)}
+                    onBlur={() => setPasswordFocused(false)}
+                  />
                   <TouchableOpacity
+                    style={loginStyles.eyeBtn}
                     onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeIcon}
-                    disabled={isLoading || !!isLockedOut}
+                    disabled={isLoading || isLockedOut}
                   >
                     <Ionicons
                       name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={18}
-                      color={passwordFocused ? '#0ea5e9' : '#94a3b8'}
+                      size={17}
+                      color={passwordFocused ? '#1D4ED8' : '#94A3B8'}
                     />
                   </TouchableOpacity>
                 </View>
               </View>
 
-              <View style={styles.optionsRow}>
+              {/* Options row */}
+              <View style={loginStyles.optionsRow}>
                 <TouchableOpacity
-                  style={styles.checkboxContainer}
+                  style={loginStyles.checkboxRow}
                   onPress={() => setKeepLoggedIn(!keepLoggedIn)}
-                  disabled={isLoading || !!isLockedOut}
+                  disabled={isLoading || isLockedOut}
                 >
                   <View
                     style={[
-                      styles.checkbox,
-                      keepLoggedIn && styles.checkboxChecked,
+                      loginStyles.checkbox,
+                      keepLoggedIn && loginStyles.checkboxOn,
                     ]}
                   >
                     {keepLoggedIn && (
-                      <Ionicons name='checkmark' size={12} color='#fff' />
+                      <Ionicons name='checkmark' size={11} color='#fff' />
                     )}
                   </View>
-                  <Text style={styles.checkboxLabel}>Keep me logged in</Text>
+                  <Text style={loginStyles.keepLoggedText}>
+                    Keep me signed in
+                  </Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity
                   onPress={() => setForgotModalVisible(true)}
-                  disabled={isLoading || !!isLockedOut}
+                  disabled={isLoading || isLockedOut}
                 >
-                  <Text style={styles.forgotText}>Forgot password?</Text>
+                  <Text style={loginStyles.forgotLink}>Forgot password?</Text>
                 </TouchableOpacity>
               </View>
 
-              {error && (
-                <View style={styles.error}>
-                  <Ionicons name='alert-circle' size={16} color='#ef4444' />
-                  <Text style={{ flex: 1, color: '#ef4444' }}>{error}</Text>
-                </View>
-              )}
+              {/* Error banner */}
+              {error ? (
+                <Animated.View
+                  style={[
+                    loginStyles.errorBanner,
+                    { transform: [{ translateX: shakeAnim }] },
+                  ]}
+                >
+                  <Ionicons name='alert-circle' size={15} color='#DC2626' />
+                  <Text style={loginStyles.errorText}>{error}</Text>
+                </Animated.View>
+              ) : null}
 
+              {/* Submit button */}
               <TouchableOpacity
                 style={[
-                  styles.button,
-                  isLoading || isLockedOut ? styles.disabled : undefined,
+                  loginStyles.loginBtn,
+                  (isLoading || isLockedOut) && loginStyles.loginBtnDisabled,
                 ]}
                 onPress={handleLogin}
                 disabled={isLoading || isLockedOut}
-                activeOpacity={0.7}
+                activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={['#0ea5e9', '#3b82f6']}
+                  colors={
+                    isLockedOut
+                      ? ['#93C5FD', '#93C5FD']
+                      : ['#1D4ED8', '#2563EB']
+                  }
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={StyleSheet.absoluteFillObject}
                 />
-                <Ionicons name='log-in-outline' size={20} color='#fff' />
-                <Text style={styles.buttonText}>Enter Portal</Text>
+                {isLockedOut ? (
+                  <>
+                    <Ionicons name='time-outline' size={18} color='#fff' />
+                    <Text style={loginStyles.loginBtnText}>
+                      Locked · {remainingLockoutSeconds}s
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name='log-in-outline' size={18} color='#fff' />
+                    <Text style={loginStyles.loginBtnText}>Enter Portal</Text>
+                  </>
+                )}
               </TouchableOpacity>
 
-              <View style={styles.footerLinks}>
+              {/* Attempt pips */}
+              {failedAttempts > 0 && !isLockedOut && (
+                <View style={loginStyles.attemptsRow}>
+                  {[0, 1, 2].map((i) => (
+                    <View
+                      key={i}
+                      style={[
+                        loginStyles.attemptPip,
+                        i < failedAttempts && loginStyles.attemptPipFilled,
+                      ]}
+                    />
+                  ))}
+                  <Text style={loginStyles.attemptsText}>
+                    {3 - failedAttempts} attempt
+                    {3 - failedAttempts !== 1 ? 's' : ''} remaining
+                  </Text>
+                </View>
+              )}
+
+              {/* Footer */}
+              <View style={loginStyles.cardFooter}>
                 <TouchableOpacity
                   onPress={() => router.push('/')}
-                  style={styles.backLink}
-                  disabled={isLoading || !!isLockedOut}
+                  disabled={isLoading || isLockedOut}
+                  style={loginStyles.backBtn}
                 >
-                  <Text style={styles.backLinkText}>← Back to Home</Text>
+                  <Ionicons
+                    name='arrow-back-outline'
+                    size={14}
+                    color='#64748B'
+                  />
+                  <Text style={loginStyles.backBtnText}>Back to Home</Text>
                 </TouchableOpacity>
-              </View>
-
-              <View style={styles.securityNote}>
-                <Ionicons name='lock-closed' size={11} color='#94a3b8' />
-                <Text style={styles.securityNoteText}>
-                  Secured with end-to-end encryption · TMC Connect v2.0
-                </Text>
+                <View style={loginStyles.securityNote}>
+                  <Ionicons
+                    name='shield-checkmark-outline'
+                    size={11}
+                    color='#CBD5E1'
+                  />
+                  <Text style={loginStyles.securityNoteText}>
+                    End-to-end encrypted
+                  </Text>
+                </View>
               </View>
             </View>
           </Animated.View>
@@ -948,3 +1126,387 @@ export default function SuperAdminLogin() {
     </ScrollView>
   )
 }
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+export const loginStyles = StyleSheet.create({
+  scrollContainer: {
+    flexGrow: 1,
+    backgroundColor: '#F0F7FF',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
+    flexDirection: 'row',
+    minHeight: '100%' as any,
+  },
+
+  // ── Left panel
+  leftPanel: {
+    flex: 1.1,
+    paddingVertical: 52,
+    paddingHorizontal: 44,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    minWidth: 320,
+    position: 'relative',
+  },
+  blob: {
+    position: 'absolute',
+    borderRadius: 999,
+  },
+  glowLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(96,165,250,0.2)',
+  },
+  leftLogoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 32,
+  },
+  leftLogoImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  leftLogoTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  leftLogoSub: {
+    color: 'rgba(148,163,184,0.8)',
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+    marginTop: 1,
+  },
+  leftBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: 'rgba(29,78,216,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    marginBottom: 20,
+  },
+  leftBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#60A5FA',
+  },
+  leftBadgeText: {
+    color: '#93C5FD',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+  },
+  leftHeadline: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    lineHeight: 46,
+    letterSpacing: -1,
+    marginBottom: 16,
+  },
+  leftHeadlineAccent: {
+    color: '#60A5FA',
+  },
+  leftSub: {
+    fontSize: 13.5,
+    color: 'rgba(148,163,184,0.85)',
+    lineHeight: 23,
+    marginBottom: 32,
+    maxWidth: 380,
+  },
+  pillsGrid: {
+    flexDirection: 'column',
+    gap: 8,
+    marginBottom: 40,
+  },
+  pillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  versionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  versionText: {
+    color: 'rgba(100,116,139,0.8)',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // ── Right panel
+  rightPanel: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  rightInner: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 36,
+    shadowColor: '#1E40AF',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.08,
+    shadowRadius: 40,
+    elevation: 8,
+  },
+
+  // Card header
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  cardLogo: {
+    width: 110,
+    height: 44,
+  },
+  secureTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  secureTagText: {
+    color: '#1D4ED8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  cardTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.6,
+    marginBottom: 4,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
+    marginBottom: 20,
+    fontWeight: '500',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginBottom: 24,
+  },
+
+  // Fields
+  fieldGroup: {
+    marginBottom: 16,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 7,
+    letterSpacing: 0.2,
+    textTransform: 'uppercase' as any,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+  },
+  inputRowFocused: {
+    borderColor: '#1D4ED8',
+    backgroundColor: '#fff',
+    shadowColor: '#1D4ED8',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+  },
+  inputRowError: {
+    borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
+  },
+  fieldIcon: {
+    marginRight: 10,
+  },
+  textInput: {
+    flex: 1,
+    paddingVertical: 13,
+    fontSize: 14,
+    color: '#0F172A',
+    fontWeight: '500',
+  },
+  eyeBtn: {
+    padding: 4,
+  },
+
+  // Options
+  optionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+    marginTop: 2,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checkbox: {
+    width: 17,
+    height: 17,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxOn: {
+    backgroundColor: '#1D4ED8',
+    borderColor: '#1D4ED8',
+  },
+  keepLoggedText: {
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  forgotLink: {
+    fontSize: 13,
+    color: '#1D4ED8',
+    fontWeight: '600',
+  },
+
+  // Error
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  errorText: {
+    flex: 1,
+    color: '#DC2626',
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+
+  // Button
+  loginBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    borderRadius: 12,
+    overflow: 'hidden',
+    paddingVertical: 15,
+    marginBottom: 12,
+    shadowColor: '#1D4ED8',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
+  },
+  loginBtnDisabled: {
+    shadowOpacity: 0,
+  },
+  loginBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+
+  // Attempt pips
+  attemptsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  attemptPip: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  attemptPipFilled: {
+    backgroundColor: '#EF4444',
+    borderColor: '#EF4444',
+  },
+  attemptsText: {
+    fontSize: 11.5,
+    color: '#EF4444',
+    fontWeight: '600',
+    marginLeft: 2,
+  },
+
+  // Footer
+  cardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    marginTop: 4,
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  backBtnText: {
+    color: '#64748B',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  securityNoteText: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+})

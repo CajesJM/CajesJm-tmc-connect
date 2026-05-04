@@ -1360,7 +1360,7 @@ export default function MainAdminProfile() {
           <View style={styles.analyticsContent}>
             <View style={styles.metricsRow}>
               <LinearGradient
-                colors={['#10b981', '#059669']}
+                colors={['#1dd396', '#059669']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.metricCard, styles.metricCardLarge]}
@@ -1480,10 +1480,10 @@ export default function MainAdminProfile() {
 
             <View style={styles.statusGrid}>
               <LinearGradient
-                colors={['#10b981', '#059669']}
+                colors={['#11e9a1', '#059669']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={[styles.statusItem, { backgroundColor: 'transparent' }]}
+                style={styles.statusItem}
               >
                 <View style={styles.statusHeader}>
                   <Feather name='check-circle' size={14} color='#ffffff' />
@@ -1504,7 +1504,7 @@ export default function MainAdminProfile() {
                 colors={['#f59e0b', '#d97706']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={[styles.statusItem, { backgroundColor: 'transparent' }]}
+                style={styles.statusItem}
               >
                 <View style={styles.statusHeader}>
                   <Feather name='clock' size={14} color='#ffffff' />
@@ -1525,7 +1525,7 @@ export default function MainAdminProfile() {
                 colors={['#ef4444', '#b91c1c']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={[styles.statusItem, { backgroundColor: 'transparent' }]}
+                style={styles.statusItem}
               >
                 <View style={styles.statusHeader}>
                   <Feather name='x-circle' size={14} color='#ffffff' />

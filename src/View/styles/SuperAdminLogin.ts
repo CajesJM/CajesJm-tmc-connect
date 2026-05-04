@@ -418,7 +418,6 @@ export const styles = StyleSheet.create({
     marginTop: 8,
   },
   backLink: {
-    // Add some padding to increase touch area if desired
     paddingVertical: 4,
   },
   backLinkText: {

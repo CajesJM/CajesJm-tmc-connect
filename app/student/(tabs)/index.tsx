@@ -7,10 +7,13 @@ import {
   collection,
   doc,
   getDocs,
+  getFirestore,
   onSnapshot,
   orderBy,
   query,
   updateDoc,
+  where,
+  writeBatch,
 } from 'firebase/firestore'
 import {
   deleteObject,
@@ -520,7 +523,12 @@ export default function StudentDashboard() {
           setNotifications((prev) => {
             const combined = [...prev]
             notifs.forEach((n) => {
-              if (!combined.some((ex) => ex.id === n.id)) combined.push(n)
+              const idx = combined.findIndex((ex) => ex.id === n.id)
+              if (idx !== -1) {
+                combined[idx] = n
+              } else {
+                combined.push(n)
+              }
             })
             combined.sort((a, b) => getTime(b.timestamp) - getTime(a.timestamp))
             return combined
@@ -536,7 +544,12 @@ export default function StudentDashboard() {
           setNotifications((prev) => {
             const combined = [...prev]
             notifs.forEach((n) => {
-              if (!combined.some((ex) => ex.id === n.id)) combined.push(n)
+              const idx = combined.findIndex((ex) => ex.id === n.id)
+              if (idx !== -1) {
+                combined[idx] = n
+              } else {
+                combined.push(n)
+              }
             })
             combined.sort((a, b) => getTime(b.timestamp) - getTime(a.timestamp))
             return combined
@@ -545,7 +558,6 @@ export default function StudentDashboard() {
       )
     }
 
-    // 🧹 Cleanup: runs when userData changes (i.e. logout) or component unmounts
     return () => {
       unsubscribeEvents()
       unsubscribeAnnouncements()
@@ -553,8 +565,8 @@ export default function StudentDashboard() {
       if (unsubscribeUid) unsubscribeUid()
       notificationService.cleanup()
     }
-  }, [userData]) // 👈 Dependency on userData is key!
-  // Update unread count whenever notifications change
+  }, [userData])
+
   useEffect(() => {
     const unread = notifications.filter((n) => !n.read).length
     setUnreadCount(unread)
@@ -650,6 +662,34 @@ export default function StudentDashboard() {
       await notificationService.markAllAsRead(currentUser.uid)
     }
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    setUnreadCount(0)
+  }
+
+  const handleClearNotifications = async () => {
+    const currentUser = auth.currentUser
+    if (!currentUser) return
+
+    const db = getFirestore()
+
+    const idsToClear: string[] = [currentUser.uid]
+    if (userData?.email && userData.email !== currentUser.uid) {
+      idsToClear.push(userData.email)
+    }
+
+    for (const id of idsToClear) {
+      const q = query(
+        collection(db, 'notifications'),
+        where('userId', '==', id)
+      )
+      const snapshot = await getDocs(q)
+      if (!snapshot.empty) {
+        const batch = writeBatch(db)
+        snapshot.forEach((doc) => batch.delete(doc.ref))
+        await batch.commit()
+      }
+    }
+
+    setNotifications([])
     setUnreadCount(0)
   }
   const handleProfileImagePress = () => {
@@ -1792,6 +1832,7 @@ export default function StudentDashboard() {
         notifications={notifications}
         onNotificationPress={handleNotificationPress}
         onMarkAllRead={handleMarkAllRead}
+        onClearNotifications={handleClearNotifications}
         pendingApprovals={[]}
         approvalCount={0}
       />

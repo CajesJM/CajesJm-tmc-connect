@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   Modal,
@@ -46,6 +47,10 @@ interface NotificationModalProps {
   approvalCount?: number
   loading?: boolean
   onRefresh?: () => Promise<void>
+  onClearNotifications?: () => Promise<void>
+  hideNotificationsTab?: boolean
+  title?: string
+  approvalStripeColor?: string
 }
 
 export const NotificationModal: React.FC<NotificationModalProps> = ({
@@ -53,6 +58,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   onClose,
   notifications,
   onNotificationPress,
+  onClearNotifications,
   onMarkAllRead,
   pendingApprovals = [],
   onApprove,
@@ -60,11 +66,14 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   approvalCount = 0,
   loading = false,
   onRefresh,
+  hideNotificationsTab,
+  title,
+  approvalStripeColor,
 }) => {
   const { width } = useWindowDimensions()
   const { colors, isDark } = useTheme()
   const [activeTab, setActiveTab] = useState<'notifications' | 'approvals'>(
-    approvalCount > 0 ? 'approvals' : 'notifications'
+    hideNotificationsTab || approvalCount > 0 ? 'approvals' : 'notifications'
   )
   const [refreshing, setRefreshing] = useState(false)
   const [snackbarVisible, setSnackbarVisible] = useState(false)
@@ -77,6 +86,9 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   const detailSlide = useRef(new Animated.Value(300)).current
   const detailOpacity = useRef(new Animated.Value(0)).current
 
+  const [clearing, setClearing] = useState(false)
+  const [snackbarMessage, setSnackbarMessage] = useState('')
+
   const getPriorityColor = (priority?: string) => {
     if (priority === 'urgent') return '#ef4444'
     if (priority === 'important') return '#f59e0b'
@@ -87,6 +99,32 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
     if (priority === 'urgent') return 'URGENT'
     if (priority === 'important') return 'IMPORTANT'
     return 'NORMAL'
+  }
+
+  const handleClearAll = () => {
+    if (!onClearNotifications) return
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    if (typeof Alert !== 'undefined') {
+      Alert.alert(
+        'Clear notification history',
+        'Are you sure you want to permanently delete all your notifications?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete All',
+            style: 'destructive',
+            onPress: async () => {
+              setClearing(true)
+              await onClearNotifications()
+              setClearing(false)
+              setSnackbarMessage('Notification history cleared')
+              setSnackbarVisible(true)
+              setTimeout(() => setSnackbarVisible(false), 2000)
+            },
+          },
+        ]
+      )
+    }
   }
 
   const panResponder = useRef(
@@ -221,8 +259,8 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   const handleMarkAllRead = () => {
     withHaptic(() => {
       onMarkAllRead()
+      setSnackbarMessage('All notifications marked as read')
       setSnackbarVisible(true)
-      setTimeout(() => setSnackbarVisible(false), 2000)
     })
   }
 
@@ -317,48 +355,51 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'notifications' && [
-              styles.activeTab,
-              { backgroundColor: d.activeTabBg },
-            ],
-          ]}
-          onPress={() => withHaptic(() => setActiveTab('notifications'))}
-          activeOpacity={0.8}
-        >
-          <Feather
-            name='bell'
-            size={13}
-            color={activeTab === 'notifications' ? '#fff' : d.textSecondary}
-          />
-          <Text
+        {!hideNotificationsTab && (
+          <TouchableOpacity
             style={[
-              styles.tabText,
-              {
-                color: activeTab === 'notifications' ? '#fff' : d.textSecondary,
-              },
+              styles.tab,
+              activeTab === 'notifications' && [
+                styles.activeTab,
+                { backgroundColor: d.activeTabBg },
+              ],
             ]}
+            onPress={() => withHaptic(() => setActiveTab('notifications'))}
+            activeOpacity={0.8}
           >
-            Notifications
-          </Text>
-          {unreadCount > 0 && (
-            <View
+            <Feather
+              name='bell'
+              size={13}
+              color={activeTab === 'notifications' ? '#fff' : d.textSecondary}
+            />
+            <Text
               style={[
-                styles.tabBadge,
+                styles.tabText,
                 {
-                  backgroundColor:
-                    activeTab === 'notifications'
-                      ? 'rgba(255,255,255,0.25)'
-                      : '#ef4444',
+                  color:
+                    activeTab === 'notifications' ? '#fff' : d.textSecondary,
                 },
               ]}
             >
-              <Text style={styles.tabBadgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+              Notifications
+            </Text>
+            {unreadCount > 0 && (
+              <View
+                style={[
+                  styles.tabBadge,
+                  {
+                    backgroundColor:
+                      activeTab === 'notifications'
+                        ? 'rgba(255,255,255,0.25)'
+                        : '#ef4444',
+                  },
+                ]}
+              >
+                <Text style={styles.tabBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   )
@@ -384,7 +425,12 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
         onPress={() => openDetail(approval)}
         activeOpacity={0.75}
       >
-        <View style={[styles.approvalStripe, { backgroundColor: cfg.color }]} />
+        <View
+          style={[
+            styles.approvalStripe,
+            { backgroundColor: approvalStripeColor || cfg.color },
+          ]}
+        />
 
         <View style={styles.approvalCardInner}>
           <View style={styles.approvalTopRow}>
@@ -844,7 +890,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
               </View>
               <View>
                 <Text style={[styles.modalTitle, { color: d.textPrimary }]}>
-                  Notifications
+                  {title || 'Notifications'}
                 </Text>
                 {unreadCount + approvalCount > 0 && (
                   <Text style={[styles.modalSubtitle, { color: d.textMuted }]}>
@@ -865,32 +911,63 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
           {/* Tabs */}
           {(approvalCount > 0 || pendingApprovals.length > 0) && renderTabs()}
 
-          {/* Mark all read */}
-          {activeTab === 'notifications' && unreadCount > 0 && (
-            <View
-              style={[
-                styles.markAllRow,
-                {
-                  backgroundColor: d.surfaceBg,
-                  borderBottomColor: d.cardBorder,
-                },
-              ]}
-            >
-              <TouchableOpacity
-                style={styles.markAllBtn}
-                onPress={handleMarkAllRead}
-                activeOpacity={0.7}
+          {!hideNotificationsTab &&
+            activeTab === 'notifications' &&
+            notifications.length > 0 && (
+              <View
+                style={[
+                  styles.markAllRow,
+                  {
+                    backgroundColor: d.surfaceBg,
+                    borderBottomColor: d.cardBorder,
+                  },
+                ]}
               >
-                <Feather name='check-circle' size={13} color={d.accent} />
-                <Text style={[styles.markAllText, { color: d.accent }]}>
-                  Mark all as read
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    flex: 1,
+                  }}
+                >
+                  {unreadCount > 0 && (
+                    <TouchableOpacity
+                      style={styles.markAllBtn}
+                      onPress={handleMarkAllRead}
+                      activeOpacity={0.7}
+                    >
+                      <Feather name='check-circle' size={13} color={d.accent} />
+                      <Text style={[styles.markAllText, { color: d.accent }]}>
+                        Mark all as read
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.markAllBtn]}
+                    onPress={handleClearAll}
+                    disabled={clearing}
+                    activeOpacity={0.7}
+                  >
+                    {clearing ? (
+                      <ActivityIndicator
+                        size='small'
+                        color='#ef4444'
+                        style={{ marginRight: 4 }}
+                      />
+                    ) : (
+                      <Feather name='trash-2' size={13} color='#ef4444' />
+                    )}
+                    <Text style={[styles.markAllText, { color: '#ef4444' }]}>
+                      {clearing ? 'Clearing...' : 'Clear all'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.markAllCount, { color: d.textMuted }]}>
+                  {notifications.length} total
                 </Text>
-              </TouchableOpacity>
-              <Text style={[styles.markAllCount, { color: d.textMuted }]}>
-                {unreadCount} unread
-              </Text>
-            </View>
-          )}
+              </View>
+            )}
 
           {/* Content */}
           <View style={{ flex: 1 }}>
@@ -917,9 +994,15 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Feather name='check-circle' size={14} color='#10b981' />
+          <Feather
+            name={
+              snackbarMessage?.includes('cleared') ? 'trash-2' : 'check-circle'
+            }
+            size={14}
+            color={snackbarMessage?.includes('cleared') ? '#ef4444' : '#10b981'}
+          />
           <Text style={{ color: '#f1f5f9', fontSize: 13 }}>
-            All notifications marked as read
+            {snackbarMessage}
           </Text>
         </View>
       </Snackbar>

@@ -437,7 +437,6 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
     setSending(true)
 
     try {
-      // Fetch push tokens for all missing students
       const studentsWithTokens = await Promise.all(
         missingStudents.map(async (student) => {
           const userQuery = query(
@@ -483,8 +482,8 @@ const PenaltyAnnouncementModal: React.FC<PenaltyAnnouncementModalProps> = ({
 
       const alertMessage =
         failedCount > 0
-          ? `✅ ${successCount} of ${missingStudents.length} students notified\n\n⚠️ ${failedCount} failed to receive notification\n\nSeverity: ${severityLabels[severity]} (${severity})\nDeadline: ${formatDeadline(deadline)}`
-          : `✅ Successfully notified ${successCount} students\n\nSeverity: ${severityLabels[severity]} (${severity})\nDeadline: ${formatDeadline(deadline)}`
+          ? ` ${successCount} of ${missingStudents.length} students notified\n\n ${failedCount} failed to receive notification\n\nSeverity: ${severityLabels[severity]} (${severity})\nDeadline: ${formatDeadline(deadline)}`
+          : ` Successfully notified ${successCount} students\n\nSeverity: ${severityLabels[severity]} (${severity})\nDeadline: ${formatDeadline(deadline)}`
 
       showAlert('Penalty Announcements Sent', alertMessage, () => {
         setConsequences('')

@@ -27,6 +27,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   Linking,
   Modal,
   Platform,
@@ -155,6 +156,7 @@ export default function AssistantAdminProfile() {
     color: string
   }>({ score: 0, label: 'Weak', color: '#EF4444' })
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -182,6 +184,19 @@ export default function AssistantAdminProfile() {
       }
     }
     fetchPref()
+  }, [])
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height)
+    })
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0)
+    })
+    return () => {
+      showSub.remove()
+      hideSub.remove()
+    }
   }, [])
 
   const calculatePasswordStrength = (password: string) => {
@@ -1081,8 +1096,12 @@ export default function AssistantAdminProfile() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={{ padding: 16 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps='handled'
+            contentContainerStyle={{ flexGrow: 1 }}
+          >
+            <View style={{ padding: 16, paddingBottom: keyboardHeight + 16 }}>
               {/* Current Password */}
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: colors.text }]}>

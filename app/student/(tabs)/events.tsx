@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as Location from 'expo-location'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -57,6 +57,7 @@ export default function StudentEventsScreen() {
   const { user, userData } = useAuth()
   const currentUserId = user?.uid
   const router = useRouter()
+  const { id } = useLocalSearchParams<{ id?: string }>()
   const { width } = useWindowDimensions()
 
   const { colors, isDark } = useTheme()
@@ -158,6 +159,47 @@ export default function StudentEventsScreen() {
 
     fetchAttendance()
   }, [currentUserId])
+
+  React.useEffect(() => {
+    if (!id) return
+
+    const existing = events.find((e) => e.id === id)
+    if (existing) {
+      setSelectedEvent(existing)
+      setShowDetailModal(true)
+      router.setParams({ id: undefined })
+      return
+    }
+
+    const fetchEvent = async () => {
+      const docSnap = await getDoc(doc(db, 'events', id))
+      if (docSnap.exists()) {
+        const data = docSnap.data()
+        const status = data.status
+        if (status !== 'approved' && data.hasOwnProperty('status')) return
+
+        const event: Event = {
+          id: docSnap.id,
+          title: data.title,
+          description: data.description,
+          date: data.date.toDate(),
+          location: data.location,
+          locationDescription: data.locationDescription || '',
+          locationImage: data.locationImage || '',
+          organizer: data.organizer,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          attendees: data.attendees || [],
+          verifiedAttendees: data.verifiedAttendees || [],
+          coordinates: data.coordinates,
+        }
+        setSelectedEvent(event)
+        setShowDetailModal(true)
+        router.setParams({ id: undefined })
+      }
+    }
+
+    fetchEvent()
+  }, [id, events])
 
   useEffect(() => {
     setIsLoading(true)

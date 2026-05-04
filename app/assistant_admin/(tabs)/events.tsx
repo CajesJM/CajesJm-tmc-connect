@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as Location from 'expo-location'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import {
   addDoc,
   collection,
@@ -25,6 +25,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -93,6 +94,7 @@ export default function AssistantAdminEvents() {
 
   const { user, userData } = useAuth()
   const router = useRouter()
+  const { id } = useLocalSearchParams<{ id?: string }>()
 
   const displayName =
     userData?.surname && userData?.name
@@ -131,6 +133,7 @@ export default function AssistantAdminEvents() {
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   const [showCoordinatesModal, setShowCoordinatesModal] = useState(false)
   const [showManualCoordinates, setShowManualCoordinates] = useState(false)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const [coordLat, setCoordLat] = useState('')
   const [coordLng, setCoordLng] = useState('')
   const [coordRadius, setCoordRadius] = useState('100')
@@ -192,6 +195,59 @@ export default function AssistantAdminEvents() {
     )
     return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height)
+    })
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0)
+    })
+    return () => {
+      showSub.remove()
+      hideSub.remove()
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (!id) return
+
+    const existing = events.find((e) => e.id === id)
+    if (existing) {
+      setSelectedEvent(existing)
+      setShowDetailModal(true)
+      router.setParams({ id: undefined })
+      return
+    }
+
+    const fetchEvent = async () => {
+      const docSnap = await getDoc(doc(db, 'events', id))
+      if (docSnap.exists()) {
+        const data = docSnap.data()
+        const event: Event = {
+          id: docSnap.id,
+          title: data.title,
+          description: data.description,
+          date: data.date.toDate(),
+          location: data.location,
+          locationDescription: data.locationDescription || '',
+          locationImage: data.locationImage || '',
+          organizer: data.organizer,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          attendees: data.attendees || [],
+          coordinates: data.coordinates,
+          status: data.status || 'approved',
+          createdBy: data.createdBy,
+          createdByName: data.createdByName,
+        }
+        setSelectedEvent(event)
+        setShowDetailModal(true)
+        router.setParams({ id: undefined })
+      }
+    }
+
+    fetchEvent()
+  }, [id, events])
 
   useEffect(() => {
     let filtered = [...events]
@@ -1325,7 +1381,14 @@ export default function AssistantAdminEvents() {
                 />
               </TouchableOpacity>
             </View>
-            <View style={styles.modalContent}>
+            <ScrollView
+              style={styles.modalContent}
+              keyboardShouldPersistTaps='handled'
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingBottom: keyboardHeight + 16,
+              }}
+            >
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Location Name</Text>
                 <TextInput
@@ -1384,7 +1447,7 @@ export default function AssistantAdminEvents() {
                   <Text style={styles.submitButtonText}>Save Location</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1484,7 +1547,14 @@ export default function AssistantAdminEvents() {
                 />
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.modalContent}>
+            <ScrollView
+              style={styles.modalContent}
+              keyboardShouldPersistTaps='handled'
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingBottom: keyboardHeight + 16,
+              }}
+            >
               <TouchableOpacity
                 style={styles.coordinatesAction}
                 onPress={getCurrentLocation}
@@ -1596,7 +1666,14 @@ export default function AssistantAdminEvents() {
                 />
               </TouchableOpacity>
             </View>
-            <View style={styles.modalContent}>
+            <ScrollView
+              style={styles.modalContent}
+              keyboardShouldPersistTaps='handled'
+              contentContainerStyle={{
+                flexGrow: 1,
+                paddingBottom: keyboardHeight + 16,
+              }}
+            >
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Latitude</Text>
                 <TextInput
@@ -1640,7 +1717,7 @@ export default function AssistantAdminEvents() {
                   <Text style={styles.submitButtonText}>Save</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

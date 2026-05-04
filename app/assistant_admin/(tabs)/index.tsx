@@ -6,12 +6,14 @@ import {
   collection,
   doc,
   getDocs,
+  getFirestore,
   limit,
   onSnapshot,
   orderBy,
   query,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore'
 import {
   deleteObject,
@@ -1561,6 +1563,12 @@ export default function AssistantAdminDashboard() {
       return []
     }
   }
+
+  useEffect(() => {
+    const unread = notifications.filter((n) => !n.read).length
+    setUnreadCount(unread)
+  }, [notifications])
+
   useEffect(() => {
     if (!userData) {
       setDashboardStats({
@@ -1602,8 +1610,35 @@ export default function AssistantAdminDashboard() {
       unsubscribeNotifications = notificationService.listenForNotifications(
         userData.email,
         (notifs) => {
-          setNotifications(notifs)
-          setUnreadCount(notifs.filter((n) => !n.read).length)
+          setNotifications((prev) => {
+            const combined = [...prev]
+            const getTime = (timestamp: any): number => {
+              if (!timestamp) return 0
+              if (
+                typeof timestamp === 'object' &&
+                timestamp.toDate &&
+                typeof timestamp.toDate === 'function'
+              )
+                return timestamp.toDate().getTime()
+              if (timestamp instanceof Date) return timestamp.getTime()
+              if (
+                typeof timestamp === 'string' ||
+                typeof timestamp === 'number'
+              )
+                return new Date(timestamp).getTime()
+              return 0
+            }
+            notifs.forEach((n) => {
+              const idx = combined.findIndex((ex) => ex.id === n.id)
+              if (idx !== -1) {
+                combined[idx] = n
+              } else {
+                combined.push(n)
+              }
+            })
+            combined.sort((a, b) => getTime(b.timestamp) - getTime(a.timestamp))
+            return combined
+          })
         }
       )
     }
@@ -1737,7 +1772,39 @@ export default function AssistantAdminDashboard() {
   }
 
   const handleMarkAllRead = async () => {
-    if (userData?.email) await notificationService.markAllAsRead(userData.email)
+    if (userData?.email) {
+      await notificationService.markAllAsRead(userData.email)
+    }
+
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    setUnreadCount(0)
+  }
+
+  const handleClearNotifications = async () => {
+    const currentUser = auth.currentUser
+    if (!currentUser) return
+
+    const db = getFirestore()
+
+    const idsToClear: string[] = [currentUser.uid]
+    if (userData?.email && userData.email !== currentUser.uid) {
+      idsToClear.push(userData.email)
+    }
+
+    for (const id of idsToClear) {
+      const q = query(
+        collection(db, 'notifications'),
+        where('userId', '==', id)
+      )
+      const snapshot = await getDocs(q)
+      if (!snapshot.empty) {
+        const batch = writeBatch(db)
+        snapshot.forEach((doc) => batch.delete(doc.ref))
+        await batch.commit()
+      }
+    }
+    setNotifications([])
+    setUnreadCount(0)
   }
 
   const deleteOldProfileImages = async (uid: string, email: string) => {
@@ -2353,6 +2420,7 @@ export default function AssistantAdminDashboard() {
         notifications={notifications}
         onNotificationPress={handleNotificationPress}
         onMarkAllRead={handleMarkAllRead}
+        onClearNotifications={handleClearNotifications}
         pendingApprovals={[]}
         approvalCount={0}
       />

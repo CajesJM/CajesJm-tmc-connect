@@ -2,10 +2,12 @@ import { Feather, Ionicons } from '@expo/vector-icons'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { onAuthStateChanged } from 'firebase/auth'
 import {
   collection,
+  doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -68,6 +70,7 @@ export default function StudentAnnouncements() {
 
   const { userData } = useAuth()
   const router = useRouter()
+  const { id } = useLocalSearchParams<{ id?: string }>()
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [filteredAnnouncements, setFilteredAnnouncements] = useState<
     Announcement[]
@@ -87,6 +90,38 @@ export default function StudentAnnouncements() {
   const [refreshKey, setRefreshKey] = useState(0)
 
   const isFocused = useRef(true)
+
+  React.useEffect(() => {
+    if (!id) return
+
+    const existing = announcements.find((a) => a.id === id)
+    if (existing) {
+      setSelectedAnnouncement(existing)
+      setShowDetailModal(true)
+      router.setParams({ id: undefined })
+      return
+    }
+
+    const fetchFromDB = async () => {
+      const docSnap = await getDoc(doc(db, 'announcements', id))
+      if (docSnap.exists()) {
+        const data = docSnap.data()
+        const announcement: Announcement = {
+          id: docSnap.id,
+          title: data.title,
+          message: data.message || data.content,
+          createdAt: data.createdAt,
+          priority: data.priority,
+          createdByName: data.createdByName,
+          status: data.status,
+        }
+        setSelectedAnnouncement(announcement)
+        setShowDetailModal(true)
+        router.setParams({ id: undefined })
+      }
+    }
+    fetchFromDB()
+  }, [id, announcements])
   const initialLoadDone = useRef(false)
   const lastFirstTimestamp = useRef<string | null>(null)
 

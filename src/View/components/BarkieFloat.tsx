@@ -1,19 +1,3 @@
-/**
- * BarkieFloat.tsx
- * Floating "Coming Soon" Barkie AI dog mascot for TMC Connect Admin Dashboard
- *
- * Usage:
- *   import BarkieFloat from "@/components/BarkieFloat";
- *   // Add anywhere in your admin dashboard screen, outside scroll views:
- *   <BarkieFloat />
- *
- * Dependencies (already in your project):
- *   react-native (core), expo (Animated is from react-native)
- *
- * Optional enhancement: npm install react-native-reanimated
- *   If you want smoother spring physics, swap Animated for Reanimated.
- */
-
 import React, { useEffect, useRef, useState } from 'react'
 import {
   Animated,
@@ -106,19 +90,14 @@ function BarkieAvatarSvg({ size = 56 }: { size?: number }) {
         strokeLinecap='round'
       />
 
-      {/* Tongue */}
       <Ellipse cx='50' cy='70' rx='5' ry='4' fill='#E05050' />
       <Path d='M 45 70 Q 50 74 55 70' fill='#C03030' stroke='none' />
 
-      {/* Cheek blush left */}
       <Ellipse cx='30' cy='57' rx='6' ry='4' fill='#F4A0A0' opacity={0.4} />
-      {/* Cheek blush right */}
       <Ellipse cx='70' cy='57' rx='6' ry='4' fill='#F4A0A0' opacity={0.4} />
 
-      {/* Collar */}
       <Rect x='30' y='78' width='40' height='8' rx='4' fill='#2D7D3A' />
       <Rect x='47' y='77' width='6' height='10' rx='3' fill='#F5C842' />
-      {/* Collar tag shine */}
       <Ellipse cx='50' cy='80' rx='2' ry='1.5' fill='rgba(255,255,255,0.5)' />
     </Svg>
   )
@@ -180,21 +159,16 @@ function FloatingPaw({ delay, x, y }: { delay: number; x: number; y: number }) {
   )
 }
 
-// ─── Main BarkieFloat Component ───────────────────────────────────────────────
+// ─── Main BarkieFloat Component
 export default function BarkieFloat() {
   const [modalVisible, setModalVisible] = useState(false)
 
-  // Floating bob animation
   const floatAnim = useRef(new Animated.Value(0)).current
-  // Pulse ring
   const pulseAnim = useRef(new Animated.Value(1)).current
   const pulseOpacity = useRef(new Animated.Value(0.7)).current
-  // Modal scale-in
   const modalScale = useRef(new Animated.Value(0.7)).current
   const modalOpacity = useRef(new Animated.Value(0)).current
-  // Tail wag (rotate)
   const wagAnim = useRef(new Animated.Value(0)).current
-  // Ears bounce on press
   const earAnim = useRef(new Animated.Value(1)).current
 
   useEffect(() => {
@@ -234,7 +208,6 @@ export default function BarkieFloat() {
     ).start()
   }, [])
 
-  // Tail wag loop
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -322,7 +295,6 @@ export default function BarkieFloat() {
 
   return (
     <>
-      {/* ── Floating FAB ─────────────────────────────────────── */}
       <Animated.View
         style={[
           styles.fabContainer,
@@ -368,18 +340,16 @@ export default function BarkieFloat() {
 
         {/* "AI" badge */}
         <View style={styles.aiBadge}>
-          <Text style={styles.aiBadgeText}>AI</Text>
+          <Text style={styles.aiBadgeText}>Barkie</Text>
         </View>
       </Animated.View>
 
-      {/* ── Floating paw particles ────────────────────────────── */}
       <View style={styles.pawContainer} pointerEvents='none'>
         <FloatingPaw delay={0} x={-24} y={-8} />
         <FloatingPaw delay={700} x={-32} y={-22} />
         <FloatingPaw delay={1400} x={-14} y={-30} />
       </View>
 
-      {/* ── Coming Soon Modal ─────────────────────────────────── */}
       <Modal
         visible={modalVisible}
         transparent
@@ -397,7 +367,6 @@ export default function BarkieFloat() {
               },
             ]}
           >
-            {/* Stop backdrop press from closing when tapping card */}
             <Pressable onPress={() => {}}>
               {/* Header glow */}
               <View style={styles.cardGlow} />
@@ -428,7 +397,7 @@ export default function BarkieFloat() {
                 I'm being trained to help you manage{'\n'}
                 students, attendance, announcements,{'\n'}
                 and everything TMC Connect.{'\n\n'}
-                Stay tuned — I'll be ready soon! 🐕
+                Stay tuned — I'll be ready soon! WOOOFF!!
               </Text>
 
               {/* Divider */}
@@ -457,7 +426,6 @@ export default function BarkieFloat() {
   )
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const FAB_SIZE = 68
 const BOTTOM = Platform.OS === 'ios' ? 130 : 110
 const RIGHT = 20

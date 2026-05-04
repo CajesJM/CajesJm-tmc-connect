@@ -2,12 +2,13 @@ import { Feather, FontAwesome6, Ionicons } from '@expo/vector-icons'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import {
   addDoc,
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -105,7 +106,7 @@ export default function AssistantAdminAnnouncements() {
 
   const { userData } = useAuth()
   const router = useRouter()
-
+  const { id } = useLocalSearchParams<{ id?: string }>()
   useEffect(() => {
     const q = query(
       collection(db, 'announcements'),
@@ -131,7 +132,40 @@ export default function AssistantAdminAnnouncements() {
     return () => unsubscribe()
   }, [])
 
-  // Filter and search logic
+  React.useEffect(() => {
+    if (!id) return
+
+    const existing = announcements.find((a) => a.id === id)
+    if (existing) {
+      setSelectedAnnouncement(existing)
+      setShowDetailModal(true)
+      router.setParams({ id: undefined })
+      return
+    }
+
+    const fetchFromDB = async () => {
+      const docSnap = await getDoc(doc(db, 'announcements', id))
+      if (docSnap.exists()) {
+        const data = docSnap.data()
+        const announcement: Announcement = {
+          id: docSnap.id,
+          title: data.title,
+          message: data.message || data.content,
+          createdAt: data.createdAt,
+          priority: data.priority,
+          createdBy: data.createdBy || '',
+          createdByName: data.createdByName || '',
+          status: data.status,
+        }
+        setSelectedAnnouncement(announcement)
+        setShowDetailModal(true)
+        router.setParams({ id: undefined })
+      }
+    }
+
+    fetchFromDB()
+  }, [id, announcements])
+
   useEffect(() => {
     let filtered = [...announcements]
 

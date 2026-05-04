@@ -1723,17 +1723,6 @@ export default function MainAdminProfile() {
             />
           </View>
         </TouchableOpacity>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Image
-            source={require('../../assets/images/Logo/TMC-Coonect-V.2.png')}
-            style={styles.logoImageButtom}
-            resizeMode='contain'
-          />
-
-          <Text style={styles.footerVersion}>Administration Panel v2.0</Text>
-        </View>
       </ScrollView>
 
       <Modal

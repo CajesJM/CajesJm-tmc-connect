@@ -1,4 +1,4 @@
-import { Feather, Ionicons } from '@expo/vector-icons'
+import { Feather, FontAwesome6, Ionicons } from '@expo/vector-icons'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import * as ImagePicker from 'expo-image-picker'
@@ -3017,20 +3017,15 @@ export default function MainAdminDashboard() {
                 ]}
                 onPress={() => setNotificationModalVisible(true)}
               >
-                <Feather
-                  name='bell'
+                <FontAwesome6
+                  name='clipboard-check'
                   size={18}
                   color={isDark ? '#ffffff' : '#1e293b'}
                 />
-                {unreadCount > 0 && (
-                  <View
-                    style={[
-                      styles.notificationBadge,
-                      approvalCount > 0 && styles.approvalBadge,
-                    ]}
-                  >
+                {approvalCount > 0 && (
+                  <View style={styles.notificationBadge}>
                     <Text style={styles.notificationBadgeText}>
-                      {unreadCount > 9 ? '9+' : unreadCount}
+                      {approvalCount > 9 ? '9+' : approvalCount}
                     </Text>
                   </View>
                 )}
@@ -3049,6 +3044,9 @@ export default function MainAdminDashboard() {
           onApprove={handleApprove}
           onReject={handleReject}
           approvalCount={approvalCount}
+          hideNotificationsTab={true}
+          title='Approvals'
+          approvalStripeColor='#0ea5e9'
         />
 
         <Modal

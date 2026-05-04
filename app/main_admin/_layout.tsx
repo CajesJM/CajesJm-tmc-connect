@@ -20,7 +20,9 @@ import {
 } from 'react-native'
 import { useAuth } from '../../src/Controller/context/AuthContext'
 import { useTheme } from '../../src/Controller/context/ThemeContext'
+import { useConfirm } from '../../src/Controller/hooks/useConfirm'
 import { db } from '../../src/Model/lib/firebaseConfig'
+import { ConfirmDialog } from '../../src/View/components/ConfirmDialog'
 import LoadingScreen from '../../src/View/components/LoadingScreen'
 
 interface MenuItem {
@@ -275,6 +277,7 @@ export default function MainAdminLayout() {
   const mobileOverlayAnim = useRef(new Animated.Value(0)).current
 
   const { userData, logout } = useAuth()
+  const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm()
   const { colors, isDark, theme, setTheme, toggleTheme } = useTheme()
 
   const accentColor = isDark ? '#60a5fa' : '#2563eb'
@@ -665,6 +668,14 @@ export default function MainAdminLayout() {
                   styles.logoutItem,
                 ]}
                 onPress={async () => {
+                  const confirmed = await confirm({
+                    title: 'Log Out',
+                    message: 'Are you sure you want to log out?',
+                    confirmLabel: 'Log Out',
+                    cancelLabel: 'Cancel',
+                    confirmDestructive: true,
+                  })
+                  if (!confirmed) return
                   try {
                     await logout()
                     router.replace('/super-admin-login' as Href)
@@ -1073,6 +1084,16 @@ export default function MainAdminLayout() {
           </View>
         </View>
       </Modal>
+      <ConfirmDialog
+        visible={confirmState.visible}
+        title={confirmState.options.title}
+        message={confirmState.options.message}
+        confirmLabel={confirmState.options.confirmLabel}
+        cancelLabel={confirmState.options.cancelLabel}
+        confirmDestructive={confirmState.options.confirmDestructive}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </View>
   )
 }

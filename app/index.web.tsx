@@ -16,7 +16,7 @@ import {
 } from 'react-native'
 
 const APK_DOWNLOAD_URL =
-  'https://github.com/CajesJM/CajesJm-tmc-connect/releases/download/v2.0.1/TMC-Connect_v2.0.1.apk'
+  'https://github.com/CajesJM/CajesJm-tmc-connect/releases/download/v2.0.1/TMC_Connect_v2.0.1.apk'
 const CONTACT_EMAIL = 'developertmcconnect@gmail.com'
 const NAV_HEIGHT = 64
 

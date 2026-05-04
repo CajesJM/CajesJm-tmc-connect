@@ -2,9 +2,9 @@
   "expo": {
     "name": "TMC Connect",
     "slug": "TMC-Connect",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/Logo/App-icon.png",
+    "icon": "./assets/images/Logo/App.png",
     "scheme": "tmccampushub",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -20,7 +20,7 @@
     "android": {
       "versionCode": 2,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/Logo/App-icon.png",
+        "foregroundImage": "./assets/images/Logo/App.png",
         "backgroundColor": "#E6F4FE"
       },
       "edgeToEdgeEnabled": true,
@@ -36,14 +36,14 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/Logo/App-icon.png"
+      "favicon": "./assets/images/Logo/App.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/Logo/App-icon.png",
+          "image": "./assets/images/Logo/App.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",

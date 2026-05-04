@@ -1,4 +1,5 @@
 import { Feather, Ionicons } from '@expo/vector-icons'
+import { Buffer } from 'buffer'
 import * as FileSystem from 'expo-file-system/legacy'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as Print from 'expo-print'
@@ -17,6 +18,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore'
+import QRCodeGenerator from 'qrcode'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -1175,45 +1177,12 @@ export default function MainAdminAttendance() {
   }
 
   const captureAndSaveQR = async () => {
-    if (!qrCodeRef.current) {
-      showAlert('Error', 'QR code not ready. Please try again.')
-      return
-    }
-
     if (!qrValue || !selectedEvent) {
       showAlert('Error', 'No QR code data or event selected.')
       return
     }
     setIsSavingQR(true)
     try {
-      const getDataURL = (): Promise<string> => {
-        return new Promise((resolve, reject) => {
-          setTimeout(() => {
-            try {
-              qrCodeRef.current.toDataURL((data: string) => {
-                let dataUrl = data
-                if (data && !data.startsWith('data:image/png;base64,')) {
-                  dataUrl = 'data:image/png;base64,' + data
-                }
-                if (
-                  dataUrl &&
-                  dataUrl.includes('base64,') &&
-                  dataUrl.length > 100
-                ) {
-                  resolve(dataUrl)
-                } else {
-                  reject(new Error('QR code generation failed.'))
-                }
-              })
-            } catch (error) {
-              reject(error)
-            }
-          }, 200)
-        })
-      }
-
-      const qrDataUrl = await getDataURL()
-
       const eventTitle = selectedEvent.title || 'Untitled Event'
       const eventDate = selectedEvent.date
         ? formatDate(selectedEvent.date)
@@ -1223,6 +1192,38 @@ export default function MainAdminAttendance() {
         ? new Date(selectedEvent.qrExpiration).toLocaleString()
         : 'No expiration set'
       const generatedTime = new Date().toLocaleString()
+
+      // Generate QR data matrix (no canvas)
+      const qrData = await QRCodeGenerator.create(qrValue, {
+        errorCorrectionLevel: 'M',
+      })
+
+      const modules = qrData.modules
+      const moduleCount = modules.size
+      const quietZone = 4
+      const size = 300
+      const moduleSize = size / (moduleCount + 2 * quietZone)
+
+      // Build SVG string
+      let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`
+      svg += `<rect width="${size}" height="${size}" fill="#ffffff"/>`
+
+      for (let row = 0; row < moduleCount; row++) {
+        for (let col = 0; col < moduleCount; col++) {
+          if (modules.get(row, col)) {
+            const x = (col + quietZone) * moduleSize
+            const y = (row + quietZone) * moduleSize
+            svg += `<rect x="${x}" y="${y}" width="${moduleSize}" height="${moduleSize}" fill="#000000"/>`
+          }
+        }
+      }
+      svg += `</svg>`
+
+      // Encode SVG to base64
+      const svgBase64 =
+        Platform.OS === 'web'
+          ? `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`
+          : `data:image/svg+xml;base64,${Buffer.from(svg, 'utf8').toString('base64')}`
 
       const htmlContent = `
       <!DOCTYPE html>
@@ -1241,14 +1242,8 @@ export default function MainAdminAttendance() {
               padding-bottom: 15px;
               margin-bottom: 20px;
             }
-            h1 {
-              color: #1e40af;
-              margin-bottom: 5px;
-            }
-            .subtitle {
-              color: #64748b;
-              font-size: 14px;
-            }
+            h1 { color: #1e40af; margin-bottom: 5px; }
+            .subtitle { color: #64748b; font-size: 14px; }
             .details {
               background: #f8fafc;
               border-radius: 12px;
@@ -1256,36 +1251,19 @@ export default function MainAdminAttendance() {
               margin: 20px 0;
               text-align: left;
             }
-            .detail-row {
-              display: flex;
-              margin-bottom: 10px;
-            }
-            .detail-label {
-              font-weight: 600;
-              width: 120px;
-              color: #475569;
-            }
-            .detail-value {
-              color: #0f172a;
-            }
+            .detail-row { display: flex; margin-bottom: 10px; }
+            .detail-label { font-weight: 600; width: 120px; color: #475569; }
+            .detail-value { color: #0f172a; }
             .qr-container {
-              margin: 30px 0;
-              padding: 20px;
+              margin: 30px auto;
+              padding: 24px;
               background: white;
               border-radius: 16px;
               box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
               display: inline-block;
             }
-            .qr-label {
-              margin-top: 10px;
-              color: #64748b;
-              font-size: 12px;
-            }
-            .footer {
-              margin-top: 30px;
-              font-size: 11px;
-              color: #94a3b8;
-            }
+            .qr-label { margin-top: 10px; color: #64748b; font-size: 12px; }
+            .footer { margin-top: 30px; font-size: 11px; color: #94a3b8; }
           </style>
         </head>
         <body>
@@ -1314,7 +1292,12 @@ export default function MainAdminAttendance() {
           </div>
 
           <div class="qr-container">
-            <img src="${qrDataUrl}" width="250" height="250" style="display:block;" />
+            <img
+              src="${svgBase64}"
+              width="250"
+              height="250"
+              style="display: block;"
+            />
             <div class="qr-label">Scan to record attendance</div>
           </div>
 
@@ -1338,7 +1321,6 @@ export default function MainAdminAttendance() {
         printWindow.document.close()
         printWindow.focus()
         printWindow.print()
-        showAlert('Print Ready', 'Use the print dialog to save as PDF.')
       } else {
         const { uri } = await Print.printToFileAsync({
           html: htmlContent,
@@ -2472,6 +2454,7 @@ export default function MainAdminAttendance() {
                             size={isMobile ? 180 : 220}
                             color={colors.text}
                             backgroundColor={colors.card}
+                            ecl='M'
                           />
                           <View style={styles.qrLabel}>
                             <Feather

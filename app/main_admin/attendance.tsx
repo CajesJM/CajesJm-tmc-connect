@@ -285,6 +285,165 @@ const AnimatedBlock = memo(function AnimatedBlock({
   )
 })
 
+const AnimatedEventItem = memo(function AnimatedEventItem({
+  item,
+  index,
+  styles,
+  colors,
+  isMobile,
+  isQRCodeExpired,
+  onPressEvent,
+  formatShortDate,
+  getEventStatusBadge,
+  getStatusBadgeStyle,
+  isValidDate,
+}: {
+  item: Event
+  index: number
+  styles: any
+  colors: any
+  isMobile: boolean
+  isQRCodeExpired: (event: Event) => boolean
+  onPressEvent: (event: Event) => void
+  formatShortDate: (date: any) => string | null
+  getEventStatusBadge: (date: any) => { text: string; color: string } | null
+  getStatusBadgeStyle: (status?: string) => { backgroundColor: string }
+  isValidDate: (date: any) => boolean
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const slideAnim = useRef(new Animated.Value(20)).current
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        delay: index * 50,
+        useNativeDriver: true,
+      }),
+    ]).start()
+  }, [])
+
+  const isExpired = isQRCodeExpired(item)
+  const isActive = item.isActive !== false && !isExpired
+  const isApproved = item.status === 'approved'
+  const dateBadge = getEventStatusBadge(item.date)
+
+  return (
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateX: slideAnim }],
+      }}
+    >
+      <TouchableOpacity
+        style={[
+          styles.eventItem,
+          isMobile && styles.eventItemMobile,
+          !isApproved && { opacity: 0.5 },
+        ]}
+        onPress={() => onPressEvent(item)}
+        activeOpacity={isApproved ? 0.7 : 1}
+      >
+        <View style={styles.eventItemContent}>
+          <Text
+            style={[
+              styles.eventItemName,
+              isMobile && styles.eventItemNameMobile,
+            ]}
+            numberOfLines={1}
+          >
+            {item.title}
+          </Text>
+          <View style={styles.eventItemBadges}>
+            {dateBadge && (
+              <View
+                style={[
+                  styles.eventItemExpBadge,
+                  { backgroundColor: dateBadge.color },
+                ]}
+              >
+                <Text style={[styles.eventItemExpText, { color: '#ffffff' }]}>
+                  {dateBadge.text}
+                </Text>
+              </View>
+            )}
+            <View
+              style={[
+                styles.eventItemStatusBadge,
+                getStatusBadgeStyle(item.status),
+              ]}
+            >
+              <Text style={styles.eventItemStatusText}>
+                {item.status?.toUpperCase() || 'APPROVED'}
+              </Text>
+            </View>
+            {item.qrExpiration && isValidDate(item.qrExpiration) && (
+              <View
+                style={[
+                  styles.eventItemExpBadge,
+                  isExpired && styles.eventItemExpBadgeExpired,
+                ]}
+              >
+                <Feather
+                  name='clock'
+                  size={10}
+                  color={isExpired ? '#dc2626' : '#d97706'}
+                />
+                <Text
+                  style={[
+                    styles.eventItemExpText,
+                    isExpired && styles.eventItemExpTextExpired,
+                  ]}
+                >
+                  {isExpired ? 'Expired' : 'QR'}
+                </Text>
+              </View>
+            )}
+            {isActive && isApproved && (
+              <View style={styles.eventItemActiveBadge}>
+                <Feather name='check-circle' size={10} color='#16a34a' />
+                <Text style={styles.eventItemActiveText}>Active</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        {formatShortDate(item.date) && (
+          <Text style={styles.eventItemDate} numberOfLines={1}>
+            {formatShortDate(item.date)}
+          </Text>
+        )}
+        <View style={styles.eventItemFooter}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Feather
+              name='map-pin'
+              size={10}
+              color={colors.sidebar.text.secondary}
+            />
+            <Text
+              style={[styles.eventItemLocation, { marginLeft: 4 }]}
+              numberOfLines={1}
+            >
+              {item.location}
+            </Text>
+          </View>
+          {item.coordinates && (
+            <View style={styles.eventItemLocBadge}>
+              <Feather name='shield' size={10} color='#16a34a' />
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  )
+})
+
 export default function MainAdminAttendance() {
   const { toast, showToast, hideToast } = useToast()
   const { confirm, confirmState, handleConfirm, handleCancel } = useConfirm()
@@ -2127,130 +2286,6 @@ export default function MainAdminAttendance() {
     return events.slice(start, end)
   }, [events, eventPage, eventItemsPerPage])
 
-  const renderEventItem = ({ item }: { item: Event }) => {
-    const isExpired = isQRCodeExpired(item)
-    const isActive = item.isActive !== false && !isExpired
-    const isApproved = item.status === 'approved'
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.eventItem,
-          isMobile && styles.eventItemMobile,
-          !isApproved && { opacity: 0.5 },
-        ]}
-        onPress={() => {
-          if (!isApproved) {
-            showToast(
-              `This event is ${item.status}. Only approved events can be used for attendance.`,
-              'error'
-            )
-            return
-          }
-          generateEventQRCode(item)
-        }}
-        activeOpacity={isApproved ? 0.7 : 1}
-      >
-        <View style={styles.eventItemContent}>
-          <Text
-            style={[
-              styles.eventItemName,
-              isMobile && styles.eventItemNameMobile,
-            ]}
-            numberOfLines={1}
-          >
-            {item.title}
-          </Text>
-          <View style={styles.eventItemBadges}>
-            {(() => {
-              const dateBadge = getEventStatusBadge(item.date)
-              if (dateBadge) {
-                return (
-                  <View
-                    style={[
-                      styles.eventItemExpBadge,
-                      { backgroundColor: dateBadge.color },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.eventItemExpText, { color: '#ffffff' }]}
-                    >
-                      {dateBadge.text}
-                    </Text>
-                  </View>
-                )
-              }
-              return null
-            })()}
-            <View
-              style={[
-                styles.eventItemStatusBadge,
-                getStatusBadgeStyle(item.status),
-              ]}
-            >
-              <Text style={styles.eventItemStatusText}>
-                {item.status?.toUpperCase() || 'APPROVED'}
-              </Text>
-            </View>
-            {item.qrExpiration && isValidDate(item.qrExpiration) && (
-              <View
-                style={[
-                  styles.eventItemExpBadge,
-                  isExpired && styles.eventItemExpBadgeExpired,
-                ]}
-              >
-                <Feather
-                  name='clock'
-                  size={10}
-                  color={isExpired ? '#dc2626' : '#d97706'}
-                />
-                <Text
-                  style={[
-                    styles.eventItemExpText,
-                    isExpired && styles.eventItemExpTextExpired,
-                  ]}
-                >
-                  {isExpired ? 'Expired' : 'QR'}
-                </Text>
-              </View>
-            )}
-            {isActive && isApproved && (
-              <View style={styles.eventItemActiveBadge}>
-                <Feather name='check-circle' size={10} color='#16a34a' />
-                <Text style={styles.eventItemActiveText}>Active</Text>
-              </View>
-            )}
-          </View>
-        </View>
-        {formatShortDate(item.date) && (
-          <Text style={styles.eventItemDate} numberOfLines={1}>
-            {formatShortDate(item.date)}
-          </Text>
-        )}
-        <View style={styles.eventItemFooter}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Feather
-              name='map-pin'
-              size={10}
-              color={colors.sidebar.text.secondary}
-            />
-            <Text
-              style={[styles.eventItemLocation, { marginLeft: 4 }]}
-              numberOfLines={1}
-            >
-              {item.location}
-            </Text>
-          </View>
-          {item.coordinates && (
-            <View style={styles.eventItemLocBadge}>
-              <Feather name='shield' size={10} color='#16a34a' />
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-    )
-  }
-
   const renderBlockSection = ({
     item,
   }: {
@@ -3911,11 +3946,36 @@ export default function MainAdminAttendance() {
                 </View>
               ) : (
                 <>
-                  {paginatedEvents.map((item, idx) => (
-                    <React.Fragment key={item.id || idx}>
-                      {renderEventItem({ item })}
-                    </React.Fragment>
-                  ))}
+                  <FlatList
+                    data={paginatedEvents}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item, index }) => (
+                      <AnimatedEventItem
+                        item={item}
+                        index={index}
+                        styles={styles}
+                        colors={colors}
+                        isMobile={isMobile}
+                        isQRCodeExpired={isQRCodeExpired}
+                        onPressEvent={(event) => {
+                          if (event.status !== 'approved') {
+                            showToast(
+                              `This event is ${event.status}. Only approved events can be used for attendance.`,
+                              'error'
+                            )
+                            return
+                          }
+                          generateEventQRCode(event)
+                        }}
+                        formatShortDate={formatShortDate}
+                        getEventStatusBadge={getEventStatusBadge}
+                        getStatusBadgeStyle={getStatusBadgeStyle}
+                        isValidDate={isValidDate}
+                      />
+                    )}
+                    showsVerticalScrollIndicator={false}
+                    scrollEnabled={false}
+                  />
                   {totalEventPages > 1 && (
                     <View
                       style={[

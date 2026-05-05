@@ -1394,6 +1394,16 @@ export default function UserManagement() {
     )
   }
 
+  const COURSES = [
+    { acronym: 'ABCOMM', full: 'Bachelor of Arts in Communication' },
+    { acronym: 'ABPOLSCI', full: 'Bachelor of Arts in Political Science' },
+    { acronym: 'BEED', full: 'Bachelor of Elementary Education' },
+    { acronym: 'BSED', full: 'Bachelor of Secondary Education' },
+    { acronym: 'BSCRIM', full: 'Bachelor of Science in Criminology' },
+    { acronym: 'BSIT', full: 'Bachelor of Science in Information Technology' },
+    { acronym: 'BSOA', full: 'Bachelor of Science in Office Administration' },
+  ]
+
   const CourseSelector = ({
     value,
     onSelect,
@@ -1403,31 +1413,239 @@ export default function UserManagement() {
     onSelect: (course: string) => void
     isMobile: boolean
   }) => {
-    const courses = ['BSIT', 'BSOA', 'BSCrim']
+    const [open, setOpen] = useState(false)
+    const dropAnim = useRef(new Animated.Value(0)).current
+    const triggerRef = useRef<View>(null)
+    const [triggerLayout, setTriggerLayout] = useState<{
+      x: number
+      y: number
+      width: number
+      height: number
+    } | null>(null)
+    const { colors, isDark } = useTheme()
+
+    const selected = COURSES.find((c) => c.acronym === value)
+
+    const openDropdown = () => {
+      triggerRef.current?.measureInWindow((x, y, width, height) => {
+        setTriggerLayout({ x, y, width, height })
+        setOpen(true)
+        dropAnim.setValue(0)
+        Animated.timing(dropAnim, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start()
+      })
+    }
+
+    const closeDropdown = () => {
+      Animated.timing(dropAnim, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => setOpen(false))
+    }
+
+    const handleSelect = (acronym: string) => {
+      onSelect(acronym)
+      closeDropdown()
+    }
 
     return (
-      <View style={[styles.courseGrid, isMobile && styles.courseGridMobile]}>
-        {courses.map((course) => (
-          <TouchableOpacity
-            key={course}
-            style={[
-              styles.courseChip,
-              value === course && styles.courseChipSelected,
-              isMobile && styles.courseChipMobile,
-            ]}
-            onPress={() => onSelect(course)}
+      <View>
+        <TouchableOpacity
+          ref={triggerRef}
+          onPress={openDropdown}
+          activeOpacity={0.8}
+          style={[
+            styles.glassFormInput,
+            {
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: isMobile ? 10 : 12,
+            },
+          ]}
+        >
+          <View style={{ flex: 1 }}>
+            {selected ? (
+              <View>
+                <Text
+                  style={{
+                    fontSize: isMobile ? 13 : 14,
+                    fontWeight: '600',
+                    color: colors.text,
+                  }}
+                >
+                  {selected.acronym}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: isMobile ? 10 : 11,
+                    color: colors.sidebar.text.muted,
+                    marginTop: 1,
+                  }}
+                  numberOfLines={1}
+                >
+                  {selected.full}
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ fontSize: isMobile ? 13 : 14, color: '#94a3b8' }}>
+                Select a course
+              </Text>
+            )}
+          </View>
+          <Animated.View
+            style={{
+              transform: [
+                {
+                  rotate: dropAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '180deg'],
+                  }),
+                },
+              ],
+              marginLeft: 8,
+            }}
           >
-            <Text
-              style={[
-                styles.courseChipText,
-                value === course && styles.courseChipTextSelected,
-                isMobile && styles.courseChipTextMobile,
-              ]}
-            >
-              {course}
-            </Text>
+            <Feather
+              name='chevron-down'
+              size={isMobile ? 14 : 16}
+              color={colors.sidebar.text.secondary}
+            />
+          </Animated.View>
+        </TouchableOpacity>
+
+        <Modal
+          visible={open}
+          transparent
+          animationType='none'
+          onRequestClose={closeDropdown}
+        >
+          {/* Backdrop */}
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={closeDropdown}
+          >
+            {triggerLayout && (
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  top: triggerLayout.y + triggerLayout.height + 4,
+                  left: triggerLayout.x,
+                  width: triggerLayout.width,
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                  borderWidth: 1,
+                  borderColor: isDark
+                    ? 'rgba(255,255,255,0.08)'
+                    : 'rgba(0,0,0,0.08)',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: isDark ? 0.5 : 0.15,
+                  shadowRadius: 16,
+                  elevation: 20,
+                  opacity: dropAnim,
+                  transform: [
+                    {
+                      translateY: dropAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-8, 0],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <TouchableOpacity activeOpacity={1}>
+                  {COURSES.map((course, index) => {
+                    const isSelected = value === course.acronym
+                    return (
+                      <TouchableOpacity
+                        key={course.acronym}
+                        onPress={() => handleSelect(course.acronym)}
+                        activeOpacity={0.7}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 14,
+                          paddingVertical: isMobile ? 10 : 12,
+                          backgroundColor: isSelected
+                            ? isDark
+                              ? 'rgba(14,165,233,0.15)'
+                              : 'rgba(14,165,233,0.08)'
+                            : 'transparent',
+                          borderBottomWidth: index < COURSES.length - 1 ? 1 : 0,
+                          borderBottomColor: isDark
+                            ? 'rgba(255,255,255,0.05)'
+                            : 'rgba(0,0,0,0.05)',
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: isMobile ? 52 : 62,
+                            backgroundColor: isSelected
+                              ? (colors.accent?.primary ?? '#0ea5e9')
+                              : isDark
+                                ? 'rgba(255,255,255,0.07)'
+                                : 'rgba(0,0,0,0.05)',
+                            borderRadius: 6,
+                            paddingVertical: 3,
+                            paddingHorizontal: 5,
+                            alignItems: 'center',
+                            marginRight: 10,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: isMobile ? 9 : 10,
+                              fontWeight: '700',
+                              letterSpacing: 0.5,
+                              color: isSelected
+                                ? '#ffffff'
+                                : (colors.sidebar?.text?.secondary ??
+                                  '#64748b'),
+                            }}
+                          >
+                            {course.acronym}
+                          </Text>
+                        </View>
+
+                        <Text
+                          style={{
+                            flex: 1,
+                            fontSize: isMobile ? 12 : 13,
+                            color: isSelected
+                              ? (colors.accent?.primary ?? '#0ea5e9')
+                              : colors.text,
+                            fontWeight: isSelected ? '600' : '400',
+                          }}
+                          numberOfLines={2}
+                        >
+                          {course.full}
+                        </Text>
+
+                        {isSelected && (
+                          <Feather
+                            name='check'
+                            size={isMobile ? 13 : 14}
+                            color={colors.accent?.primary ?? '#0ea5e9'}
+                            style={{ marginLeft: 6 }}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    )
+                  })}
+                </TouchableOpacity>
+              </Animated.View>
+            )}
           </TouchableOpacity>
-        ))}
+        </Modal>
       </View>
     )
   }
@@ -1501,7 +1719,7 @@ export default function UserManagement() {
                 </Text>
                 <FormTextInput
                   inputStyle={styles.glassFormInput}
-                  placeholder='Enter full name'
+                  placeholder='Enter  name'
                   value={isEdit ? selectedUser?.name || '' : newUser.name}
                   onChangeText={(text) =>
                     isEdit
@@ -1523,7 +1741,7 @@ export default function UserManagement() {
                 </Text>
                 <FormTextInput
                   inputStyle={styles.glassFormInput}
-                  placeholder='Enter surname (e.g., Cajes)'
+                  placeholder='Enter surname'
                   value={isEdit ? selectedUser?.surname || '' : newUser.surname}
                   onChangeText={(text) =>
                     isEdit
@@ -1764,11 +1982,11 @@ export default function UserManagement() {
                     </Text>
                     <FormTextInput
                       inputStyle={styles.glassFormInput}
-                      placeholder='Enter block (e.g., 1, 2, 3)'
+                      placeholder='Enter block number'
                       keyboardType='numeric'
                       value={isEdit ? selectedUser?.block || '' : newUser.block}
                       onChangeText={(text) => {
-                        const filtered = text.replace(/[^0-9]/g, '')
+                        const filtered = text.replace(/[^0-9]/g, '').slice(0, 3)
                         if (isEdit) {
                           setSelectedUser((prev) =>
                             prev ? { ...prev, block: filtered } : null

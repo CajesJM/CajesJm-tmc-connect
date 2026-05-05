@@ -16,7 +16,6 @@ export const firebaseConfig = {
 const app = initializeApp(firebaseConfig)
 let auth: Auth
 
-// Detect React Native environment
 const isNative =
   typeof navigator !== 'undefined' &&
   (navigator.product === 'ReactNative' ||
@@ -24,7 +23,6 @@ const isNative =
 
 if (isNative) {
   try {
-    // Dynamically import native-only modules to avoid web errors
     const { initializeAuth } = require('firebase/auth')
     const AsyncStorage =
       require('@react-native-async-storage/async-storage').default
@@ -42,7 +40,6 @@ if (isNative) {
     }
   }
 } else {
-  // Web: default persistence (localStorage) works automatically
   auth = getAuth(app)
 }
 

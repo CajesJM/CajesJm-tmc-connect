@@ -1131,6 +1131,13 @@ export default function MainAdminProfile() {
                 icon: 'user',
                 color: '#10b981',
               },
+
+              {
+                value: stats.totalAnnouncements,
+                label: 'Announcements',
+                icon: 'bell',
+                color: '#8b5cf6',
+              },
               {
                 value: stats.pastEvents,
                 label: 'Past Events',
@@ -1138,10 +1145,10 @@ export default function MainAdminProfile() {
                 color: '#f59e0b',
               },
               {
-                value: stats.totalAnnouncements,
-                label: 'Announcements',
-                icon: 'bell',
-                color: '#8b5cf6',
+                value: stats.approvedEvents,
+                label: 'Approved Events',
+                icon: 'check-circle',
+                color: '#3b82f6',
               },
               {
                 value: stats.activeEvents,

@@ -3,7 +3,7 @@ import { Auth, getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: 'AIzaSyCdtS1KbDFuqAsCpC5HMoP0-9tULYZQyC0',
   authDomain: 'tmc-connect-92a46.firebaseapp.com',
   projectId: 'tmc-connect-92a46',
@@ -34,7 +34,6 @@ if (isNative) {
       persistence: getReactNativePersistence(AsyncStorage),
     })
   } catch (error: any) {
-    // If already initialized (e.g., due to hot reload), fall back to getAuth
     if (error.code === 'auth/already-initialized') {
       auth = getAuth(app)
       console.warn('Auth already initialized, using existing instance.')

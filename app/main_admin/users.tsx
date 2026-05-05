@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
+import { deleteApp, getApps, initializeApp } from 'firebase/app'
 import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth'
 import {
   collection,
@@ -31,7 +32,7 @@ import { useAuth } from '../../src/Controller/context/AuthContext'
 import { useTheme } from '../../src/Controller/context/ThemeContext'
 import { useConfirm } from '../../src/Controller/hooks/useConfirm'
 import { useToast } from '../../src/Controller/hooks/useToast'
-import { db } from '../../src/Model/lib/firebaseConfig'
+import { db, firebaseConfig } from '../../src/Model/lib/firebaseConfig'
 import { ConfirmDialog } from '../../src/View/components/ConfirmDialog'
 import { Toast } from '../../src/View/components/Toast'
 import { createUsersStyles } from '../../src/View/styles/main-admin/usersStyles'
@@ -564,6 +565,7 @@ export default function UserManagement() {
     }
     try {
       setModalLoading(true)
+
       if (newUser.role === 'student' && newUser.studentID) {
         const usersCollection = collection(db, 'users')
         const studentIdQuery = query(
@@ -572,7 +574,6 @@ export default function UserManagement() {
         )
         const studentIdSnapshot = await getDocs(studentIdQuery)
         if (!studentIdSnapshot.empty) {
-          const existingUser = studentIdSnapshot.docs[0].data()
           showToast(
             `Student ID "${newUser.studentID}" is already taken`,
             'error'
@@ -581,13 +582,20 @@ export default function UserManagement() {
           return
         }
       }
-      const auth = getAuth()
+
+      const secondaryApp =
+        getApps().find((app) => app.name === 'Secondary') ??
+        initializeApp(firebaseConfig, 'Secondary')
+
+      const secondaryAuth = getAuth(secondaryApp)
+
       const password =
         newUser.role === 'student' ? newUser.studentID : newUser.password
+
       let userCredential
       try {
         userCredential = await createUserWithEmailAndPassword(
-          auth,
+          secondaryAuth,
           newUser.email.trim(),
           password
         )
@@ -598,7 +606,10 @@ export default function UserManagement() {
           return
         }
         throw authError
+      } finally {
+        await deleteApp(secondaryApp)
       }
+
       const uid = userCredential.user.uid
       const userData: any = {
         username: newUser.username.trim(),
@@ -610,6 +621,7 @@ export default function UserManagement() {
         uid: uid,
         status: 'active',
       }
+
       if (newUser.role === 'student') {
         userData.studentID = newUser.studentID.trim()
         userData.course = newUser.course.trim()
@@ -619,6 +631,7 @@ export default function UserManagement() {
       } else if (newUser.studentID?.trim()) {
         userData.studentID = newUser.studentID.trim()
       }
+
       await setDoc(doc(db, 'users', uid), userData)
 
       showToast('User created successfully!', 'success')

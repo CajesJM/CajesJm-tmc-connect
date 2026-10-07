@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { Ionicons } from '@expo/vector-icons'
+import React, { useEffect, useState } from 'react'
 import {
-  Animated,
   Dimensions,
   Image,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -15,2005 +14,1328 @@ import {
   View,
 } from 'react-native'
 
-const APK_DOWNLOAD_URL =
+const APK_URL =
   'https://github.com/CajesJM/CajesJm-tmc-connect/releases/download/v2.0.1/TMC_Connect_v2.0.1.apk'
-const CONTACT_EMAIL = 'developertmcconnect@gmail.com'
-const NAV_HEIGHT = 64
+const EMAIL = 'developertmcconnect@gmail.com'
+const NAV_H = 64
+const LOGO = require('../assets/images/Logo/TMC-Coonect-V.2.png')
 
-interface NavLink {
-  label: string
-  href: string
+type Theme = {
+  ink: string
+  slate: string
+  mute: string
+  faint: string
+  line: string
+  paper: string
+  white: string
+  navy: string
+  blue: string
+  green: string
+  greenBg: string
+  inputBg: string
+  iconChip: string
 }
 
-interface Feature {
-  icon: React.ReactNode
-  title: string
-  description: string
+const Light: Theme = {
+  ink: '#0F172A',
+  slate: '#334155',
+  mute: '#64748B',
+  faint: '#94A3B8',
+  line: '#E2E8F0',
+  paper: '#F8FAFC',
+  white: '#FFFFFF',
+  navy: '#0B1B3A',
+  blue: '#1D4ED8',
+  green: '#15803D',
+  greenBg: '#F0FDF4',
+  inputBg: '#FFFFFF',
+  iconChip: '#FFFFFF',
 }
 
-interface Stat {
-  value: string
-  label: string
+const Dark: Theme = {
+  ink: '#F1F5F9',
+  slate: '#CBD5E1',
+  mute: '#94A3B8',
+  faint: '#64748B',
+  line: '#1E293B',
+  paper: '#0F172A',
+  white: '#0B1220',
+  navy: '#060C1D',
+  blue: '#60A5FA',
+  green: '#4ADE80',
+  greenBg: 'rgba(74,222,128,0.12)',
+  inputBg: '#0F172A',
+  iconChip: '#1E293B',
 }
 
-const NAV_LINKS: NavLink[] = [
-  { label: 'Features', href: '#features' },
-  { label: 'How It Works', href: '#how-it-works' },
-  { label: 'About', href: '#about' },
-  { label: 'Contact', href: '#contact' },
+type Mode = 'light' | 'dark'
+
+const web = Platform.OS === 'web'
+const F = {
+  body: web ? { fontFamily: "'Inter', system-ui, -apple-system, sans-serif" } : {},
+} as any
+
+type Icon = React.ComponentProps<typeof Ionicons>['name']
+
+const NAV = [
+  { label: 'Features', id: 'features' },
+  { label: 'How it works', id: 'how-it-works' },
+  { label: 'FAQ', id: 'faq' },
+  { label: 'Contact', id: 'contact' },
 ]
 
-const MapPinIcon = ({ size = 28, color = '#1D4ED8' }) => (
-  <View style={{ width: size, height: size }}>
-    <Text
-      style={{
-        fontSize: size * 0.85,
-        color,
-        fontWeight: '300',
-        lineHeight: size,
-      }}
-    >
-      {'\u{1F4CD}'}
-    </Text>
-  </View>
-)
-const IconGeo = ({
-  color = '#1D4ED8',
-  size = 28,
-}: {
-  color?: string
-  size?: number
-}) => (
-  <View
-    style={{
-      width: size,
-      height: size,
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}
-  >
-    <View
-      style={{
-        width: size * 0.55,
-        height: size * 0.55,
-        borderRadius: size * 0.275,
-        borderWidth: 2.5,
-        borderColor: color,
-      }}
-    />
-    <View
-      style={{
-        width: 2.5,
-        height: size * 0.3,
-        backgroundColor: color,
-        marginTop: -3,
-        borderRadius: 2,
-      }}
-    />
-  </View>
-)
-
-const IconQR = ({
-  color = '#1D4ED8',
-  size = 28,
-}: {
-  color?: string
-  size?: number
-}) => (
-  <View
-    style={{
-      width: size,
-      height: size,
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}
-  >
-    <View style={{ flexDirection: 'row', gap: 2 }}>
-      <View
-        style={{
-          width: size * 0.35,
-          height: size * 0.35,
-          borderWidth: 2,
-          borderColor: color,
-          borderRadius: 2,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <View
-          style={{
-            width: size * 0.12,
-            height: size * 0.12,
-            backgroundColor: color,
-            borderRadius: 1,
-          }}
-        />
-      </View>
-      <View style={{ gap: 2 }}>
-        <View
-          style={{
-            width: size * 0.13,
-            height: size * 0.13,
-            backgroundColor: color,
-            borderRadius: 1,
-          }}
-        />
-        <View
-          style={{
-            width: size * 0.13,
-            height: size * 0.13,
-            backgroundColor: color,
-            borderRadius: 1,
-            opacity: 0.4,
-          }}
-        />
-      </View>
-    </View>
-    <View style={{ flexDirection: 'row', gap: 2, marginTop: 2 }}>
-      <View
-        style={{
-          width: size * 0.13,
-          height: size * 0.13,
-          backgroundColor: color,
-          borderRadius: 1,
-          opacity: 0.4,
-        }}
-      />
-      <View
-        style={{
-          width: size * 0.13,
-          height: size * 0.13,
-          backgroundColor: color,
-          borderRadius: 1,
-        }}
-      />
-      <View
-        style={{
-          width: size * 0.35,
-          height: size * 0.13,
-          backgroundColor: color,
-          borderRadius: 1,
-          opacity: 0.6,
-        }}
-      />
-    </View>
-  </View>
-)
-
-const IconCalendar = ({
-  color = '#1D4ED8',
-  size = 28,
-}: {
-  color?: string
-  size?: number
-}) => (
-  <View
-    style={{
-      width: size,
-      height: size,
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}
-  >
-    <View
-      style={{
-        width: size * 0.8,
-        height: size * 0.72,
-        borderWidth: 2,
-        borderColor: color,
-        borderRadius: 3,
-      }}
-    >
-      <View
-        style={{
-          height: size * 0.2,
-          backgroundColor: color,
-          borderTopLeftRadius: 1,
-          borderTopRightRadius: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-around',
-          paddingHorizontal: 3,
-        }}
-      >
-        <View
-          style={{
-            width: 2,
-            height: size * 0.25,
-            backgroundColor: '#fff',
-            borderRadius: 1,
-          }}
-        />
-        <View
-          style={{
-            width: 2,
-            height: size * 0.25,
-            backgroundColor: '#fff',
-            borderRadius: 1,
-          }}
-        />
-      </View>
-      <View
-        style={{
-          flex: 1,
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: 2,
-          padding: 3,
-        }}
-      >
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <View
-            key={i}
-            style={{
-              width: size * 0.12,
-              height: size * 0.12,
-              backgroundColor: i === 3 ? color : color + '30',
-              borderRadius: 1,
-            }}
-          />
-        ))}
-      </View>
-    </View>
-  </View>
-)
-
-const IconShield = ({
-  color = '#1D4ED8',
-  size = 28,
-}: {
-  color?: string
-  size?: number
-}) => (
-  <View
-    style={{
-      width: size,
-      height: size,
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}
-  >
-    <View
-      style={{
-        width: size * 0.65,
-        height: size * 0.75,
-        borderWidth: 2.5,
-        borderColor: color,
-        borderRadius: size * 0.15,
-        borderBottomLeftRadius: size * 0.32,
-        borderBottomRightRadius: size * 0.32,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <View
-        style={{
-          width: size * 0.22,
-          height: size * 0.14,
-          borderBottomWidth: 2.5,
-          borderLeftWidth: 2.5,
-          borderColor: color,
-          transform: [{ rotate: '-45deg' }],
-          marginTop: 4,
-        }}
-      />
-    </View>
-  </View>
-)
-
-const IconChart = ({
-  color = '#1D4ED8',
-  size = 28,
-}: {
-  color?: string
-  size?: number
-}) => (
-  <View
-    style={{
-      width: size,
-      height: size,
-      alignItems: 'flex-end',
-      justifyContent: 'flex-end',
-      flexDirection: 'row',
-      gap: 3,
-      paddingBottom: 2,
-    }}
-  >
-    {[0.35, 0.6, 0.45, 0.8, 0.55].map((h, i) => (
-      <View
-        key={i}
-        style={{
-          width: size * 0.1,
-          height: size * h,
-          backgroundColor: i === 3 ? color : color + '70',
-          borderRadius: 2,
-        }}
-      />
-    ))}
-  </View>
-)
-
-const IconGlobe = ({
-  color = '#1D4ED8',
-  size = 28,
-}: {
-  color?: string
-  size?: number
-}) => (
-  <View
-    style={{
-      width: size,
-      height: size,
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}
-  >
-    <View
-      style={{
-        width: size * 0.75,
-        height: size * 0.75,
-        borderRadius: size * 0.375,
-        borderWidth: 2,
-        borderColor: color,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <View
-        style={{
-          width: size * 0.4,
-          height: size * 0.75 - 4,
-          borderRadius: size * 0.2,
-          borderWidth: 1.5,
-          borderColor: color + '80',
-          position: 'absolute',
-        }}
-      />
-      <View
-        style={{
-          width: size * 0.75 - 4,
-          height: 1.5,
-          backgroundColor: color + '60',
-          position: 'absolute',
-        }}
-      />
-    </View>
-  </View>
-)
-
-const FEATURES: Feature[] = [
+const PROOF: { value: string; label: string }[] = [
   {
-    icon: <IconGeo color='#1D4ED8' size={30} />,
-    title: 'Geolocation Attendance',
-    description:
-      'Verify student presence at campus events with precise GPS-based location checks — no more proxy attendance.',
+    value: 'QR + GPS verification',
+    label: 'Each check-in pairs a scan with a location match.',
   },
   {
-    icon: <IconQR color='#1D4ED8' size={30} />,
-    title: 'QR Code Check-In',
-    description:
-      'Generate and scan unique QR codes for instant, seamless event check-ins directly from your mobile device.',
+    value: 'Real-time records',
+    label: 'Attendance syncs to Firestore as it happens.',
   },
   {
-    icon: <IconCalendar color='#1D4ED8' size={30} />,
-    title: 'Event Management',
-    description:
-      'Discover, register, and track campus events all in one place — from academic seminars to org activities.',
-  },
-  {
-    icon: <IconShield color='#1D4ED8' size={30} />,
-    title: 'Secure Authentication',
-    description:
-      'Role-based access for students, faculty, and administrators backed by Firebase secure authentication.',
-  },
-  {
-    icon: <IconChart color='#1D4ED8' size={30} />,
-    title: 'Real-Time Analytics',
-    description:
-      'Organizers get instant attendance reports and participation insights to power data-driven decisions.',
-  },
-  {
-    icon: <IconGlobe color='#1D4ED8' size={30} />,
-    title: 'Cross-Platform',
-    description:
-      'Works flawlessly on iOS, Android, and the web — one app for every device on campus.',
+    value: 'Offline-tolerant',
+    label: 'Check-ins queue when campus WiFi drops.',
   },
 ]
 
-const STATS: Stat[] = [
-  { value: '100%', label: 'Attendance Accuracy' },
-  { value: '< 3s', label: 'Average Check-In Time' },
-  { value: 'iOS & Android', label: 'Platform Support' },
-  { value: 'Real-Time', label: 'Data Syncing' },
-]
-
-const HOW_IT_WORKS = [
+const FEATURES: { icon: Icon; title: string; body: string }[] = [
   {
-    step: '01',
-    title: 'Create or Join an Event',
-    body: 'Faculty publish events; students browse the campus feed and register with one tap.',
+    icon: 'location-outline',
+    title: 'GPS verification',
+    body: 'Confirm the device is at the venue before a check-in counts.',
   },
   {
-    step: '02',
-    title: 'Arrive & Check In',
-    body: 'On arrival, scan the event QR code. The app confirms your GPS location matches the venue.',
+    icon: 'qr-code-outline',
+    title: 'QR check-in',
+    body: 'One scan per event. No sign-up sheets passed down the row.',
   },
   {
-    step: '03',
-    title: 'Attendance Logged',
-    body: 'Your attendance is recorded instantly in the firestore. No paper forms, no manual counting.',
-  },
-]
-
-const LEARN_MORE_SECTIONS = [
-  {
-    title: 'Built for Philippine Campuses',
-    body: 'TMC Connect was designed specifically with local campus realities in mind — from spotty WiFi to large student populations. The app uses optimized cloud sync and offline fallback so check-ins never fail.',
+    icon: 'calendar-outline',
+    title: 'Event publishing',
+    body: 'Departments and orgs post events with date, venue, and capacity.',
   },
   {
-    title: 'Firebase-Powered Backend',
-    body: 'The entire backend runs on Google Firebase — Firestore for real-time data, Firebase Auth for role-based access, and Firebase Storage for event assets. Secure, scalable, and battle-tested.',
+    icon: 'key-outline',
+    title: 'Role-based access',
+    body: 'Separate views for students, organizers, and administrators.',
   },
   {
-    title: 'Thesis → Production',
-    body: 'What started as a thesis project has become a full production platform. The v2.0 release includes a redesigned UI, performance improvements, and new admin analytics dashboard.',
+    icon: 'document-text-outline',
+    title: 'Attendance exports',
+    body: 'Organizers pull per-event records without manual tallying.',
   },
   {
-    title: 'Open for All Departments',
-    body: "Any department or student organization can create events on TMC Connect. Faculty can generate attendance reports in seconds. Administrators get a bird's eye view of campus engagement.",
+    icon: 'phone-portrait-outline',
+    title: 'Android and web',
+    body: 'Native app for check-ins, web access for review and admin.',
   },
 ]
 
-const useWindowWidth = () => {
-  const [width, setWidth] = useState(Dimensions.get('window').width)
+const STEPS = [
+  {
+    n: '01',
+    title: 'Register for the event',
+    body: 'Students browse the feed and register. Organizers see headcount in advance.',
+  },
+  {
+    n: '02',
+    title: 'Scan on arrival',
+    body: 'Scan the event QR at the venue. The app checks GPS against the event location.',
+  },
+  {
+    n: '03',
+    title: 'Record is saved',
+    body: 'Attendance lands in Firestore immediately and appears in the organizer report.',
+  },
+]
+
+const ROLES: { icon: Icon; who: string; blurb: string; points: string[] }[] = [
+  {
+    icon: 'school-outline',
+    who: 'Students',
+    blurb: 'One place for events and attendance history.',
+    points: [
+      'Browse events by department or org',
+      'Register in one tap',
+      'Check in with QR + location',
+      'Review personal attendance record',
+    ],
+  },
+  {
+    icon: 'clipboard-outline',
+    who: 'Faculty and organizers',
+    blurb: 'Publish events and close out attendance the same day.',
+    points: [
+      'Create events with venue coordinates',
+      'Monitor check-ins during the event',
+      'Export attendance per event',
+      'Send announcements to registrants',
+    ],
+  },
+  {
+    icon: 'shield-outline',
+    who: 'Administrators',
+    blurb: 'Oversight across departments without spreadsheets.',
+    points: [
+      'Manage users and roles',
+      'Review events across departments',
+      'Audit attendance records',
+      'Configure system settings',
+    ],
+  },
+]
+
+const FAQ = [
+  {
+    q: 'What happens if the WiFi drops during check-in?',
+    a: 'Check-ins are queued on the device and synced to Firestore when the connection returns. Organizers see the final record, not a failed attempt.',
+  },
+  {
+    q: 'Why does the app request location?',
+    a: 'Location is read once at check-in and compared against the event venue coordinates. It is not tracked in the background.',
+  },
+  {
+    q: 'Who can create events?',
+    a: 'Faculty accounts and approved organizers. Each event carries a venue, schedule, and organizer so records stay auditable.',
+  },
+  {
+    q: 'How do I get an account?',
+    a: 'Student accounts use a TMC email. If your department provisions accounts centrally, use the credentials they issue, then sign in on Android or web.',
+  },
+  {
+    q: 'Which devices are supported?',
+    a: 'Android for on-site check-in (v2.0.1 APK linked below) and any modern browser for browsing events and admin work. iOS builds ship via EAS on request.',
+  },
+]
+
+const useWidth = () => {
+  const [w, setW] = useState(Dimensions.get('window').width)
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ window }) =>
-      setWidth(window.width)
+      setW(window.width)
     )
     return () => sub?.remove()
   }, [])
-  return width
+  return w
 }
 
-// Breakpoints
-const BP = { sm: 480, md: 768, lg: 1024 }
-
-const handleDownload = () => {
-  Linking.openURL(APK_DOWNLOAD_URL).catch(console.error)
-}
-
-const LearnMoreModal: React.FC<{ visible: boolean; onClose: () => void }> = ({
-  visible,
-  onClose,
-}) => {
-  const slideAnim = useRef(new Animated.Value(80)).current
-  const fadeAnim = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          tension: 80,
-          friction: 12,
-          useNativeDriver: true,
-        }),
-      ]).start()
-    } else {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 80,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start()
-    }
-  }, [visible])
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType='none'
-      onRequestClose={onClose}
-    >
-      <Animated.View style={[modalStyles.overlay, { opacity: fadeAnim }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <Animated.View
-          style={[
-            modalStyles.sheet,
-            { transform: [{ translateY: slideAnim }] },
-          ]}
-        >
-          {/* Header */}
-          <View style={modalStyles.header}>
-            <View>
-              <Text style={modalStyles.headerTag}>LEARN MORE</Text>
-              <Text style={modalStyles.headerTitle}>About TMC Connect</Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={modalStyles.closeBtn}>
-              <View style={modalStyles.closeIcon}>
-                <View
-                  style={[
-                    modalStyles.closeBar,
-                    { transform: [{ rotate: '45deg' }] },
-                  ]}
-                />
-                <View
-                  style={[
-                    modalStyles.closeBar,
-                    { transform: [{ rotate: '-45deg' }], position: 'absolute' },
-                  ]}
-                />
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            style={modalStyles.body}
-          >
-            {/* Hero stat row */}
-            <View style={modalStyles.statRow}>
-              {[
-                { v: 'v2.0', l: 'Latest Release' },
-                { v: 'Expo', l: 'Framework' },
-                { v: 'Firebase', l: 'Backend' },
-              ].map((s) => (
-                <View key={s.l} style={modalStyles.miniStat}>
-                  <Text style={modalStyles.miniStatVal}>{s.v}</Text>
-                  <Text style={modalStyles.miniStatLabel}>{s.l}</Text>
-                </View>
-              ))}
-            </View>
-
-            {LEARN_MORE_SECTIONS.map((sec, i) => (
-              <View key={i} style={modalStyles.infoBlock}>
-                <View style={modalStyles.infoNumber}>
-                  <Text style={modalStyles.infoNumberText}>
-                    {String(i + 1).padStart(2, '0')}
-                  </Text>
-                </View>
-                <View style={modalStyles.infoContent}>
-                  <Text style={modalStyles.infoTitle}>{sec.title}</Text>
-                  <Text style={modalStyles.infoBody}>{sec.body}</Text>
-                </View>
-              </View>
-            ))}
-
-            {/* Tech stack */}
-            <View style={modalStyles.techSection}>
-              <Text style={modalStyles.techHeading}>Tech Stack</Text>
-              <View style={modalStyles.techGrid}>
-                {[
-                  'React Native',
-                  'Expo',
-                  'TypeScript',
-                  'Firebase',
-                  'Firestore',
-                  'Firebase Auth',
-                ].map((t) => (
-                  <View key={t} style={modalStyles.techTag}>
-                    <Text style={modalStyles.techTagText}>{t}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={modalStyles.downloadBtn}
-              onPress={handleDownload}
-            >
-              <Text style={modalStyles.downloadBtnText}>
-                Download TMC Connect →
-              </Text>
-            </TouchableOpacity>
-
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </Animated.View>
-      </Animated.View>
-    </Modal>
-  )
-}
-
-const modalStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  headerTag: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 2,
-    color: '#1D4ED8',
-    marginBottom: 4,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.5,
-  },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeIcon: {
-    width: 16,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeBar: {
-    width: 16,
-    height: 2,
-    backgroundColor: '#475569',
-    borderRadius: 1,
-  },
-  body: { paddingHorizontal: 24 },
-  statRow: { flexDirection: 'row', gap: 12, paddingVertical: 20 },
-  miniStat: {
-    flex: 1,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-  },
-  miniStatVal: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#1D4ED8',
-    marginBottom: 2,
-  },
-  miniStatLabel: { fontSize: 11, color: '#64748B', fontWeight: '500' },
-  infoBlock: {
-    flexDirection: 'row',
-    gap: 16,
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  infoNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    marginTop: 2,
-  },
-  infoNumberText: { fontSize: 11, fontWeight: '800', color: '#1D4ED8' },
-  infoContent: { flex: 1 },
-  infoTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 6,
-  },
-  infoBody: { fontSize: 13, color: '#64748B', lineHeight: 21 },
-  techSection: { paddingVertical: 20 },
-  techHeading: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 12,
-    letterSpacing: 0.3,
-  },
-  techGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  techTag: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 20,
-  },
-  techTagText: { fontSize: 12, color: '#475569', fontWeight: '600' },
-  downloadBtn: {
-    backgroundColor: '#1D4ED8',
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  downloadBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-})
-
-const DesktopNav: React.FC<{ onNavPress: (href: string) => void }> = ({
-  onNavPress,
+const Wrap: React.FC<{ children: React.ReactNode; style?: any }> = ({
+  children,
+  style,
 }) => (
-  <View style={styles.desktopNav}>
-    <Image
-      source={require('../assets/images/Logo/TMC-Coonect-V.2.png')}
-      style={styles.logoImage}
-      resizeMode='contain'
-    />
-    <View style={styles.navLinks}>
-      {NAV_LINKS.map((link) => (
-        <TouchableOpacity
-          key={link.href}
-          onPress={() => onNavPress(link.href)}
-          style={styles.navLinkBtn}
-        >
-          <Text style={styles.navLinkText}>{link.label}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-    <TouchableOpacity style={styles.navCTA} onPress={handleDownload}>
-      <Text style={styles.navCTAText}>Get the App →</Text>
-    </TouchableOpacity>
+  <View style={[{ width: '100%', maxWidth: 1120, alignSelf: 'center' }, style]}>
+    {children}
   </View>
 )
 
-const MobileNav: React.FC<{ onNavPress: (href: string) => void }> = ({
-  onNavPress,
-}) => {
-  const [open, setOpen] = useState(false)
-  const anim = useRef(new Animated.Value(0)).current
+type Ctx = { T: Theme; s: ReturnType<typeof makeStyles> }
 
-  const toggle = () => {
-    Animated.timing(anim, {
-      toValue: open ? 0 : 1,
-      duration: 240,
-      useNativeDriver: false,
-    }).start()
-    setOpen((v) => !v)
+const Eyebrow: React.FC<Ctx & { children: string }> = ({ T, s, children }) => (
+  <Text style={[s.eyebrow, F.body, { color: T.blue }]}>{children}</Text>
+)
+
+const Btn: React.FC<
+  Ctx & {
+    label: string
+    icon?: Icon
+    onPress: () => void
+    variant?: 'primary' | 'secondary'
   }
+> = ({ T, s, label, icon, onPress, variant = 'primary' }) => (
+  <TouchableOpacity
+    accessibilityRole='button'
+    onPress={onPress}
+    style={[s.btn, variant === 'primary' ? s.btnPrimary : s.btnSecondary]}
+  >
+    {icon ? (
+      <Ionicons
+        name={icon}
+        size={17}
+        color={variant === 'primary' ? '#FFFFFF' : T.ink}
+      />
+    ) : null}
+    <Text
+      style={[
+        s.btnText,
+        F.body,
+        { color: variant === 'primary' ? '#FFFFFF' : T.ink },
+      ]}
+    >
+      {label}
+    </Text>
+  </TouchableOpacity>
+)
 
-  const menuHeight = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, NAV_LINKS.length * 52 + 72],
-  })
-  const menuOpacity = anim.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [0, 0, 1],
-  })
+const ThemeToggle: React.FC<Ctx & { mode: Mode; onToggle: () => void }> = ({
+  T,
+  s,
+  mode,
+  onToggle,
+}) => (
+  <TouchableOpacity
+    accessibilityRole='button'
+    accessibilityLabel={
+      mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+    }
+    onPress={onToggle}
+    style={s.themeToggle}
+  >
+    <Ionicons
+      name={mode === 'dark' ? 'sunny-outline' : 'moon-outline'}
+      size={18}
+      color={T.slate}
+    />
+  </TouchableOpacity>
+)
 
-  return (
-    <View style={styles.mobileNavContainer}>
-      <View style={styles.mobileNavBar}>
-        <Image
-          source={require('../assets/images/Logo/TMC-Coonect-V.2.png')}
-          style={styles.logoImage}
-          resizeMode='contain'
-        />
-        <TouchableOpacity
-          style={styles.hamburger}
-          onPress={toggle}
-          accessibilityLabel='Toggle navigation menu'
-        >
-          <HamburgerIcon open={open} />
-        </TouchableOpacity>
+/** Flat product card — no phone frame, no fake notch. */
+const EventCard: React.FC<Ctx> = ({ T, s }) => (
+  <View style={s.eventCard}>
+    <View style={s.eventTop}>
+      <View style={s.traffic}>
+        <View style={[s.dot, { backgroundColor: T.line }]} />
+        <View style={[s.dot, { backgroundColor: T.line }]} />
+        <View style={[s.dot, { backgroundColor: T.line }]} />
       </View>
-      <Animated.View
-        style={[
-          styles.mobileMenu,
-          { maxHeight: menuHeight, opacity: menuOpacity },
-        ]}
-      >
-        {NAV_LINKS.map((link) => (
-          <TouchableOpacity
-            key={link.href}
-            style={styles.mobileMenuLink}
-            onPress={() => {
-              onNavPress(link.href)
-              toggle()
-            }}
-          >
-            <Text style={styles.mobileMenuLinkText}>{link.label}</Text>
-          </TouchableOpacity>
-        ))}
-        <TouchableOpacity style={styles.mobileMenuCTA} onPress={handleDownload}>
-          <Text style={styles.navCTAText}>Get the App →</Text>
-        </TouchableOpacity>
-      </Animated.View>
+      <Text style={[s.eventTopText, F.body]}>TMC Connect — Student</Text>
+    </View>
+    <View style={s.eventBody}>
+      <Text style={[s.eventKicker, F.body]}>TODAY · MAIN CAMPUS</Text>
+      <Text style={[s.eventTitle, F.body]}>Campus Technodays 2026</Text>
+      <Text style={[s.eventMeta, F.body]}>Building A · 8:00 AM – 5:00 PM</Text>
+
+      <View style={s.qrBox}>
+        <Ionicons name='qr-code-outline' size={56} color={T.ink} />
+        <Text style={[s.qrCaption, F.body]}>Event QR verified</Text>
+      </View>
+
+      <View style={s.statusRow}>
+        <View style={s.statusPill}>
+          <Ionicons name='checkmark-circle' size={16} color={T.green} />
+          <Text style={[s.statusText, F.body]}>Checked in · 8:02 AM</Text>
+        </View>
+      </View>
+      <View style={s.locRow}>
+        <Ionicons name='location-sharp' size={14} color={T.green} />
+        <Text style={[s.locText, F.body]}>Location match · Main Campus</Text>
+      </View>
+
+      <View style={s.eventDivider} />
+      <View style={s.eventFoot}>
+        <Text style={[s.eventFootText, F.body]}>Attendance history</Text>
+        <Ionicons name='chevron-forward' size={16} color={T.mute} />
+      </View>
+    </View>
+  </View>
+)
+
+const Faq: React.FC<Ctx> = ({ T, s }) => {
+  const [open, setOpen] = useState<number | null>(0)
+  return (
+    <View style={{ width: '100%' }}>
+      {FAQ.map((f, i) => {
+        const isOpen = open === i
+        return (
+          <View key={f.q} style={s.faqItem}>
+            <Pressable
+              style={s.faqHead}
+              onPress={() => setOpen(isOpen ? null : i)}
+              accessibilityRole='button'
+            >
+              <Text style={[s.faqQ, F.body]}>{f.q}</Text>
+              <Ionicons
+                name={isOpen ? 'remove' : 'add'}
+                size={20}
+                color={T.slate}
+              />
+            </Pressable>
+            {isOpen ? <Text style={[s.faqA, F.body]}>{f.a}</Text> : null}
+          </View>
+        )
+      })}
     </View>
   )
 }
 
-const HamburgerIcon: React.FC<{ open: boolean }> = ({ open }) => (
-  <View style={styles.hamburgerIcon}>
-    <View
-      style={[
-        styles.bar,
-        open && { transform: [{ rotate: '45deg' }, { translateY: 8 }] },
-      ]}
-    />
-    <View style={[styles.bar, open && { opacity: 0 }]} />
-    <View
-      style={[
-        styles.bar,
-        open && { transform: [{ rotate: '-45deg' }, { translateY: -8 }] },
-      ]}
-    />
-  </View>
-)
-
-const SystemBanner: React.FC = () => (
-  <View style={styles.systemBanner}>
-    <View style={styles.bannerBadgeWrap}>
-      <Text style={styles.bannerBadge}>System Notice</Text>
-    </View>
-    <Text style={styles.bannerText}>
-      TMC Connect v2.0 is now live.{' '}
-      <Text style={styles.bannerLink} onPress={handleDownload}>
-        Download and register today.
-      </Text>
-    </Text>
-  </View>
-)
-
-const FeatureCard: React.FC<Feature & { index: number }> = ({
-  icon,
-  title,
-  description,
-  index,
-}) => (
-  <View
-    style={[styles.featureCard, { animationDelay: `${index * 80}ms` }] as any}
-  >
-    <View style={styles.featureIconWrap}>{icon}</View>
-    <Text style={styles.featureTitle}>{title}</Text>
-    <Text style={styles.featureDesc}>{description}</Text>
-  </View>
-)
-
-const StatItem: React.FC<Stat> = ({ value, label }) => (
-  <View style={styles.statItem}>
-    <Text style={styles.statValue}>{value}</Text>
-    <Text style={styles.statLabel}>{label}</Text>
-  </View>
-)
-
-const StepCard: React.FC<(typeof HOW_IT_WORKS)[0] & { isLast: boolean }> = ({
-  step,
-  title,
-  body,
-  isLast,
-}) => (
-  <View style={styles.stepRow}>
-    <View style={styles.stepLeft}>
-      <View style={styles.stepCircle}>
-        <Text style={styles.stepNumber}>{step}</Text>
-      </View>
-      {!isLast && <View style={styles.stepLine} />}
-    </View>
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>{title}</Text>
-      <Text style={styles.stepBody}>{body}</Text>
-    </View>
-  </View>
-)
-
-const ContactSection: React.FC = () => {
+const Contact: React.FC<Ctx> = ({ T, s }) => {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [message, setMessage] = useState('')
+  const [msg, setMsg] = useState('')
   const [sent, setSent] = useState(false)
+  const ready = !!(name.trim() && email.trim() && msg.trim())
 
-  const handleSend = () => {
-    const subject = encodeURIComponent(
-      `TMC Connect Inquiry from ${name || 'User'}`
+  const send = () => {
+    const subject = encodeURIComponent(`TMC Connect inquiry from ${name}`)
+    const body = encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\n${msg}`)
+    Linking.openURL(`mailto:${EMAIL}?subject=${subject}&body=${body}`).catch(
+      console.error
     )
-    const body = encodeURIComponent(
-      `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`
-    )
-    Linking.openURL(
-      `mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`
-    ).catch(console.error)
     setSent(true)
     setTimeout(() => setSent(false), 4000)
   }
 
   return (
-    <View style={contactStyles.section} nativeID='contact'>
-      <View style={contactStyles.inner}>
-        {/* Left column */}
-        <View style={contactStyles.infoCol}>
-          <Text style={styles.sectionTag}>Get In Touch</Text>
-          <Text style={contactStyles.heading}>
-            We'd love{'\n'}to hear from you.
-          </Text>
-          <Text style={contactStyles.sub}>
-            Have questions about TMC Connect, want to report a bug, or
-            interested in integrating it with your campus? Reach out.
-          </Text>
-
-          <View style={contactStyles.contactItems}>
-            <View style={contactStyles.contactItem}>
-              <View style={contactStyles.contactItemIcon}>
-                <View
-                  style={{
-                    width: 18,
-                    height: 13,
-                    borderWidth: 2,
-                    borderColor: '#1D4ED8',
-                    borderRadius: 3,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 12,
-                      height: 7,
-                      borderTopWidth: 2,
-                      borderTopColor: '#1D4ED8',
-                      transform: [{ rotate: '180deg' }],
-                    }}
-                  />
-                </View>
-              </View>
-              <View>
-                <Text style={contactStyles.contactItemLabel}>Email</Text>
-                <Text
-                  style={contactStyles.contactItemValue}
-                  onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}`)}
-                >
-                  {CONTACT_EMAIL}
-                </Text>
-              </View>
-            </View>
-
-            <View style={contactStyles.contactItem}>
-              <View style={contactStyles.contactItemIcon}>
-                {/* GitHub icon */}
-                <View
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 9,
-                    borderWidth: 2,
-                    borderColor: '#1D4ED8',
-                  }}
-                />
-              </View>
-              <View>
-                <Text style={contactStyles.contactItemLabel}>
-                  FB of the Developer
-                </Text>
-                <Text
-                  style={contactStyles.contactItemValue}
-                  onPress={() =>
-                    Linking.openURL('https://www.facebook.com/arissuuu1')
-                  }
-                >
-                  CajesJM / CajesJm-tmc-connect
-                </Text>
-              </View>
-            </View>
-
-            <View style={contactStyles.contactItem}>
-              <View style={contactStyles.contactItemIcon}>
-                <View
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
-                    backgroundColor: '#22C55E',
-                  }}
-                />
-              </View>
-              <View>
-                <Text style={contactStyles.contactItemLabel}>Status</Text>
-                <Text
-                  style={[contactStyles.contactItemValue, { color: '#16A34A' }]}
-                >
-                  Active — v2.0 Live
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Right column — form */}
-        <View style={contactStyles.formCol}>
-          {sent ? (
-            <View style={contactStyles.sentBox}>
-              <View
-                style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 24,
-                  backgroundColor: '#DCFCE7',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 12,
-                }}
-              >
-                <View
-                  style={{
-                    width: 20,
-                    height: 12,
-                    borderLeftWidth: 3,
-                    borderBottomWidth: 3,
-                    borderColor: '#16A34A',
-                    transform: [{ rotate: '-45deg' }],
-                    marginTop: 4,
-                  }}
-                />
-              </View>
-              <Text style={contactStyles.sentTitle}>Message Sent!</Text>
-              <Text style={contactStyles.sentBody}>
-                Your email client should have opened. We'll get back to you
-                soon.
-              </Text>
-            </View>
-          ) : (
-            <>
-              <View style={contactStyles.formRow}>
-                <View style={contactStyles.formField}>
-                  <Text style={contactStyles.fieldLabel}>Your Name</Text>
-                  <TextInput
-                    style={contactStyles.input}
-                    placeholder='Juan dela Cruz'
-                    placeholderTextColor='#94A3B8'
-                    value={name}
-                    onChangeText={setName}
-                  />
-                </View>
-                <View style={contactStyles.formField}>
-                  <Text style={contactStyles.fieldLabel}>Email Address</Text>
-                  <TextInput
-                    style={contactStyles.input}
-                    placeholder='juan@tmc.edu.ph'
-                    placeholderTextColor='#94A3B8'
-                    keyboardType='email-address'
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize='none'
-                  />
-                </View>
-              </View>
-
-              <View style={[contactStyles.formField, { marginBottom: 20 }]}>
-                <Text style={contactStyles.fieldLabel}>Message</Text>
-                <TextInput
-                  style={[contactStyles.input, contactStyles.textarea]}
-                  placeholder='Tell us what you need...'
-                  placeholderTextColor='#94A3B8'
-                  multiline
-                  numberOfLines={5}
-                  value={message}
-                  onChangeText={setMessage}
-                  textAlignVertical='top'
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  contactStyles.sendBtn,
-                  (!name || !email || !message) &&
-                    contactStyles.sendBtnDisabled,
-                ]}
-                onPress={handleSend}
-                disabled={!name || !email || !message}
-              >
-                <Text style={contactStyles.sendBtnText}>Send Message →</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
-    </View>
-  )
-}
-
-const contactStyles = StyleSheet.create({
-  section: {
-    backgroundColor: '#F8FAFC',
-    paddingVertical: 80,
-    paddingHorizontal: 24,
-  },
-  inner: {
-    maxWidth: 960,
-    width: '100%',
-    alignSelf: 'center',
-    flexDirection: 'row' as any,
-    flexWrap: 'wrap' as any,
-    gap: 48,
-  },
-  infoCol: { flex: 1, minWidth: 260 },
-  formCol: {
-    flex: 1.4,
-    minWidth: 280,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 28,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#1E40AF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.07,
-    shadowRadius: 24,
-  },
-  heading: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#0F172A',
-    lineHeight: 42,
-    letterSpacing: -0.8,
-    marginBottom: 14,
-    marginTop: 8,
-  },
-  sub: { fontSize: 14, color: '#64748B', lineHeight: 24, marginBottom: 32 },
-  contactItems: { gap: 20 },
-  contactItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-  contactItemIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  contactItemLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginBottom: 2,
-  },
-  contactItemValue: { fontSize: 13, fontWeight: '600', color: '#1D4ED8' },
-  formRow: {
-    flexDirection: 'row' as any,
-    flexWrap: 'wrap' as any,
-    gap: 14,
-    marginBottom: 14,
-  },
-  formField: { flex: 1, minWidth: 180 },
-  fieldLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 7,
-    letterSpacing: 0.2,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 14,
-    color: '#0F172A',
-    backgroundColor: '#FAFBFC',
-  },
-  textarea: { minHeight: 120, paddingTop: 12 },
-  sendBtn: {
-    backgroundColor: '#1D4ED8',
-    paddingVertical: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#1D4ED8',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-  },
-  sendBtnDisabled: { backgroundColor: '#93C5FD', shadowOpacity: 0 },
-  sendBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  sentBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-  },
-  sentTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 8,
-  },
-  sentBody: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-})
-
-const TMCConnectLanding: React.FC = () => {
-  const scrollViewRef = useRef<ScrollView>(null)
-  const width = useWindowWidth()
-  const isDesktop = width >= BP.md
-  const isWide = width >= BP.lg
-
-  const [learnMoreVisible, setLearnMoreVisible] = useState(false)
-
-  const heroAnim = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    Animated.timing(heroAnim, {
-      toValue: 1,
-      duration: 900,
-      useNativeDriver: true,
-    }).start()
-  }, [])
-
-  const handleNavPress = (href: string) => {
-    if (Platform.OS !== 'web') return
-    const elementId = href.replace('#', '')
-    const element = document.getElementById(elementId)
-    if (element && scrollViewRef.current) {
-      const scrollNode =
-        scrollViewRef.current.getScrollableNode() as HTMLElement
-      if (scrollNode) {
-        const elementRect = element.getBoundingClientRect()
-        const scrollRect = scrollNode.getBoundingClientRect()
-        const relativeTop =
-          elementRect.top - scrollRect.top + scrollNode.scrollTop
-        scrollViewRef.current.scrollTo({
-          y: relativeTop - NAV_HEIGHT,
-          animated: true,
-        })
-      }
-    }
-  }
-
-  return (
-    <View style={styles.root}>
-      <View style={styles.navWrapper}>
-        {isDesktop ? (
-          <DesktopNav onNavPress={handleNavPress} />
-        ) : (
-          <MobileNav onNavPress={handleNavPress} />
-        )}
-      </View>
-
-      <LearnMoreModal
-        visible={learnMoreVisible}
-        onClose={() => setLearnMoreVisible(false)}
-      />
-
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+    <View style={[s.sectionPaper]} nativeID='contact'>
+      <Wrap
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 48,
+        }}
       >
-        <SystemBanner />
+        <View style={{ flex: 1, minWidth: 260 }}>
+          <Eyebrow T={T} s={s}>
+            Contact
+          </Eyebrow>
+          <Text style={[s.h2, F.body, { textAlign: 'left' }]}>
+            Report an issue or request access
+          </Text>
+          <Text style={[s.sub, F.body, { textAlign: 'left' }]}>
+            Messages open in your email client and go directly to the
+            maintainer.
+          </Text>
 
-        <View style={[styles.hero, isWide && styles.heroWide]} nativeID='hero'>
-          <View style={styles.blob1} />
-          <View style={styles.blob2} />
-
-          <Animated.View
-            style={[
-              styles.heroInner,
-              { opacity: heroAnim },
-              isWide && styles.heroInnerWide,
-            ]}
+          <Pressable
+            style={s.contactRow}
+            onPress={() => Linking.openURL(`mailto:${EMAIL}`)}
           >
-            <View style={styles.heroBadge}>
-              <View style={styles.heroBadgeDot} />
-              <Text style={styles.heroBadgeText}>
-                Campus Digital Hub · v2.0
+            <Ionicons name='mail-outline' size={18} color={T.slate} />
+            <View style={{ flex: 1 }}>
+              <Text style={[s.contactLabel, F.body]}>Email</Text>
+              <Text style={[s.contactValue, F.body]}>{EMAIL}</Text>
+            </View>
+          </Pressable>
+          <Pressable
+            style={s.contactRow}
+            onPress={() =>
+              Linking.openURL('https://github.com/CajesJM/CajesJm-tmc-connect')
+            }
+          >
+            <Ionicons name='logo-github' size={18} color={T.slate} />
+            <View style={{ flex: 1 }}>
+              <Text style={[s.contactLabel, F.body]}>Releases and source</Text>
+              <Text style={[s.contactValue, F.body]}>
+                CajesJM / CajesJm-tmc-connect
               </Text>
             </View>
+          </Pressable>
 
-            <Text
-              style={[styles.heroHeadline, isDesktop && styles.heroHeadlineLg]}
-            >
-              Attendance{'\n'}
-              <Text style={styles.heroAccent}>Reimagined</Text>
-              {'\n'}for Campus Life.
-            </Text>
-
-            <Text style={styles.heroSubtitle}>
-              TMC Connect brings QR check-ins, GPS verification, and event
-              management into one seamless campus experience — built for
-              students and faculty alike.
-            </Text>
-
-            <View style={styles.heroCTAs}>
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={handleDownload}
-              >
-                <Text style={styles.primaryBtnText}>Download the App</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.secondaryBtn}
-                onPress={() => setLearnMoreVisible(true)}
-              >
-                <Text style={styles.secondaryBtnText}>Learn More ↓</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-
-          {/* App preview card */}
-          <View style={[styles.heroCard, isWide && styles.heroCardWide]}>
-            <View style={styles.heroCardHeader}>
-              <View style={[styles.dot, { backgroundColor: '#FF6B6B' }]} />
-              <View style={[styles.dot, { backgroundColor: '#FFE66D' }]} />
-              <View style={[styles.dot, { backgroundColor: '#4CAF50' }]} />
-              <Text style={styles.heroCardTitle}>TMC Connect</Text>
-            </View>
-            <View style={styles.heroCardBody}>
-              <View style={styles.cardEventRow}>
-                <View style={styles.cardEventDot} />
-                <Text style={styles.cardEvent}>Campus TechnoDays 2026</Text>
+          <View style={s.reqBox}>
+            <Text style={[s.reqTitle, F.body]}>Before you install</Text>
+            {[
+              'Android 8.0 or later',
+              'Location permission granted at check-in',
+              'TMC email or provisioned account',
+            ].map((r) => (
+              <View key={r} style={s.reqRow}>
+                <Ionicons name='checkmark' size={15} color={T.green} />
+                <Text style={[s.reqText, F.body]}>{r}</Text>
               </View>
-              <View style={styles.cardDivider} />
-              <View style={styles.cardStatusRow}>
-                <View style={styles.cardStatusBadge}>
-                  <Text style={styles.cardStatusText}>✓ Checked In</Text>
-                </View>
-                <Text style={styles.cardTime}>08:00 AM</Text>
-              </View>
-              <Text style={styles.cardVenue}>Main Campus, Building A</Text>
-
-              <View style={styles.cardQRBox}>
-                {/* Geometric QR representation */}
-                <View style={styles.qrGrid}>
-                  {[1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1].map(
-                    (on, i) => (
-                      <View
-                        key={i}
-                        style={[
-                          styles.qrCell,
-                          { backgroundColor: on ? '#1D4ED8' : 'transparent' },
-                        ]}
-                      />
-                    )
-                  )}
-                </View>
-                <Text style={styles.cardQRLabel}>
-                  Scan to verify attendance
-                </Text>
-              </View>
-
-              <View style={styles.cardGPSRow}>
-                <View style={styles.gpsDot} />
-                <Text style={styles.cardGPS}>
-                  Location confirmed — Main Campus
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.statsBanner}>
-          {STATS.map((s) => (
-            <StatItem key={s.label} {...s} />
-          ))}
-        </View>
-
-        {/* ─── Features ─── */}
-        <View style={styles.section} nativeID='features'>
-          <Text style={styles.sectionTag}>Features</Text>
-          <Text style={styles.sectionHeading}>
-            Everything campus attendance needs
-          </Text>
-          <Text style={styles.sectionSub}>
-            Designed for Philippine campuses — fast, accurate, and resilient
-            when the WiFi drops.
-          </Text>
-          <View
-            style={[
-              styles.featuresGrid,
-              isDesktop && styles.featuresGridDesktop,
-            ]}
-          >
-            {FEATURES.map((f, i) => (
-              <FeatureCard key={f.title} {...f} index={i} />
             ))}
           </View>
         </View>
 
-        {/* ─── How It Works ─── */}
-        <View style={styles.howSection} nativeID='how-it-works'>
-          <View style={styles.howContent}>
-            <Text style={styles.sectionTag}>How It Works</Text>
-            <Text style={styles.sectionHeadingLight}>
-              From event to attendance in 3 steps
-            </Text>
-            <View style={styles.steps}>
-              {HOW_IT_WORKS.map((s, i) => (
-                <StepCard
-                  key={s.step}
-                  {...s}
-                  isLast={i === HOW_IT_WORKS.length - 1}
+        <View style={s.form}>
+          {sent ? (
+            <View style={{ alignItems: 'flex-start', paddingVertical: 24 }}>
+              <Ionicons name='checkmark-circle' size={32} color={T.green} />
+              <Text style={[s.formTitle, F.body, { marginTop: 12 }]}>
+                Your email app should be open
+              </Text>
+              <Text style={[s.formSub, F.body]}>
+                Press send there to deliver the message.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text style={[s.formTitle, F.body]}>Send a message</Text>
+              <Text style={[s.formSub, F.body]}>
+                Typically replies within 2–3 working days.
+              </Text>
+              <View style={{ height: 18 }} />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                <View style={{ flex: 1, minWidth: 170 }}>
+                  <Text style={[s.label, F.body]}>Name</Text>
+                  <TextInput
+                    style={[s.input, F.body]}
+                    placeholder='Juan dela Cruz'
+                    placeholderTextColor={T.faint}
+                    value={name}
+                    onChangeText={setName}
+                  />
+                </View>
+                <View style={{ flex: 1, minWidth: 170 }}>
+                  <Text style={[s.label, F.body]}>Email</Text>
+                  <TextInput
+                    style={[s.input, F.body]}
+                    placeholder='juan@tmc.edu.ph'
+                    placeholderTextColor={T.faint}
+                    keyboardType='email-address'
+                    autoCapitalize='none'
+                    value={email}
+                    onChangeText={setEmail}
+                  />
+                </View>
+              </View>
+              <View style={{ height: 12 }} />
+              <Text style={[s.label, F.body]}>Message</Text>
+              <TextInput
+                style={[s.input, F.body, { minHeight: 112, paddingTop: 10 }]}
+                placeholder='Describe the issue or request…'
+                placeholderTextColor={T.faint}
+                multiline
+                textAlignVertical='top'
+                value={msg}
+                onChangeText={setMsg}
+              />
+              <View style={{ height: 16 }} />
+              <TouchableOpacity
+                style={[
+                  s.btn,
+                  s.btnPrimary,
+                  { justifyContent: 'center' },
+                  !ready && { opacity: 0.45 },
+                ]}
+                disabled={!ready}
+                onPress={send}
+              >
+                <Text style={[s.btnText, F.body, { color: '#FFFFFF' }]}>
+                  Send message
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </Wrap>
+    </View>
+  )
+}
+
+const TMCConnectLanding: React.FC = () => {
+  const width = useWidth()
+  const wide = width >= 960
+  const desktop = width >= 768
+  const [menu, setMenu] = useState(false)
+  const [mode, setMode] = useState<Mode>(() => {
+    if (!web) return 'light'
+    try {
+      const saved = localStorage.getItem('tmc-theme')
+      if (saved === 'light' || saved === 'dark') return saved
+    } catch {}
+    try {
+      if (
+        window.matchMedia?.('(prefers-color-scheme: dark)').matches
+      )
+        return 'dark'
+    } catch {}
+    return 'light'
+  })
+
+  const T = mode === 'dark' ? Dark : Light
+  const s = makeStyles(T)
+  const toggle = () => setMode((m) => (m === 'dark' ? 'light' : 'dark'))
+
+  useEffect(() => {
+    if (!web) return
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href =
+      'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
+    document.head.appendChild(link)
+    return () => {
+      if (document.head.contains(link)) document.head.removeChild(link)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!web) return
+    try {
+      localStorage.setItem('tmc-theme', mode)
+    } catch {}
+    try {
+      document.documentElement.style.backgroundColor = T.white
+      document.body.style.backgroundColor = T.white
+    } catch {}
+  }, [mode])
+
+  const goTo = (id: string) => {
+    setMenu(false)
+    if (!web) return
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const download = () => Linking.openURL(APK_URL).catch(console.error)
+
+  return (
+    <View style={{ flex: 1, backgroundColor: T.white }}>
+      {/* Nav */}
+      <View style={s.nav}>
+        <View style={s.navBar}>
+          <Pressable
+            onPress={() => {
+              if (web) window.scrollTo?.({ top: 0, behavior: 'smooth' })
+            }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+          >
+            <Image
+              source={LOGO}
+              style={{ width: 104, height: 40 }}
+              resizeMode='contain'
+            />
+          </Pressable>
+          {desktop ? (
+            <>
+              <View style={{ flexDirection: 'row', gap: 2 }}>
+                {NAV.map((n) => (
+                  <TouchableOpacity
+                    key={n.id}
+                    onPress={() => goTo(n.id)}
+                    style={{ paddingHorizontal: 12, paddingVertical: 8 }}
+                  >
+                    <Text style={[s.navLink, F.body]}>{n.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                <ThemeToggle T={T} s={s} mode={mode} onToggle={toggle} />
+                <Btn
+                  T={T}
+                  s={s}
+                  label='Download APK'
+                  icon='logo-android'
+                  onPress={download}
                 />
-              ))}
+              </View>
+            </>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <ThemeToggle T={T} s={s} mode={mode} onToggle={toggle} />
+              <TouchableOpacity
+                onPress={() => setMenu(!menu)}
+                accessibilityLabel='Toggle menu'
+                style={{ padding: 8 }}
+              >
+                <Ionicons
+                  name={menu ? 'close' : 'menu'}
+                  size={24}
+                  color={T.ink}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+        {!desktop && menu ? (
+          <View style={s.mobileMenu}>
+            {NAV.map((n) => (
+              <TouchableOpacity
+                key={n.id}
+                onPress={() => goTo(n.id)}
+                style={s.mobileLink}
+              >
+                <Text style={[s.navLink, F.body, { fontSize: 15 }]}>
+                  {n.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <View style={{ paddingVertical: 12 }}>
+              <Btn T={T} s={s} label='Download APK' onPress={download} />
             </View>
           </View>
+        ) : null}
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: NAV_H }}
+      >
+        {/* Hero */}
+        <View style={s.hero}>
+          <Wrap
+            style={{
+              flexDirection: wide ? 'row' : 'column',
+              alignItems: wide ? 'flex-start' : 'stretch',
+              gap: wide ? 64 : 40,
+            }}
+          >
+            <View style={{ flex: 1.1 }}>
+              <View style={s.badge}>
+                <View style={s.badgeDot} />
+                <Text style={[s.badgeText, F.body]}>
+                  v2.0 · Android build available
+                </Text>
+              </View>
+              <Text style={[s.h1, F.body, !wide && s.h1Mobile]}>
+                Campus attendance without the paper sheets.
+              </Text>
+              <Text style={[s.lead, F.body]}>
+                TMC Connect records event attendance with a QR scan backed by
+                GPS. Students check in from their phones. Organizers get a
+                clean record in Firestore — no tallying.
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: 10,
+                }}
+              >
+                <Btn
+                  T={T}
+                  s={s}
+                  label='Download for Android'
+                  icon='logo-android'
+                  onPress={download}
+                />
+                <Btn
+                  T={T}
+                  s={s}
+                  label='See how it works'
+                  variant='secondary'
+                  onPress={() => goTo('how-it-works')}
+                />
+              </View>
+              <Text style={[s.heroMeta, F.body]}>
+                v2.0.1 · APK via GitHub · Free for TMC use
+              </Text>
+            </View>
+            <View
+              style={{
+                flex: 1,
+                alignItems: wide ? 'flex-end' : 'center',
+              }}
+            >
+              <EventCard T={T} s={s} />
+            </View>
+          </Wrap>
         </View>
 
-        {/* ─── About / CTA ─── */}
-        <View style={styles.aboutSection} nativeID='about'>
-          <View style={styles.blob3} />
-          <Text style={styles.sectionTag}>About TMC Connect</Text>
-          <Text style={styles.sectionHeading}>
-            Built by students,{'\n'}for the campus community.
-          </Text>
-          <Text style={styles.aboutBody}>
-            TMC Connect started as a thesis project to solve one of the most
-            persistent campus problems — unreliable attendance. Now it's a
-            full-featured platform covering event management, QR check-in, GPS
-            verification, and real-time reporting. Open for all departments.
-          </Text>
-          <View style={styles.aboutCTARow}>
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={handleDownload}
-            >
-              <Text style={styles.primaryBtnText}>Get TMC Connect →</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.secondaryBtn}
-              onPress={() => setLearnMoreVisible(true)}
-            >
-              <Text style={styles.secondaryBtnText}>Learn More</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Proof strip */}
+        <View style={s.strip}>
+          <Wrap
+            style={{
+              flexDirection: wide ? 'row' : 'column',
+              gap: wide ? 40 : 20,
+            }}
+          >
+            {PROOF.map((x, i) => (
+              <View
+                key={x.value}
+                style={[
+                  { flex: 1 },
+                  wide &&
+                    i > 0 && {
+                      borderLeftWidth: 1,
+                      borderLeftColor: T.line,
+                      paddingLeft: 40,
+                    },
+                ]}
+              >
+                <Text style={[s.stripValue, F.body]}>{x.value}</Text>
+                <Text style={[s.stripLabel, F.body]}>{x.label}</Text>
+              </View>
+            ))}
+          </Wrap>
         </View>
 
-        {/* ─── Contact ─── */}
-        <ContactSection />
+        {/* Features */}
+        <View style={s.sectionPaper} nativeID='features'>
+          <Wrap>
+            <View style={{ maxWidth: 640 }}>
+              <Eyebrow T={T} s={s}>
+                Features
+              </Eyebrow>
+              <Text style={[s.h2, F.body, { textAlign: 'left' }]}>
+                Built to hold up on event day
+              </Text>
+              <Text style={[s.sub, F.body, { textAlign: 'left' }]}>
+                The parts that matter when 200 students arrive at once: fast
+                check-in, verifiable presence, and records you can audit.
+              </Text>
+            </View>
+            <View style={{ height: 32 }} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+              {FEATURES.map((f) => (
+                <View key={f.title} style={s.card}>
+                  <View style={s.cardIcon}>
+                    <Ionicons name={f.icon} size={20} color={T.slate} />
+                  </View>
+                  <Text style={[s.cardTitle, F.body]}>{f.title}</Text>
+                  <Text style={[s.cardBody, F.body]}>{f.body}</Text>
+                </View>
+              ))}
+            </View>
+          </Wrap>
+        </View>
 
-        {/* ─── Footer ─── */}
-        <View style={styles.footer}>
-          <Image
-            source={require('../assets/images/Logo/TMC-Coonect-V.2.png')}
-            style={styles.logoImageBottom}
-            resizeMode='contain'
-          />
-          <Text style={styles.footerTagline}>
-            Empowering campus communities through smart attendance technology.
-          </Text>
-          <View style={styles.footerLinks}>
-            <Text style={styles.footerLink} onPress={handleDownload}>
-              Download
-            </Text>
-            <Text style={styles.footerDivider}>·</Text>
-            <Text
-              style={styles.footerLink}
-              onPress={() => Linking.openURL('https://github.com/CajesJM')}
+        {/* How it works */}
+        <View style={s.sectionWhite} nativeID='how-it-works'>
+          <Wrap>
+            <View style={{ maxWidth: 640 }}>
+              <Eyebrow T={T} s={s}>
+                How it works
+              </Eyebrow>
+              <Text style={[s.h2, F.body, { textAlign: 'left' }]}>
+                Three steps, no paperwork
+              </Text>
+            </View>
+            <View style={{ height: 32 }} />
+            <View
+              style={{
+                flexDirection: wide ? 'row' : 'column',
+                gap: wide ? 32 : 24,
+              }}
             >
-              GitHub
-            </Text>
-            <Text style={styles.footerDivider}>·</Text>
-            <Text
-              style={styles.footerLink}
-              onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}`)}
+              {STEPS.map((st) => (
+                <View key={st.n} style={{ flex: 1 }}>
+                  <View style={s.stepTop}>
+                    <Text style={[s.stepN, F.body]}>{st.n}</Text>
+                  </View>
+                  <Text style={[s.stepTitle, F.body]}>{st.title}</Text>
+                  <Text style={[s.stepBody, F.body]}>{st.body}</Text>
+                </View>
+              ))}
+            </View>
+          </Wrap>
+        </View>
+
+        {/* Roles */}
+        <View style={s.sectionPaper} nativeID='about'>
+          <Wrap>
+            <View style={{ maxWidth: 640 }}>
+              <Eyebrow T={T} s={s}>
+                Who it&apos;s for
+              </Eyebrow>
+              <Text style={[s.h2, F.body, { textAlign: 'left' }]}>
+                One system, three views
+              </Text>
+              <Text style={[s.sub, F.body, { textAlign: 'left' }]}>
+                Started as a thesis project to replace sign-up sheets. Now
+                open to every department and student organization.
+              </Text>
+            </View>
+            <View style={{ height: 32 }} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+              {ROLES.map((a) => (
+                <View key={a.who} style={[s.card, s.cardSolid]}>
+                  <View style={s.cardIcon}>
+                    <Ionicons name={a.icon} size={20} color={T.slate} />
+                  </View>
+                  <Text style={[s.cardTitle, F.body]}>{a.who}</Text>
+                  <Text style={[s.roleBlurb, F.body]}>{a.blurb}</Text>
+                  <View style={{ height: 12 }} />
+                  {a.points.map((p) => (
+                    <View key={p} style={s.checkRow}>
+                      <Ionicons
+                        name='checkmark'
+                        size={15}
+                        color={T.green}
+                        style={{ marginTop: 3 }}
+                      />
+                      <Text style={[s.cardBody, F.body, { flex: 1 }]}>{p}</Text>
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
+          </Wrap>
+        </View>
+
+        {/* FAQ */}
+        <View style={s.sectionWhite} nativeID='faq'>
+          <Wrap
+            style={{
+              flexDirection: wide ? 'row' : 'column',
+              gap: wide ? 64 : 24,
+              alignItems: wide ? 'flex-start' : 'stretch',
+            }}
+          >
+            <View style={{ flex: wide ? 0.85 : 1 }}>
+              <Eyebrow T={T} s={s}>
+                FAQ
+              </Eyebrow>
+              <Text style={[s.h2, F.body, { textAlign: 'left' }]}>
+                Common questions
+              </Text>
+              <Text style={[s.sub, F.body, { textAlign: 'left' }]}>
+                Can&apos;t find an answer?{' '}
+                <Text
+                  style={{ color: T.blue, fontWeight: '600' }}
+                  onPress={() => goTo('contact')}
+                >
+                  Send a message
+                </Text>
+                .
+              </Text>
+            </View>
+            <View style={{ flex: 1.4 }}>
+              <Faq T={T} s={s} />
+            </View>
+          </Wrap>
+        </View>
+
+        <Contact T={T} s={s} />
+
+        {/* Footer */}
+        <View style={s.footer}>
+          <Wrap>
+            <View
+              style={{
+                flexDirection: wide ? 'row' : 'column',
+                justifyContent: 'space-between',
+                gap: 24,
+              }}
             >
-              Contact
-            </Text>
-          </View>
-          <Text style={styles.footerCopy}>
-            © {new Date().getFullYear()} TMC Connect · All rights reserved
-          </Text>
+              <View style={{ maxWidth: 340 }}>
+                <View style={s.footLogo}>
+                  <Image
+                    source={LOGO}
+                    style={{ width: 112, height: 42 }}
+                    resizeMode='contain'
+                  />
+                </View>
+                <Text style={[s.footText, F.body]}>
+                  QR + GPS attendance for TMC campus events.
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 40 }}>
+                <View style={{ gap: 10 }}>
+                  <Text style={[s.footHead, F.body]}>Product</Text>
+                  <Text style={[s.footLink, F.body]} onPress={download}>
+                    Download APK
+                  </Text>
+                  <Text
+                    style={[s.footLink, F.body]}
+                    onPress={() => goTo('features')}
+                  >
+                    Features
+                  </Text>
+                  <Text
+                    style={[s.footLink, F.body]}
+                    onPress={() => goTo('faq')}
+                  >
+                    FAQ
+                  </Text>
+                </View>
+                <View style={{ gap: 10 }}>
+                  <Text style={[s.footHead, F.body]}>Project</Text>
+                  <Text
+                    style={[s.footLink, F.body]}
+                    onPress={() =>
+                      Linking.openURL(
+                        'https://github.com/CajesJM/CajesJm-tmc-connect'
+                      )
+                    }
+                  >
+                    GitHub
+                  </Text>
+                  <Text
+                    style={[s.footLink, F.body]}
+                    onPress={() => Linking.openURL(`mailto:${EMAIL}`)}
+                  >
+                    Contact
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <View style={s.footBottom}>
+              <Text style={[s.footSmall, F.body]}>
+                © {new Date().getFullYear()} TMC Connect · v2.0.1
+              </Text>
+              <Text style={[s.footSmall, F.body]}>
+                Expo · Firebase · Firestore
+              </Text>
+            </View>
+          </Wrap>
         </View>
       </ScrollView>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F0F7FF' },
+const makeStyles = (T: Theme) =>
+  StyleSheet.create({
+    nav: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 100,
+      backgroundColor:
+        T.white === '#FFFFFF' ? 'rgba(255,255,255,0.96)' : 'rgba(11,18,32,0.92)',
+      borderBottomWidth: 1,
+      borderBottomColor: T.line,
+    },
+    navBar: {
+      height: NAV_H,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 24,
+      width: '100%',
+      maxWidth: 1168,
+      alignSelf: 'center',
+    },
+    navLink: { color: T.slate, fontSize: 14, fontWeight: '500' },
+    mobileMenu: {
+      paddingHorizontal: 24,
+      backgroundColor: T.white,
+      borderTopWidth: 1,
+      borderTopColor: T.line,
+    },
+    mobileLink: {
+      paddingVertical: 13,
+      borderBottomWidth: 1,
+      borderBottomColor: T.line,
+    },
+    themeToggle: {
+      width: 38,
+      height: 38,
+      borderRadius: 9,
+      borderWidth: 1,
+      borderColor: T.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+    },
 
-  navWrapper: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-    backgroundColor: 'rgba(240,247,255,0.95)',
-    ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(16px)' } as any) : {}),
-    borderBottomWidth: 1,
-    borderBottomColor: '#DBEAFE',
-    shadowColor: '#1E40AF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-  },
-  logoImage: { width: 130, height: 100 },
-  logoImageBottom: { width: 160, height: 64 },
-  desktopNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: NAV_HEIGHT,
-    paddingHorizontal: 48,
-  },
-  mobileNavContainer: { overflow: 'hidden' },
-  mobileNavBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: NAV_HEIGHT,
-    paddingHorizontal: 20,
-  },
-  navLinks: { flexDirection: 'row', gap: 4 },
-  navLinkBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  navLinkText: { color: '#475569', fontSize: 14, fontWeight: '500' },
-  navCTA: {
-    backgroundColor: '#1D4ED8',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  navCTAText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  hamburger: { padding: 8 },
-  hamburgerIcon: { width: 24, height: 20, justifyContent: 'space-between' },
-  bar: { height: 2.5, backgroundColor: '#1E293B', borderRadius: 2 },
-  mobileMenu: {
-    overflow: 'hidden',
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingHorizontal: 20,
-  },
-  mobileMenuLink: {
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  mobileMenuLinkText: { color: '#334155', fontSize: 15, fontWeight: '500' },
-  mobileMenuCTA: {
-    backgroundColor: '#1D4ED8',
-    marginVertical: 16,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  scroll: { flex: 1 },
-  scrollContent: { paddingTop: NAV_HEIGHT },
+    hero: {
+      backgroundColor: T.white,
+      paddingVertical: 64,
+      paddingHorizontal: 24,
+    },
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 8,
+      backgroundColor: T.paper,
+      borderWidth: 1,
+      borderColor: T.line,
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      marginBottom: 20,
+    },
+    badgeDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: T.green,
+    },
+    badgeText: { fontSize: 13, fontWeight: '500', color: T.slate },
+    h1: {
+      fontSize: 44,
+      lineHeight: 50,
+      fontWeight: '700',
+      color: T.ink,
+      letterSpacing: -0.8,
+      marginBottom: 16,
+      maxWidth: 520,
+    },
+    h1Mobile: { fontSize: 34, lineHeight: 40 },
+    lead: {
+      fontSize: 16,
+      lineHeight: 26,
+      color: T.slate,
+      maxWidth: 500,
+      marginBottom: 28,
+    },
+    heroMeta: { fontSize: 13, color: T.faint, marginTop: 16 },
 
-  // Banner
-  systemBanner: {
-    backgroundColor: '#1D4ED8',
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-  },
-  bannerBadgeWrap: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  bannerBadge: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  bannerText: { color: '#BFDBFE', fontSize: 13, flex: 1 },
-  bannerLink: {
-    color: '#fff',
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-  },
+    btn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      borderRadius: 8,
+    },
+    btnPrimary: { backgroundColor: '#1D4ED8' },
+    btnSecondary: {
+      borderWidth: 1,
+      borderColor: T.faint,
+      backgroundColor: 'transparent',
+    },
+    btnText: { fontSize: 14, fontWeight: '600' },
 
-  // Hero
-  hero: {
-    backgroundColor: '#EFF6FF',
-    paddingTop: 64,
-    paddingBottom: 80,
-    paddingHorizontal: 24,
-    overflow: 'hidden',
-    minHeight: 600,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  heroWide: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 48,
-    paddingHorizontal: 64,
-  },
-  blob1: {
-    position: 'absolute',
-    width: 400,
-    height: 400,
-    borderRadius: 200,
-    backgroundColor: '#BFDBFE',
-    opacity: 0.4,
-    top: -80,
-    right: -120,
-  },
-  blob2: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: '#93C5FD',
-    opacity: 0.25,
-    bottom: 0,
-    left: -80,
-  },
-  heroInner: { maxWidth: 520, alignItems: 'center', zIndex: 1 },
-  heroInnerWide: { alignItems: 'flex-start', flex: 1 },
-  heroBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#DBEAFE',
-    borderWidth: 1,
-    borderColor: '#93C5FD',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    marginBottom: 22,
-    marginTop: -10,
-  },
-  heroBadgeDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#1D4ED8',
-  },
-  heroBadgeText: {
-    color: '#1D4ED8',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  heroHeadline: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: '#0F172A',
-    textAlign: 'center',
-    lineHeight: 50,
-    letterSpacing: -1.5,
-    marginBottom: 20,
-  },
-  heroHeadlineLg: { fontSize: 52, lineHeight: 62, textAlign: 'left' },
-  heroAccent: { color: '#1D4ED8' },
-  heroSubtitle: {
-    fontSize: 15,
-    color: '#475569',
-    textAlign: 'center',
-    lineHeight: 26,
-    maxWidth: 460,
-    marginBottom: 36,
-  },
-  heroCTAs: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
+    eventCard: {
+      width: '100%',
+      maxWidth: 360,
+      backgroundColor: T.paper === '#F8FAFC' ? '#FFFFFF' : '#111C33',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: T.line,
+      overflow: 'hidden',
+      ...(web
+        ? ({
+            boxShadow:
+              T.white === '#FFFFFF'
+                ? '0 1px 2px rgba(15,23,42,0.06), 0 12px 32px rgba(15,23,42,0.10)'
+                : '0 1px 2px rgba(0,0,0,0.4), 0 12px 32px rgba(0,0,0,0.45)',
+          } as any)
+        : { elevation: 3 }),
+    },
+    eventTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: T.paper,
+      borderBottomWidth: 1,
+      borderBottomColor: T.line,
+    },
+    traffic: { flexDirection: 'row', gap: 6 },
+    dot: { width: 9, height: 9, borderRadius: 5 },
+    eventTopText: { fontSize: 13, fontWeight: '600', color: T.slate },
+    eventBody: { padding: 20 },
+    eventKicker: {
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 1,
+      color: T.faint,
+      marginBottom: 8,
+    },
+    eventTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: T.ink,
+      letterSpacing: -0.3,
+    },
+    eventMeta: { fontSize: 13, color: T.mute, marginTop: 4 },
+    qrBox: {
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 20,
+      marginTop: 16,
+      backgroundColor: T.paper,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: T.line,
+      borderStyle: 'dashed',
+    },
+    qrCaption: { fontSize: 12, fontWeight: '600', color: T.slate },
+    statusRow: { marginTop: 14 },
+    statusPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: T.greenBg,
+      borderRadius: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    statusText: { color: T.green, fontSize: 13, fontWeight: '600' },
+    locRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 10,
+    },
+    locText: { fontSize: 12, color: T.green, fontWeight: '500' },
+    eventDivider: {
+      height: 1,
+      backgroundColor: T.line,
+      marginTop: 16,
+    },
+    eventFoot: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: 14,
+    },
+    eventFootText: { fontSize: 14, fontWeight: '600', color: T.ink },
 
-  // Buttons
-  primaryBtn: {
-    backgroundColor: '#1D4ED8',
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 12,
-    shadowColor: '#1D4ED8',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-  },
-  primaryBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  secondaryBtn: {
-    borderWidth: 1.5,
-    borderColor: '#93C5FD',
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-  },
-  secondaryBtnText: { color: '#1D4ED8', fontSize: 15, fontWeight: '600' },
+    strip: {
+      backgroundColor: T.white,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: T.line,
+      paddingVertical: 32,
+      paddingHorizontal: 24,
+    },
+    stripValue: { color: T.ink, fontSize: 15, fontWeight: '700' },
+    stripLabel: {
+      color: T.mute,
+      fontSize: 13,
+      lineHeight: 20,
+      marginTop: 4,
+      maxWidth: 320,
+    },
 
-  // Hero card
-  heroCard: {
-    marginTop: 48,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    width: '100%',
-    maxWidth: 320,
-    shadowColor: '#1E40AF',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.15,
-    shadowRadius: 40,
-    zIndex: 1,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  heroCardWide: { marginTop: 0, maxWidth: 340 },
-  heroCardHeader: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-    padding: 14,
-    backgroundColor: '#F8FAFC',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  heroCardTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-    marginLeft: 8,
-  },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  heroCardBody: { padding: 18, gap: 10 },
-  cardEventRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardEventDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#1D4ED8',
-  },
-  cardEvent: { fontSize: 13, fontWeight: '700', color: '#0F172A', flex: 1 },
-  cardDivider: { height: 1, backgroundColor: '#F1F5F9' },
-  cardStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardStatusBadge: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  cardStatusText: { fontSize: 12, color: '#16A34A', fontWeight: '700' },
-  cardTime: { fontSize: 12, color: '#94A3B8', fontWeight: '500' },
-  cardVenue: { fontSize: 11, color: '#94A3B8' },
-  cardQRBox: {
-    backgroundColor: '#EFF6FF',
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  qrGrid: { flexDirection: 'row', flexWrap: 'wrap', width: 64, gap: 3 },
-  qrCell: { width: 12, height: 12, borderRadius: 2 },
-  cardQRLabel: { fontSize: 10, color: '#64748B', fontWeight: '500' },
-  cardGPSRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  gpsDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' },
-  cardGPS: { fontSize: 11, color: '#16A34A', fontWeight: '600', flex: 1 },
+    sectionPaper: {
+      backgroundColor: T.paper,
+      paddingVertical: 72,
+      paddingHorizontal: 24,
+    },
+    sectionWhite: {
+      backgroundColor: T.white,
+      paddingVertical: 72,
+      paddingHorizontal: 24,
+    },
+    eyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      marginBottom: 12,
+    },
+    h2: {
+      fontSize: 28,
+      lineHeight: 36,
+      fontWeight: '700',
+      color: T.ink,
+      letterSpacing: -0.4,
+      maxWidth: 640,
+    },
+    sub: {
+      fontSize: 15,
+      lineHeight: 25,
+      color: T.mute,
+      maxWidth: 560,
+      marginTop: 12,
+    },
 
-  // Stats
-  statsBanner: {
-    backgroundColor: '#1D4ED8',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    paddingVertical: 36,
-    paddingHorizontal: 24,
-    gap: 24,
-  },
-  statItem: { alignItems: 'center', minWidth: 110 },
-  statValue: {
-    color: '#fff',
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  statLabel: {
-    color: '#93C5FD',
-    fontSize: 12,
-    marginTop: 4,
-    fontWeight: '500',
-  },
+    card: {
+      flexBasis: 300,
+      flexGrow: 1,
+      backgroundColor: T.paper === '#F8FAFC' ? '#FFFFFF' : '#111C33',
+      borderRadius: 12,
+      padding: 22,
+      borderWidth: 1,
+      borderColor: T.line,
+    },
+    cardSolid: {},
+    cardIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 9,
+      backgroundColor: T.iconChip,
+      borderWidth: 1,
+      borderColor: T.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 14,
+    },
+    cardTitle: { fontSize: 15, fontWeight: '700', color: T.ink, marginBottom: 6 },
+    cardBody: { fontSize: 14, lineHeight: 22, color: T.mute },
+    roleBlurb: { fontSize: 13, lineHeight: 20, color: T.slate, marginBottom: 2 },
+    checkRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
 
-  // Features
-  section: {
-    paddingVertical: 80,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-  },
-  sectionTag: {
-    color: '#1D4ED8',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 2.5,
-    textTransform: 'uppercase',
-    marginBottom: 12,
-  },
-  sectionHeading: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#0F172A',
-    textAlign: 'center',
-    letterSpacing: -0.8,
-    marginBottom: 14,
-  },
-  sectionSub: {
-    color: '#64748B',
-    fontSize: 15,
-    textAlign: 'center',
-    maxWidth: 520,
-    lineHeight: 24,
-    marginBottom: 48,
-  },
-  featuresGrid: { width: '100%', maxWidth: 960, gap: 16 },
-  featuresGridDesktop: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  featureCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    width: '100%',
-    maxWidth: 284,
-    shadowColor: '#1E40AF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-  },
-  featureIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  featureTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 8,
-  },
-  featureDesc: { fontSize: 13, color: '#64748B', lineHeight: 21 },
+    stepTop: {
+      borderTopWidth: 2,
+      borderTopColor: T.ink,
+      paddingTop: 14,
+      marginBottom: 12,
+    },
+    stepN: {
+      fontSize: 13,
+      fontWeight: '700',
+      letterSpacing: 1,
+      color: T.faint,
+    },
+    stepTitle: { fontSize: 16, fontWeight: '700', color: T.ink, marginBottom: 8 },
+    stepBody: { fontSize: 14, lineHeight: 23, color: T.mute, maxWidth: 340 },
 
-  // How it works
-  howSection: {
-    backgroundColor: '#0F172A',
-    paddingVertical: 80,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
-  howContent: { maxWidth: 560, width: '100%' },
-  sectionHeadingLight: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    letterSpacing: -0.8,
-    marginBottom: 40,
-  },
-  steps: { gap: 0 },
-  stepRow: { flexDirection: 'row', gap: 20 },
-  stepLeft: { alignItems: 'center', width: 44 },
-  stepCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#1D4ED8',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepNumber: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  stepLine: {
-    flex: 1,
-    width: 2,
-    backgroundColor: '#1E3A5F',
-    marginVertical: 4,
-    minHeight: 40,
-    borderRadius: 1,
-  },
-  stepContent: { flex: 1, paddingBottom: 36 },
-  stepTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    marginBottom: 8,
-    lineHeight: 24,
-  },
-  stepBody: { fontSize: 14, color: '#94A3B8', lineHeight: 22 },
+    faqItem: { borderBottomWidth: 1, borderBottomColor: T.line },
+    faqHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 18,
+      gap: 16,
+    },
+    faqQ: { flex: 1, fontSize: 15, fontWeight: '600', color: T.ink },
+    faqA: {
+      fontSize: 14,
+      lineHeight: 23,
+      color: T.mute,
+      paddingBottom: 18,
+      maxWidth: 640,
+    },
 
-  // About
-  aboutSection: {
-    backgroundColor: '#EFF6FF',
-    paddingVertical: 80,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  blob3: {
-    position: 'absolute',
-    width: 480,
-    height: 480,
-    borderRadius: 240,
-    backgroundColor: '#BFDBFE',
-    opacity: 0.35,
-    top: -120,
-    right: -160,
-  },
-  aboutBody: {
-    fontSize: 15,
-    color: '#475569',
-    textAlign: 'center',
-    maxWidth: 560,
-    lineHeight: 26,
-    marginBottom: 36,
-    zIndex: 1,
-  },
-  aboutCTARow: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    zIndex: 1,
-  },
+    contactRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: T.line,
+    },
+    contactLabel: { fontSize: 12, color: T.mute, marginBottom: 2 },
+    contactValue: { fontSize: 14, fontWeight: '600', color: T.ink },
+    reqBox: {
+      marginTop: 24,
+      backgroundColor: T.paper === '#F8FAFC' ? '#FFFFFF' : '#111C33',
+      borderWidth: 1,
+      borderColor: T.line,
+      borderRadius: 12,
+      padding: 18,
+    },
+    reqTitle: { fontSize: 13, fontWeight: '700', color: T.ink, marginBottom: 10 },
+    reqRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+    reqText: { fontSize: 13, color: T.slate },
 
-  // Footer
-  footer: {
-    backgroundColor: '#0F172A',
-    paddingVertical: 40,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    gap: 12,
-  },
-  footerTagline: {
-    color: '#475569',
-    fontSize: 13,
-    textAlign: 'center',
-    maxWidth: 380,
-    lineHeight: 22,
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 4,
-  },
-  footerLink: { color: '#64748B', fontSize: 13, fontWeight: '600' },
-  footerDivider: { color: '#334155', fontSize: 13 },
-  footerCopy: { color: '#334155', fontSize: 12 },
-})
+    form: {
+      flex: 1.2,
+      minWidth: 280,
+      backgroundColor: T.paper === '#F8FAFC' ? '#FFFFFF' : '#111C33',
+      borderRadius: 12,
+      padding: 26,
+      borderWidth: 1,
+      borderColor: T.line,
+      alignSelf: 'flex-start',
+      width: '100%',
+      maxWidth: 520,
+    },
+    formTitle: { fontSize: 16, fontWeight: '700', color: T.ink },
+    formSub: { fontSize: 13, color: T.mute, marginTop: 4 },
+    label: { fontSize: 13, fontWeight: '600', color: T.slate, marginBottom: 6 },
+    input: {
+      borderWidth: 1,
+      borderColor: T.line,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: T.ink,
+      backgroundColor: T.inputBg,
+    },
+
+    footer: {
+      backgroundColor: T.navy,
+      paddingVertical: 48,
+      paddingHorizontal: 24,
+    },
+    footLogo: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      alignSelf: 'flex-start',
+      marginBottom: 14,
+    },
+    footText: { color: '#94A3B8', fontSize: 13, lineHeight: 20 },
+    footHead: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+    },
+    footLink: { color: '#CBD5E1', fontSize: 14 },
+    footBottom: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(255,255,255,0.12)',
+      marginTop: 32,
+      paddingTop: 20,
+    },
+    footSmall: { color: '#64748B', fontSize: 12 },
+  })
 
 export default TMCConnectLanding

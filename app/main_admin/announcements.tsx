@@ -533,7 +533,6 @@ export default function MainAdminAnnouncements() {
         updatedAt: serverTimestamp(),
       })
 
-      // Notify students about the update
       const studentsQuery = query(
         collection(db, 'users'),
         where('role', '==', 'student')
